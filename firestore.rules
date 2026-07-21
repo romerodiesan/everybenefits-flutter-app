@@ -1,0 +1,58 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function callerRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && callerRole() == 'admin';
+    }
+
+    function isBootstrapRole() {
+      return request.resource.data.role in ['guest', 'student', 'agent'];
+    }
+
+    function isProtectedRole(role) {
+      return role in ['instructor', 'admin'];
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+
+      // First profile create: owner may only set guest|student|agent.
+      allow create: if isOwner(uid)
+        && isBootstrapRole()
+        && request.resource.data.uid == uid;
+
+      // Owner can update own profile. Role may move among guest/student/agent,
+      // but never into or out of instructor/admin (except via admin rule).
+      allow update: if isOwner(uid)
+        && request.resource.data.uid == resource.data.uid
+        && !isProtectedRole(request.resource.data.role)
+        && (
+          request.resource.data.role == resource.data.role
+          || !isProtectedRole(resource.data.role)
+        );
+
+      // Admins can update any user (including role changes).
+      allow update: if isAdmin();
+
+      allow delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
