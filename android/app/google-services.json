@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "978334689853",
+    "project_id": "every-insurance",
+    "storage_bucket": "every-insurance.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:978334689853:android:da04393db288567a7d1854",
+        "android_client_info": {
+          "package_name": "com.everybenefits.everyinsurance"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "978334689853-gtsd6137qfiun197dvd5fno8agc5f3mv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.everybenefits.everyinsurance",
+            "certificate_hash": "cbedb57bec48d18d7a994620c474f7ebce97c67d"
+          }
+        },
+        {
+          "client_id": "978334689853-kfpmt1vo60khftpg1mieu5hggk4o506c.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDxEn-G4MK7g2kl8joAiztg3M-WqUVXH8g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "978334689853-kfpmt1vo60khftpg1mieu5hggk4o506c.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "978334689853-tkm6t93ck27fnq16prpg4pshst6a1q1g.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.everybenefits.everyinsurance"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
