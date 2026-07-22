@@ -86,7 +86,7 @@ class _TagChip extends StatelessWidget {
       label,
       style: theme.textTheme.bodyMedium?.copyWith(
         fontSize: 12,
-        color: AppColors.accent,
+        color: AppColors.brandOf(context),
         fontWeight: FontWeight.w700,
       ),
     );

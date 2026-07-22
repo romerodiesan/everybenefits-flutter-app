@@ -45,7 +45,7 @@ class ForumAvatar extends StatelessWidget {
           : Text(
               _initials,
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.accent,
+                    color: AppColors.brandOf(context),
                     fontSize: size * 0.38,
                     fontWeight: FontWeight.w800,
                   ),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
-import '../../app/widgets/mesh_background.dart';
+import '../../app/widgets/pulse_chrome.dart';
 import '../../users/users.dart';
 import 'forum_repository.dart';
 import 'forum_tags.dart';
@@ -87,12 +87,10 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(
-          builder: (_) => MeshBackground(
-            child: ThreadDetailScreen(
-              threadId: thread.id,
-              profile: widget.profile,
-              forumRepository: widget.forumRepository,
-            ),
+          builder: (_) => ThreadDetailScreen(
+            threadId: thread.id,
+            profile: widget.profile,
+            forumRepository: widget.forumRepository,
           ),
         ),
       );
@@ -106,7 +104,8 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
     }
   }
 
-  InputDecoration _decoration({
+  InputDecoration _decoration(
+    BuildContext context, {
     required String label,
     String? hint,
     bool alignHint = false,
@@ -117,9 +116,12 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
       alignLabelWithHint: alignHint,
       border: const OutlineInputBorder(borderRadius: _radius),
       enabledBorder: const OutlineInputBorder(borderRadius: _radius),
-      focusedBorder: const OutlineInputBorder(
+      focusedBorder: OutlineInputBorder(
         borderRadius: _radius,
-        borderSide: BorderSide(color: AppColors.accent, width: 1.4),
+        borderSide: BorderSide(
+          color: AppColors.brandOf(context),
+          width: 1.4,
+        ),
       ),
     );
   }
@@ -129,14 +131,12 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
 
-    return MeshBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Nueva publicación')),
-        body: SafeArea(
-          child: Form(
-            key: _formKey,
-            child: ListView(
+    return PulseScaffold(
+      appBar: AppBar(title: const Text('Nueva publicación')),
+      body: SafeArea(
+        child: Form(
+          key: _formKey,
+          child: ListView(
               padding: const EdgeInsets.fromLTRB(
                 AppSpacing.lg,
                 AppSpacing.sm,
@@ -149,6 +149,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                   textCapitalization: TextCapitalization.sentences,
                   textInputAction: TextInputAction.next,
                   decoration: _decoration(
+                    context,
                     label: 'Título',
                     hint: 'Un encabezado claro',
                   ),
@@ -166,6 +167,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                   minLines: 8,
                   maxLines: 14,
                   decoration: _decoration(
+                    context,
                     label: '¿Qué quieres compartir?',
                     hint: 'Escribe tu publicación…',
                     alignHint: true,
@@ -195,6 +197,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                         textInputAction: TextInputAction.done,
                         onSubmitted: (_) => _addTag(),
                         decoration: _decoration(
+                          context,
                           label: 'Nuevo tag',
                           hint: 'escribe y agrega',
                         ),
@@ -235,7 +238,6 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
             ),
           ),
         ),
-      ),
     );
   }
 }

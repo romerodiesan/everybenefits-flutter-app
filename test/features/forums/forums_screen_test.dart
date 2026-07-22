@@ -4,8 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'package:every_benefits/app/theme.dart';
-import 'package:every_benefits/app/widgets/glass_card.dart';
-import 'package:every_benefits/app/widgets/mesh_background.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/forums/forums_screen.dart';
@@ -40,6 +38,21 @@ class _MemoryForumStore implements ForumStore {
   }
 
   @override
+  Stream<RelevanceVote> watchThreadVote({
+    required String threadId,
+    required String uid,
+  }) =>
+      Stream.value(RelevanceVote.none);
+
+  @override
+  Stream<RelevanceVote> watchReplyVote({
+    required String threadId,
+    required String replyId,
+    required String uid,
+  }) =>
+      Stream.value(RelevanceVote.none);
+
+  @override
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,
@@ -66,19 +79,40 @@ class _MemoryForumStore implements ForumStore {
     required String threadId,
     required String replyId,
   }) async {}
+
+  @override
+  Future<void> setThreadRelevance({
+    required String threadId,
+    required String uid,
+    required RelevanceVote vote,
+  }) async {}
+
+  @override
+  Future<void> setReplyRelevance({
+    required String threadId,
+    required String replyId,
+    required String uid,
+    required RelevanceVote vote,
+  }) async {}
 }
 
-ForumThread _thread() {
+ForumThread _thread({
+  String id = 't1',
+  String title = 'Bienvenidos a la comunidad',
+  String body = 'Este es el primer hilo de prueba para agentes.',
+  int score = 0,
+}) {
   final now = DateTime.utc(2024, 1, 1);
   return ForumThread(
-    id: 't1',
+    id: id,
     tags: const ['general', 'ventas'],
-    title: 'Bienvenidos a la comunidad',
-    body: 'Este es el primer hilo de prueba para agentes.',
+    title: title,
+    body: body,
     authorId: 'a1',
     authorName: 'Ada',
     authorRole: UserRole.agent,
     replyCount: 3,
+    score: score,
     createdAt: now,
     updatedAt: now,
     lastReplyAt: now,
@@ -105,11 +139,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildEveryInsuranceTheme(Brightness.dark),
-        home: MeshBackground(
-          child: ForumsScreen(
-            profile: _profile(role: UserRole.agent),
-            forumRepository: repo,
-          ),
+        home: ForumsScreen(
+          profile: _profile(role: UserRole.agent),
+          forumRepository: repo,
         ),
       ),
     );
@@ -117,13 +149,11 @@ void main() {
     await tester.pump();
 
     expect(find.text('Bienvenidos a la comunidad'), findsOneWidget);
-    expect(find.textContaining('¿Qué estás pensando?'), findsOneWidget);
-    expect(find.text('3 respuestas'), findsOneWidget);
-    expect(find.byType(GlassCard), findsWidgets);
+    expect(find.textContaining('¿Cuál es tu pregunta'), findsOneWidget);
+    expect(find.text('Relevancia'), findsWidgets);
+    expect(find.text('Chats'), findsWidgets);
     expect(find.byType(FloatingActionButton), findsOneWidget);
-    expect(find.byTooltip('Nueva publicación'), findsOneWidget);
-    expect(find.text('#general'), findsOneWidget);
-    expect(find.text('#ventas'), findsOneWidget);
+    expect(find.byTooltip('Buscar preguntas'), findsOneWidget);
   });
 
   testWidgets('guest is read-only without composer or FAB', (tester) async {
@@ -132,21 +162,51 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildEveryInsuranceTheme(Brightness.dark),
-        home: MeshBackground(
-          child: ForumsScreen(
-            profile: _profile(role: UserRole.guest, anonymous: true),
-            forumRepository: repo,
-          ),
+        home: ForumsScreen(
+          profile: _profile(role: UserRole.guest, anonymous: true),
+          forumRepository: repo,
         ),
       ),
     );
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Bienvenidos a la comunidad'), findsOneWidget);
-    expect(find.textContaining('¿Qué estás pensando?'), findsNothing);
+    expect(find.textContaining('¿Cuál es tu pregunta?'), findsNothing);
     expect(find.byType(FloatingActionButton), findsNothing);
     expect(find.textContaining('Modo lectura'), findsOneWidget);
+  });
+
+  testWidgets('search filters previously asked questions', (tester) async {
+    final repo = ForumRepository(
+      store: _MemoryForumStore([
+        _thread(id: 't1', title: 'Cómo renovar NPN', body: 'Pasos oficiales'),
+        _thread(
+          id: 't2',
+          title: 'Cierre de ventas',
+          body: 'Tips de pipeline',
+        ),
+      ]),
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildEveryInsuranceTheme(Brightness.dark),
+        home: ForumsScreen(
+          profile: _profile(role: UserRole.agent),
+          forumRepository: repo,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.byTooltip('Buscar preguntas'));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byType(TextField).first, 'NPN');
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cómo renovar NPN'), findsOneWidget);
+    expect(find.text('Cierre de ventas'), findsNothing);
   });
 
   testWidgets('tapping post opens conversation detail', (tester) async {
@@ -155,11 +215,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildEveryInsuranceTheme(Brightness.dark),
-        home: MeshBackground(
-          child: ForumsScreen(
-            profile: _profile(role: UserRole.agent),
-            forumRepository: repo,
-          ),
+        home: ForumsScreen(
+          profile: _profile(role: UserRole.agent),
+          forumRepository: repo,
         ),
       ),
     );
@@ -173,7 +231,32 @@ void main() {
       find.text('Este es el primer hilo de prueba para agentes.'),
       findsOneWidget,
     );
-    expect(find.text('3 comentarios'), findsOneWidget);
-    expect(find.textContaining('Escribe un comentario'), findsOneWidget);
+    expect(find.text('3 respuestas'), findsOneWidget);
+    expect(find.textContaining('Escribe una respuesta'), findsOneWidget);
+    expect(find.text('Chats'), findsWidgets);
+  });
+
+  testWidgets('share opens chat picker sheet', (tester) async {
+    final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: buildEveryInsuranceTheme(Brightness.dark),
+        home: ForumsScreen(
+          profile: _profile(role: UserRole.agent),
+          forumRepository: repo,
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Chats').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Compartir en chat'), findsOneWidget);
+    expect(find.text('Equipo Ventas CR'), findsOneWidget);
+    expect(find.textContaining('Chat privado'), findsWidgets);
+    expect(find.text('Bienvenidos a la comunidad'), findsWidgets);
   });
 }

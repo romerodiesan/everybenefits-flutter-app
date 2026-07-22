@@ -13,6 +13,17 @@ abstract class ForumStore {
 
   Stream<List<ForumReply>> watchReplies(String threadId);
 
+  Stream<RelevanceVote> watchThreadVote({
+    required String threadId,
+    required String uid,
+  });
+
+  Stream<RelevanceVote> watchReplyVote({
+    required String threadId,
+    required String replyId,
+    required String uid,
+  });
+
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,
@@ -32,6 +43,20 @@ abstract class ForumStore {
     required String threadId,
     required String replyId,
   });
+
+  /// Sets the actor's relevance vote. Passing [RelevanceVote.none] clears it.
+  Future<void> setThreadRelevance({
+    required String threadId,
+    required String uid,
+    required RelevanceVote vote,
+  });
+
+  Future<void> setReplyRelevance({
+    required String threadId,
+    required String replyId,
+    required String uid,
+    required RelevanceVote vote,
+  });
 }
 
 class FirestoreForumStore implements ForumStore {
@@ -45,6 +70,19 @@ class FirestoreForumStore implements ForumStore {
 
   CollectionReference<Map<String, dynamic>> _replies(String threadId) =>
       _threads.doc(threadId).collection('replies');
+
+  DocumentReference<Map<String, dynamic>> _threadVote(
+    String threadId,
+    String uid,
+  ) =>
+      _threads.doc(threadId).collection('votes').doc(uid);
+
+  DocumentReference<Map<String, dynamic>> _replyVote(
+    String threadId,
+    String replyId,
+    String uid,
+  ) =>
+      _replies(threadId).doc(replyId).collection('votes').doc(uid);
 
   @override
   Stream<List<ForumThread>> watchThreads({String? tag}) {
@@ -74,13 +112,34 @@ class FirestoreForumStore implements ForumStore {
 
   @override
   Stream<List<ForumReply>> watchReplies(String threadId) {
-    return _replies(threadId)
-        .orderBy('createdAt')
-        .snapshots()
-        .map((snapshot) {
-      return snapshot.docs
+    return _replies(threadId).snapshots().map((snapshot) {
+      final replies = snapshot.docs
           .map((doc) => ForumReply.fromMap(threadId, doc.id, doc.data()))
           .toList();
+      return sortRepliesByRelevance(replies);
+    });
+  }
+
+  @override
+  Stream<RelevanceVote> watchThreadVote({
+    required String threadId,
+    required String uid,
+  }) {
+    return _threadVote(threadId, uid).snapshots().map((snap) {
+      final value = (snap.data()?['value'] as num?)?.toInt();
+      return RelevanceVote.fromValue(value);
+    });
+  }
+
+  @override
+  Stream<RelevanceVote> watchReplyVote({
+    required String threadId,
+    required String replyId,
+    required String uid,
+  }) {
+    return _replyVote(threadId, replyId, uid).snapshots().map((snap) {
+      final value = (snap.data()?['value'] as num?)?.toInt();
+      return RelevanceVote.fromValue(value);
     });
   }
 
@@ -104,6 +163,7 @@ class FirestoreForumStore implements ForumStore {
       authorPhotoUrl: author.photoUrl,
       authorRole: author.role,
       replyCount: 0,
+      score: 0,
       createdAt: now,
       updatedAt: now,
       lastReplyAt: now,
@@ -117,6 +177,7 @@ class FirestoreForumStore implements ForumStore {
       'authorPhotoUrl': thread.authorPhotoUrl,
       'authorRole': thread.authorRole.wireValue,
       'replyCount': 0,
+      'score': 0,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'lastReplyAt': FieldValue.serverTimestamp(),
@@ -140,6 +201,7 @@ class FirestoreForumStore implements ForumStore {
       authorName: author.headlineName,
       authorPhotoUrl: author.photoUrl,
       authorRole: author.role,
+      score: 0,
       createdAt: now,
       updatedAt: now,
     );
@@ -151,6 +213,7 @@ class FirestoreForumStore implements ForumStore {
       'authorName': reply.authorName,
       'authorPhotoUrl': reply.authorPhotoUrl,
       'authorRole': reply.authorRole.wireValue,
+      'score': 0,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
     });
@@ -168,7 +231,15 @@ class FirestoreForumStore implements ForumStore {
     final replies = await _replies(threadId).get();
     final batch = _firestore.batch();
     for (final doc in replies.docs) {
+      final votes = await doc.reference.collection('votes').get();
+      for (final vote in votes.docs) {
+        batch.delete(vote.reference);
+      }
       batch.delete(doc.reference);
+    }
+    final threadVotes = await _threads.doc(threadId).collection('votes').get();
+    for (final vote in threadVotes.docs) {
+      batch.delete(vote.reference);
     }
     batch.delete(_threads.doc(threadId));
     await batch.commit();
@@ -179,13 +250,73 @@ class FirestoreForumStore implements ForumStore {
     required String threadId,
     required String replyId,
   }) async {
+    final voteDocs =
+        await _replies(threadId).doc(replyId).collection('votes').get();
     final batch = _firestore.batch();
+    for (final vote in voteDocs.docs) {
+      batch.delete(vote.reference);
+    }
     batch.delete(_replies(threadId).doc(replyId));
     batch.update(_threads.doc(threadId), {
       'replyCount': FieldValue.increment(-1),
       'updatedAt': FieldValue.serverTimestamp(),
     });
     await batch.commit();
+  }
+
+  Future<void> _applyVote({
+    required DocumentReference<Map<String, dynamic>> target,
+    required DocumentReference<Map<String, dynamic>> voteRef,
+    required RelevanceVote next,
+  }) async {
+    await _firestore.runTransaction((tx) async {
+      final voteSnap = await tx.get(voteRef);
+      final previous = RelevanceVote.fromValue(
+        (voteSnap.data()?['value'] as num?)?.toInt(),
+      );
+      final delta = next.value - previous.value;
+      if (delta == 0) return;
+
+      if (next == RelevanceVote.none) {
+        tx.delete(voteRef);
+      } else {
+        tx.set(voteRef, {
+          'value': next.value,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      }
+      tx.update(target, {
+        'score': FieldValue.increment(delta),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    });
+  }
+
+  @override
+  Future<void> setThreadRelevance({
+    required String threadId,
+    required String uid,
+    required RelevanceVote vote,
+  }) {
+    return _applyVote(
+      target: _threads.doc(threadId),
+      voteRef: _threadVote(threadId, uid),
+      next: vote,
+    );
+  }
+
+  @override
+  Future<void> setReplyRelevance({
+    required String threadId,
+    required String replyId,
+    required String uid,
+    required RelevanceVote vote,
+  }) {
+    return _applyVote(
+      target: _replies(threadId).doc(replyId),
+      voteRef: _replyVote(threadId, replyId, uid),
+      next: vote,
+    );
   }
 }
 
@@ -204,6 +335,23 @@ class ForumRepository {
 
   Stream<List<ForumReply>> watchReplies(String threadId) =>
       _store.watchReplies(threadId);
+
+  Stream<RelevanceVote> watchThreadVote({
+    required String threadId,
+    required String uid,
+  }) =>
+      _store.watchThreadVote(threadId: threadId, uid: uid);
+
+  Stream<RelevanceVote> watchReplyVote({
+    required String threadId,
+    required String replyId,
+    required String uid,
+  }) =>
+      _store.watchReplyVote(
+        threadId: threadId,
+        replyId: replyId,
+        uid: uid,
+      );
 
   Future<ForumThread> createThread({
     required List<String> tags,
@@ -260,7 +408,8 @@ class ForumRepository {
     required ForumThread thread,
     required UserProfile actor,
   }) {
-    final allowed = actor.role == UserRole.admin || thread.authorId == actor.uid;
+    final allowed =
+        actor.role == UserRole.admin || thread.authorId == actor.uid;
     if (!allowed) {
       throw StateError('No puedes eliminar este hilo.');
     }
@@ -276,5 +425,48 @@ class ForumRepository {
       throw StateError('No puedes eliminar esta respuesta.');
     }
     return _store.deleteReply(threadId: reply.threadId, replyId: reply.id);
+  }
+
+  Future<void> setThreadRelevance({
+    required ForumThread thread,
+    required UserProfile actor,
+    required RelevanceVote vote,
+  }) {
+    if (!canParticipateInForums(
+      role: actor.role,
+      isAnonymous: actor.isAnonymous,
+    )) {
+      throw StateError('Regístrate para marcar relevancia.');
+    }
+    if (thread.authorId == actor.uid) {
+      throw StateError('No puedes votar tu propia pregunta.');
+    }
+    return _store.setThreadRelevance(
+      threadId: thread.id,
+      uid: actor.uid,
+      vote: vote,
+    );
+  }
+
+  Future<void> setReplyRelevance({
+    required ForumReply reply,
+    required UserProfile actor,
+    required RelevanceVote vote,
+  }) {
+    if (!canParticipateInForums(
+      role: actor.role,
+      isAnonymous: actor.isAnonymous,
+    )) {
+      throw StateError('Regístrate para marcar relevancia.');
+    }
+    if (reply.authorId == actor.uid) {
+      throw StateError('No puedes votar tu propia respuesta.');
+    }
+    return _store.setReplyRelevance(
+      threadId: reply.threadId,
+      replyId: reply.id,
+      uid: actor.uid,
+      vote: vote,
+    );
   }
 }

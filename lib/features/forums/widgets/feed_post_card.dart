@@ -2,31 +2,38 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
-import '../../../app/widgets/glass_card.dart';
+import '../../../app/widgets/pulse_chrome.dart';
 import '../forum_models.dart';
 import 'forum_avatar.dart';
 import 'forum_meta_line.dart';
 import 'forum_tag_wrap.dart';
+import 'relevance_controls.dart';
 
-/// Spaced social-feed card for a community thread.
+/// Minimal social-feed card: author, body, tags, relevance / comment / share.
 class FeedPostCard extends StatelessWidget {
   const FeedPostCard({
     super.key,
     required this.thread,
     required this.onTap,
+    this.onComment,
     this.onTagTap,
+    this.onShare,
+    this.onRelevance,
   });
 
   final ForumThread thread;
   final VoidCallback onTap;
+  final VoidCallback? onComment;
   final ValueChanged<String>? onTagTap;
+  final VoidCallback? onShare;
+  final VoidCallback? onRelevance;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final body = thread.body.trim().replaceAll(RegExp(r'\s+'), ' ');
-    final repliesLabel = thread.replyCount == 0
+    final commentsLabel = thread.replyCount == 0
         ? 'Responder'
         : thread.replyCount == 1
             ? '1 respuesta'
@@ -34,7 +41,7 @@ class FeedPostCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: GlassCard(
+      child: PulseSheet(
         onTap: onTap,
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -46,7 +53,7 @@ class FeedPostCard extends StatelessWidget {
                 ForumAvatar(
                   name: thread.authorName,
                   photoUrl: thread.authorPhotoUrl,
-                  size: 48,
+                  size: 44,
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
@@ -59,6 +66,20 @@ class FeedPostCard extends StatelessWidget {
                     dense: true,
                   ),
                 ),
+                if (thread.score != 0)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Text(
+                      thread.score > 0
+                          ? '+${thread.score}'
+                          : '${thread.score}',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        color: AppColors.brandOf(context),
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
               ],
             ),
             const SizedBox(height: AppSpacing.sm),
@@ -74,13 +95,12 @@ class FeedPostCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 body,
-                maxLines: 3,
+                maxLines: 4,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: colors.ink.withValues(alpha: 0.88),
                   height: 1.45,
                   fontSize: 15,
-                  fontWeight: FontWeight.w500,
                 ),
               ),
             ],
@@ -93,27 +113,74 @@ class FeedPostCard extends StatelessWidget {
               ),
             ],
             const SizedBox(height: AppSpacing.sm),
-            Divider(height: 1, color: colors.glassBorder),
-            const SizedBox(height: 8),
+            Divider(height: 1, color: colors.border),
+            const SizedBox(height: 4),
             Row(
               children: [
-                Icon(
-                  Icons.chat_bubble_outline_rounded,
-                  size: 18,
-                  color: AppColors.accent.withValues(alpha: 0.9),
-                ),
-                const SizedBox(width: 6),
-                Text(
-                  repliesLabel,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: AppColors.accent,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
+                Expanded(
+                  child: RelevanceScoreChip(
+                    score: thread.score,
+                    onTap: onRelevance ?? onTap,
                   ),
+                ),
+                _Action(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: commentsLabel,
+                  onTap: onComment ?? onTap,
+                ),
+                _Action(
+                  icon: Icons.forum_outlined,
+                  label: 'Chats',
+                  onTap: onShare ?? () {},
                 ),
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _Action extends StatelessWidget {
+  const _Action({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Expanded(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 16, color: colors.muted),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: colors.muted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

@@ -78,7 +78,7 @@ class ForumMetaLine extends StatelessWidget {
           TextSpan(
             text: authorName,
             style: TextStyle(
-              color: emphasizeAuthor ? AppColors.accent : null,
+              color: emphasizeAuthor ? AppColors.brandOf(context) : null,
               fontWeight: FontWeight.w700,
             ),
           ),

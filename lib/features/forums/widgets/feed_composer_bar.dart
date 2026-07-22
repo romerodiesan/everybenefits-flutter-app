@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
-import '../../../app/widgets/glass_card.dart';
+import '../../../app/widgets/pulse_chrome.dart';
 import '../../../users/user_profile.dart';
 import 'forum_avatar.dart';
 
@@ -32,7 +32,7 @@ class FeedComposerBar extends StatelessWidget {
         AppSpacing.md,
         AppSpacing.sm,
       ),
-      child: GlassCard(
+      child: PulseSheet(
         onTap: onTap,
         padding: const EdgeInsets.symmetric(
           horizontal: AppSpacing.md,
@@ -48,7 +48,7 @@ class FeedComposerBar extends StatelessWidget {
             const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
-                '¿Qué estás pensando?',
+                '¿Cuál es tu pregunta?',
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: colors.muted,
                   fontWeight: FontWeight.w500,
@@ -58,7 +58,7 @@ class FeedComposerBar extends StatelessWidget {
             Icon(
               Icons.edit_outlined,
               size: 18,
-              color: AppColors.accent.withValues(alpha: 0.9),
+              color: AppColors.brandOf(context).withValues(alpha: 0.9),
             ),
           ],
         ),

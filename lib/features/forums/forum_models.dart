@@ -24,6 +24,27 @@ List<String> _readTags(Map<String, dynamic> data) {
   return const [];
 }
 
+/// Stack Overflow–style relevance: +1 (útil), −1 (poco útil), 0 (sin voto).
+enum RelevanceVote {
+  up(1),
+  down(-1),
+  none(0);
+
+  const RelevanceVote(this.value);
+  final int value;
+
+  static RelevanceVote fromValue(int? raw) {
+    switch (raw) {
+      case 1:
+        return RelevanceVote.up;
+      case -1:
+        return RelevanceVote.down;
+      default:
+        return RelevanceVote.none;
+    }
+  }
+}
+
 class ForumThread {
   const ForumThread({
     required this.id,
@@ -34,6 +55,7 @@ class ForumThread {
     required this.authorName,
     required this.authorRole,
     required this.replyCount,
+    required this.score,
     required this.createdAt,
     required this.updatedAt,
     required this.lastReplyAt,
@@ -49,9 +71,38 @@ class ForumThread {
   final String? authorPhotoUrl;
   final UserRole authorRole;
   final int replyCount;
+  /// Net relevance (upvotes − downvotes), Stack Overflow–style.
+  final int score;
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime lastReplyAt;
+
+  ForumThread copyWith({
+    List<String>? tags,
+    String? title,
+    String? body,
+    int? replyCount,
+    int? score,
+    DateTime? updatedAt,
+    DateTime? lastReplyAt,
+    String? authorPhotoUrl,
+  }) {
+    return ForumThread(
+      id: id,
+      tags: tags ?? this.tags,
+      title: title ?? this.title,
+      body: body ?? this.body,
+      authorId: authorId,
+      authorName: authorName,
+      authorPhotoUrl: authorPhotoUrl ?? this.authorPhotoUrl,
+      authorRole: authorRole,
+      replyCount: replyCount ?? this.replyCount,
+      score: score ?? this.score,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      lastReplyAt: lastReplyAt ?? this.lastReplyAt,
+    );
+  }
 
   Map<String, Object?> toMap() {
     return {
@@ -63,6 +114,7 @@ class ForumThread {
       'authorPhotoUrl': authorPhotoUrl,
       'authorRole': authorRole.wireValue,
       'replyCount': replyCount,
+      'score': score,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
       'lastReplyAt': lastReplyAt.toUtc().toIso8601String(),
@@ -80,12 +132,21 @@ class ForumThread {
       authorPhotoUrl: data['authorPhotoUrl'] as String?,
       authorRole: UserRole.parse(data['authorRole'] as String?),
       replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
+      score: (data['score'] as num?)?.toInt() ?? 0,
       createdAt: _readForumDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readForumDate(data['updatedAt']) ?? DateTime.now().toUtc(),
       lastReplyAt: _readForumDate(data['lastReplyAt']) ??
           _readForumDate(data['createdAt']) ??
           DateTime.now().toUtc(),
     );
+  }
+
+  bool matchesQuery(String rawQuery) {
+    final q = rawQuery.trim().toLowerCase();
+    if (q.isEmpty) return true;
+    if (title.toLowerCase().contains(q)) return true;
+    if (body.toLowerCase().contains(q)) return true;
+    return tags.any((t) => t.toLowerCase().contains(q) || '#$t'.contains(q));
   }
 }
 
@@ -97,6 +158,7 @@ class ForumReply {
     required this.authorId,
     required this.authorName,
     required this.authorRole,
+    required this.score,
     required this.createdAt,
     required this.updatedAt,
     this.authorPhotoUrl,
@@ -109,8 +171,29 @@ class ForumReply {
   final String authorName;
   final String? authorPhotoUrl;
   final UserRole authorRole;
+  final int score;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  ForumReply copyWith({
+    String? body,
+    int? score,
+    DateTime? updatedAt,
+    String? authorPhotoUrl,
+  }) {
+    return ForumReply(
+      id: id,
+      threadId: threadId,
+      body: body ?? this.body,
+      authorId: authorId,
+      authorName: authorName,
+      authorPhotoUrl: authorPhotoUrl ?? this.authorPhotoUrl,
+      authorRole: authorRole,
+      score: score ?? this.score,
+      createdAt: createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 
   Map<String, Object?> toMap() {
     return {
@@ -119,6 +202,7 @@ class ForumReply {
       'authorName': authorName,
       'authorPhotoUrl': authorPhotoUrl,
       'authorRole': authorRole.wireValue,
+      'score': score,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
     };
@@ -137,6 +221,7 @@ class ForumReply {
       authorName: data['authorName'] as String? ?? 'Usuario',
       authorPhotoUrl: data['authorPhotoUrl'] as String?,
       authorRole: UserRole.parse(data['authorRole'] as String?),
+      score: (data['score'] as num?)?.toInt() ?? 0,
       createdAt: _readForumDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readForumDate(data['updatedAt']) ?? DateTime.now().toUtc(),
     );
@@ -152,4 +237,36 @@ bool canParticipateInForums({
       role == UserRole.agent ||
       role == UserRole.instructor ||
       role == UserRole.admin;
+}
+
+/// Client-side helpers for discovery.
+List<ForumThread> filterAndSortThreads(
+  List<ForumThread> threads, {
+  String query = '',
+  ForumSort sort = ForumSort.recent,
+}) {
+  var list = threads.where((t) => t.matchesQuery(query)).toList();
+  switch (sort) {
+    case ForumSort.recent:
+      list.sort((a, b) => b.lastReplyAt.compareTo(a.lastReplyAt));
+    case ForumSort.relevant:
+      list.sort((a, b) {
+        final byScore = b.score.compareTo(a.score);
+        if (byScore != 0) return byScore;
+        return b.lastReplyAt.compareTo(a.lastReplyAt);
+      });
+  }
+  return list;
+}
+
+enum ForumSort { recent, relevant }
+
+List<ForumReply> sortRepliesByRelevance(List<ForumReply> replies) {
+  final list = List<ForumReply>.from(replies);
+  list.sort((a, b) {
+    final byScore = b.score.compareTo(a.score);
+    if (byScore != 0) return byScore;
+    return a.createdAt.compareTo(b.createdAt);
+  });
+  return list;
 }

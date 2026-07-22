@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:every_benefits/app/home_shell.dart';
 import 'package:every_benefits/app/theme.dart';
@@ -14,6 +15,7 @@ import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
 import 'package:every_benefits/features/profile/profile_completion_flow.dart';
+import 'package:every_benefits/features/profile/settings_screen.dart';
 import 'package:every_benefits/main.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_repository.dart';
@@ -28,6 +30,7 @@ class MockUser extends Mock implements User {}
 void main() {
   late MockAuthService auth;
   late MockUserRepository users;
+  late ForumRepository emptyForums;
 
   setUpAll(() {
     registerFallbackValue(MockUser());
@@ -35,9 +38,20 @@ void main() {
   });
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
     auth = MockAuthService();
     users = MockUserRepository();
+    emptyForums = ForumRepository(store: _EmptyForumStore());
   });
+
+  Widget app() {
+    return EveryInsuranceApp(
+      authService: auth,
+      userRepository: users,
+      themeController: ThemeController(),
+      forumRepository: emptyForums,
+    );
+  }
 
   UserProfile completedProfile({
     String uid = 'uid-1',
@@ -71,35 +85,27 @@ void main() {
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
 
     await tester.pumpWidget(
-      EveryInsuranceApp(
-        authService: auth,
-        userRepository: users,
-        themeController: ThemeController(),
-      ),
+      app(),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
-    expect(find.text('Every'), findsOneWidget);
-    expect(find.text('Insurance'), findsOneWidget);
-    expect(find.text('Iniciar sesión'), findsOneWidget);
-    expect(find.text('Continuar como invitado'), findsOneWidget);
+    expect(find.text('EVERY'), findsOneWidget);
+    expect(find.text('INSURANCE'), findsOneWidget);
+    expect(find.text('Entrar'), findsOneWidget);
+    expect(find.text('Soy invitado'), findsOneWidget);
   });
 
   testWidgets('welcome navigates to login and register', (tester) async {
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
 
     await tester.pumpWidget(
-      EveryInsuranceApp(
-        authService: auth,
-        userRepository: users,
-        themeController: ThemeController(),
-      ),
+      app(),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
-    await tester.tap(find.text('Iniciar sesión'));
+    await tester.tap(find.text('Entrar'));
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget);
@@ -133,28 +139,25 @@ void main() {
     stubCompletedProfile(profile);
 
     await tester.pumpWidget(
-      EveryInsuranceApp(
-        authService: auth,
-        userRepository: users,
-        themeController: ThemeController(),
-      ),
+      app(),
     );
     authController.add(null);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
-    await tester.tap(find.text('Iniciar sesión'));
+    await tester.tap(find.text('Entrar').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField).at(0), 'a@b.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'secret12');
-    await tester.tap(find.text('Entrar'));
+    await tester.tap(find.text('Entrar').last);
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsNothing);
-    expect(find.byTooltip('Inicio'), findsOneWidget);
-    expect(find.text('Asistente IA'), findsOneWidget);
+    expect(find.text('Inicio'), findsWidgets);
+    expect(find.text('Chats'), findsWidgets);
+    expect(find.text('IA'), findsWidgets);
 
     await authController.close();
   });
@@ -179,20 +182,17 @@ void main() {
         .thenAnswer((_) => Stream.value(incomplete));
 
     await tester.pumpWidget(
-      EveryInsuranceApp(
-        authService: auth,
-        userRepository: users,
-        themeController: ThemeController(),
-      ),
+      app(),
     );
     await tester.pump();
     await tester.pump();
 
     expect(find.byType(ProfileCompletionFlow), findsOneWidget);
-    expect(find.text('¿Cómo participas en Every Insurance?'), findsOneWidget);
+    expect(find.textContaining('¿Cómo late'), findsOneWidget);
     expect(find.text('Soy agente'), findsOneWidget);
     expect(find.text('Soy estudiante'), findsOneWidget);
-    expect(find.byTooltip('Inicio'), findsNothing);
+    expect(find.text('Desk'), findsNothing);
+    expect(find.text('Inicio'), findsNothing);
   });
 
   testWidgets('guest CTA signs in anonymously', (tester) async {
@@ -202,16 +202,12 @@ void main() {
     });
 
     await tester.pumpWidget(
-      EveryInsuranceApp(
-        authService: auth,
-        userRepository: users,
-        themeController: ThemeController(),
-      ),
+      app(),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
-    await tester.tap(find.text('Continuar como invitado'));
+    await tester.tap(find.text('Soy invitado'));
     await tester.pump();
 
     verify(() => auth.signInAnonymously()).called(1);
@@ -226,20 +222,19 @@ void main() {
     stubCompletedProfile(profile);
 
     await tester.pumpWidget(
-      EveryInsuranceApp(
-        authService: auth,
-        userRepository: users,
-        themeController: ThemeController(),
-      ),
+      app(),
     );
     await tester.pump();
     await tester.pump();
 
-    expect(find.byTooltip('Inicio'), findsOneWidget);
-    expect(find.text('Asistente IA'), findsOneWidget);
+    expect(find.text('Inicio'), findsWidgets);
+    expect(find.text('Chats'), findsWidgets);
+    expect(find.text('IA'), findsWidgets);
+    expect(find.text('Academia'), findsWidgets);
+    expect(find.text('Perfil'), findsWidgets);
   });
 
-  testWidgets('home shell can switch tabs and open community from grid',
+  testWidgets('pulse shell tabs switch between feed chats and profile',
       (tester) async {
     final authService = MockAuthService();
     final usersRepo = MockUserRepository();
@@ -259,22 +254,61 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    await tester.tap(find.text('Comunidad'));
-    await tester.pumpAndSettle();
-    expect(find.text('Conversaciones de la comunidad'), findsOneWidget);
-    expect(find.text('Nuevo hilo'), findsNothing);
     expect(find.textContaining('Modo lectura'), findsOneWidget);
 
-    await tester.pageBack();
+    await tester.tap(find.text('Chats').last);
     await tester.pumpAndSettle();
+    expect(find.text('Equipo Ventas CR'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Perfil'));
+    await tester.tap(find.text('Perfil').last);
     await tester.pumpAndSettle();
 
     expect(find.text('Invitado'), findsOneWidget);
-    expect(find.text('Ajustes'), findsOneWidget);
+    expect(find.byTooltip('Ajustes'), findsOneWidget);
     expect(find.text('Agregar foto de perfil'), findsOneWidget);
     expect(find.text('uid-1'), findsNothing);
+  });
+
+  testWidgets('theme and accent changes keep Settings on the stack',
+      (tester) async {
+    final user = MockUser();
+    when(() => user.uid).thenReturn('uid-1');
+    // Simulate AuthService returning a fresh stream on every getter access.
+    when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(user));
+
+    final profile = completedProfile();
+    stubCompletedProfile(profile);
+
+    final themeController = ThemeController();
+    await tester.pumpWidget(
+      EveryInsuranceApp(
+        authService: auth,
+        userRepository: users,
+        themeController: themeController,
+        forumRepository: emptyForums,
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    await tester.tap(find.text('Perfil').last);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byTooltip('Ajustes'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.text('Color de acento'), findsOneWidget);
+
+    await tester.tap(find.text('Oscuro'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(themeController.mode, ThemeMode.dark);
+
+    await tester.tap(find.bySemanticsLabel('Ámbar'));
+    await tester.pumpAndSettle();
+    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(themeController.primarySeedId, 'amber');
+    expect(themeController.primaryColor, const Color(0xFFF5A524));
   });
 }
 
@@ -291,6 +325,21 @@ class _EmptyForumStore implements ForumStore {
   @override
   Stream<List<ForumReply>> watchReplies(String threadId) =>
       Stream.value(const []);
+
+  @override
+  Stream<RelevanceVote> watchThreadVote({
+    required String threadId,
+    required String uid,
+  }) =>
+      Stream.value(RelevanceVote.none);
+
+  @override
+  Stream<RelevanceVote> watchReplyVote({
+    required String threadId,
+    required String replyId,
+    required String uid,
+  }) =>
+      Stream.value(RelevanceVote.none);
 
   @override
   Future<ForumThread> createThread({
@@ -318,5 +367,20 @@ class _EmptyForumStore implements ForumStore {
   Future<void> deleteReply({
     required String threadId,
     required String replyId,
+  }) async {}
+
+  @override
+  Future<void> setThreadRelevance({
+    required String threadId,
+    required String uid,
+    required RelevanceVote vote,
+  }) async {}
+
+  @override
+  Future<void> setReplyRelevance({
+    required String threadId,
+    required String replyId,
+    required String uid,
+    required RelevanceVote vote,
   }) async {}
 }
