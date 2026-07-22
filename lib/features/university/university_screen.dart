@@ -43,7 +43,7 @@ class UniversityScreen extends StatelessWidget {
           AppSpacing.lg,
           AppSpacing.sm,
           AppSpacing.lg,
-          AppSpacing.xl,
+          96,
         ),
         children: [
           Row(

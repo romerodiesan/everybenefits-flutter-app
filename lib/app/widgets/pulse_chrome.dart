@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../app_spacing.dart';
 import '../theme.dart';
 
 class PulseScaffold extends StatelessWidget {
@@ -119,33 +118,44 @@ class PulseTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
+    final wide = MediaQuery.sizeOf(context).width >= 390;
 
     return Material(
-      color: colors.sheet,
-      elevation: 0,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          border: Border(top: BorderSide(color: colors.border)),
-        ),
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.sm,
-            AppSpacing.sm,
-            AppSpacing.sm,
-            bottom > 0 ? bottom : AppSpacing.sm,
-          ),
-          child: Row(
-            children: [
-              for (var i = 0; i < items.length; i++)
-                Expanded(
-                  child: _PulseTab(
-                    item: items[i],
-                    selected: i == selectedIndex,
-                    onTap: () => onSelect(i),
-                  ),
-                ),
+      type: MaterialType.transparency,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(16, 0, 16, (bottom > 0 ? bottom : 8) + 6),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colors.sheet.withValues(alpha: 0.94),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: colors.border),
+            boxShadow: [
+              BoxShadow(
+                color: colors.ink.withValues(alpha: 0.07),
+                blurRadius: 28,
+                offset: const Offset(0, 10),
+              ),
             ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+            child: Row(
+              children: [
+                for (var i = 0; i < items.length; i++)
+                  Expanded(
+                    flex: wide && i == selectedIndex ? 16 : 12,
+                    child: _PulseTab(
+                      item: items[i],
+                      selected: i == selectedIndex,
+                      showLabel: wide && i == selectedIndex,
+                      brand: brand,
+                      onTap: () => onSelect(i),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
@@ -157,11 +167,15 @@ class _PulseTab extends StatelessWidget {
   const _PulseTab({
     required this.item,
     required this.selected,
+    required this.showLabel,
+    required this.brand,
     required this.onTap,
   });
 
   final PulseTabItem item;
   final bool selected;
+  final bool showLabel;
+  final Color brand;
   final VoidCallback onTap;
 
   @override
@@ -169,37 +183,47 @@ class _PulseTab extends StatelessWidget {
     final colors = AppColors.of(context);
     final theme = Theme.of(context);
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        decoration: BoxDecoration(
-          color: selected
-              ? AppColors.brandOf(context).withValues(alpha: 0.16)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              selected ? item.selectedIcon : item.icon,
-              size: 22,
-              color: selected ? AppColors.brandOf(context) : colors.muted,
-            ),
-            const SizedBox(height: 4),
-            Text(
-              item.label,
-              style: theme.textTheme.labelLarge?.copyWith(
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                color: selected ? colors.ink : colors.muted,
+    return Tooltip(
+      message: item.label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 240),
+          curve: Curves.easeOutCubic,
+          height: 44,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: EdgeInsets.symmetric(horizontal: showLabel ? 10 : 0),
+          decoration: BoxDecoration(
+            color: selected ? brand.withValues(alpha: 0.14) : Colors.transparent,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                selected ? item.selectedIcon : item.icon,
+                size: 22,
+                color: selected ? brand : colors.muted,
               ),
-            ),
-          ],
+              if (showLabel) ...[
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    item.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.1,
+                      color: colors.ink,
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
         ),
       ),
     );

@@ -184,7 +184,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 AppSpacing.md,
                 0,
                 AppSpacing.md,
-                AppSpacing.md,
+                72,
               ),
               child: TextField(
                 controller: _controller,
