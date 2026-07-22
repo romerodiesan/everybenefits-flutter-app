@@ -29,7 +29,7 @@ void main() {
   Future<void> pumpAuth(WidgetTester tester, Widget home) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(),
+        theme: buildEveryInsuranceTheme(Brightness.dark),
         home: home,
       ),
     );
@@ -113,6 +113,16 @@ void main() {
     expect(
       const AuthException(code: 'email-already-in-use').userMessage,
       contains('Ya existe'),
+    );
+    expect(
+      const AuthException(code: 'emulator-unreachable').userMessage,
+      contains('emuladores'),
+    );
+    expect(
+      AuthException.fromUnknown(
+        Exception('SocketException: Connection refused'),
+      ).code,
+      'emulator-unreachable',
     );
   });
 }

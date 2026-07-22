@@ -2,16 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../app/widgets/mesh_background.dart';
-import '../../../auth/auth.dart';
 
-void showAuthError(BuildContext context, Object error) {
-  final message = error is AuthException
-      ? error.userMessage
-      : 'Ocurrió un error inesperado.';
-  ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message)),
-  );
-}
+export '../../../app/app_feedback.dart' show showAuthError, showAppError, showAppSuccess;
 
 class AuthFlowScaffold extends StatelessWidget {
   const AuthFlowScaffold({

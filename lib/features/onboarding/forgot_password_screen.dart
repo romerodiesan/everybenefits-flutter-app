@@ -38,14 +38,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       await widget.authService.sendPasswordResetEmail(_email.text);
       if (!mounted) return;
       setState(() => _sent = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Enviamos un enlace a ${_email.text.trim()}'),
-        ),
+      showAppSuccess(
+        context,
+        'Enviamos un enlace a ${_email.text.trim()}',
       );
-    } on AuthException catch (error) {
+    } catch (error, stackTrace) {
       if (!mounted) return;
-      showAuthError(context, error);
+      showAuthError(context, error, stackTrace: stackTrace);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

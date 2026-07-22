@@ -135,8 +135,12 @@ class AuthService {
         accessToken: tokens.accessToken,
       );
       return await _auth.signInWithCredential(credential);
+    } on AuthException {
+      rethrow;
     } on FirebaseAuthException catch (error) {
       throw AuthException.fromFirebase(error);
+    } catch (error) {
+      throw AuthException.fromUnknown(error);
     }
   }
 
@@ -144,16 +148,24 @@ class AuthService {
     try {
       await _googleSignIn.signOut();
       await _auth.signOut();
+    } on AuthException {
+      rethrow;
     } on FirebaseAuthException catch (error) {
       throw AuthException.fromFirebase(error);
+    } catch (error) {
+      throw AuthException.fromUnknown(error);
     }
   }
 
   Future<T> _guard<T>(Future<T> Function() action) async {
     try {
       return await action();
+    } on AuthException {
+      rethrow;
     } on FirebaseAuthException catch (error) {
       throw AuthException.fromFirebase(error);
+    } catch (error) {
+      throw AuthException.fromUnknown(error);
     }
   }
 }

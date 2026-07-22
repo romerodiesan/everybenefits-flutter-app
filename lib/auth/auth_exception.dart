@@ -13,6 +13,35 @@ class AuthException implements Exception {
     return AuthException(code: error.code, message: error.message);
   }
 
+  /// Maps socket / emulator / unexpected failures into a usable [AuthException].
+  factory AuthException.fromUnknown(Object error) {
+    final text = error.toString().toLowerCase();
+    if (text.contains('connection refused') ||
+        text.contains('failed host lookup') ||
+        text.contains('network is unreachable') ||
+        text.contains('socketexception') ||
+        text.contains('clientexception') ||
+        text.contains('xmlhttprequest error') ||
+        text.contains('unavailable')) {
+      return AuthException(
+        code: 'emulator-unreachable',
+        message: error.toString(),
+      );
+    }
+    if (text.contains('permission-denied') ||
+        text.contains('missing or insufficient permissions') ||
+        text.contains('permission_denied')) {
+      return AuthException(
+        code: 'permission-denied',
+        message: error.toString(),
+      );
+    }
+    return AuthException(
+      code: 'unknown',
+      message: error.toString(),
+    );
+  }
+
   /// Message suitable for SnackBars / form errors (ES).
   String get userMessage {
     switch (code) {
@@ -33,6 +62,12 @@ class AuthException implements Exception {
         return 'Demasiados intentos. Espera un momento e inténtalo de nuevo.';
       case 'network-request-failed':
         return 'Sin conexión. Revisa tu red e inténtalo de nuevo.';
+      case 'emulator-unreachable':
+        return 'No se pudo conectar con Firebase. '
+            '¿Están corriendo los emuladores locales?';
+      case 'permission-denied':
+        return 'No tienes permiso para esta acción '
+            '(revisa reglas o sesión en el emulador).';
       case 'invalid-phone-number':
         return 'Número de teléfono inválido. Usa formato internacional (+506…).';
       case 'invalid-verification-code':

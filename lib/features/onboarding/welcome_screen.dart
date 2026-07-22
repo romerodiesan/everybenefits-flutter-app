@@ -52,9 +52,9 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     setState(() => _busy = true);
     try {
       await action();
-    } on AuthException catch (error) {
+    } catch (error, stackTrace) {
       if (!mounted) return;
-      showAuthError(context, error);
+      showAuthError(context, error, stackTrace: stackTrace);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -111,7 +111,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             child: Text(
                               'Comunidad para agentes',
                               style: theme.textTheme.bodyLarge?.copyWith(
-                                color: AppColors.muted,
+                                color: AppColors.of(context).muted,
                               ),
                             ),
                           ),

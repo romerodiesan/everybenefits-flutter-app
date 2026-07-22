@@ -42,9 +42,9 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
         onVerificationCompleted: (credential) async {
           try {
             await widget.authService.signInWithPhoneCredential(credential);
-          } on AuthException catch (error) {
+          } catch (error, stackTrace) {
             if (!mounted) return;
-            showAuthError(context, error);
+            showAuthError(context, error, stackTrace: stackTrace);
           }
         },
         onVerificationFailed: (error) {
@@ -60,17 +60,15 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
             _codeSent = true;
             _busy = false;
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Código SMS enviado')),
-          );
+          showAppSuccess(context, 'Código SMS enviado');
         },
         onCodeAutoRetrievalTimeout: (verificationId) {
           _verificationId = verificationId;
         },
       );
-    } on AuthException catch (error) {
+    } catch (error, stackTrace) {
       if (!mounted) return;
-      showAuthError(context, error);
+      showAuthError(context, error, stackTrace: stackTrace);
       setState(() => _busy = false);
     }
   }
@@ -95,9 +93,9 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
         verificationId: id,
         smsCode: _code.text,
       );
-    } on AuthException catch (error) {
+    } catch (error, stackTrace) {
       if (!mounted) return;
-      showAuthError(context, error);
+      showAuthError(context, error, stackTrace: stackTrace);
     } finally {
       if (mounted) setState(() => _busy = false);
     }

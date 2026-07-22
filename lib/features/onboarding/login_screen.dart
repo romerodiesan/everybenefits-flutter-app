@@ -35,9 +35,9 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _busy = true);
     try {
       await action();
-    } on AuthException catch (error) {
+    } catch (error, stackTrace) {
       if (!mounted) return;
-      showAuthError(context, error);
+      showAuthError(context, error, stackTrace: stackTrace);
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -72,9 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (!mounted) return;
       setState(() => _magicLinkSent = true);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Enlace enviado a $email')),
-      );
+      showAppSuccess(context, 'Enlace enviado a $email');
     });
   }
 
