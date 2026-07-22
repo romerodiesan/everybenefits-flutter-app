@@ -77,8 +77,8 @@ class HomeScreen extends StatelessWidget {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.glassFill,
-                      border: Border.all(color: AppColors.glassBorder),
+                      color: AppColors.of(context).glassFill,
+                      border: Border.all(color: AppColors.of(context).glassBorder),
                       image: profile.photoUrl == null
                           ? null
                           : DecorationImage(

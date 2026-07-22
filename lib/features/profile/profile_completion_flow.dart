@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/app_feedback.dart';
 import '../../app/app_spacing.dart';
 import '../../app/widgets/mesh_background.dart';
 import '../../auth/auth.dart';
@@ -47,10 +48,13 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
         clearAgency: type == UserRole.student,
       );
       await widget.userRepository.updateProfile(completed);
-    } catch (error) {
+    } catch (error, stackTrace) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo guardar el perfil: $error')),
+      showAppError(
+        context,
+        error,
+        stackTrace: stackTrace,
+        fallbackMessage: 'No se pudo guardar el perfil.',
       );
     } finally {
       if (mounted) setState(() => _busy = false);

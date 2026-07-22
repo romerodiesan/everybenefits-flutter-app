@@ -53,7 +53,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(),
+        theme: buildEveryInsuranceTheme(Brightness.dark),
         home: ProfileCompletionFlow(
           profile: incomplete,
           userRepository: users,
@@ -109,7 +109,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(),
+        theme: buildEveryInsuranceTheme(Brightness.dark),
         home: ProfileCompletionFlow(
           profile: incomplete,
           userRepository: users,

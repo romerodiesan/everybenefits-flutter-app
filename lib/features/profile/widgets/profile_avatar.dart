@@ -27,8 +27,8 @@ class ProfileAvatar extends StatelessWidget {
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.glassFill,
-        border: Border.all(color: AppColors.glassBorder, width: 1.5),
+        color: AppColors.of(context).glassFill,
+        border: Border.all(color: AppColors.of(context).glassBorder, width: 1.5),
         image: photoUrl == null
             ? null
             : DecorationImage(
@@ -78,7 +78,7 @@ class ProfileAvatar extends StatelessWidget {
               decoration: BoxDecoration(
                 color: AppColors.accent,
                 shape: BoxShape.circle,
-                border: Border.all(color: AppColors.meshBase, width: 2),
+                border: Border.all(color: AppColors.of(context).meshBase, width: 2),
               ),
               child: const Icon(
                 Icons.camera_alt_rounded,

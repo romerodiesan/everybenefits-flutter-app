@@ -28,7 +28,7 @@ class PhoneCountryField extends StatelessWidget {
   Future<void> _pick(BuildContext context) async {
     final selected = await showModalBottomSheet<PhoneCountry>(
       context: context,
-      backgroundColor: AppColors.meshDeep,
+      backgroundColor: AppColors.of(context).meshDeep,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -300,7 +300,7 @@ class AccountTypeCard extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: selected ? AppColors.accent : AppColors.muted,
+            color: selected ? AppColors.accent : AppColors.of(context).muted,
             size: 28,
           ),
           const SizedBox(width: AppSpacing.md),
@@ -318,7 +318,7 @@ class AccountTypeCard extends StatelessWidget {
             selected
                 ? Icons.check_circle_rounded
                 : Icons.circle_outlined,
-            color: selected ? AppColors.accent : AppColors.muted,
+            color: selected ? AppColors.accent : AppColors.of(context).muted,
           ),
         ],
       ),

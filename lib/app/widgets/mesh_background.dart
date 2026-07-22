@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../theme.dart';
 
-/// Dark atmospheric mesh behind luminous glass screens.
+/// Quiet atmospheric wash — minimal, barely-there depth.
 class MeshBackground extends StatelessWidget {
   const MeshBackground({super.key, this.child});
 
@@ -10,12 +10,13 @@ class MeshBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
     return ColoredBox(
-      color: AppColors.meshBase,
+      color: colors.meshBase,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          const CustomPaint(painter: _MeshPainter()),
+          CustomPaint(painter: _MeshPainter(colors: colors)),
           ?child,
         ],
       ),
@@ -24,30 +25,37 @@ class MeshBackground extends StatelessWidget {
 }
 
 class _MeshPainter extends CustomPainter {
-  const _MeshPainter();
+  const _MeshPainter({required this.colors});
+
+  final AppColors colors;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final isLight = colors.meshBase.computeLuminance() > 0.5;
+
+    final wash = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          colors.meshDeep.withValues(alpha: isLight ? 0.55 : 0.7),
+          colors.meshBase.withValues(alpha: 0),
+          colors.meshBlob.withValues(alpha: isLight ? 0.35 : 0.45),
+        ],
+        stops: const [0, 0.5, 1],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, wash);
+
     final blobs = <(Offset, double, Color)>[
       (
-        Offset(size.width * 0.2, size.height * 0.08),
-        size.width * 0.7,
-        AppColors.accent.withValues(alpha: 0.18),
-      ),
-      (
-        Offset(size.width * 0.95, size.height * 0.32),
+        Offset(size.width * 0.15, size.height * 0.1),
         size.width * 0.55,
-        AppColors.brand.withValues(alpha: 0.35),
+        colors.meshBlob.withValues(alpha: isLight ? 0.22 : 0.35),
       ),
       (
-        Offset(size.width * 0.1, size.height * 0.72),
-        size.width * 0.65,
-        AppColors.accent.withValues(alpha: 0.1),
-      ),
-      (
-        Offset(size.width * 0.7, size.height * 0.9),
+        Offset(size.width * 0.9, size.height * 0.75),
         size.width * 0.5,
-        const Color(0xFF1A3D30).withValues(alpha: 0.8),
+        AppColors.brand.withValues(alpha: isLight ? 0.04 : 0.12),
       ),
     ];
 
@@ -61,5 +69,6 @@ class _MeshPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _MeshPainter oldDelegate) =>
+      oldDelegate.colors != colors;
 }

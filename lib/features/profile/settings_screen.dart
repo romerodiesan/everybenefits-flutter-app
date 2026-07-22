@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
+import '../../app/theme_controller.dart';
 import '../../app/widgets/glass_card.dart';
 import '../../app/widgets/mesh_background.dart';
 import '../../app/widgets/role_badge.dart';
@@ -25,6 +26,7 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final themeController = ThemeScope.of(context);
 
     return MeshBackground(
       child: Scaffold(
@@ -76,6 +78,49 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ],
                   ],
+                ],
+              ),
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            Text('Apariencia', style: theme.textTheme.titleMedium),
+            const SizedBox(height: AppSpacing.sm),
+            GlassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Tema',
+                    style: theme.textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  ListenableBuilder(
+                    listenable: themeController,
+                    builder: (context, _) {
+                      return SegmentedButton<ThemeMode>(
+                        segments: const [
+                          ButtonSegment(
+                            value: ThemeMode.light,
+                            label: Text('Claro'),
+                            icon: Icon(Icons.light_mode_outlined, size: 18),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.dark,
+                            label: Text('Oscuro'),
+                            icon: Icon(Icons.dark_mode_outlined, size: 18),
+                          ),
+                          ButtonSegment(
+                            value: ThemeMode.system,
+                            label: Text('Sistema'),
+                            icon: Icon(Icons.phone_iphone_outlined, size: 18),
+                          ),
+                        ],
+                        selected: {themeController.mode},
+                        onSelectionChanged: (selection) {
+                          themeController.setMode(selection.first);
+                        },
+                      );
+                    },
+                  ),
                 ],
               ),
             ),
@@ -190,7 +235,8 @@ class _SettingsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = destructive ? const Color(0xFFFF8A80) : AppColors.ink;
+    final colors = AppColors.of(context);
+    final color = destructive ? const Color(0xFFE57373) : colors.ink;
     return ListTile(
       leading: Icon(icon, color: destructive ? color : AppColors.accent),
       title: Text(
@@ -202,7 +248,7 @@ class _SettingsTile extends StatelessWidget {
           : Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium),
       trailing: Icon(
         Icons.chevron_right_rounded,
-        color: AppColors.muted.withValues(alpha: 0.7),
+        color: colors.muted.withValues(alpha: 0.7),
       ),
       onTap: onTap,
     );
