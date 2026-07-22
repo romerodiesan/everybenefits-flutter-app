@@ -1,23 +1,41 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'app/home_shell.dart';
 import 'app/theme.dart';
+import 'app/theme_controller.dart';
 import 'app/widgets/mesh_background.dart';
 import 'auth/auth.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/profile/profile_completion_flow.dart';
+import 'firebase/firebase_emulators.dart';
 import 'firebase_options.dart';
 import 'users/users.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('[FlutterError] ${details.exceptionAsString()}');
+    if (details.stack != null) {
+      debugPrint(details.stack.toString());
+    }
+  };
+
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await connectFirebaseEmulators();
+  await LiquidGlassWidgets.initialize();
+  final themeController = await ThemeController.load();
   runApp(
-    EveryInsuranceApp(
-      authService: AuthService(),
-      userRepository: UserRepository(),
+    LiquidGlassWidgets.wrap(
+      child: EveryInsuranceApp(
+        authService: AuthService(),
+        userRepository: UserRepository(),
+        themeController: themeController,
+      ),
     ),
   );
 }
@@ -27,34 +45,46 @@ class EveryInsuranceApp extends StatelessWidget {
     super.key,
     required this.authService,
     required this.userRepository,
+    required this.themeController,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
+  final ThemeController themeController;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: authService.authStateChanges,
-      builder: (context, snapshot) {
-        // Rebuild MaterialApp (new Navigator) when auth flips so login/register
-        // routes cannot stay stacked above the dashboard.
-        final authKey = snapshot.connectionState == ConnectionState.waiting
-            ? 'boot'
-            : (snapshot.data?.uid ?? 'signed-out');
+    return ThemeScope(
+      controller: themeController,
+      child: ListenableBuilder(
+        listenable: themeController,
+        builder: (context, _) {
+          return StreamBuilder<User?>(
+            stream: authService.authStateChanges,
+            builder: (context, snapshot) {
+              // Rebuild MaterialApp (new Navigator) when auth flips so login/register
+              // routes cannot stay stacked above the dashboard.
+              final authKey = snapshot.connectionState == ConnectionState.waiting
+                  ? 'boot'
+                  : (snapshot.data?.uid ?? 'signed-out');
 
-        return MaterialApp(
-          key: ValueKey<String>(authKey),
-          title: 'Every Insurance',
-          theme: buildEveryInsuranceTheme(),
-          home: _AuthHome(
-            authService: authService,
-            userRepository: userRepository,
-            connectionState: snapshot.connectionState,
-            user: snapshot.data,
-          ),
-        );
-      },
+              return MaterialApp(
+                key: ValueKey<String>(authKey),
+                title: 'Every Insurance',
+                theme: buildEveryInsuranceTheme(Brightness.light),
+                darkTheme: buildEveryInsuranceTheme(Brightness.dark),
+                themeMode: themeController.mode,
+                home: _AuthHome(
+                  authService: authService,
+                  userRepository: userRepository,
+                  connectionState: snapshot.connectionState,
+                  user: snapshot.data,
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -131,15 +161,27 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
         }
 
         if (profileSnapshot.hasError) {
+          final error = profileSnapshot.error!;
+          debugPrint('[ProfileBootstrap] $error');
           return MeshBackground(
             child: Scaffold(
               backgroundColor: Colors.transparent,
               body: Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24),
-                  child: Text(
-                    'No se pudo cargar el perfil:\n${profileSnapshot.error}',
-                    textAlign: TextAlign.center,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        'No se pudo cargar el perfil:\n$error',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 16),
+                      FilledButton(
+                        onPressed: () => widget.authService.signOut(),
+                        child: const Text('Volver al inicio'),
+                      ),
+                    ],
                   ),
                 ),
               ),

@@ -7,7 +7,10 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:every_benefits/app/home_shell.dart';
 import 'package:every_benefits/app/theme.dart';
+import 'package:every_benefits/app/theme_controller.dart';
 import 'package:every_benefits/auth/auth_service.dart';
+import 'package:every_benefits/features/forums/forum_models.dart';
+import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
 import 'package:every_benefits/features/profile/profile_completion_flow.dart';
@@ -68,7 +71,11 @@ void main() {
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
 
     await tester.pumpWidget(
-      EveryInsuranceApp(authService: auth, userRepository: users),
+      EveryInsuranceApp(
+        authService: auth,
+        userRepository: users,
+        themeController: ThemeController(),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
@@ -83,7 +90,11 @@ void main() {
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
 
     await tester.pumpWidget(
-      EveryInsuranceApp(authService: auth, userRepository: users),
+      EveryInsuranceApp(
+        authService: auth,
+        userRepository: users,
+        themeController: ThemeController(),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
@@ -122,7 +133,11 @@ void main() {
     stubCompletedProfile(profile);
 
     await tester.pumpWidget(
-      EveryInsuranceApp(authService: auth, userRepository: users),
+      EveryInsuranceApp(
+        authService: auth,
+        userRepository: users,
+        themeController: ThemeController(),
+      ),
     );
     authController.add(null);
     await tester.pump();
@@ -164,7 +179,11 @@ void main() {
         .thenAnswer((_) => Stream.value(incomplete));
 
     await tester.pumpWidget(
-      EveryInsuranceApp(authService: auth, userRepository: users),
+      EveryInsuranceApp(
+        authService: auth,
+        userRepository: users,
+        themeController: ThemeController(),
+      ),
     );
     await tester.pump();
     await tester.pump();
@@ -183,7 +202,11 @@ void main() {
     });
 
     await tester.pumpWidget(
-      EveryInsuranceApp(authService: auth, userRepository: users),
+      EveryInsuranceApp(
+        authService: auth,
+        userRepository: users,
+        themeController: ThemeController(),
+      ),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
@@ -203,7 +226,11 @@ void main() {
     stubCompletedProfile(profile);
 
     await tester.pumpWidget(
-      EveryInsuranceApp(authService: auth, userRepository: users),
+      EveryInsuranceApp(
+        authService: auth,
+        userRepository: users,
+        themeController: ThemeController(),
+      ),
     );
     await tester.pump();
     await tester.pump();
@@ -220,11 +247,12 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(),
+        theme: buildEveryInsuranceTheme(Brightness.dark),
         home: HomeShell(
           authService: authService,
           userRepository: usersRepo,
           profile: profile,
+          forumRepository: ForumRepository(store: _EmptyForumStore()),
         ),
       ),
     );
@@ -234,6 +262,8 @@ void main() {
     await tester.tap(find.text('Comunidad'));
     await tester.pumpAndSettle();
     expect(find.text('Conversaciones de la comunidad'), findsOneWidget);
+    expect(find.text('Nuevo hilo'), findsNothing);
+    expect(find.textContaining('Modo lectura'), findsOneWidget);
 
     await tester.pageBack();
     await tester.pumpAndSettle();
@@ -249,3 +279,44 @@ void main() {
 }
 
 class FakeUserCredential extends Fake implements UserCredential {}
+
+class _EmptyForumStore implements ForumStore {
+  @override
+  Stream<List<ForumThread>> watchThreads({String? tag}) =>
+      Stream.value(const []);
+
+  @override
+  Stream<ForumThread?> watchThread(String threadId) => Stream.value(null);
+
+  @override
+  Stream<List<ForumReply>> watchReplies(String threadId) =>
+      Stream.value(const []);
+
+  @override
+  Future<ForumThread> createThread({
+    required List<String> tags,
+    required String title,
+    required String body,
+    required UserProfile author,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<ForumReply> addReply({
+    required String threadId,
+    required String body,
+    required UserProfile author,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> deleteThread(String threadId) async {}
+
+  @override
+  Future<void> deleteReply({
+    required String threadId,
+    required String replyId,
+  }) async {}
+}
