@@ -5,13 +5,13 @@ service firebase.storage {
       return request.auth != null;
     }
 
-    function isOwner(uid) {
-      return isSignedIn() && request.auth.uid == uid;
+    function isOwnerFile(fileName) {
+      return isSignedIn() && fileName == request.auth.uid + '.jpg';
     }
 
-    match /avatars/{uid}.jpg {
+    match /avatars/{fileName} {
       allow read: if isSignedIn();
-      allow write: if isOwner(uid)
+      allow write: if isOwnerFile(fileName)
         && request.resource.size < 5 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }

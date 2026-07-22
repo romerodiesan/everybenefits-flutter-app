@@ -1,8 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
+import '../firebase/firebase_emulators.dart';
 import 'avatar_storage.dart';
 import 'user_profile.dart';
 import 'user_role.dart';
@@ -47,7 +47,9 @@ class FirestoreUserProfileStore implements UserProfileStore {
 
   @override
   Future<UserProfile?> get(String uid) async {
-    final snapshot = await _users.doc(uid).get();
+    final snapshot = await _users.doc(uid).get(
+          const GetOptions(source: Source.server),
+        );
     if (!snapshot.exists || snapshot.data() == null) return null;
     return UserProfile.fromMap(snapshot.data()!);
   }
@@ -88,26 +90,46 @@ class UserRepository {
       _avatarStorageOverride ?? AvatarStorage();
 
   Future<UserProfile> ensureProfile(User user) async {
-    final existing = await _store.get(user.uid);
-    if (existing != null) return existing;
-
-    final now = DateTime.now().toUtc();
-    final isAnonymous = user.isAnonymous;
-    final profile = UserProfile(
-      uid: user.uid,
-      email: user.email,
-      displayName: user.displayName,
-      photoUrl: user.photoURL,
-      role: isAnonymous ? UserRole.guest : UserRole.agent,
-      isAnonymous: isAnonymous,
-      // Guests skip the completion wizard; registered users must finish it.
-      profileCompleted: isAnonymous,
-      createdAt: now,
-      updatedAt: now,
-      agency: isAnonymous ? null : kDefaultAgency,
+    final token = await user.getIdToken(true);
+    final firestoreHost = FirebaseFirestore.instance.settings.host;
+    final emulatorToken = isAuthEmulatorIdToken(token);
+    debugPrint(
+      'ensureProfile uid=${user.uid} anonymous=${user.isAnonymous} '
+      'tokenLen=${token?.length ?? 0} emulatorToken=$emulatorToken '
+      'firestoreHost=$firestoreHost',
     );
-    await _store.create(profile);
-    return profile;
+
+    try {
+      final existing = await _store.get(user.uid);
+      if (existing != null) return existing;
+
+      final now = DateTime.now().toUtc();
+      final isAnonymous = user.isAnonymous;
+      final profile = UserProfile(
+        uid: user.uid,
+        email: user.email,
+        displayName: user.displayName,
+        photoUrl: user.photoURL,
+        role: isAnonymous ? UserRole.guest : UserRole.agent,
+        isAnonymous: isAnonymous,
+        profileCompleted: isAnonymous,
+        createdAt: now,
+        updatedAt: now,
+        agency: isAnonymous ? null : kDefaultAgency,
+      );
+      await _store.create(profile);
+      return profile;
+    } on FirebaseException catch (error) {
+      if (error.code == 'permission-denied' && emulatorToken) {
+        throw StateError(
+          'Firestore permission-denied with Auth Emulator token '
+          '(dart host=$firestoreHost). Usually the native Firestore client '
+          'was created before emulator settings. Fully quit the app and '
+          '`flutter run` again (not hot restart).',
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<UserProfile> updateProfile(UserProfile profile) async {
