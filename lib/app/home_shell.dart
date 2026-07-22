@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../auth/auth.dart';
 import '../features/ai_chat/ai_chat_screen.dart';
 import '../features/chats/chats_screen.dart';
+import '../features/forums/forum_repository.dart';
 import '../features/forums/forums_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/profile/profile_screen.dart';
@@ -18,11 +19,13 @@ class HomeShell extends StatefulWidget {
     required this.authService,
     required this.userRepository,
     required this.profile,
+    this.forumRepository,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
   final UserProfile profile;
+  final ForumRepository? forumRepository;
 
   @override
   State<HomeShell> createState() => HomeShellState();
@@ -68,7 +71,12 @@ class HomeShellState extends State<HomeShell> {
   Future<void> _openCommunity() {
     return Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => const MeshBackground(child: ForumsScreen()),
+        builder: (_) => MeshBackground(
+          child: ForumsScreen(
+            profile: widget.profile,
+            forumRepository: widget.forumRepository,
+          ),
+        ),
       ),
     );
   }

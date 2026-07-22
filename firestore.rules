@@ -9,14 +9,26 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function userDoc(uid) {
+      return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function hasUserProfile() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
     function callerRole() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+      return userDoc(request.auth.uid).data.role;
     }
 
     function isAdmin() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && callerRole() == 'admin';
+      return hasUserProfile() && callerRole() == 'admin';
+    }
+
+    function isForumParticipant() {
+      return hasUserProfile()
+        && callerRole() in ['student', 'agent', 'instructor', 'admin'];
     }
 
     function isBootstrapRole() {
@@ -27,16 +39,15 @@ service cloud.firestore {
       return role in ['instructor', 'admin'];
     }
 
-    match /users/{uid} {
-      allow read: if isOwner(uid) || isAdmin();
+    function isNonEmptyString(value) {
+      return value is string && value.size() > 0;
+    }
 
-      // First profile create: owner may only set guest|student|agent.
+    match /users/{uid} {
+      allow read: if isOwner(uid);
       allow create: if isOwner(uid)
         && isBootstrapRole()
         && request.resource.data.uid == uid;
-
-      // Owner can update own profile. Role may move among guest/student/agent,
-      // but never into or out of instructor/admin (except via admin rule).
       allow update: if isOwner(uid)
         && request.resource.data.uid == resource.data.uid
         && !isProtectedRole(request.resource.data.role)
@@ -44,11 +55,50 @@ service cloud.firestore {
           request.resource.data.role == resource.data.role
           || !isProtectedRole(resource.data.role)
         );
+      allow read, update, delete: if isAdmin();
+    }
 
-      // Admins can update any user (including role changes).
-      allow update: if isAdmin();
+    match /threads/{threadId} {
+      allow read: if isSignedIn();
 
-      allow delete: if isAdmin();
+      allow create: if isForumParticipant()
+        && request.resource.data.authorId == request.auth.uid
+        && isNonEmptyString(request.resource.data.title)
+        && isNonEmptyString(request.resource.data.body)
+        && request.resource.data.tags is list
+        && request.resource.data.tags.size() > 0
+        && request.resource.data.tags.size() <= 5
+        && request.resource.data.replyCount == 0;
+
+      allow update: if isSignedIn()
+        && (
+          resource.data.authorId == request.auth.uid
+          || isAdmin()
+          || (
+            isForumParticipant()
+            && request.resource.data.authorId == resource.data.authorId
+            && request.resource.data.title == resource.data.title
+            && request.resource.data.body == resource.data.body
+            && request.resource.data.tags == resource.data.tags
+          )
+        );
+
+      allow delete: if isSignedIn()
+        && (resource.data.authorId == request.auth.uid || isAdmin());
+
+      match /replies/{replyId} {
+        allow read: if isSignedIn();
+
+        allow create: if isForumParticipant()
+          && request.resource.data.authorId == request.auth.uid
+          && isNonEmptyString(request.resource.data.body);
+
+        allow update: if isSignedIn()
+          && (resource.data.authorId == request.auth.uid || isAdmin());
+
+        allow delete: if isSignedIn()
+          && (resource.data.authorId == request.auth.uid || isAdmin());
+      }
     }
 
     match /{document=**} {
