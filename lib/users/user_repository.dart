@@ -90,14 +90,19 @@ class UserRepository {
       _avatarStorageOverride ?? AvatarStorage();
 
   Future<UserProfile> ensureProfile(User user) async {
-    final token = await user.getIdToken(true);
-    final firestoreHost = FirebaseFirestore.instance.settings.host;
-    final emulatorToken = isAuthEmulatorIdToken(token);
-    debugPrint(
-      'ensureProfile uid=${user.uid} anonymous=${user.isAnonymous} '
-      'tokenLen=${token?.length ?? 0} emulatorToken=$emulatorToken '
-      'firestoreHost=$firestoreHost',
-    );
+    String? token;
+    String? firestoreHost;
+    var emulatorToken = false;
+    if (kDebugMode && _store is FirestoreUserProfileStore) {
+      token = await user.getIdToken(true);
+      firestoreHost = FirebaseFirestore.instance.settings.host;
+      emulatorToken = isAuthEmulatorIdToken(token);
+      debugPrint(
+        'ensureProfile uid=${user.uid} anonymous=${user.isAnonymous} '
+        'tokenLen=${token?.length ?? 0} emulatorToken=$emulatorToken '
+        'firestoreHost=$firestoreHost',
+      );
+    }
 
     try {
       final existing = await _store.get(user.uid);

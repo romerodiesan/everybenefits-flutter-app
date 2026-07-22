@@ -300,7 +300,7 @@ class AccountTypeCard extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: selected ? AppColors.accent : AppColors.of(context).muted,
+            color: selected ? AppColors.brandOf(context) : AppColors.of(context).muted,
             size: 28,
           ),
           const SizedBox(width: AppSpacing.md),
@@ -318,7 +318,7 @@ class AccountTypeCard extends StatelessWidget {
             selected
                 ? Icons.check_circle_rounded
                 : Icons.circle_outlined,
-            color: selected ? AppColors.accent : AppColors.of(context).muted,
+            color: selected ? AppColors.brandOf(context) : AppColors.of(context).muted,
           ),
         ],
       ),

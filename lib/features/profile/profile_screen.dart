@@ -4,12 +4,14 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
+import '../../app/widgets/pulse_chrome.dart';
 import '../../auth/auth.dart';
 import '../../users/users.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/profile_avatar.dart';
 
+/// Minimal profile — identity, edit, settings.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
@@ -32,9 +34,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _pickAvatar() async {
     final source = await showModalBottomSheet<ImageSource>(
       context: context,
-      backgroundColor: AppColors.of(context).meshDeep,
+      backgroundColor: AppColors.of(context).sheet,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (context) {
         return SafeArea(
@@ -75,20 +77,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     } on PlatformException catch (error) {
       if (!mounted) return;
-      final needsRebuild = error.code == 'channel-error';
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            needsRebuild
-                ? 'Reinicia la app por completo (quita y vuelve a abrir) para habilitar la cámara/galería.'
-                : 'No se pudo abrir la galería: ${error.message ?? error.code}',
-          ),
-        ),
+        SnackBar(content: Text('No se pudo elegir imagen: ${error.message}')),
       );
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo actualizar la foto: $error')),
+        SnackBar(content: Text('No se pudo subir la foto: $error')),
       );
     } finally {
       if (mounted) setState(() => _uploading = false);
@@ -102,17 +97,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
           authService: widget.authService,
           userRepository: widget.userRepository,
           profile: widget.profile,
-          onEditProfile: () {
-            Navigator.of(context).pop();
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => EditProfileScreen(
-                  profile: widget.profile,
-                  userRepository: widget.userRepository,
-                ),
-              ),
-            );
-          },
+          onEditProfile: _openEdit,
+        ),
+      ),
+    );
+  }
+
+  void _openEdit() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EditProfileScreen(
+          profile: widget.profile,
+          userRepository: widget.userRepository,
         ),
       ),
     );
@@ -121,12 +117,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
     final profile = widget.profile;
+    final handle = profile.email?.split('@').first ??
+        (profile.uid.length <= 6 ? profile.uid : profile.uid.substring(0, 6));
 
-    return Scaffold(
-      backgroundColor: Colors.transparent,
+    return PulseScaffold(
       appBar: AppBar(
-        title: const Text('Perfil'),
+        title: Text(
+          'Perfil',
+          style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
+        ),
         actions: [
           IconButton(
             tooltip: 'Ajustes',
@@ -138,50 +139,61 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg,
-          AppSpacing.xl,
+          AppSpacing.md,
           AppSpacing.lg,
           AppSpacing.xl,
         ),
         children: [
           Center(
-            child: ProfileAvatar(
-              profile: profile,
-              size: 120,
-              busy: _uploading,
-              showEditBadge: true,
-              onTap: _pickAvatar,
+            child: GestureDetector(
+              onTap: _uploading ? null : _pickAvatar,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  ProfileAvatar(profile: profile, size: 96, showEditBadge: true),
+                  if (_uploading)
+                    const SizedBox(
+                      width: 28,
+                      height: 28,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: AppSpacing.md),
-          TextButton(
-            onPressed: _uploading ? null : _pickAvatar,
-            child: Text(
-              profile.photoUrl == null
-                  ? 'Agregar foto de perfil'
-                  : 'Cambiar foto de perfil',
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
           Text(
             profile.headlineName,
             textAlign: TextAlign.center,
-            style: theme.textTheme.headlineMedium,
+            style: theme.textTheme.headlineMedium?.copyWith(fontSize: 26),
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: 4),
           Text(
-            profile.email ?? 'Sin email vinculado',
+            '@$handle',
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium,
+            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
           ),
-          if (profile.isAnonymous) ...[
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              'Regístrate para completar tu perfil y desbloquear la comunidad.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium,
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            profile.isAnonymous
+                ? 'Invitado en Every Insurance. Únete para publicar.'
+                : 'Comunidad · Academia · Chats',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodyLarge,
+          ),
+          if (profile.photoUrl == null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(
+              onPressed: _pickAvatar,
+              child: const Text('Agregar foto de perfil'),
             ),
           ],
           const SizedBox(height: AppSpacing.xl),
+          SignalButton(
+            label: 'Editar perfil',
+            onPressed: _openEdit,
+          ),
+          const SizedBox(height: AppSpacing.sm),
           OutlinedButton(
             onPressed: _openSettings,
             child: const Text('Ajustes'),

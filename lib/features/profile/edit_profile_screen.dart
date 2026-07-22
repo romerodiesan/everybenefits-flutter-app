@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
-import '../../app/widgets/mesh_background.dart';
+import '../../app/widgets/pulse_chrome.dart';
 import '../../users/users.dart';
 import 'widgets/profile_form_widgets.dart';
 
@@ -56,54 +56,51 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return MeshBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Editar perfil')),
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.xl,
-            ),
-            children: [
-              Text(
-                'Tipo de cuenta',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              AccountTypeCard(
-                title: 'Agente',
-                subtitle: 'NPN, dirección y agencia',
-                icon: Icons.badge_outlined,
-                selected: _type == UserRole.agent,
-                onTap: () => setState(() => _type = UserRole.agent),
-              ),
-              const SizedBox(height: AppSpacing.md),
-              AccountTypeCard(
-                title: 'Estudiante',
-                subtitle: 'Nombre y teléfono',
-                icon: Icons.school_outlined,
-                selected: _type == UserRole.student,
-                onTap: () => setState(() => _type = UserRole.student),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              ProfileDetailsForm(
-                accountType: _type,
-                busy: _busy,
-                submitLabel: 'Guardar cambios',
-                initialName: widget.profile.displayName,
-                initialCountryCode: widget.profile.phoneCountryCode,
-                initialPhoneNumber: widget.profile.phoneNumber,
-                initialNpn: widget.profile.npn,
-                initialAddress: widget.profile.address,
-                initialAgency: widget.profile.agency ?? kDefaultAgency,
-                onSubmit: _save,
-              ),
-            ],
+    return PulseScaffold(
+      appBar: AppBar(title: const Text('Editar perfil')),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xl,
           ),
+          children: [
+            Text(
+              'Tipo de cuenta',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AccountTypeCard(
+              title: 'Agente',
+              subtitle: 'NPN, dirección y agencia',
+              icon: Icons.badge_outlined,
+              selected: _type == UserRole.agent,
+              onTap: () => setState(() => _type = UserRole.agent),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            AccountTypeCard(
+              title: 'Estudiante',
+              subtitle: 'Nombre y teléfono',
+              icon: Icons.school_outlined,
+              selected: _type == UserRole.student,
+              onTap: () => setState(() => _type = UserRole.student),
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            ProfileDetailsForm(
+              accountType: _type,
+              busy: _busy,
+              submitLabel: 'Guardar cambios',
+              initialName: widget.profile.displayName,
+              initialCountryCode: widget.profile.phoneCountryCode,
+              initialPhoneNumber: widget.profile.phoneNumber,
+              initialNpn: widget.profile.npn,
+              initialAddress: widget.profile.address,
+              initialAgency: widget.profile.agency ?? kDefaultAgency,
+              onSubmit: _save,
+            ),
+          ],
         ),
       ),
     );

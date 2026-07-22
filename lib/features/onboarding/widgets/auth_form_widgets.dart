@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
-import '../../../app/widgets/mesh_background.dart';
+import '../../../app/theme.dart';
+import '../../../app/widgets/pulse_chrome.dart';
 
-export '../../../app/app_feedback.dart' show showAuthError, showAppError, showAppSuccess;
+export '../../../app/app_feedback.dart'
+    show showAuthError, showAppError, showAppSuccess;
 
 class AuthFlowScaffold extends StatelessWidget {
   const AuthFlowScaffold({
@@ -21,33 +23,30 @@ class AuthFlowScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return MeshBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => Navigator.of(context).maybePop(),
-          ),
+    return PulseScaffold(
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.xl,
-            ),
-            children: [
-              Text(title, style: theme.textTheme.headlineMedium),
-              if (subtitle != null) ...[
-                const SizedBox(height: AppSpacing.sm),
-                Text(subtitle!, style: theme.textTheme.bodyMedium),
-              ],
-              const SizedBox(height: AppSpacing.xl),
-              child,
-            ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xl,
           ),
+          children: [
+            Text(title, style: theme.textTheme.headlineMedium),
+            if (subtitle != null) ...[
+              const SizedBox(height: AppSpacing.sm),
+              Text(subtitle!, style: theme.textTheme.bodyMedium),
+            ],
+            const SizedBox(height: AppSpacing.xl),
+            child,
+          ],
         ),
       ),
     );
@@ -84,14 +83,7 @@ class _AuthPasswordFieldState extends State<AuthPasswordField> {
       obscureText: _obscure,
       textInputAction: widget.textInputAction,
       onFieldSubmitted: widget.onFieldSubmitted,
-      autofillHints: const [AutofillHints.password],
-      validator: widget.validator ??
-          (value) {
-            if (value == null || value.length < 6) {
-              return 'Mínimo 6 caracteres.';
-            }
-            return null;
-          },
+      validator: widget.validator,
       decoration: InputDecoration(
         labelText: widget.label,
         suffixIcon: IconButton(
@@ -103,6 +95,69 @@ class _AuthPasswordFieldState extends State<AuthPasswordField> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class AuthPrimaryButton extends StatelessWidget {
+  const AuthPrimaryButton({
+    super.key,
+    required this.label,
+    required this.onPressed,
+    this.busy = false,
+  });
+
+  final String label;
+  final VoidCallback? onPressed;
+  final bool busy;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton(
+      onPressed: busy ? null : onPressed,
+      child: busy
+          ? SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: Theme.of(context).colorScheme.onPrimary,
+              ),
+            )
+          : Text(label),
+    );
+  }
+}
+
+class AuthLinkRow extends StatelessWidget {
+  const AuthLinkRow({
+    super.key,
+    required this.prompt,
+    required this.actionLabel,
+    required this.onPressed,
+  });
+
+  final String prompt;
+  final String actionLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Text(prompt, style: theme.textTheme.bodyMedium),
+        TextButton(
+          onPressed: onPressed,
+          child: Text(
+            actionLabel,
+            style: theme.textTheme.labelLarge?.copyWith(
+              color: AppColors.brandOf(context),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

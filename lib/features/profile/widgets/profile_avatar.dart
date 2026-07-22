@@ -41,7 +41,7 @@ class ProfileAvatar extends StatelessWidget {
           ? Text(
               profile.initials,
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppColors.accent,
+                    color: AppColors.brandOf(context),
                     fontSize: size * 0.38,
                   ),
             )
@@ -76,7 +76,7 @@ class ProfileAvatar extends StatelessWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                color: AppColors.accent,
+                color: AppColors.brandOf(context),
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.of(context).meshBase, width: 2),
               ),

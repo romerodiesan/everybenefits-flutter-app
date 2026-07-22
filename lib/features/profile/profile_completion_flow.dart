@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_feedback.dart';
 import '../../app/app_spacing.dart';
-import '../../app/widgets/mesh_background.dart';
+import '../../app/theme.dart';
+import '../../app/widgets/pulse_chrome.dart';
 import '../../auth/auth.dart';
 import '../../users/users.dart';
 import 'widgets/profile_form_widgets.dart';
@@ -64,92 +65,134 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
 
-    return MeshBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(
-          title: Text(_step == 0 ? 'Tu perfil' : 'Datos personales'),
-          actions: [
-            TextButton(
-              onPressed: _busy ? null : widget.authService.signOut,
-              child: const Text('Salir'),
-            ),
-          ],
-        ),
-        body: SafeArea(
-          child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.xl,
-            ),
-            children: [
+    return PulseScaffold(
+      appBar: AppBar(
+        title: Text(_step == 0 ? 'Tu rol' : 'Tus datos'),
+        actions: [
+          TextButton(
+            onPressed: _busy ? null : widget.authService.signOut,
+            child: const Text('Salir'),
+          ),
+        ],
+      ),
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.md,
+            AppSpacing.lg,
+            AppSpacing.xl,
+          ),
+          children: [
+            if (_step == 0) ...[
               Text(
-                _step == 0
-                    ? '¿Cómo participas en Every Insurance?'
-                    : 'Completa tu información',
-                style: theme.textTheme.headlineMedium,
+                '¿Cómo late\ntu Pulse?',
+                style: theme.textTheme.displaySmall?.copyWith(fontSize: 34),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                _step == 0
-                    ? 'Esto personaliza tu experiencia en la comunidad.'
-                    : _type == UserRole.agent
-                        ? 'Como agente necesitamos NPN, dirección y agencia.'
-                        : 'Como estudiante solo necesitamos contacto básico.',
-                style: theme.textTheme.bodyMedium,
+                'Elige cómo participas. Puedes cambiarlo después.',
+                style: theme.textTheme.bodyLarge?.copyWith(color: colors.muted),
               ),
               const SizedBox(height: AppSpacing.xl),
-              if (_step == 0) ...[
-                AccountTypeCard(
-                  title: 'Soy agente',
-                  subtitle: 'Licencia / NPN y agencia afiliada',
-                  icon: Icons.badge_outlined,
-                  selected: _type == UserRole.agent,
-                  onTap: () => setState(() => _type = UserRole.agent),
+              _RoleHeroCard(
+                title: 'Soy agente',
+                subtitle: 'NPN, agencia y comunidad profesional',
+                selected: _type == UserRole.agent,
+                onTap: () => setState(() => _type = UserRole.agent),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _RoleHeroCard(
+                title: 'Soy estudiante',
+                subtitle: 'Campus, práctica y networking',
+                selected: _type == UserRole.student,
+                onTap: () => setState(() => _type = UserRole.student),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              SignalButton(
+                label: 'Continuar',
+                onPressed: _type == null
+                    ? null
+                    : () => setState(() => _step = 1),
+              ),
+            ] else ...[
+              TextButton(
+                onPressed: _busy ? null : () => setState(() => _step = 0),
+                child: const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('← Cambiar rol'),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                AccountTypeCard(
-                  title: 'Soy estudiante',
-                  subtitle: 'Aprendiendo y explorando la universidad',
-                  icon: Icons.school_outlined,
-                  selected: _type == UserRole.student,
-                  onTap: () => setState(() => _type = UserRole.student),
-                ),
-                const SizedBox(height: AppSpacing.xl),
-                FilledButton(
-                  onPressed: _type == null
-                      ? null
-                      : () => setState(() => _step = 1),
-                  child: const Text('Continuar'),
-                ),
-              ] else ...[
-                TextButton(
-                  onPressed: _busy ? null : () => setState(() => _step = 0),
-                  child: const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('← Cambiar tipo de cuenta'),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                ProfileDetailsForm(
-                  accountType: _type!,
-                  busy: _busy,
-                  submitLabel: 'Finalizar',
-                  initialName: widget.profile.displayName,
-                  initialCountryCode: widget.profile.phoneCountryCode,
-                  initialPhoneNumber: widget.profile.phoneNumber,
-                  initialNpn: widget.profile.npn,
-                  initialAddress: widget.profile.address,
-                  initialAgency: widget.profile.agency ?? kDefaultAgency,
-                  onSubmit: _save,
-                ),
-              ],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Cuéntanos un poco más',
+                style: theme.textTheme.headlineMedium,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              ProfileDetailsForm(
+                accountType: _type!,
+                busy: _busy,
+                submitLabel: 'Finalizar',
+                initialName: widget.profile.displayName,
+                initialCountryCode: widget.profile.phoneCountryCode,
+                initialPhoneNumber: widget.profile.phoneNumber,
+                initialNpn: widget.profile.npn,
+                initialAddress: widget.profile.address,
+                initialAgency: widget.profile.agency ?? kDefaultAgency,
+                onSubmit: _save,
+              ),
             ],
-          ),
+          ],
         ),
+      ),
+    );
+  }
+}
+
+class _RoleHeroCard extends StatelessWidget {
+  const _RoleHeroCard({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+
+    return PulseSheet(
+      onTap: onTap,
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
+                ),
+                const SizedBox(height: 6),
+                Text(subtitle, style: theme.textTheme.bodyMedium),
+              ],
+            ),
+          ),
+          Icon(
+            selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+            color: selected ? AppColors.brandOf(context) : colors.muted,
+            size: 28,
+          ),
+        ],
       ),
     );
   }
