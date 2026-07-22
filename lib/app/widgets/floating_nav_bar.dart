@@ -1,6 +1,5 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
+import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import '../app_spacing.dart';
 import '../theme.dart';
@@ -17,7 +16,7 @@ class FloatingNavItem {
   final IconData selectedIcon;
 }
 
-/// Full-width floating dock — icons only, sliding glass pill.
+/// Full-width floating dock — icons only, liquid-glass surface.
 class FloatingNavBar extends StatelessWidget {
   const FloatingNavBar({
     super.key,
@@ -35,76 +34,74 @@ class FloatingNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(999),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: const Color(0x990A1510),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-              color: Colors.white.withValues(alpha: 0.1),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 28,
-                offset: const Offset(0, 12),
-              ),
-            ],
-          ),
-          child: SizedBox(
-            height: _barHeight,
-            width: double.infinity,
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final trackWidth = constraints.maxWidth - _inset * 2;
-                final itemExtent = trackWidth / items.length;
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
-                return Stack(
-                  children: [
-                    AnimatedPositioned(
-                      duration: const Duration(milliseconds: 320),
-                      curve: Curves.easeOutCubic,
-                      left: _inset + selectedIndex * itemExtent,
-                      top: 6,
-                      bottom: 6,
-                      width: itemExtent,
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(999),
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    AppColors.accent.withValues(alpha: 0.25),
-                                blurRadius: 12,
-                              ),
-                            ],
-                          ),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: isLight ? 0.08 : 0.35),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: GlassContainer(
+        useOwnLayer: true,
+        height: _barHeight,
+        width: double.infinity,
+        shape: const LiquidRoundedSuperellipse(borderRadius: 28),
+        clipBehavior: Clip.antiAlias,
+        settings: LiquidGlassSettings(
+          thickness: isLight ? 26 : 34,
+          blur: isLight ? 14 : 10,
+          glassColor: isLight
+              ? const Color(0x38FFFFFF)
+              : const Color(0x330A1510),
+          lightIntensity: isLight ? 1.1 : 0.9,
+        ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final trackWidth = constraints.maxWidth - _inset * 2;
+            final itemExtent = trackWidth / items.length;
+
+            return Stack(
+              children: [
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 320),
+                  curve: Curves.easeOutCubic,
+                  left: _inset + selectedIndex * itemExtent,
+                  top: 6,
+                  bottom: 6,
+                  width: itemExtent,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: AppColors.brand.withValues(
+                          alpha: isLight ? 0.1 : 0.28,
                         ),
+                        borderRadius: BorderRadius.circular(999),
                       ),
                     ),
-                    for (var i = 0; i < items.length; i++)
-                      Positioned(
-                        left: _inset + i * itemExtent,
-                        top: 0,
-                        bottom: 0,
-                        width: itemExtent,
-                        child: _NavIcon(
-                          item: items[i],
-                          selected: i == selectedIndex,
-                          onTap: () => onSelect(i),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-          ),
+                  ),
+                ),
+                for (var i = 0; i < items.length; i++)
+                  Positioned(
+                    left: _inset + i * itemExtent,
+                    top: 0,
+                    bottom: 0,
+                    width: itemExtent,
+                    child: _NavIcon(
+                      item: items[i],
+                      selected: i == selectedIndex,
+                      onTap: () => onSelect(i),
+                    ),
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -141,7 +138,9 @@ class _NavIcon extends StatelessWidget {
               child: Icon(
                 selected ? item.selectedIcon : item.icon,
                 size: 24,
-                color: selected ? AppColors.accent : AppColors.muted,
+                color: selected
+                    ? AppColors.brand
+                    : AppColors.of(context).muted,
               ),
             ),
           ),
