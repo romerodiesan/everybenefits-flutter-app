@@ -1,20 +1,38 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
-import '../../app/demo_content.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../users/user_profile.dart';
+import '../../users/user_repository.dart';
 import 'chat_conversation_screen.dart';
+import 'chat_models.dart';
 import 'chat_new_chat_screen.dart';
+import 'chat_repository.dart';
+import 'widgets/chat_avatar.dart';
 
-/// Minimal chat list (1:1 essence).
+/// Chat inbox backed by [ChatRepository].
 class ChatsScreen extends StatelessWidget {
-  const ChatsScreen({super.key});
+  const ChatsScreen({
+    super.key,
+    required this.profile,
+    this.chatRepository,
+    this.userRepository,
+  });
+
+  final UserProfile profile;
+  final ChatRepository? chatRepository;
+  final UserRepository? userRepository;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final repo = chatRepository ?? ChatRepository();
+    final canChat = canParticipateInChats(
+      role: profile.role,
+      isAnonymous: profile.isAnonymous,
+    );
 
     return PulseScaffold(
       appBar: AppBar(
@@ -23,116 +41,306 @@ class ChatsScreen extends StatelessWidget {
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Nuevo chat',
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const ChatNewChatScreen(),
-                ),
-              );
-            },
-            icon: const Icon(Icons.edit_outlined),
-          ),
+          if (canChat)
+            IconButton(
+              tooltip: 'Nuevo chat',
+              onPressed: () => _openNewChat(context, repo),
+              icon: const Icon(Icons.edit_outlined),
+            ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        heroTag: 'fab-chats-new',
-        onPressed: () {
-          Navigator.of(context).push(
-            MaterialPageRoute<void>(
-              builder: (_) => const ChatNewChatScreen(),
-            ),
-          );
-        },
-        tooltip: 'Nuevo chat',
-        child: const Icon(Icons.add_rounded),
-      ),
-      body: ListView.separated(
-        padding: const EdgeInsets.only(bottom: AppSpacing.xl),
-        itemCount: demoChats.length,
-        separatorBuilder: (_, _) => Divider(
-          height: 1,
-          indent: 76,
-          color: colors.border,
-        ),
-        itemBuilder: (context, index) {
-          final chat = demoChats[index];
-          return ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: 4,
-            ),
-            onTap: () {
-              Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => ChatConversationScreen(chat: chat),
-                ),
-              );
-            },
-            leading: CircleAvatar(
-              radius: 26,
-              backgroundColor: AppColors.brandOf(context).withValues(alpha: 0.18),
-              child: Text(
-                chat.initials,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: colors.ink,
-                  fontWeight: FontWeight.w800,
+      floatingActionButton: canChat
+          ? FloatingActionButton(
+              heroTag: 'fab-chats-new',
+              onPressed: () => _openNewChat(context, repo),
+              tooltip: 'Nuevo chat',
+              child: const Icon(Icons.add_rounded),
+            )
+          : null,
+      body: !canChat
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Text(
+                  'Regístrate con una cuenta para enviar y recibir mensajes.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: colors.muted,
+                    height: 1.4,
+                  ),
                 ),
               ),
-            ),
-            title: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    chat.title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Text(
-                  chat.time,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: chat.unread > 0 ? AppColors.brandOf(context) : colors.muted,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-            subtitle: Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    chat.preview,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodyMedium,
-                  ),
-                ),
-                if (chat.unread > 0)
-                  Container(
-                    margin: const EdgeInsets.only(left: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 7,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.brandOf(context),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      '${chat.unread}',
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimary,
-                        fontSize: 11,
+            )
+          : StreamBuilder<List<ChatConversation>>(
+              stream: repo.watchChats(profile.uid),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Text(
+                        friendlyChatError(snapshot.error!),
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: colors.muted,
+                        ),
                       ),
                     ),
+                  );
+                }
+                if (!snapshot.hasData) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+
+                final chats = snapshot.data!;
+                if (chats.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Aún no tienes chats',
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Toca + para escribirle a un compañero.',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.muted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
+                final pinned =
+                    chats.where((c) => c.isPinnedFor(profile.uid)).toList();
+                final rest =
+                    chats.where((c) => !c.isPinnedFor(profile.uid)).toList();
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    110,
                   ),
-              ],
+                  children: [
+                    if (pinned.isNotEmpty) ...[
+                      const _SectionLabel(label: 'Fijados'),
+                      const SizedBox(height: 8),
+                      for (final chat in pinned) ...[
+                        _ChatRow(
+                          chat: chat,
+                          viewerUid: profile.uid,
+                          onTap: () => _openChat(context, chat, repo),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      const SizedBox(height: 8),
+                      const _SectionLabel(label: 'Recientes'),
+                      const SizedBox(height: 8),
+                    ],
+                    for (final chat in rest) ...[
+                      _ChatRow(
+                        chat: chat,
+                        viewerUid: profile.uid,
+                        onTap: () => _openChat(context, chat, repo),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
+                );
+              },
             ),
-          );
-        },
+    );
+  }
+
+  void _openNewChat(BuildContext context, ChatRepository repo) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatNewChatScreen(
+          profile: profile,
+          chatRepository: repo,
+          userRepository: userRepository ?? UserRepository(),
+        ),
+      ),
+    );
+  }
+
+  void _openChat(
+    BuildContext context,
+    ChatConversation chat,
+    ChatRepository repo,
+  ) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ChatConversationScreen(
+          chat: chat,
+          profile: profile,
+          chatRepository: repo,
+        ),
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  const _SectionLabel({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label.toUpperCase(),
+      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: AppColors.of(context).muted,
+            fontSize: 11,
+            letterSpacing: 1.1,
+            fontWeight: FontWeight.w800,
+          ),
+    );
+  }
+}
+
+class _ChatRow extends StatelessWidget {
+  const _ChatRow({
+    required this.chat,
+    required this.viewerUid,
+    required this.onTap,
+  });
+
+  final ChatConversation chat;
+  final String viewerUid;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+    final unread = chat.unreadFor(viewerUid);
+    final hasUnread = unread > 0;
+    final title = chat.titleFor(viewerUid);
+    final preview = chat.lastMessage.isEmpty
+        ? 'Sin mensajes todavía'
+        : chat.lastMessage;
+
+    return Material(
+      color: colors.sheet,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: colors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+          child: Row(
+            children: [
+              ChatAvatar(
+                initials: chat.initialsFor(viewerUid),
+                isGroup: chat.isGroup,
+                size: 50,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        if (chat.isPinnedFor(viewerUid)) ...[
+                          Icon(
+                            Icons.push_pin_rounded,
+                            size: 13,
+                            color: colors.muted,
+                          ),
+                          const SizedBox(width: 4),
+                        ],
+                        Expanded(
+                          child: Text(
+                            title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: hasUnread
+                                  ? FontWeight.w800
+                                  : FontWeight.w700,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          formatChatTime(chat.lastMessageAt),
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: hasUnread ? brand : colors.muted,
+                            fontSize: 11.5,
+                            fontWeight:
+                                hasUnread ? FontWeight.w800 : FontWeight.w600,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            preview,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: hasUnread
+                                  ? colors.ink.withValues(alpha: 0.78)
+                                  : colors.muted,
+                              fontWeight:
+                                  hasUnread ? FontWeight.w600 : FontWeight.w500,
+                              fontSize: 13.5,
+                            ),
+                          ),
+                        ),
+                        if (hasUnread) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            constraints: const BoxConstraints(minWidth: 22),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: brand,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              '$unread',
+                              style: theme.textTheme.labelLarge?.copyWith(
+                                color: AppColors.onBrandOf(context),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

@@ -1,13 +1,71 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
-import '../../app/demo_content.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../users/user_profile.dart';
+import '../../users/user_repository.dart';
 import 'chat_conversation_screen.dart';
+import 'chat_models.dart';
+import 'chat_repository.dart';
+import 'widgets/chat_avatar.dart';
 
-class ChatNewChatScreen extends StatelessWidget {
-  const ChatNewChatScreen({super.key});
+class ChatNewChatScreen extends StatefulWidget {
+  const ChatNewChatScreen({
+    super.key,
+    required this.profile,
+    this.chatRepository,
+    this.userRepository,
+  });
+
+  final UserProfile profile;
+  final ChatRepository? chatRepository;
+  final UserRepository? userRepository;
+
+  @override
+  State<ChatNewChatScreen> createState() => _ChatNewChatScreenState();
+}
+
+class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
+  late final Future<List<UserProfile>> _contactsFuture;
+  late final ChatRepository _chatRepo =
+      widget.chatRepository ?? ChatRepository();
+  late final UserRepository _users =
+      widget.userRepository ?? UserRepository();
+  String? _openingUid;
+
+  @override
+  void initState() {
+    super.initState();
+    _contactsFuture = _users.listDirectory(excludeUid: widget.profile.uid);
+  }
+
+  Future<void> _openDm(UserProfile other) async {
+    if (_openingUid != null) return;
+    setState(() => _openingUid = other.uid);
+    try {
+      final chat = await _chatRepo.getOrCreateDm(
+        me: widget.profile,
+        other: other,
+      );
+      if (!mounted) return;
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => ChatConversationScreen(
+            chat: chat,
+            profile: widget.profile,
+            chatRepository: _chatRepo,
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyChatError(error))),
+      );
+      setState(() => _openingUid = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -15,64 +73,135 @@ class ChatNewChatScreen extends StatelessWidget {
     final colors = AppColors.of(context);
 
     return PulseScaffold(
-      appBar: AppBar(title: const Text('Nuevo chat')),
-      body: ListView(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.md,
-              AppSpacing.lg,
-              AppSpacing.sm,
-            ),
-            child: Text(
-              'Contactos',
-              style: theme.textTheme.labelLarge?.copyWith(color: colors.muted),
-            ),
+      appBar: AppBar(
+        title: Text(
+          'Nuevo chat',
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w800,
           ),
-          for (final person in demoPeople)
-            ListTile(
-              leading: CircleAvatar(
-                backgroundColor: AppColors.brandOf(context).withValues(alpha: 0.18),
+        ),
+      ),
+      body: FutureBuilder<List<UserProfile>>(
+        future: _contactsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Text(
-                  person.initials,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
+                  friendlyChatError(snapshot.error!),
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.muted,
                   ),
                 ),
               ),
-              title: Text(
-                person.name,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
+            );
+          }
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final contacts = snapshot.data!;
+          if (contacts.isEmpty) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.xl),
+                child: Text(
+                  'No hay otros usuarios todavía. Cuando alguien se registre, aparecerá aquí.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    color: colors.muted,
+                    height: 1.4,
+                  ),
                 ),
               ),
-              subtitle: Text(person.handle),
-              onTap: () {
-                Navigator.of(context).pushReplacement(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ChatConversationScreen(
-                      chat: DemoChat(
-                        id: person.handle,
-                        title: person.name,
-                        preview: '',
-                        time: '',
-                        initials: person.initials,
+            );
+          }
+
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.xl,
+            ),
+            children: [
+              Text(
+                'CONTACTOS',
+                style: theme.textTheme.labelLarge?.copyWith(
+                  color: colors.muted,
+                  fontSize: 11,
+                  letterSpacing: 1.1,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 10),
+              for (final person in contacts) ...[
+                Material(
+                  color: colors.sheet,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: BorderSide(color: colors.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: InkWell(
+                    onTap: _openingUid == null ? () => _openDm(person) : null,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+                      child: Row(
+                        children: [
+                          ChatAvatar(
+                            initials: chatInitials(person.headlineName),
+                            size: 46,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  person.headlineName,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.2,
+                                  ),
+                                ),
+                                if (person.agency?.trim().isNotEmpty ==
+                                    true) ...[
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    person.agency!,
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: colors.muted,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          if (_openingUid == person.uid)
+                            const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            Icon(
+                              Icons.chevron_right_rounded,
+                              color: colors.muted.withValues(alpha: 0.7),
+                            ),
+                        ],
                       ),
                     ),
                   ),
-                );
-              },
-            ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Text(
-              'Placeholder — chats reales próximamente.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-            ),
-          ),
-        ],
+                ),
+                const SizedBox(height: 8),
+              ],
+            ],
+          );
+        },
       ),
     );
   }

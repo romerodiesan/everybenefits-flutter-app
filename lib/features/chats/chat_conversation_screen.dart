@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
-import '../../app/demo_content.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../users/user_profile.dart';
@@ -9,20 +8,25 @@ import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
 import '../forums/widgets/share_to_chat_sheet.dart';
 import 'chat_contact_info_screen.dart';
+import 'chat_models.dart';
+import 'chat_repository.dart';
+import 'widgets/chat_avatar.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   const ChatConversationScreen({
     super.key,
     required this.chat,
-    this.initialSharedPost,
-    this.viewerProfile,
+    required this.profile,
+    this.chatRepository,
     this.forumRepository,
+    this.initialSharedPost,
   });
 
-  final DemoChat chat;
-  final SharedPostPreview? initialSharedPost;
-  final UserProfile? viewerProfile;
+  final ChatConversation chat;
+  final UserProfile profile;
+  final ChatRepository? chatRepository;
   final ForumRepository? forumRepository;
+  final SharedPostPreview? initialSharedPost;
 
   @override
   State<ChatConversationScreen> createState() => _ChatConversationScreenState();
@@ -30,47 +34,82 @@ class ChatConversationScreen extends StatefulWidget {
 
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _controller = TextEditingController();
-  late final List<DemoMessage> _messages = [
-    ...demoMessages,
-    if (widget.initialSharedPost != null)
-      DemoMessage(
-        body: '',
-        time: 'Ahora',
-        mine: true,
-        sharedPost: widget.initialSharedPost,
-      ),
-  ];
+  final _scrollController = ScrollController();
+  late final ChatRepository _repo =
+      widget.chatRepository ?? ChatRepository();
+  var _sending = false;
+  var _sharedBootstrapped = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _repo.markRead(chatId: widget.chat.id, uid: widget.profile.uid);
+      _bootstrapSharedPost();
+    });
+  }
+
+  Future<void> _bootstrapSharedPost() async {
+    final preview = widget.initialSharedPost;
+    if (preview == null || _sharedBootstrapped) return;
+    _sharedBootstrapped = true;
+    try {
+      await _repo.sharePost(
+        chatId: widget.chat.id,
+        author: widget.profile,
+        preview: preview,
+      );
+      await _repo.markRead(chatId: widget.chat.id, uid: widget.profile.uid);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyChatError(error))),
+      );
+    }
+  }
 
   @override
   void dispose() {
     _controller.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  void _send() {
+  Future<void> _send() async {
     final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _messages.add(DemoMessage(body: text, time: 'Ahora', mine: true));
+    if (text.isEmpty || _sending) return;
+    setState(() => _sending = true);
+    try {
+      await _repo.sendMessage(
+        chatId: widget.chat.id,
+        body: text,
+        author: widget.profile,
+      );
       _controller.clear();
-    });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_scrollController.hasClients) return;
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOut,
+        );
+      });
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyChatError(error))),
+      );
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
   }
 
   void _openSharedPost(SharedPostPreview preview) {
-    final profile = widget.viewerProfile;
-    if (profile == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('No se pudo abrir la pregunta desde este chat.'),
-        ),
-      );
-      return;
-    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ThreadDetailScreen(
           threadId: preview.threadId,
-          profile: profile,
+          profile: widget.profile,
           forumRepository: widget.forumRepository ?? ForumRepository(),
         ),
       ),
@@ -81,224 +120,315 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+    final uid = widget.profile.uid;
 
     return PulseScaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: InkWell(
-          onTap: () {
-            Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => ChatContactInfoScreen(chat: widget.chat),
+        title: StreamBuilder<ChatConversation?>(
+          stream: _repo.watchChat(widget.chat.id),
+          initialData: widget.chat,
+          builder: (context, snapshot) {
+            final chat = snapshot.data ?? widget.chat;
+            return InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ChatContactInfoScreen(
+                      chat: chat,
+                      profile: widget.profile,
+                      chatRepository: _repo,
+                    ),
+                  ),
+                );
+              },
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+                child: Row(
+                  children: [
+                    ChatAvatar(
+                      initials: chat.initialsFor(uid),
+                      isGroup: chat.isGroup,
+                      size: 38,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            chat.titleFor(uid),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.2,
+                            ),
+                          ),
+                          Text(
+                            chat.isGroup ? 'Grupo' : 'Chat privado',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: colors.muted,
+                              fontWeight: FontWeight.w600,
+                              fontSize: 11,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             );
           },
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 18,
-                backgroundColor:
-                    AppColors.brandOf(context).withValues(alpha: 0.2),
-                child: Text(
-                  widget.chat.initials,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  widget.chat.title,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
         ),
       ),
       body: Column(
         children: [
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.md,
-                AppSpacing.sm,
-              ),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final msg = _messages[index];
-                final shared = msg.sharedPost;
-
-                if (shared != null) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Align(
-                      alignment: msg.mine
-                          ? Alignment.centerRight
-                          : Alignment.centerLeft,
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: msg.mine
-                              ? CrossAxisAlignment.end
-                              : CrossAxisAlignment.start,
-                          children: [
-                            SharedPostCard(
-                              preview: shared,
-                              onTap: () => _openSharedPost(shared),
-                            ),
-                            if (msg.body.trim().isNotEmpty) ...[
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.fromLTRB(
-                                  12,
-                                  10,
-                                  12,
-                                  8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: msg.mine
-                                      ? AppColors.brandOf(context)
-                                          .withValues(alpha: 0.14)
-                                      : colors.sheet,
-                                  borderRadius: BorderRadius.only(
-                                    topLeft: const Radius.circular(16),
-                                    topRight: const Radius.circular(16),
-                                    bottomLeft:
-                                        Radius.circular(msg.mine ? 16 : 4),
-                                    bottomRight:
-                                        Radius.circular(msg.mine ? 4 : 16),
-                                  ),
-                                  border: Border.all(color: colors.border),
-                                ),
-                                child: Text(
-                                  msg.body,
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: colors.ink,
-                                    height: 1.35,
-                                  ),
-                                ),
-                              ),
-                            ],
-                            const SizedBox(height: 4),
-                            Text(
-                              msg.time,
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: colors.muted,
-                                fontSize: 11,
-                              ),
-                            ),
-                          ],
-                        ),
+            child: StreamBuilder<List<ChatMessage>>(
+              stream: _repo.watchMessages(widget.chat.id),
+              builder: (context, snapshot) {
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Text(
+                      friendlyChatError(snapshot.error!),
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.muted,
+                      ),
+                    ),
+                  );
+                }
+                final messages = snapshot.data;
+                if (messages == null) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (messages.isEmpty) {
+                  return Center(
+                    child: Text(
+                      'Di el primero. Los mensajes se sincronizan en vivo.',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.muted,
                       ),
                     ),
                   );
                 }
 
-                return Align(
-                  alignment:
-                      msg.mine ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.sizeOf(context).width * 0.78,
-                    ),
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-                    decoration: BoxDecoration(
-                      color: msg.mine
-                          ? AppColors.brandOf(context).withValues(alpha: 0.14)
-                          : colors.sheet,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(16),
-                        topRight: const Radius.circular(16),
-                        bottomLeft: Radius.circular(msg.mine ? 16 : 4),
-                        bottomRight: Radius.circular(msg.mine ? 4 : 16),
-                      ),
-                      border: Border.all(color: colors.border),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          msg.body,
-                          style: theme.textTheme.bodyLarge?.copyWith(
-                            color: colors.ink,
-                            height: 1.35,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          msg.time,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.muted,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
+                return ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.md,
+                    AppSpacing.md,
+                    AppSpacing.sm,
                   ),
+                  itemCount: messages.length,
+                  itemBuilder: (context, index) {
+                    final msg = messages[index];
+                    final mine = msg.isMine(uid);
+                    final shared = msg.sharedPost;
+                    final time = formatChatTime(msg.createdAt);
+
+                    if (shared != null) {
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: Align(
+                          alignment: mine
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.sizeOf(context).width * 0.82,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: mine
+                                  ? CrossAxisAlignment.end
+                                  : CrossAxisAlignment.start,
+                              children: [
+                                SharedPostCard(
+                                  preview: shared,
+                                  onTap: () => _openSharedPost(shared),
+                                ),
+                                if (msg.body.trim().isNotEmpty) ...[
+                                  const SizedBox(height: 6),
+                                  _MessageBubble(
+                                    text: msg.body,
+                                    mine: mine,
+                                  ),
+                                ],
+                                const SizedBox(height: 4),
+                                Text(
+                                  time,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colors.muted,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Align(
+                        alignment: mine
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth:
+                                MediaQuery.sizeOf(context).width * 0.78,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: mine
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              _MessageBubble(text: msg.body, mine: mine),
+                              const SizedBox(height: 4),
+                              Text(
+                                time,
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: colors.muted,
+                                  fontSize: 11,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 );
               },
             ),
           ),
-          Divider(height: 1, color: colors.border),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.sm,
-                AppSpacing.sm,
-                AppSpacing.sm,
-                AppSpacing.sm,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        hintText: 'Mensaje',
-                        filled: true,
-                        fillColor: colors.sheet,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: colors.border),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.sheet.withValues(alpha: 0.96),
+              border: Border(top: BorderSide(color: colors.border)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _controller,
+                        minLines: 1,
+                        maxLines: 4,
+                        textCapitalization: TextCapitalization.sentences,
+                        enabled: !_sending,
+                        decoration: InputDecoration(
+                          hintText: 'Escribe un mensaje…',
+                          hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                            color: colors.muted,
+                          ),
+                          filled: true,
+                          fillColor: colors.glassFill,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide(color: colors.border),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide(color: colors.border),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(22),
+                            borderSide: BorderSide(color: brand, width: 1.4),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 12,
+                          ),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: BorderSide(color: colors.border),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
+                        onSubmitted: (_) => _send(),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Material(
+                      color: brand,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: InkWell(
+                        onTap: _sending ? null : _send,
+                        borderRadius: BorderRadius.circular(16),
+                        child: SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: _sending
+                              ? Padding(
+                                  padding: const EdgeInsets.all(14),
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppColors.onBrandOf(context),
+                                  ),
+                                )
+                              : Icon(
+                                  Icons.send_rounded,
+                                  size: 20,
+                                  color: AppColors.onBrandOf(context),
+                                ),
                         ),
                       ),
-                      onSubmitted: (_) => _send(),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    onPressed: _send,
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.brandOf(context),
-                      foregroundColor: Theme.of(context).colorScheme.onPrimary,
-                    ),
-                    icon: const Icon(Icons.send_rounded, size: 20),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({required this.text, required this.mine});
+
+  final String text;
+  final bool mine;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+      decoration: BoxDecoration(
+        color: mine ? brand.withValues(alpha: 0.16) : colors.sheet,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(18),
+          topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(mine ? 18 : 5),
+          bottomRight: Radius.circular(mine ? 5 : 18),
+        ),
+        border: Border.all(
+          color: mine ? brand.withValues(alpha: 0.22) : colors.border,
+        ),
+      ),
+      child: Text(
+        text,
+        style: theme.textTheme.bodyLarge?.copyWith(
+          color: colors.ink,
+          height: 1.4,
+          fontSize: 15,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }

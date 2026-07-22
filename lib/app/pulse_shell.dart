@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../auth/auth.dart';
 import '../features/ai_chat/ai_chat_screen.dart';
+import '../features/chats/chat_repository.dart';
 import '../features/chats/chats_screen.dart';
 import '../features/forums/forum_repository.dart';
 import '../features/forums/forums_screen.dart';
@@ -18,12 +19,14 @@ class PulseShell extends StatefulWidget {
     required this.userRepository,
     required this.profile,
     this.forumRepository,
+    this.chatRepository,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
   final UserProfile profile;
   final ForumRepository? forumRepository;
+  final ChatRepository? chatRepository;
 
   @override
   State<PulseShell> createState() => PulseShellState();
@@ -76,9 +79,14 @@ class PulseShellState extends State<PulseShell> {
       ForumsScreen(
         profile: profile,
         forumRepository: widget.forumRepository,
+        chatRepository: widget.chatRepository,
         embeddedInShell: true,
       ),
-      const ChatsScreen(),
+      ChatsScreen(
+        profile: profile,
+        chatRepository: widget.chatRepository,
+        userRepository: widget.userRepository,
+      ),
       const AiChatScreen(),
       const UniversityScreen(),
       ProfileScreen(
@@ -89,7 +97,7 @@ class PulseShellState extends State<PulseShell> {
     ];
 
     return PulseScaffold(
-      extendBody: false,
+      extendBody: true,
       body: IndexedStack(index: _index, children: pages),
       bottomNavigationBar: PulseTabBar(
         items: _navItems,

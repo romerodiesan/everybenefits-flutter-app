@@ -16,6 +16,12 @@ abstract class UserProfileStore {
   Future<void> update(UserProfile profile);
 
   Stream<UserProfile?> watch(String uid);
+
+  /// Directory of peers for starting chats (excludes anonymous guests).
+  Future<List<UserProfile>> listDirectory({
+    String? excludeUid,
+    int limit = 80,
+  });
 }
 
 class FirestoreUserProfileStore implements UserProfileStore {
@@ -73,6 +79,28 @@ class FirestoreUserProfileStore implements UserProfileStore {
       if (!snapshot.exists || snapshot.data() == null) return null;
       return UserProfile.fromMap(snapshot.data()!);
     });
+  }
+
+  @override
+  Future<List<UserProfile>> listDirectory({
+    String? excludeUid,
+    int limit = 80,
+  }) async {
+    final snap = await _users
+        .where('isAnonymous', isEqualTo: false)
+        .limit(limit + (excludeUid == null ? 0 : 1))
+        .get();
+    final list = snap.docs
+        .map((d) => UserProfile.fromMap(d.data()))
+        .where((p) => p.uid != excludeUid && p.role != UserRole.guest)
+        .take(limit)
+        .toList()
+      ..sort(
+        (a, b) => a.headlineName.toLowerCase().compareTo(
+              b.headlineName.toLowerCase(),
+            ),
+      );
+    return list;
   }
 }
 
@@ -155,4 +183,11 @@ class UserRepository {
   }
 
   Stream<UserProfile?> watchProfile(String uid) => _store.watch(uid);
+
+  Future<List<UserProfile>> listDirectory({
+    String? excludeUid,
+    int limit = 80,
+  }) {
+    return _store.listDirectory(excludeUid: excludeUid, limit: limit);
+  }
 }

@@ -10,6 +10,7 @@ import 'package:every_benefits/app/home_shell.dart';
 import 'package:every_benefits/app/theme.dart';
 import 'package:every_benefits/app/theme_controller.dart';
 import 'package:every_benefits/auth/auth_service.dart';
+import 'package:every_benefits/features/chats/chat_repository.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
@@ -21,6 +22,8 @@ import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_repository.dart';
 import 'package:every_benefits/users/user_role.dart';
 
+import 'helpers/fake_chat_store.dart';
+
 class MockAuthService extends Mock implements AuthService {}
 
 class MockUserRepository extends Mock implements UserRepository {}
@@ -31,6 +34,8 @@ void main() {
   late MockAuthService auth;
   late MockUserRepository users;
   late ForumRepository emptyForums;
+  late FakeChatStore chatStore;
+  late ChatRepository emptyChats;
 
   setUpAll(() {
     registerFallbackValue(MockUser());
@@ -42,7 +47,11 @@ void main() {
     auth = MockAuthService();
     users = MockUserRepository();
     emptyForums = ForumRepository(store: _EmptyForumStore());
+    chatStore = FakeChatStore();
+    emptyChats = ChatRepository(store: chatStore);
   });
+
+  tearDown(() => chatStore.dispose());
 
   Widget app() {
     return EveryInsuranceApp(
@@ -50,6 +59,7 @@ void main() {
       userRepository: users,
       themeController: ThemeController(),
       forumRepository: emptyForums,
+      chatRepository: emptyChats,
     );
   }
 
@@ -155,9 +165,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsNothing);
-    expect(find.text('Inicio'), findsWidgets);
-    expect(find.text('Chats'), findsWidgets);
-    expect(find.text('IA'), findsWidgets);
+    expect(find.byTooltip('Inicio'), findsOneWidget);
+    expect(find.byTooltip('Chats'), findsOneWidget);
+    expect(find.byTooltip('IA'), findsOneWidget);
 
     await authController.close();
   });
@@ -227,11 +237,11 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('Inicio'), findsWidgets);
-    expect(find.text('Chats'), findsWidgets);
-    expect(find.text('IA'), findsWidgets);
-    expect(find.text('Academia'), findsWidgets);
-    expect(find.text('Perfil'), findsWidgets);
+    expect(find.byTooltip('Inicio'), findsOneWidget);
+    expect(find.byTooltip('Chats'), findsOneWidget);
+    expect(find.byTooltip('IA'), findsOneWidget);
+    expect(find.byTooltip('Academia'), findsOneWidget);
+    expect(find.byTooltip('Perfil'), findsOneWidget);
   });
 
   testWidgets('pulse shell tabs switch between feed chats and profile',
@@ -248,6 +258,7 @@ void main() {
           userRepository: usersRepo,
           profile: profile,
           forumRepository: ForumRepository(store: _EmptyForumStore()),
+          chatRepository: emptyChats,
         ),
       ),
     );
@@ -256,11 +267,11 @@ void main() {
 
     expect(find.textContaining('Modo lectura'), findsOneWidget);
 
-    await tester.tap(find.text('Chats').last);
+    await tester.tap(find.byTooltip('Chats'));
     await tester.pumpAndSettle();
-    expect(find.text('Equipo Ventas CR'), findsOneWidget);
+    expect(find.textContaining('Regístrate con una cuenta'), findsOneWidget);
 
-    await tester.tap(find.text('Perfil').last);
+    await tester.tap(find.byTooltip('Perfil'));
     await tester.pumpAndSettle();
 
     expect(find.text('Invitado'), findsOneWidget);
@@ -286,12 +297,13 @@ void main() {
         userRepository: users,
         themeController: themeController,
         forumRepository: emptyForums,
+        chatRepository: emptyChats,
       ),
     );
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(find.text('Perfil').last);
+    await tester.tap(find.byTooltip('Perfil'));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Ajustes'));
     await tester.pumpAndSettle();
@@ -316,8 +328,14 @@ class FakeUserCredential extends Fake implements UserCredential {}
 
 class _EmptyForumStore implements ForumStore {
   @override
-  Stream<List<ForumThread>> watchThreads({String? tag}) =>
-      Stream.value(const []);
+  Future<ForumThreadPage> queryThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+    Object? cursor,
+  }) async =>
+      const ForumThreadPage(threads: []);
 
   @override
   Stream<ForumThread?> watchThread(String threadId) => Stream.value(null);
@@ -352,6 +370,14 @@ class _EmptyForumStore implements ForumStore {
   }
 
   @override
+  Future<void> updateThread({
+    required String threadId,
+    required String title,
+    required String body,
+    required List<String> tags,
+  }) async {}
+
+  @override
   Future<ForumReply> addReply({
     required String threadId,
     required String body,
@@ -361,12 +387,25 @@ class _EmptyForumStore implements ForumStore {
   }
 
   @override
+  Future<void> updateReply({
+    required String threadId,
+    required String replyId,
+    required String body,
+  }) async {}
+
+  @override
   Future<void> deleteThread(String threadId) async {}
 
   @override
   Future<void> deleteReply({
     required String threadId,
     required String replyId,
+  }) async {}
+
+  @override
+  Future<void> setAcceptedReply({
+    required String threadId,
+    required String? replyId,
   }) async {}
 
   @override

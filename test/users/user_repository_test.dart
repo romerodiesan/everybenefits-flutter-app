@@ -47,6 +47,22 @@ class FakeUserStore implements UserProfileStore {
     yield profiles[uid];
     yield* _controllerFor(uid).stream;
   }
+
+  @override
+  Future<List<UserProfile>> listDirectory({
+    String? excludeUid,
+    int limit = 80,
+  }) async {
+    return profiles.values
+        .where(
+          (p) =>
+              !p.isAnonymous &&
+              p.role != UserRole.guest &&
+              p.uid != excludeUid,
+        )
+        .take(limit)
+        .toList();
+  }
 }
 
 void main() {
