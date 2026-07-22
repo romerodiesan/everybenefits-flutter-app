@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
-import '../../../app/demo_content.dart';
 import '../../../app/theme.dart';
 import '../../../users/user_profile.dart';
 import '../../chats/chat_conversation_screen.dart';
+import '../../chats/chat_models.dart';
+import '../../chats/chat_repository.dart';
 import '../forum_models.dart';
 import '../forum_repository.dart';
 
@@ -30,10 +31,12 @@ Future<void> showShareToChatSheet({
   required ForumThread thread,
   required UserProfile profile,
   ForumRepository? forumRepository,
+  ChatRepository? chatRepository,
 }) {
   final colors = AppColors.of(context);
   final shared = sharedPostFromThread(thread);
-  final repo = forumRepository ?? ForumRepository();
+  final forumRepo = forumRepository ?? ForumRepository();
+  final chatRepo = chatRepository ?? ChatRepository();
 
   return showModalBottomSheet<void>(
     context: context,
@@ -86,54 +89,106 @@ Future<void> showShareToChatSheet({
                 constraints: BoxConstraints(
                   maxHeight: MediaQuery.sizeOf(sheetContext).height * 0.42,
                 ),
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: demoChats.length,
-                  separatorBuilder: (_, _) => Divider(
-                    height: 1,
-                    color: colors.border,
-                  ),
-                  itemBuilder: (context, index) {
-                    final chat = demoChats[index];
-                    return ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        backgroundColor:
-                            AppColors.brandOf(context).withValues(alpha: 0.18),
+                child: StreamBuilder<List<ChatConversation>>(
+                  stream: chatRepo.watchChats(profile.uid),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasError) {
+                      return Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         child: Text(
-                          chat.initials,
-                          style: Theme.of(context).textTheme.labelLarge
-                              ?.copyWith(fontWeight: FontWeight.w800),
+                          friendlyChatError(snapshot.error!),
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: colors.muted),
                         ),
+                      );
+                    }
+                    if (!snapshot.hasData) {
+                      return const Padding(
+                        padding: EdgeInsets.all(AppSpacing.lg),
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    }
+                    final chats = snapshot.data!;
+                    if (chats.isEmpty) {
+                      return Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
+                        child: Text(
+                          'Aún no tienes chats. Abre Chats y escribe a alguien primero.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: colors.muted, height: 1.35),
+                        ),
+                      );
+                    }
+                    return ListView.separated(
+                      shrinkWrap: true,
+                      itemCount: chats.length,
+                      separatorBuilder: (_, _) => Divider(
+                        height: 1,
+                        color: colors.border,
                       ),
-                      title: Text(
-                        chat.title,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                      subtitle: Text(
-                        chat.isGroup ? 'Grupo' : 'Chat privado',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colors.muted,
-                            ),
-                      ),
-                      trailing: Icon(
-                        chat.isGroup
-                            ? Icons.groups_outlined
-                            : Icons.person_outline_rounded,
-                        color: colors.muted,
-                      ),
-                      onTap: () {
-                        Navigator.of(sheetContext).pop();
-                        Navigator.of(context).push(
-                          MaterialPageRoute<void>(
-                            builder: (_) => ChatConversationScreen(
-                              chat: chat,
-                              initialSharedPost: shared,
-                              viewerProfile: profile,
-                              forumRepository: repo,
+                      itemBuilder: (context, index) {
+                        final chat = chats[index];
+                        return ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: CircleAvatar(
+                            backgroundColor: AppColors.brandOf(context)
+                                .withValues(alpha: 0.18),
+                            child: Text(
+                              chat.initialsFor(profile.uid),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelLarge
+                                  ?.copyWith(fontWeight: FontWeight.w800),
                             ),
                           ),
+                          title: Text(
+                            chat.titleFor(profile.uid),
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          subtitle: Text(
+                            chat.isGroup ? 'Grupo' : 'Chat privado',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: colors.muted),
+                          ),
+                          trailing: Icon(
+                            chat.isGroup
+                                ? Icons.groups_outlined
+                                : Icons.person_outline_rounded,
+                            color: colors.muted,
+                          ),
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            try {
+                              await chatRepo.sharePost(
+                                chatId: chat.id,
+                                author: profile,
+                                preview: shared,
+                              );
+                              if (!context.mounted) return;
+                              await Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => ChatConversationScreen(
+                                    chat: chat,
+                                    profile: profile,
+                                    chatRepository: chatRepo,
+                                    forumRepository: forumRepo,
+                                  ),
+                                ),
+                              );
+                            } catch (error) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(friendlyChatError(error)),
+                                ),
+                              );
+                            }
+                          },
                         );
                       },
                     );

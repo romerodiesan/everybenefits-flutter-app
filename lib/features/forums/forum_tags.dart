@@ -20,3 +20,15 @@ List<String> normalizeForumTags(Iterable<String> raw) {
   }
   return result;
 }
+
+/// Curated discovery chips for create + feed filters.
+const kSuggestedForumTags = <String>[
+  'npn',
+  'ventas',
+  'productos',
+  'compliance',
+  'onboarding',
+  'comisiones',
+  'renovacion',
+  'general',
+];

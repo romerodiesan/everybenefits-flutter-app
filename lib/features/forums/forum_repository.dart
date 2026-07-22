@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../users/user_profile.dart';
@@ -5,9 +7,17 @@ import '../../users/user_role.dart';
 import 'forum_models.dart';
 import 'forum_tags.dart';
 
+const kForumPageSize = 20;
+
 /// Persistence port for forums (testable without Firestore).
 abstract class ForumStore {
-  Stream<List<ForumThread>> watchThreads({String? tag});
+  Future<ForumThreadPage> queryThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+    Object? cursor,
+  });
 
   Stream<ForumThread?> watchThread(String threadId);
 
@@ -31,10 +41,23 @@ abstract class ForumStore {
     required UserProfile author,
   });
 
+  Future<void> updateThread({
+    required String threadId,
+    required String title,
+    required String body,
+    required List<String> tags,
+  });
+
   Future<ForumReply> addReply({
     required String threadId,
     required String body,
     required UserProfile author,
+  });
+
+  Future<void> updateReply({
+    required String threadId,
+    required String replyId,
+    required String body,
   });
 
   Future<void> deleteThread(String threadId);
@@ -42,6 +65,11 @@ abstract class ForumStore {
   Future<void> deleteReply({
     required String threadId,
     required String replyId,
+  });
+
+  Future<void> setAcceptedReply({
+    required String threadId,
+    required String? replyId,
   });
 
   /// Sets the actor's relevance vote. Passing [RelevanceVote.none] clears it.
@@ -85,21 +113,39 @@ class FirestoreForumStore implements ForumStore {
       _replies(threadId).doc(replyId).collection('votes').doc(uid);
 
   @override
-  Stream<List<ForumThread>> watchThreads({String? tag}) {
-    Query<Map<String, dynamic>> query = _threads.orderBy(
-      'lastReplyAt',
-      descending: true,
-    );
-    if (tag != null && tag.isNotEmpty) {
-      query = _threads
-          .where('tags', arrayContains: tag)
-          .orderBy('lastReplyAt', descending: true);
+  Future<ForumThreadPage> queryThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+    Object? cursor,
+  }) async {
+    final orderField =
+        sort == ForumSort.relevant ? 'score' : 'lastReplyAt';
+    Query<Map<String, dynamic>> query = _threads;
+
+    if (authorId != null && authorId.isNotEmpty) {
+      query = query.where('authorId', isEqualTo: authorId);
     }
-    return query.snapshots().map((snapshot) {
-      return snapshot.docs
+    if (tag != null && tag.isNotEmpty) {
+      query = query.where('tags', arrayContains: tag);
+    }
+    query = query.orderBy(orderField, descending: true).limit(limit + 1);
+
+    if (cursor is DocumentSnapshot<Map<String, dynamic>>) {
+      query = query.startAfterDocument(cursor);
+    }
+
+    final snapshot = await query.get();
+    final docs = snapshot.docs;
+    final hasMore = docs.length > limit;
+    final pageDocs = hasMore ? docs.sublist(0, limit) : docs;
+    return ForumThreadPage(
+      threads: pageDocs
           .map((doc) => ForumThread.fromMap(doc.id, doc.data()))
-          .toList();
-    });
+          .toList(),
+      nextCursor: hasMore ? pageDocs.last : null,
+    );
   }
 
   @override
@@ -112,12 +158,56 @@ class FirestoreForumStore implements ForumStore {
 
   @override
   Stream<List<ForumReply>> watchReplies(String threadId) {
-    return _replies(threadId).snapshots().map((snapshot) {
-      final replies = snapshot.docs
-          .map((doc) => ForumReply.fromMap(threadId, doc.id, doc.data()))
-          .toList();
-      return sortRepliesByRelevance(replies);
-    });
+    return _mergeThreadAndReplies(
+      _threads.doc(threadId).snapshots(),
+      _replies(threadId).snapshots(),
+      threadId,
+    );
+  }
+
+  Stream<List<ForumReply>> _mergeThreadAndReplies(
+    Stream<DocumentSnapshot<Map<String, dynamic>>> threadStream,
+    Stream<QuerySnapshot<Map<String, dynamic>>> repliesStream,
+    String threadId,
+  ) {
+    late final StreamController<List<ForumReply>> controller;
+    String? accepted;
+    List<ForumReply> replies = const [];
+    var threadReady = false;
+    var repliesReady = false;
+    StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? threadSub;
+    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? repliesSub;
+
+    void emit() {
+      if (!threadReady || !repliesReady) return;
+      if (!controller.isClosed) {
+        controller.add(
+          sortRepliesByRelevance(replies, acceptedReplyId: accepted),
+        );
+      }
+    }
+
+    controller = StreamController<List<ForumReply>>(
+      onListen: () {
+        threadSub = threadStream.listen((snap) {
+          accepted = snap.data()?['acceptedReplyId'] as String?;
+          threadReady = true;
+          emit();
+        });
+        repliesSub = repliesStream.listen((snap) {
+          replies = snap.docs
+              .map((doc) => ForumReply.fromMap(threadId, doc.id, doc.data()))
+              .toList();
+          repliesReady = true;
+          emit();
+        });
+      },
+      onCancel: () async {
+        await threadSub?.cancel();
+        await repliesSub?.cancel();
+      },
+    );
+    return controller.stream;
   }
 
   @override
@@ -178,11 +268,27 @@ class FirestoreForumStore implements ForumStore {
       'authorRole': thread.authorRole.wireValue,
       'replyCount': 0,
       'score': 0,
+      'acceptedReplyId': null,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'lastReplyAt': FieldValue.serverTimestamp(),
     });
     return thread;
+  }
+
+  @override
+  Future<void> updateThread({
+    required String threadId,
+    required String title,
+    required String body,
+    required List<String> tags,
+  }) async {
+    await _threads.doc(threadId).update({
+      'title': title.trim(),
+      'body': body.trim(),
+      'tags': normalizeForumTags(tags),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   @override
@@ -227,6 +333,18 @@ class FirestoreForumStore implements ForumStore {
   }
 
   @override
+  Future<void> updateReply({
+    required String threadId,
+    required String replyId,
+    required String body,
+  }) async {
+    await _replies(threadId).doc(replyId).update({
+      'body': body.trim(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  @override
   Future<void> deleteThread(String threadId) async {
     final replies = await _replies(threadId).get();
     final batch = _firestore.batch();
@@ -250,18 +368,63 @@ class FirestoreForumStore implements ForumStore {
     required String threadId,
     required String replyId,
   }) async {
-    final voteDocs =
-        await _replies(threadId).doc(replyId).collection('votes').get();
+    final threadRef = _threads.doc(threadId);
+    final replyRef = _replies(threadId).doc(replyId);
+    final voteDocs = await replyRef.collection('votes').get();
+
+    final remaining = await _replies(threadId)
+        .orderBy('createdAt', descending: true)
+        .limit(5)
+        .get();
+    DateTime? lastReplyAt;
+    for (final doc in remaining.docs) {
+      if (doc.id == replyId) continue;
+      lastReplyAt = _readDate(doc.data()['createdAt']);
+      break;
+    }
+
+    final threadSnap = await threadRef.get();
+    final threadCreated = _readDate(threadSnap.data()?['createdAt']);
+    final acceptedId = threadSnap.data()?['acceptedReplyId'] as String?;
+
     final batch = _firestore.batch();
     for (final vote in voteDocs.docs) {
       batch.delete(vote.reference);
     }
-    batch.delete(_replies(threadId).doc(replyId));
-    batch.update(_threads.doc(threadId), {
+    batch.delete(replyRef);
+
+    final updates = <String, Object?>{
       'replyCount': FieldValue.increment(-1),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+      'lastReplyAt': lastReplyAt != null
+          ? Timestamp.fromDate(lastReplyAt.toLocal())
+          : (threadCreated != null
+              ? Timestamp.fromDate(threadCreated.toLocal())
+              : FieldValue.serverTimestamp()),
+    };
+    if (acceptedId == replyId) {
+      updates['acceptedReplyId'] = null;
+    }
+    batch.update(threadRef, updates);
     await batch.commit();
+  }
+
+  DateTime? _readDate(Object? value) {
+    if (value is Timestamp) return value.toDate().toUtc();
+    if (value is DateTime) return value.toUtc();
+    if (value is String) return DateTime.tryParse(value)?.toUtc();
+    return null;
+  }
+
+  @override
+  Future<void> setAcceptedReply({
+    required String threadId,
+    required String? replyId,
+  }) async {
+    await _threads.doc(threadId).update({
+      'acceptedReplyId': replyId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   Future<void> _applyVote({
@@ -327,8 +490,20 @@ class ForumRepository {
 
   ForumStore get _store => _storeOverride ?? FirestoreForumStore();
 
-  Stream<List<ForumThread>> watchThreads({String? tag}) =>
-      _store.watchThreads(tag: tag);
+  Future<ForumThreadPage> queryThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+    Object? cursor,
+  }) =>
+      _store.queryThreads(
+        tag: tag,
+        authorId: authorId,
+        sort: sort,
+        limit: limit,
+        cursor: cursor,
+      );
 
   Stream<ForumThread?> watchThread(String threadId) =>
       _store.watchThread(threadId);
@@ -382,6 +557,35 @@ class ForumRepository {
     );
   }
 
+  Future<void> updateThread({
+    required ForumThread thread,
+    required UserProfile actor,
+    required String title,
+    required String body,
+    required List<String> tags,
+  }) {
+    final allowed =
+        actor.role == UserRole.admin || thread.authorId == actor.uid;
+    if (!allowed) {
+      throw StateError('No puedes editar esta pregunta.');
+    }
+    final trimmedTitle = title.trim();
+    final trimmedBody = body.trim();
+    final normalizedTags = normalizeForumTags(tags);
+    if (trimmedTitle.isEmpty || trimmedBody.isEmpty) {
+      throw ArgumentError('Título y contenido son obligatorios.');
+    }
+    if (normalizedTags.isEmpty) {
+      throw ArgumentError('Agrega al menos un tag.');
+    }
+    return _store.updateThread(
+      threadId: thread.id,
+      title: trimmedTitle,
+      body: trimmedBody,
+      tags: normalizedTags,
+    );
+  }
+
   Future<ForumReply> addReply({
     required String threadId,
     required String body,
@@ -404,6 +608,27 @@ class ForumRepository {
     );
   }
 
+  Future<void> updateReply({
+    required ForumReply reply,
+    required UserProfile actor,
+    required String body,
+  }) {
+    final allowed =
+        actor.role == UserRole.admin || reply.authorId == actor.uid;
+    if (!allowed) {
+      throw StateError('No puedes editar esta respuesta.');
+    }
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('La respuesta no puede estar vacía.');
+    }
+    return _store.updateReply(
+      threadId: reply.threadId,
+      replyId: reply.id,
+      body: trimmed,
+    );
+  }
+
   Future<void> deleteThread({
     required ForumThread thread,
     required UserProfile actor,
@@ -411,7 +636,7 @@ class ForumRepository {
     final allowed =
         actor.role == UserRole.admin || thread.authorId == actor.uid;
     if (!allowed) {
-      throw StateError('No puedes eliminar este hilo.');
+      throw StateError('No puedes eliminar esta pregunta.');
     }
     return _store.deleteThread(thread.id);
   }
@@ -425,6 +650,24 @@ class ForumRepository {
       throw StateError('No puedes eliminar esta respuesta.');
     }
     return _store.deleteReply(threadId: reply.threadId, replyId: reply.id);
+  }
+
+  Future<void> acceptReply({
+    required ForumThread thread,
+    required ForumReply reply,
+    required UserProfile actor,
+  }) {
+    final allowed =
+        actor.role == UserRole.admin || thread.authorId == actor.uid;
+    if (!allowed) {
+      throw StateError('Solo el autor de la pregunta puede aceptar respuestas.');
+    }
+    if (reply.threadId != thread.id) {
+      throw ArgumentError('La respuesta no pertenece a esta pregunta.');
+    }
+    final nextId =
+        thread.acceptedReplyId == reply.id ? null : reply.id;
+    return _store.setAcceptedReply(threadId: thread.id, replyId: nextId);
   }
 
   Future<void> setThreadRelevance({

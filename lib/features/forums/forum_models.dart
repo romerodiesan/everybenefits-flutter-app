@@ -45,6 +45,8 @@ enum RelevanceVote {
   }
 }
 
+enum ForumSort { recent, relevant }
+
 class ForumThread {
   const ForumThread({
     required this.id,
@@ -60,6 +62,7 @@ class ForumThread {
     required this.updatedAt,
     required this.lastReplyAt,
     this.authorPhotoUrl,
+    this.acceptedReplyId,
   });
 
   final String id;
@@ -76,6 +79,7 @@ class ForumThread {
   final DateTime createdAt;
   final DateTime updatedAt;
   final DateTime lastReplyAt;
+  final String? acceptedReplyId;
 
   ForumThread copyWith({
     List<String>? tags,
@@ -86,6 +90,8 @@ class ForumThread {
     DateTime? updatedAt,
     DateTime? lastReplyAt,
     String? authorPhotoUrl,
+    String? acceptedReplyId,
+    bool clearAcceptedReplyId = false,
   }) {
     return ForumThread(
       id: id,
@@ -101,6 +107,9 @@ class ForumThread {
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       lastReplyAt: lastReplyAt ?? this.lastReplyAt,
+      acceptedReplyId: clearAcceptedReplyId
+          ? null
+          : (acceptedReplyId ?? this.acceptedReplyId),
     );
   }
 
@@ -115,6 +124,7 @@ class ForumThread {
       'authorRole': authorRole.wireValue,
       'replyCount': replyCount,
       'score': score,
+      'acceptedReplyId': acceptedReplyId,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
       'lastReplyAt': lastReplyAt.toUtc().toIso8601String(),
@@ -133,6 +143,7 @@ class ForumThread {
       authorRole: UserRole.parse(data['authorRole'] as String?),
       replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
       score: (data['score'] as num?)?.toInt() ?? 0,
+      acceptedReplyId: data['acceptedReplyId'] as String?,
       createdAt: _readForumDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readForumDate(data['updatedAt']) ?? DateTime.now().toUtc(),
       lastReplyAt: _readForumDate(data['lastReplyAt']) ??
@@ -174,6 +185,8 @@ class ForumReply {
   final int score;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  bool isAcceptedBy(ForumThread thread) => thread.acceptedReplyId == id;
 
   ForumReply copyWith({
     String? body,
@@ -228,6 +241,18 @@ class ForumReply {
   }
 }
 
+class ForumThreadPage {
+  const ForumThreadPage({
+    required this.threads,
+    this.nextCursor,
+  });
+
+  final List<ForumThread> threads;
+  final Object? nextCursor;
+
+  bool get hasMore => nextCursor != null;
+}
+
 bool canParticipateInForums({
   required UserRole role,
   required bool isAnonymous,
@@ -239,7 +264,7 @@ bool canParticipateInForums({
       role == UserRole.admin;
 }
 
-/// Client-side helpers for discovery.
+/// Client-side helpers for discovery over an already-loaded page.
 List<ForumThread> filterAndSortThreads(
   List<ForumThread> threads, {
   String query = '',
@@ -259,14 +284,45 @@ List<ForumThread> filterAndSortThreads(
   return list;
 }
 
-enum ForumSort { recent, relevant }
-
-List<ForumReply> sortRepliesByRelevance(List<ForumReply> replies) {
+List<ForumReply> sortRepliesByRelevance(
+  List<ForumReply> replies, {
+  String? acceptedReplyId,
+}) {
   final list = List<ForumReply>.from(replies);
   list.sort((a, b) {
+    final aAccepted = acceptedReplyId != null && a.id == acceptedReplyId;
+    final bAccepted = acceptedReplyId != null && b.id == acceptedReplyId;
+    if (aAccepted != bAccepted) return aAccepted ? -1 : 1;
     final byScore = b.score.compareTo(a.score);
     if (byScore != 0) return byScore;
     return a.createdAt.compareTo(b.createdAt);
   });
   return list;
+}
+
+String friendlyForumError(Object error) {
+  final raw = '$error';
+  if (raw.contains('permission') || raw.contains('PERMISSION')) {
+    return 'No tienes permiso para esta acción.';
+  }
+  if (raw.contains('StateError:')) {
+    return raw.replaceFirst('Bad state: ', '').replaceFirst('StateError: ', '');
+  }
+  if (raw.contains('ArgumentError:')) {
+    return raw.replaceFirst('Invalid argument(s): ', '').replaceFirst(
+          'ArgumentError: ',
+          '',
+        );
+  }
+  if (raw.contains('No tienes') ||
+      raw.contains('No puedes') ||
+      raw.contains('Regístrate') ||
+      raw.contains('Agrega') ||
+      raw.contains('obligator')) {
+    return raw
+        .replaceFirst(RegExp(r'^.*?Exception:\s*'), '')
+        .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+        .trim();
+  }
+  return 'Algo salió mal. Intenta de nuevo.';
 }

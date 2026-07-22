@@ -9,12 +9,16 @@ class EmptyState extends StatelessWidget {
     required this.title,
     required this.subtitle,
     this.mark,
+    this.actionLabel,
+    this.onAction,
   });
 
   final String title;
   final String subtitle;
   /// Optional large typographic mark (letter/number), not an icon-first look.
   final String? mark;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -44,25 +48,35 @@ class EmptyState extends StatelessWidget {
           alignment: Alignment.centerLeft,
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 360),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (mark != null) ...[
-                  Text(
-                    mark!,
-                    style: theme.textTheme.displayLarge?.copyWith(
-                      color: AppColors.brandOf(context).withValues(alpha: 0.18),
-                      fontSize: 96,
-                      height: 0.85,
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (mark != null) ...[
+                    Text(
+                      mark!,
+                      style: theme.textTheme.displayLarge?.copyWith(
+                        color:
+                            AppColors.brandOf(context).withValues(alpha: 0.18),
+                        fontSize: 72,
+                        height: 0.85,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
+                    const SizedBox(height: AppSpacing.md),
+                  ],
+                  Text(title, style: theme.textTheme.headlineMedium),
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(subtitle, style: theme.textTheme.bodyMedium),
+                  if (actionLabel != null && onAction != null) ...[
+                    const SizedBox(height: AppSpacing.lg),
+                    FilledButton(
+                      onPressed: onAction,
+                      child: Text(actionLabel!),
+                    ),
+                  ],
                 ],
-                Text(title, style: theme.textTheme.headlineMedium),
-                const SizedBox(height: AppSpacing.sm),
-                Text(subtitle, style: theme.textTheme.bodyMedium),
-              ],
+              ),
             ),
           ),
         ),

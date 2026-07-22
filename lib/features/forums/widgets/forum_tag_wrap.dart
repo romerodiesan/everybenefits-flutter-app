@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
+import 'forum_filter_chip.dart';
 
 /// Tappable `#tag` wrap used across list, detail, and create screens.
 class ForumTagWrap extends StatelessWidget {
@@ -29,8 +30,9 @@ class ForumTagWrap extends StatelessWidget {
         emptyLabel!,
         style: theme.textTheme.labelLarge?.copyWith(
           color: AppColors.of(context).muted,
-          letterSpacing: 1.2,
-          fontSize: 11,
+          letterSpacing: 0.2,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
         ),
       );
     }
@@ -41,12 +43,12 @@ class ForumTagWrap extends StatelessWidget {
         maxVisible == null ? 0 : (tags.length - visible.length).clamp(0, 99);
 
     return Wrap(
-      spacing: 10,
-      runSpacing: 6,
+      spacing: 8,
+      runSpacing: 8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         for (final tag in visible)
-          _TagChip(
+          ForumTagPill(
             tag: tag,
             removable: onTagRemove != null,
             onTap: onTagRemove != null
@@ -59,47 +61,10 @@ class ForumTagWrap extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(
               fontSize: 12,
               color: AppColors.of(context).muted,
+              fontWeight: FontWeight.w600,
             ),
           ),
       ],
-    );
-  }
-}
-
-class _TagChip extends StatelessWidget {
-  const _TagChip({
-    required this.tag,
-    required this.removable,
-    this.onTap,
-  });
-
-  final String tag;
-  final bool removable;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final label = removable ? '#$tag  ×' : '#$tag';
-
-    final text = Text(
-      label,
-      style: theme.textTheme.bodyMedium?.copyWith(
-        fontSize: 12,
-        color: AppColors.brandOf(context),
-        fontWeight: FontWeight.w700,
-      ),
-    );
-
-    if (onTap == null) return text;
-
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(4),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2),
-        child: text,
-      ),
     );
   }
 }

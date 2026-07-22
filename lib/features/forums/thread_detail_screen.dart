@@ -5,8 +5,10 @@ import '../../app/theme.dart';
 import '../../app/widgets/empty_state.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../users/users.dart';
+import '../chats/chat_repository.dart';
 import 'forum_models.dart';
 import 'forum_repository.dart';
+import 'forum_tags.dart';
 import 'widgets/forum_avatar.dart';
 import 'widgets/forum_meta_line.dart';
 import 'widgets/forum_tag_wrap.dart';
@@ -20,11 +22,13 @@ class ThreadDetailScreen extends StatefulWidget {
     required this.threadId,
     required this.profile,
     required this.forumRepository,
+    this.chatRepository,
   });
 
   final String threadId;
   final UserProfile profile;
   final ForumRepository forumRepository;
+  final ChatRepository? chatRepository;
 
   @override
   State<ThreadDetailScreen> createState() => _ThreadDetailScreenState();
@@ -42,11 +46,47 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         isAnonymous: widget.profile.isAnonymous,
       );
 
+  bool _isAuthorOrAdmin(String authorId) {
+    return widget.profile.role == UserRole.admin ||
+        authorId == widget.profile.uid;
+  }
+
   @override
   void dispose() {
     _replyController.dispose();
     _replyFocus.dispose();
     super.dispose();
+  }
+
+  void _showError(Object error) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(friendlyForumError(error))),
+    );
+  }
+
+  Future<bool> _confirmDelete({
+    required String title,
+    required String message,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    return result == true;
   }
 
   Future<void> _sendReply() async {
@@ -62,16 +102,18 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       _replyController.clear();
       _replyFocus.unfocus();
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo publicar: $error')),
-      );
+      _showError(error);
     } finally {
       if (mounted) setState(() => _sending = false);
     }
   }
 
   Future<void> _deleteThread(ForumThread thread) async {
+    final confirmed = await _confirmDelete(
+      title: 'Eliminar pregunta',
+      message: 'Esta acción no se puede deshacer.',
+    );
+    if (!confirmed) return;
     try {
       await widget.forumRepository.deleteThread(
         thread: thread,
@@ -80,10 +122,210 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       if (!mounted) return;
       Navigator.of(context).pop();
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo eliminar: $error')),
+      _showError(error);
+    }
+  }
+
+  Future<void> _deleteReply(ForumReply reply) async {
+    final confirmed = await _confirmDelete(
+      title: 'Eliminar respuesta',
+      message: 'Esta acción no se puede deshacer.',
+    );
+    if (!confirmed) return;
+    try {
+      await widget.forumRepository.deleteReply(
+        reply: reply,
+        actor: widget.profile,
       );
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _editThread(ForumThread thread) async {
+    final titleController = TextEditingController(text: thread.title);
+    final bodyController = TextEditingController(text: thread.body);
+    final tagInput = TextEditingController();
+    var tags = {...thread.tags};
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+            top: AppSpacing.sm,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Editar pregunta',
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: titleController,
+                      textCapitalization: TextCapitalization.sentences,
+                      decoration: const InputDecoration(
+                        labelText: 'Título',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: bodyController,
+                      textCapitalization: TextCapitalization.sentences,
+                      minLines: 4,
+                      maxLines: 8,
+                      decoration: const InputDecoration(
+                        labelText: 'Contenido',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    TextField(
+                      controller: tagInput,
+                      textInputAction: TextInputAction.done,
+                      decoration: const InputDecoration(
+                        labelText: 'Agregar tag',
+                        border: OutlineInputBorder(),
+                      ),
+                      onSubmitted: (_) {
+                        final tag = normalizeForumTag(tagInput.text);
+                        if (tag.isEmpty || tags.contains(tag)) {
+                          tagInput.clear();
+                          return;
+                        }
+                        if (tags.length >= 5) return;
+                        setModalState(() {
+                          tags.add(tag);
+                          tagInput.clear();
+                        });
+                      },
+                    ),
+                    if (tags.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.sm),
+                      ForumTagWrap(
+                        tags: tags.toList(),
+                        onTagRemove: (tag) {
+                          setModalState(() => tags.remove(tag));
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: AppSpacing.lg),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('Guardar'),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    final title = titleController.text;
+    final body = bodyController.text;
+    final tagList = tags.toList();
+    titleController.dispose();
+    bodyController.dispose();
+    tagInput.dispose();
+
+    if (saved != true) return;
+    try {
+      await widget.forumRepository.updateThread(
+        thread: thread,
+        actor: widget.profile,
+        title: title,
+        body: body,
+        tags: tagList,
+      );
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _editReply(ForumReply reply) async {
+    final bodyController = TextEditingController(text: reply.body);
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) {
+        return Padding(
+          padding: EdgeInsets.only(
+            left: AppSpacing.lg,
+            right: AppSpacing.lg,
+            bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+            top: AppSpacing.sm,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Editar respuesta',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextField(
+                controller: bodyController,
+                autofocus: true,
+                textCapitalization: TextCapitalization.sentences,
+                minLines: 4,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  labelText: 'Respuesta',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.lg),
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                child: const Text('Guardar'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+
+    final body = bodyController.text;
+    bodyController.dispose();
+    if (saved != true) return;
+    try {
+      await widget.forumRepository.updateReply(
+        reply: reply,
+        actor: widget.profile,
+        body: body,
+      );
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _acceptReply(ForumThread thread, ForumReply reply) async {
+    try {
+      await widget.forumRepository.acceptReply(
+        thread: thread,
+        reply: reply,
+        actor: widget.profile,
+      );
+    } catch (error) {
+      _showError(error);
     }
   }
 
@@ -95,10 +337,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         vote: next,
       );
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$error')),
-      );
+      _showError(error);
     }
   }
 
@@ -110,10 +349,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         vote: next,
       );
     } catch (error) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('$error')),
-      );
+      _showError(error);
     }
   }
 
@@ -134,9 +370,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             threadSnapshot.connectionState == ConnectionState.waiting &&
                 thread == null;
         final missing = !loading && thread == null;
-        final canDelete = thread != null &&
-            (widget.profile.role == UserRole.admin ||
-                thread.authorId == widget.profile.uid);
+        final canManageThread =
+            thread != null && _isAuthorOrAdmin(thread.authorId);
+        final canAccept =
+            thread != null && _isAuthorOrAdmin(thread.authorId);
         final canVote = _canPost &&
             thread != null &&
             thread.authorId != widget.profile.uid;
@@ -157,14 +394,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                     thread: thread,
                     profile: widget.profile,
                     forumRepository: widget.forumRepository,
+                    chatRepository: widget.chatRepository,
                   ),
                   icon: const Icon(Icons.forum_outlined),
-                ),
-              if (canDelete)
-                IconButton(
-                  tooltip: 'Eliminar pregunta',
-                  onPressed: () => _deleteThread(thread),
-                  icon: const Icon(Icons.delete_outline),
                 ),
             ],
           ),
@@ -211,6 +443,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                         thread: thread,
                                         vote: vote,
                                         canVote: canVote,
+                                        canManage: canManageThread,
                                         onUp: () => _voteThread(
                                           thread,
                                           _toggle(vote, RelevanceVote.up),
@@ -229,7 +462,11 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                           profile: widget.profile,
                                           forumRepository:
                                               widget.forumRepository,
+                                          chatRepository: widget.chatRepository,
                                         ),
+                                        onEdit: () => _editThread(thread),
+                                        onDelete: () =>
+                                            _deleteThread(thread),
                                       );
                                     },
                                   ),
@@ -271,13 +508,26 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                           height: AppSpacing.md,
                                         ),
                                       _PulseAnswer(
+                                        thread: thread,
                                         reply: replies[i],
                                         profile: widget.profile,
                                         canParticipate: _canPost,
+                                        canManage: _isAuthorOrAdmin(
+                                          replies[i].authorId,
+                                        ),
+                                        canAccept: canAccept,
                                         forumRepository:
                                             widget.forumRepository,
                                         onVote: (next) =>
                                             _voteReply(replies[i], next),
+                                        onEdit: () =>
+                                            _editReply(replies[i]),
+                                        onDelete: () =>
+                                            _deleteReply(replies[i]),
+                                        onAccept: () => _acceptReply(
+                                          thread,
+                                          replies[i],
+                                        ),
                                       ),
                                     ],
                                 ],
@@ -307,19 +557,25 @@ class _OriginalPost extends StatelessWidget {
     required this.thread,
     required this.vote,
     required this.canVote,
+    required this.canManage,
     required this.onUp,
     required this.onDown,
     this.onAnswer,
     this.onShare,
+    this.onEdit,
+    this.onDelete,
   });
 
   final ForumThread thread;
   final RelevanceVote vote;
   final bool canVote;
+  final bool canManage;
   final VoidCallback onUp;
   final VoidCallback onDown;
   final VoidCallback? onAnswer;
   final VoidCallback? onShare;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -361,6 +617,28 @@ class _OriginalPost extends StatelessWidget {
                         dense: true,
                       ),
                     ),
+                    if (canManage)
+                      PopupMenuButton<_ThreadAction>(
+                        tooltip: 'Opciones',
+                        onSelected: (action) {
+                          switch (action) {
+                            case _ThreadAction.edit:
+                              onEdit?.call();
+                            case _ThreadAction.delete:
+                              onDelete?.call();
+                          }
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: _ThreadAction.edit,
+                            child: Text('Editar'),
+                          ),
+                          PopupMenuItem(
+                            value: _ThreadAction.delete,
+                            child: Text('Eliminar'),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -413,6 +691,8 @@ class _OriginalPost extends StatelessWidget {
   }
 }
 
+enum _ThreadAction { edit, delete }
+
 class _PostAction extends StatelessWidget {
   const _PostAction({
     required this.icon,
@@ -460,18 +740,30 @@ class _PostAction extends StatelessWidget {
 
 class _PulseAnswer extends StatelessWidget {
   const _PulseAnswer({
+    required this.thread,
     required this.reply,
     required this.profile,
     required this.canParticipate,
+    required this.canManage,
+    required this.canAccept,
     required this.forumRepository,
     required this.onVote,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onAccept,
   });
 
+  final ForumThread thread;
   final ForumReply reply;
   final UserProfile profile;
   final bool canParticipate;
+  final bool canManage;
+  final bool canAccept;
   final ForumRepository forumRepository;
   final ValueChanged<RelevanceVote> onVote;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onAccept;
 
   RelevanceVote _toggle(RelevanceVote current, RelevanceVote pressed) {
     return current == pressed ? RelevanceVote.none : pressed;
@@ -482,6 +774,7 @@ class _PulseAnswer extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final canVote = canParticipate && reply.authorId != profile.uid;
+    final accepted = reply.isAcceptedBy(thread);
 
     return StreamBuilder<RelevanceVote>(
       stream: forumRepository.watchReplyVote(
@@ -511,21 +804,74 @@ class _PulseAnswer extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: colors.glassFill,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: colors.border),
+                      border: Border.all(
+                        color: accepted
+                            ? AppColors.brandOf(context).withValues(alpha: 0.55)
+                            : colors.border,
+                      ),
                     ),
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            reply.authorName,
-                            style: theme.textTheme.labelLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 13,
-                              letterSpacing: -0.1,
-                              color: colors.ink,
-                            ),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  reply.authorName,
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 13,
+                                    letterSpacing: -0.1,
+                                    color: colors.ink,
+                                  ),
+                                ),
+                              ),
+                              if (accepted)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.brandOf(context)
+                                        .withValues(alpha: 0.14),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    'Aceptada',
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: AppColors.brandOf(context),
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 10,
+                                    ),
+                                  ),
+                                ),
+                              if (canManage)
+                                PopupMenuButton<_ThreadAction>(
+                                  tooltip: 'Opciones',
+                                  padding: EdgeInsets.zero,
+                                  onSelected: (action) {
+                                    switch (action) {
+                                      case _ThreadAction.edit:
+                                        onEdit();
+                                      case _ThreadAction.delete:
+                                        onDelete();
+                                    }
+                                  },
+                                  itemBuilder: (context) => const [
+                                    PopupMenuItem(
+                                      value: _ThreadAction.edit,
+                                      child: Text('Editar'),
+                                    ),
+                                    PopupMenuItem(
+                                      value: _ThreadAction.delete,
+                                      child: Text('Eliminar'),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -543,14 +889,35 @@ class _PulseAnswer extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(left: 4, top: 5),
-                    child: Text(
-                      formatRelativeTime(reply.createdAt),
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colors.muted,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,
-                        letterSpacing: 0.2,
-                      ),
+                    child: Row(
+                      children: [
+                        Text(
+                          formatRelativeTime(reply.createdAt),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: colors.muted,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 11,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        if (canAccept) ...[
+                          const SizedBox(width: 8),
+                          TextButton(
+                            onPressed: onAccept,
+                            style: TextButton.styleFrom(
+                              visualDensity: VisualDensity.compact,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: Text(
+                              accepted ? 'Quitar aceptación' : 'Aceptar',
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],

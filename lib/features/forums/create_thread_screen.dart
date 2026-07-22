@@ -4,9 +4,11 @@ import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../users/users.dart';
+import 'forum_models.dart';
 import 'forum_repository.dart';
 import 'forum_tags.dart';
 import 'thread_detail_screen.dart';
+import 'widgets/forum_filter_chip.dart';
 import 'widgets/forum_tag_wrap.dart';
 
 class CreateThreadScreen extends StatefulWidget {
@@ -49,11 +51,11 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
     setState(() => _tags.remove(tag));
   }
 
-  void _addTag() {
-    final tag = normalizeForumTag(_tagInput.text);
+  void _addTag([String? raw]) {
+    final tag = normalizeForumTag(raw ?? _tagInput.text);
     if (tag.isEmpty) return;
     if (_tags.contains(tag)) {
-      _tagInput.clear();
+      if (raw == null) _tagInput.clear();
       return;
     }
     if (_tags.length >= 5) {
@@ -64,8 +66,16 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
     }
     setState(() {
       _tags.add(tag);
-      _tagInput.clear();
+      if (raw == null) _tagInput.clear();
     });
+  }
+
+  void _toggleSuggestedTag(String tag, bool selected) {
+    if (selected) {
+      _addTag(tag);
+      return;
+    }
+    setState(() => _tags.remove(normalizeForumTag(tag)));
   }
 
   Future<void> _submit() async {
@@ -97,7 +107,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo publicar: $error')),
+        SnackBar(content: Text(friendlyForumError(error))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -150,8 +160,8 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                   textInputAction: TextInputAction.next,
                   decoration: _decoration(
                     context,
-                    label: 'Título',
-                    hint: 'Un encabezado claro',
+                    label: 'Pregunta',
+                    hint: '¿Qué necesitas resolver?',
                   ),
                   validator: (value) {
                     if (value == null || value.trim().length < 4) {
@@ -168,22 +178,22 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                   maxLines: 14,
                   decoration: _decoration(
                     context,
-                    label: '¿Qué quieres compartir?',
-                    hint: 'Escribe tu publicación…',
+                    label: 'Contexto',
+                    hint: 'Detalles, lo que ya intentaste, y el resultado esperado…',
                     alignHint: true,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().length < 8) {
-                      return 'Comparte un poco más de contexto.';
+                      return 'Añade un poco más de contexto.';
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                Text('Etiquetas', style: theme.textTheme.titleMedium),
+                Text('Temas', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
-                  'Hasta 5 etiquetas para descubrir tu publicación.',
+                  'Hasta 5 etiquetas para que otros encuentren tu pregunta.',
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colors.muted,
                   ),
@@ -198,8 +208,8 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                         onSubmitted: (_) => _addTag(),
                         decoration: _decoration(
                           context,
-                          label: 'Nuevo tag',
-                          hint: 'escribe y agrega',
+                          label: 'Etiqueta',
+                          hint: 'ej. npn',
                         ),
                       ),
                     ),
@@ -217,6 +227,30 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                     onTagRemove: _removeTag,
                   ),
                 ],
+                const SizedBox(height: AppSpacing.md),
+                Text(
+                  'Temas frecuentes',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: colors.muted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    for (final tag in kSuggestedForumTags)
+                      ForumTagPill(
+                        tag: tag,
+                        selected: _tags.contains(tag),
+                        onTap: () => _toggleSuggestedTag(
+                          tag,
+                          !_tags.contains(tag),
+                        ),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: AppSpacing.xl),
                 FilledButton(
                   onPressed: _busy ? null : _submit,

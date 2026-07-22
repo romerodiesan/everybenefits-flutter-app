@@ -43,8 +43,38 @@ service cloud.firestore {
       return value is string && value.size() > 0;
     }
 
+    // Score deltas are applied by the client transaction; self-vote is blocked here.
+    function notVotingOwnThread(threadId) {
+      return get(/databases/$(database)/documents/threads/$(threadId)).data.authorId
+        != request.auth.uid;
+    }
+
+    function notVotingOwnReply(threadId, replyId) {
+      return get(/databases/$(database)/documents/threads/$(threadId)/replies/$(replyId)).data.authorId
+        != request.auth.uid;
+    }
+
+    function threadAuthorUnchanged() {
+      return request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.authorName == resource.data.authorName
+        && request.resource.data.authorRole == resource.data.authorRole;
+    }
+
+    function threadContentUnchanged() {
+      return request.resource.data.title == resource.data.title
+        && request.resource.data.body == resource.data.body
+        && request.resource.data.tags == resource.data.tags;
+    }
+
+    function replyAuthorUnchanged() {
+      return request.resource.data.authorId == resource.data.authorId
+        && request.resource.data.authorName == resource.data.authorName
+        && request.resource.data.authorRole == resource.data.authorRole;
+    }
+
     match /users/{uid} {
-      allow read: if isOwner(uid);
+      // Owner/admin full access; participants can read peers for chat contacts.
+      allow read: if isOwner(uid) || isAdmin() || isForumParticipant();
       allow create: if isOwner(uid)
         && isBootstrapRole()
         && request.resource.data.uid == uid;
@@ -55,7 +85,51 @@ service cloud.firestore {
           request.resource.data.role == resource.data.role
           || !isProtectedRole(resource.data.role)
         );
-      allow read, update, delete: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    function isChatMember(chatId) {
+      return isSignedIn()
+        && request.auth.uid in
+          get(/databases/$(database)/documents/chats/$(chatId)).data.memberIds;
+    }
+
+    match /chats/{chatId} {
+      allow read: if isSignedIn()
+        && request.auth.uid in resource.data.memberIds;
+
+      allow create: if isForumParticipant()
+        && request.resource.data.createdBy == request.auth.uid
+        && request.auth.uid in request.resource.data.memberIds
+        && request.resource.data.memberIds is list
+        && request.resource.data.memberIds.size() >= 2
+        && request.resource.data.memberIds.size() <= 20
+        && request.resource.data.isGroup is bool
+        && request.resource.data.lastMessage is string;
+
+      allow update: if isSignedIn()
+        && request.auth.uid in resource.data.memberIds
+        && request.resource.data.memberIds == resource.data.memberIds
+        && request.resource.data.createdBy == resource.data.createdBy
+        && request.resource.data.dmKey == resource.data.dmKey
+        && request.resource.data.isGroup == resource.data.isGroup;
+
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if isChatMember(chatId);
+
+        allow create: if isChatMember(chatId)
+          && isForumParticipant()
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.senderName is string
+          && (
+            isNonEmptyString(request.resource.data.body)
+            || request.resource.data.keys().hasAll(['sharedPost'])
+          );
+
+        allow update, delete: if false;
+      }
     }
 
     match /threads/{threadId} {
@@ -69,18 +143,25 @@ service cloud.firestore {
         && request.resource.data.tags.size() > 0
         && request.resource.data.tags.size() <= 5
         && request.resource.data.replyCount == 0
+        && request.resource.data.score is int
         && request.resource.data.score == 0;
 
+      // Author/admin: full content edits. Participants: counters/score/accept only.
       allow update: if isSignedIn()
+        && threadAuthorUnchanged()
+        && request.resource.data.score is int
         && (
-          resource.data.authorId == request.auth.uid
-          || isAdmin()
+          (
+            (resource.data.authorId == request.auth.uid || isAdmin())
+            && isNonEmptyString(request.resource.data.title)
+            && isNonEmptyString(request.resource.data.body)
+            && request.resource.data.tags is list
+            && request.resource.data.tags.size() > 0
+            && request.resource.data.tags.size() <= 5
+          )
           || (
             isForumParticipant()
-            && request.resource.data.authorId == resource.data.authorId
-            && request.resource.data.title == resource.data.title
-            && request.resource.data.body == resource.data.body
-            && request.resource.data.tags == resource.data.tags
+            && threadContentUnchanged()
           )
         );
 
@@ -91,6 +172,7 @@ service cloud.firestore {
         allow read: if isSignedIn();
         allow create, update: if isForumParticipant()
           && request.auth.uid == uid
+          && notVotingOwnThread(threadId)
           && request.resource.data.value is int
           && (request.resource.data.value == 1
               || request.resource.data.value == -1);
@@ -104,15 +186,19 @@ service cloud.firestore {
         allow create: if isForumParticipant()
           && request.resource.data.authorId == request.auth.uid
           && isNonEmptyString(request.resource.data.body)
+          && request.resource.data.score is int
           && request.resource.data.score == 0;
 
         allow update: if isSignedIn()
+          && replyAuthorUnchanged()
+          && request.resource.data.score is int
           && (
-            resource.data.authorId == request.auth.uid
-            || isAdmin()
+            (
+              (resource.data.authorId == request.auth.uid || isAdmin())
+              && isNonEmptyString(request.resource.data.body)
+            )
             || (
               isForumParticipant()
-              && request.resource.data.authorId == resource.data.authorId
               && request.resource.data.body == resource.data.body
             )
           );
@@ -124,6 +210,7 @@ service cloud.firestore {
           allow read: if isSignedIn();
           allow create, update: if isForumParticipant()
             && request.auth.uid == uid
+            && notVotingOwnReply(threadId, replyId)
             && request.resource.data.value is int
             && (request.resource.data.value == 1
                 || request.resource.data.value == -1);

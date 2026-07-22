@@ -6,7 +6,7 @@ import '../../../app/widgets/pulse_chrome.dart';
 import '../../../users/user_profile.dart';
 import 'forum_avatar.dart';
 
-/// Facebook/X-style "What's on your mind?" composer strip.
+/// Quiet Q&A entry point — invites a clear question, not a social status.
 class FeedComposerBar extends StatelessWidget {
   const FeedComposerBar({
     super.key,
@@ -21,6 +21,7 @@ class FeedComposerBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
     final name = profile.displayName?.trim().isNotEmpty == true
         ? profile.displayName!.trim()
         : (profile.email ?? 'Tú');
@@ -28,37 +29,61 @@ class FeedComposerBar extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
-        AppSpacing.sm,
+        AppSpacing.xs,
         AppSpacing.md,
         AppSpacing.sm,
       ),
       child: PulseSheet(
         onTap: onTap,
-        padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md,
-          vertical: AppSpacing.sm,
-        ),
+        padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             ForumAvatar(
               name: name,
               photoUrl: profile.photoUrl,
-              size: 40,
+              size: 42,
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                '¿Cuál es tu pregunta?',
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  color: colors.muted,
-                  fontWeight: FontWeight.w500,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Haz una pregunta a la comunidad',
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: -0.2,
+                      color: colors.ink,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'NPN, productos, ventas… alguien ya pudo resolverlo.',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.muted,
+                      fontSize: 12.5,
+                      height: 1.25,
+                    ),
+                  ),
+                ],
               ),
             ),
-            Icon(
-              Icons.edit_outlined,
-              size: 18,
-              color: AppColors.brandOf(context).withValues(alpha: 0.9),
+            const SizedBox(width: 8),
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: brand.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                Icons.edit_note_rounded,
+                size: 20,
+                color: brand,
+              ),
             ),
           ],
         ),

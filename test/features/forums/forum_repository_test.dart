@@ -53,17 +53,26 @@ class FakeForumStore implements ForumStore {
   }
 
   @override
-  Stream<List<ForumThread>> watchThreads({String? tag}) async* {
-    var list = threads.values.toList()
-      ..sort((a, b) => b.lastReplyAt.compareTo(a.lastReplyAt));
+  Future<ForumThreadPage> queryThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+    Object? cursor,
+  }) async {
+    var list = threads.values.toList();
     if (tag != null) {
       list = list.where((t) => t.tags.contains(tag)).toList();
     }
-    yield list;
-    yield* _threadsController.stream.map((all) {
-      if (tag == null) return all;
-      return all.where((t) => t.tags.contains(tag)).toList();
-    });
+    if (authorId != null) {
+      list = list.where((t) => t.authorId == authorId).toList();
+    }
+    list = filterAndSortThreads(list, sort: sort);
+    final start = cursor is int ? cursor : 0;
+    final end = (start + limit).clamp(0, list.length);
+    final page = list.sublist(start.clamp(0, list.length), end);
+    final next = end < list.length ? end : null;
+    return ForumThreadPage(threads: page, nextCursor: next);
   }
 
   @override
@@ -74,8 +83,17 @@ class FakeForumStore implements ForumStore {
 
   @override
   Stream<List<ForumReply>> watchReplies(String threadId) async* {
-    yield sortRepliesByRelevance(replies[threadId] ?? const []);
-    yield* _repliesFor(threadId).stream.map(sortRepliesByRelevance);
+    final accepted = threads[threadId]?.acceptedReplyId;
+    yield sortRepliesByRelevance(
+      replies[threadId] ?? const [],
+      acceptedReplyId: accepted,
+    );
+    yield* _repliesFor(threadId).stream.map(
+          (list) => sortRepliesByRelevance(
+            list,
+            acceptedReplyId: threads[threadId]?.acceptedReplyId,
+          ),
+        );
   }
 
   @override
@@ -129,6 +147,23 @@ class FakeForumStore implements ForumStore {
   }
 
   @override
+  Future<void> updateThread({
+    required String threadId,
+    required String title,
+    required String body,
+    required List<String> tags,
+  }) async {
+    final thread = threads[threadId]!;
+    threads[threadId] = thread.copyWith(
+      title: title,
+      body: body,
+      tags: normalizeForumTags(tags),
+      updatedAt: DateTime.utc(2024, 1, 4),
+    );
+    _emitThreads();
+  }
+
+  @override
   Future<ForumReply> addReply({
     required String threadId,
     required String body,
@@ -160,6 +195,21 @@ class FakeForumStore implements ForumStore {
   }
 
   @override
+  Future<void> updateReply({
+    required String threadId,
+    required String replyId,
+    required String body,
+  }) async {
+    final list = replies[threadId]!;
+    final index = list.indexWhere((r) => r.id == replyId);
+    list[index] = list[index].copyWith(
+      body: body,
+      updatedAt: DateTime.utc(2024, 1, 4),
+    );
+    _repliesFor(threadId).add(list);
+  }
+
+  @override
   Future<void> deleteThread(String threadId) async {
     threads.remove(threadId);
     replies.remove(threadId);
@@ -171,7 +221,37 @@ class FakeForumStore implements ForumStore {
     required String threadId,
     required String replyId,
   }) async {
-    replies[threadId]?.removeWhere((r) => r.id == replyId);
+    final list = replies[threadId] ?? [];
+    list.removeWhere((r) => r.id == replyId);
+    replies[threadId] = list;
+    final thread = threads[threadId];
+    if (thread != null) {
+      DateTime lastReplyAt = thread.createdAt;
+      if (list.isNotEmpty) {
+        list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        lastReplyAt = list.first.createdAt;
+      }
+      threads[threadId] = thread.copyWith(
+        replyCount: thread.replyCount - 1,
+        lastReplyAt: lastReplyAt,
+        updatedAt: DateTime.utc(2024, 1, 5),
+        clearAcceptedReplyId: thread.acceptedReplyId == replyId,
+      );
+      _emitThreads();
+    }
+    _repliesFor(threadId).add(list);
+  }
+
+  @override
+  Future<void> setAcceptedReply({
+    required String threadId,
+    required String? replyId,
+  }) async {
+    final thread = threads[threadId]!;
+    threads[threadId] = replyId == null
+        ? thread.copyWith(clearAcceptedReplyId: true)
+        : thread.copyWith(acceptedReplyId: replyId);
+    _emitThreads();
     _repliesFor(threadId).add(replies[threadId] ?? const []);
   }
 
@@ -463,5 +543,199 @@ void main() {
       canParticipateInForums(role: UserRole.agent, isAnonymous: false),
       isTrue,
     );
+  });
+
+  test('updateThread allows author and rejects strangers', () async {
+    final author = _agent(uid: 'author');
+    final other = _agent(uid: 'other');
+    final thread = await repository.createThread(
+      tags: ['general'],
+      title: 'Original',
+      body: 'Cuerpo original de la pregunta',
+      author: author,
+    );
+
+    await repository.updateThread(
+      thread: thread,
+      actor: author,
+      title: 'Editada',
+      body: 'Cuerpo editado de la pregunta',
+      tags: ['npn'],
+    );
+    expect(store.threads[thread.id]?.title, 'Editada');
+    expect(store.threads[thread.id]?.tags, ['npn']);
+
+    expect(
+      () => repository.updateThread(
+        thread: store.threads[thread.id]!,
+        actor: other,
+        title: 'Hack',
+        body: 'No debería pasar',
+        tags: ['general'],
+      ),
+      throwsStateError,
+    );
+  });
+
+  test('acceptReply toggles and only question author can accept', () async {
+    final author = _agent(uid: 'author');
+    final answerer = _agent(uid: 'answerer');
+    final thread = await repository.createThread(
+      tags: ['general'],
+      title: 'Pregunta',
+      body: 'Necesito una buena respuesta',
+      author: author,
+    );
+    final reply = await repository.addReply(
+      threadId: thread.id,
+      body: 'Esta es la respuesta correcta',
+      author: answerer,
+    );
+
+    expect(
+      () => repository.acceptReply(
+        thread: store.threads[thread.id]!,
+        reply: reply,
+        actor: answerer,
+      ),
+      throwsStateError,
+    );
+
+    await repository.acceptReply(
+      thread: store.threads[thread.id]!,
+      reply: reply,
+      actor: author,
+    );
+    expect(store.threads[thread.id]?.acceptedReplyId, reply.id);
+
+    await repository.acceptReply(
+      thread: store.threads[thread.id]!,
+      reply: reply,
+      actor: author,
+    );
+    expect(store.threads[thread.id]?.acceptedReplyId, isNull);
+  });
+
+  test('deleteReply updates count lastReplyAt and clears accept', () async {
+    final author = _agent(uid: 'author');
+    final answerer = _agent(uid: 'answerer');
+    final thread = await repository.createThread(
+      tags: ['general'],
+      title: 'Pregunta',
+      body: 'Con varias respuestas',
+      author: author,
+    );
+    final first = await repository.addReply(
+      threadId: thread.id,
+      body: 'Primera respuesta del hilo',
+      author: answerer,
+    );
+    final second = await repository.addReply(
+      threadId: thread.id,
+      body: 'Segunda respuesta del hilo',
+      author: answerer,
+    );
+
+    store.replies[thread.id]![0] = ForumReply(
+      id: first.id,
+      threadId: first.threadId,
+      body: first.body,
+      authorId: first.authorId,
+      authorName: first.authorName,
+      authorRole: first.authorRole,
+      score: first.score,
+      createdAt: DateTime.utc(2024, 1, 3),
+      updatedAt: DateTime.utc(2024, 1, 3),
+    );
+    store.replies[thread.id]![1] = ForumReply(
+      id: second.id,
+      threadId: second.threadId,
+      body: second.body,
+      authorId: second.authorId,
+      authorName: second.authorName,
+      authorRole: second.authorRole,
+      score: second.score,
+      createdAt: DateTime.utc(2024, 1, 4),
+      updatedAt: DateTime.utc(2024, 1, 4),
+    );
+
+    await repository.acceptReply(
+      thread: store.threads[thread.id]!,
+      reply: store.replies[thread.id]![1],
+      actor: author,
+    );
+
+    await repository.deleteReply(
+      reply: store.replies[thread.id]![1],
+      actor: answerer,
+    );
+
+    expect(store.threads[thread.id]?.replyCount, 1);
+    expect(store.threads[thread.id]?.acceptedReplyId, isNull);
+    expect(
+      store.threads[thread.id]?.lastReplyAt,
+      DateTime.utc(2024, 1, 3),
+    );
+  });
+
+  test('queryThreads paginates and filters by author', () async {
+    final a = _agent(uid: 'a');
+    final b = _agent(uid: 'b');
+    for (var i = 0; i < 3; i++) {
+      await repository.createThread(
+        tags: ['general'],
+        title: 'Pregunta A $i con texto',
+        body: 'Cuerpo de pregunta A número $i',
+        author: a,
+      );
+    }
+    await repository.createThread(
+      tags: ['npn'],
+      title: 'Pregunta B unica',
+      body: 'Cuerpo de pregunta B',
+      author: b,
+    );
+
+    final mine = await repository.queryThreads(authorId: 'a', limit: 2);
+    expect(mine.threads, hasLength(2));
+    expect(mine.hasMore, isTrue);
+
+    final next = await repository.queryThreads(
+      authorId: 'a',
+      limit: 2,
+      cursor: mine.nextCursor,
+    );
+    expect(next.threads, hasLength(1));
+    expect(next.hasMore, isFalse);
+  });
+
+  test('sortRepliesByRelevance puts accepted first', () {
+    final now = DateTime.utc(2024, 1, 1);
+    final replies = [
+      ForumReply(
+        id: 'r1',
+        threadId: 't',
+        body: 'low',
+        authorId: 'u',
+        authorName: 'Ada',
+        authorRole: UserRole.agent,
+        score: 10,
+        createdAt: now,
+        updatedAt: now,
+      ),
+      ForumReply(
+        id: 'r2',
+        threadId: 't',
+        body: 'accepted',
+        authorId: 'u',
+        authorName: 'Ada',
+        authorRole: UserRole.agent,
+        score: 1,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
+    final sorted = sortRepliesByRelevance(replies, acceptedReplyId: 'r2');
+    expect(sorted.first.id, 'r2');
   });
 }
