@@ -52,7 +52,7 @@ class EmptyState extends StatelessWidget {
                   Text(
                     mark!,
                     style: theme.textTheme.displayLarge?.copyWith(
-                      color: AppColors.accent.withValues(alpha: 0.18),
+                      color: AppColors.brandOf(context).withValues(alpha: 0.18),
                       fontSize: 96,
                       height: 0.85,
                     ),

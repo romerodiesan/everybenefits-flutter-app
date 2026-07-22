@@ -11,9 +11,9 @@ class RoleBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(
-          bottom: BorderSide(color: AppColors.accent, width: 2),
+          bottom: BorderSide(color: AppColors.brandOf(context), width: 2),
         ),
       ),
       child: Padding(
@@ -21,7 +21,7 @@ class RoleBadge extends StatelessWidget {
         child: Text(
           role.label.toUpperCase(),
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: AppColors.accent,
+                color: AppColors.brandOf(context),
                 fontSize: 11,
                 letterSpacing: 1.4,
                 fontWeight: FontWeight.w800,

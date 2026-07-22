@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import 'app_spacing.dart';
+import 'theme_controller.dart';
 
+/// EVERY Pulse design tokens — ink canvas + dynamic brand signal.
 @immutable
 class AppColors extends ThemeExtension<AppColors> {
   const AppColors({
@@ -15,11 +17,22 @@ class AppColors extends ThemeExtension<AppColors> {
     required this.meshBlob,
   });
 
-  /// Deep forest — restrained brand.
-  static const Color brand = Color(0xFF1F4F40);
+  /// Fallback when no [Theme] is available (tests / early boot).
+  static const Color brand = Color(0xFF1F6B4A);
 
-  /// Soft sage accent — not neon.
-  static const Color accent = Color(0xFF3D6B5C);
+  /// Alias kept for older call sites; prefer [brandOf].
+  static const Color accent = brand;
+
+  static const Color inkBrand = Color(0xFF0C0D10);
+
+  /// Live primary from [ColorScheme] (user-selected seed).
+  static Color brandOf(BuildContext context) {
+    return Theme.of(context).colorScheme.primary;
+  }
+
+  static Color onBrandOf(BuildContext context) {
+    return Theme.of(context).colorScheme.onPrimary;
+  }
 
   final Color ink;
   final Color muted;
@@ -29,30 +42,33 @@ class AppColors extends ThemeExtension<AppColors> {
   final Color glassBorder;
   final Color meshBlob;
 
-  Color get surface => const Color(0xFFFFFFFF);
+  Color get canvas => meshBase;
+  Color get sheet => meshDeep;
+  Color get quiet => muted;
+  Color get surface => glassFill;
   Color get border => glassBorder;
   Color get background => meshBase;
   Color get textPrimary => ink;
   Color get textSecondary => muted;
 
   static const dark = AppColors(
-    ink: Color(0xFFF4F4F3),
-    muted: Color(0xFF8A8F8C),
-    meshBase: Color(0xFF111312),
-    meshDeep: Color(0xFF171A18),
-    glassFill: Color(0x14FFFFFF),
-    glassBorder: Color(0x1AFFFFFF),
-    meshBlob: Color(0xFF1C2A24),
+    ink: Color(0xFFF4F3F0),
+    muted: Color(0xFF8B9098),
+    meshBase: Color(0xFF0C0D10),
+    meshDeep: Color(0xFF16171C),
+    glassFill: Color(0xFF1C1D24),
+    glassBorder: Color(0x22FFFFFF),
+    meshBlob: Color(0xFF1C1D24),
   );
 
   static const light = AppColors(
-    ink: Color(0xFF141816),
-    muted: Color(0xFF6B736E),
-    meshBase: Color(0xFFF7F7F6),
-    meshDeep: Color(0xFFEEEEEC),
-    glassFill: Color(0xCCFFFFFF),
+    ink: Color(0xFF0C0D10),
+    muted: Color(0xFF5C6570),
+    meshBase: Color(0xFFF3F5F7),
+    meshDeep: Color(0xFFFFFFFF),
+    glassFill: Color(0xFFFFFFFF),
     glassBorder: Color(0x14000000),
-    meshBlob: Color(0xFFD8DDD9),
+    meshBlob: Color(0xFFE4E7EB),
   );
 
   static AppColors of(BuildContext context) {
@@ -95,41 +111,50 @@ class AppColors extends ThemeExtension<AppColors> {
   }
 }
 
-ThemeData buildEveryInsuranceTheme(Brightness brightness) {
-  final colors = brightness == Brightness.dark ? AppColors.dark : AppColors.light;
+/// On-primary ink for light brands; white for dark/saturated brands.
+Color onBrandFor(Color brand) {
+  return brand.computeLuminance() > 0.45 ? AppColors.inkBrand : Colors.white;
+}
+
+ThemeData buildEveryInsuranceTheme(
+  Brightness brightness, {
+  Color brand = AppColors.brand,
+}) {
+  final colors =
+      brightness == Brightness.dark ? AppColors.dark : AppColors.light;
   final baseText = brightness == Brightness.dark
       ? ThemeData.dark().textTheme
       : ThemeData.light().textTheme;
-  final body = GoogleFonts.plusJakartaSansTextTheme(baseText);
-  final display = GoogleFonts.syneTextTheme(baseText);
-  const onAccent = Colors.white;
+  final body = GoogleFonts.figtreeTextTheme(baseText);
+  final display = GoogleFonts.outfitTextTheme(baseText);
+  final onBrand = onBrandFor(brand);
 
   final textTheme = body
       .apply(bodyColor: colors.ink, displayColor: colors.ink)
       .copyWith(
         displayLarge: display.displayLarge?.copyWith(
           fontWeight: FontWeight.w800,
-          letterSpacing: -2.2,
-          height: 0.92,
+          letterSpacing: -2.4,
+          height: 0.9,
           color: colors.ink,
           fontSize: 56,
         ),
         displaySmall: display.displaySmall?.copyWith(
           fontWeight: FontWeight.w800,
-          letterSpacing: -1.4,
+          letterSpacing: -1.6,
           height: 0.95,
           color: colors.ink,
           fontSize: 40,
         ),
         headlineMedium: display.headlineMedium?.copyWith(
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.8,
+          letterSpacing: -0.9,
           color: colors.ink,
           fontSize: 28,
         ),
         titleLarge: display.titleLarge?.copyWith(
           fontWeight: FontWeight.w700,
-          letterSpacing: -0.4,
+          letterSpacing: -0.5,
           color: colors.ink,
           fontSize: 22,
         ),
@@ -149,20 +174,20 @@ ThemeData buildEveryInsuranceTheme(Brightness brightness) {
         ),
         labelLarge: body.labelLarge?.copyWith(
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.2,
+          letterSpacing: 0.15,
           color: colors.ink,
         ),
       );
 
   final scheme = ColorScheme(
     brightness: brightness,
-    primary: AppColors.brand,
-    onPrimary: onAccent,
-    secondary: AppColors.accent,
-    onSecondary: Colors.white,
+    primary: brand,
+    onPrimary: onBrand,
+    secondary: brand,
+    onSecondary: onBrand,
     error: const Color(0xFFE57373),
     onError: Colors.white,
-    surface: Colors.transparent,
+    surface: colors.meshDeep,
     onSurface: colors.ink,
     outline: colors.glassBorder,
   );
@@ -171,14 +196,14 @@ ThemeData buildEveryInsuranceTheme(Brightness brightness) {
     useMaterial3: true,
     brightness: brightness,
     colorScheme: scheme,
-    scaffoldBackgroundColor: Colors.transparent,
+    scaffoldBackgroundColor: colors.meshBase,
     textTheme: textTheme,
     extensions: [colors],
     appBarTheme: AppBarTheme(
       elevation: 0,
       scrolledUnderElevation: 0,
       centerTitle: false,
-      backgroundColor: Colors.transparent,
+      backgroundColor: colors.meshBase,
       foregroundColor: colors.ink,
       surfaceTintColor: Colors.transparent,
       titleTextStyle: textTheme.titleLarge,
@@ -186,14 +211,14 @@ ThemeData buildEveryInsuranceTheme(Brightness brightness) {
     filledButtonTheme: FilledButtonThemeData(
       style: FilledButton.styleFrom(
         elevation: 0,
-        backgroundColor: AppColors.brand,
-        foregroundColor: onAccent,
+        backgroundColor: brand,
+        foregroundColor: onBrand,
         minimumSize: const Size.fromHeight(56),
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
         ),
-        textStyle: textTheme.labelLarge?.copyWith(color: onAccent),
+        textStyle: textTheme.labelLarge?.copyWith(color: onBrand),
       ),
     ),
     textButtonTheme: TextButtonThemeData(
@@ -209,10 +234,16 @@ ThemeData buildEveryInsuranceTheme(Brightness brightness) {
         padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
         side: BorderSide(color: colors.glassBorder),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
         ),
         textStyle: textTheme.labelLarge,
       ),
+    ),
+    floatingActionButtonTheme: FloatingActionButtonThemeData(
+      backgroundColor: brand,
+      foregroundColor: onBrand,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
     ),
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -225,29 +256,29 @@ ThemeData buildEveryInsuranceTheme(Brightness brightness) {
         fontSize: 12,
       ),
       border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide(color: colors.glassBorder),
       ),
       enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         borderSide: BorderSide(color: colors.glassBorder),
       ),
       focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: AppColors.accent, width: 1.4),
+        borderRadius: BorderRadius.circular(20),
+        borderSide: BorderSide(color: brand, width: 1.6),
       ),
       errorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         borderSide: const BorderSide(color: Color(0xFFE57373)),
       ),
       focusedErrorBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(16),
-        borderSide: const BorderSide(color: Color(0xFFE57373), width: 1.4),
+        borderRadius: BorderRadius.circular(20),
+        borderSide: const BorderSide(color: Color(0xFFE57373), width: 1.6),
       ),
     ),
     tabBarTheme: TabBarThemeData(
       dividerColor: Colors.transparent,
-      indicatorColor: AppColors.accent,
+      indicatorColor: brand,
       labelColor: colors.ink,
       unselectedLabelColor: colors.muted,
       labelStyle: textTheme.labelLarge,
@@ -261,5 +292,24 @@ ThemeData buildEveryInsuranceTheme(Brightness brightness) {
       thickness: 1,
       space: 1,
     ),
+    cardTheme: CardThemeData(
+      color: colors.meshDeep,
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+        side: BorderSide(color: colors.glassBorder),
+      ),
+    ),
+  );
+}
+
+/// Convenience for tests / callers that only have a [ThemeController].
+ThemeData themeForController(
+  ThemeController controller,
+  Brightness brightness,
+) {
+  return buildEveryInsuranceTheme(
+    brightness,
+    brand: controller.primaryColor,
   );
 }

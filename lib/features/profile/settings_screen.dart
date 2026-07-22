@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/theme_controller.dart';
-import '../../app/widgets/glass_card.dart';
-import '../../app/widgets/mesh_background.dart';
+import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/role_badge.dart';
 import '../../auth/auth.dart';
 import '../../users/users.dart';
@@ -26,165 +25,142 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
     final themeController = ThemeScope.of(context);
 
-    return MeshBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
-        appBar: AppBar(title: const Text('Ajustes')),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            AppSpacing.xl,
+    return PulseScaffold(
+      appBar: AppBar(title: const Text('Ajustes')),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.lg,
+          AppSpacing.sm,
+          AppSpacing.lg,
+          AppSpacing.xl,
+        ),
+        children: [
+          Text('Tu información', style: theme.textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          PulseSheet(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                RoleBadge(role: profile.role),
+                const SizedBox(height: AppSpacing.md),
+                _InfoRow(label: 'Nombre', value: profile.headlineName),
+                Divider(color: colors.border),
+                _InfoRow(
+                  label: 'Email',
+                  value: profile.email ?? 'Sin email vinculado',
+                ),
+              ],
+            ),
           ),
-          children: [
-            Text('Tu información', style: theme.textTheme.titleMedium),
+          if (onEditProfile != null) ...[
             const SizedBox(height: AppSpacing.sm),
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RoleBadge(role: profile.role),
-                  const SizedBox(height: AppSpacing.md),
-                  _InfoRow(
-                    label: 'Nombre',
-                    value: profile.headlineName,
-                  ),
-                  const Divider(),
-                  _InfoRow(
-                    label: 'Email',
-                    value: profile.email ?? 'Sin email vinculado',
-                  ),
-                  if (!profile.isAnonymous) ...[
-                    const Divider(),
-                    _InfoRow(
-                      label: 'Teléfono',
-                      value: profile.fullPhone ?? 'Sin teléfono',
-                    ),
-                    if (profile.role == UserRole.agent) ...[
-                      const Divider(),
-                      _InfoRow(label: 'NPN', value: profile.npn ?? '—'),
-                      const Divider(),
-                      _InfoRow(
-                        label: 'Dirección',
-                        value: profile.address ?? '—',
-                      ),
-                      const Divider(),
-                      _InfoRow(
-                        label: 'Agencia',
-                        value: profile.agency ?? kDefaultAgency,
-                      ),
-                    ],
-                  ],
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Apariencia', style: theme.textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.sm),
-            GlassCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Tema',
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  ListenableBuilder(
-                    listenable: themeController,
-                    builder: (context, _) {
-                      return SegmentedButton<ThemeMode>(
-                        segments: const [
-                          ButtonSegment(
-                            value: ThemeMode.light,
-                            label: Text('Claro'),
-                            icon: Icon(Icons.light_mode_outlined, size: 18),
-                          ),
-                          ButtonSegment(
-                            value: ThemeMode.dark,
-                            label: Text('Oscuro'),
-                            icon: Icon(Icons.dark_mode_outlined, size: 18),
-                          ),
-                          ButtonSegment(
-                            value: ThemeMode.system,
-                            label: Text('Sistema'),
-                            icon: Icon(Icons.phone_iphone_outlined, size: 18),
-                          ),
-                        ],
-                        selected: {themeController.mode},
-                        onSelectionChanged: (selection) {
-                          themeController.setMode(selection.first);
-                        },
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Cuenta', style: theme.textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.sm),
-            GlassCard(
-              padding: EdgeInsets.zero,
-              child: Column(
-                children: [
-                  if (!profile.isAnonymous)
-                    _SettingsTile(
-                      icon: Icons.edit_outlined,
-                      title: 'Editar perfil',
-                      onTap: onEditProfile,
-                    ),
-                  if (!profile.isAnonymous) const Divider(height: 1),
-                  _SettingsTile(
-                    icon: Icons.notifications_outlined,
-                    title: 'Notificaciones',
-                    subtitle: 'Próximamente',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Las notificaciones llegan pronto.'),
-                        ),
-                      );
-                    },
-                  ),
-                  const Divider(height: 1),
-                  _SettingsTile(
-                    icon: Icons.lock_outline_rounded,
-                    title: 'Privacidad',
-                    subtitle: 'Próximamente',
-                    onTap: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Ajustes de privacidad llegan pronto.'),
-                        ),
-                      );
-                    },
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Sesión', style: theme.textTheme.titleMedium),
-            const SizedBox(height: AppSpacing.sm),
-            GlassCard(
-              padding: EdgeInsets.zero,
-              child: _SettingsTile(
-                icon: Icons.logout_rounded,
-                title: 'Cerrar sesión',
-                destructive: true,
-                onTap: authService.signOut,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            Text(
-              'Every Insurance',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyMedium,
+            OutlinedButton(
+              onPressed: onEditProfile,
+              child: const Text('Editar perfil'),
             ),
           ],
+          const SizedBox(height: AppSpacing.xl),
+          Text('Tema', style: theme.textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          SegmentedButton<ThemeMode>(
+            segments: const [
+              ButtonSegment(value: ThemeMode.system, label: Text('Auto')),
+              ButtonSegment(value: ThemeMode.light, label: Text('Claro')),
+              ButtonSegment(value: ThemeMode.dark, label: Text('Oscuro')),
+            ],
+            selected: {themeController.mode},
+            onSelectionChanged: (value) {
+              themeController.setMode(value.first);
+            },
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          Text('Color de acento', style: theme.textTheme.titleMedium),
+          const SizedBox(height: 4),
+          Text(
+            'Se aplica a botones, tabs y acentos de la app.',
+            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: [
+              for (final seed in kPrimarySeeds)
+                _ColorSwatch(
+                  seed: seed,
+                  selected: themeController.primarySeedId == seed.id,
+                  onTap: () => themeController.setPrimarySeed(seed.id),
+                ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          TextButton(
+            onPressed: authService.signOut,
+            child: Text(
+              'Cerrar sesión',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ColorSwatch extends StatelessWidget {
+  const _ColorSwatch({
+    required this.seed,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final PrimarySeed seed;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    return Semantics(
+      button: true,
+      selected: selected,
+      label: seed.label,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: seed.color,
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected ? colors.ink : colors.border,
+              width: selected ? 2.5 : 1,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: seed.color.withValues(alpha: 0.35),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: selected
+              ? Icon(
+                  Icons.check_rounded,
+                  color: onBrandFor(seed.color),
+                  size: 22,
+                )
+              : null,
         ),
       ),
     );
@@ -200,57 +176,22 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 96,
-            child: Text(label, style: theme.textTheme.bodyMedium),
+            width: 88,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+            ),
           ),
-          Expanded(
-            child: Text(value, style: theme.textTheme.bodyLarge),
-          ),
+          Expanded(child: Text(value, style: theme.textTheme.bodyLarge)),
         ],
       ),
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({
-    required this.icon,
-    required this.title,
-    this.subtitle,
-    this.onTap,
-    this.destructive = false,
-  });
-
-  final IconData icon;
-  final String title;
-  final String? subtitle;
-  final VoidCallback? onTap;
-  final bool destructive;
-
-  @override
-  Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
-    final color = destructive ? const Color(0xFFE57373) : colors.ink;
-    return ListTile(
-      leading: Icon(icon, color: destructive ? color : AppColors.accent),
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(color: color),
-      ),
-      subtitle: subtitle == null
-          ? null
-          : Text(subtitle!, style: Theme.of(context).textTheme.bodyMedium),
-      trailing: Icon(
-        Icons.chevron_right_rounded,
-        color: colors.muted.withValues(alpha: 0.7),
-      ),
-      onTap: onTap,
     );
   }
 }

@@ -14,12 +14,18 @@ class OrbVisual extends StatelessWidget {
     return SizedBox(
       width: size,
       height: size,
-      child: CustomPaint(painter: _OrbPainter()),
+      child: CustomPaint(
+        painter: _OrbPainter(brand: AppColors.brandOf(context)),
+      ),
     );
   }
 }
 
 class _OrbPainter extends CustomPainter {
+  _OrbPainter({required this.brand});
+
+  final Color brand;
+
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
@@ -28,8 +34,8 @@ class _OrbPainter extends CustomPainter {
     final glow = Paint()
       ..shader = RadialGradient(
         colors: [
-          AppColors.brand.withValues(alpha: 0.12),
-          AppColors.brand.withValues(alpha: 0),
+          brand.withValues(alpha: 0.12),
+          brand.withValues(alpha: 0),
         ],
       ).createShader(Rect.fromCircle(center: center, radius: radius * 1.25));
     canvas.drawCircle(center, radius * 1.25, glow);
@@ -39,8 +45,8 @@ class _OrbPainter extends CustomPainter {
         center: const Alignment(-0.35, -0.45),
         colors: [
           const Color(0xFFE8EEEB),
-          AppColors.accent.withValues(alpha: 0.75),
-          AppColors.brand,
+          brand.withValues(alpha: 0.75),
+          brand,
           const Color(0xFF0E1A16),
         ],
         stops: const [0.0, 0.32, 0.68, 1.0],
@@ -76,5 +82,6 @@ class _OrbPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _OrbPainter oldDelegate) =>
+      oldDelegate.brand != brand;
 }

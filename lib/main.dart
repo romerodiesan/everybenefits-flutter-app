@@ -1,13 +1,13 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'app/home_shell.dart';
 import 'app/theme.dart';
 import 'app/theme_controller.dart';
-import 'app/widgets/mesh_background.dart';
+import 'app/widgets/pulse_chrome.dart';
 import 'auth/auth.dart';
+import 'features/forums/forum_repository.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/profile/profile_completion_flow.dart';
 import 'firebase/firebase_emulators.dart';
@@ -27,56 +27,69 @@ Future<void> main() async {
 
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await connectFirebaseEmulators();
-  await LiquidGlassWidgets.initialize();
   final themeController = await ThemeController.load();
   runApp(
-    LiquidGlassWidgets.wrap(
-      child: EveryInsuranceApp(
-        authService: AuthService(),
-        userRepository: UserRepository(),
-        themeController: themeController,
-      ),
+    EveryInsuranceApp(
+      authService: AuthService(),
+      userRepository: UserRepository(),
+      themeController: themeController,
     ),
   );
 }
 
-class EveryInsuranceApp extends StatelessWidget {
+class EveryInsuranceApp extends StatefulWidget {
   const EveryInsuranceApp({
     super.key,
     required this.authService,
     required this.userRepository,
     required this.themeController,
+    this.forumRepository,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
   final ThemeController themeController;
+  final ForumRepository? forumRepository;
+
+  @override
+  State<EveryInsuranceApp> createState() => _EveryInsuranceAppState();
+}
+
+class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
+  /// Cached so theme rebuilds do not resubscribe auth (which resets navigation).
+  late final Stream<User?> _authStream = widget.authService.authStateChanges;
 
   @override
   Widget build(BuildContext context) {
     return ThemeScope(
-      controller: themeController,
-      child: ListenableBuilder(
-        listenable: themeController,
-        builder: (context, _) {
-          return StreamBuilder<User?>(
-            stream: authService.authStateChanges,
-            builder: (context, snapshot) {
-              // Rebuild MaterialApp (new Navigator) when auth flips so login/register
-              // routes cannot stay stacked above the dashboard.
-              final authKey = snapshot.connectionState == ConnectionState.waiting
-                  ? 'boot'
-                  : (snapshot.data?.uid ?? 'signed-out');
+      controller: widget.themeController,
+      child: StreamBuilder<User?>(
+        stream: _authStream,
+        builder: (context, snapshot) {
+          final authKey = snapshot.connectionState == ConnectionState.waiting
+              ? 'boot'
+              : (snapshot.data?.uid ?? 'signed-out');
 
+          return ListenableBuilder(
+            listenable: widget.themeController,
+            builder: (context, _) {
+              final brand = widget.themeController.primaryColor;
               return MaterialApp(
                 key: ValueKey<String>(authKey),
                 title: 'Every Insurance',
-                theme: buildEveryInsuranceTheme(Brightness.light),
-                darkTheme: buildEveryInsuranceTheme(Brightness.dark),
-                themeMode: themeController.mode,
+                theme: buildEveryInsuranceTheme(
+                  Brightness.light,
+                  brand: brand,
+                ),
+                darkTheme: buildEveryInsuranceTheme(
+                  Brightness.dark,
+                  brand: brand,
+                ),
+                themeMode: widget.themeController.mode,
                 home: _AuthHome(
-                  authService: authService,
-                  userRepository: userRepository,
+                  authService: widget.authService,
+                  userRepository: widget.userRepository,
+                  forumRepository: widget.forumRepository,
                   connectionState: snapshot.connectionState,
                   user: snapshot.data,
                 ),
@@ -93,23 +106,22 @@ class _AuthHome extends StatelessWidget {
   const _AuthHome({
     required this.authService,
     required this.userRepository,
+    required this.forumRepository,
     required this.connectionState,
     required this.user,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
+  final ForumRepository? forumRepository;
   final ConnectionState connectionState;
   final User? user;
 
   @override
   Widget build(BuildContext context) {
     if (connectionState == ConnectionState.waiting) {
-      return MeshBackground(
-        child: const Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Center(child: CircularProgressIndicator()),
-        ),
+      return const PulseScaffold(
+        body: Center(child: CircularProgressIndicator()),
       );
     }
 
@@ -122,6 +134,7 @@ class _AuthHome extends StatelessWidget {
       user: user!,
       authService: authService,
       userRepository: userRepository,
+      forumRepository: forumRepository,
     );
   }
 }
@@ -132,11 +145,13 @@ class ProfileBootstrap extends StatefulWidget {
     required this.user,
     required this.authService,
     required this.userRepository,
+    this.forumRepository,
   });
 
   final User user;
   final AuthService authService;
   final UserRepository userRepository;
+  final ForumRepository? forumRepository;
 
   @override
   State<ProfileBootstrap> createState() => _ProfileBootstrapState();
@@ -152,37 +167,31 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
       future: _profileFuture,
       builder: (context, profileSnapshot) {
         if (profileSnapshot.connectionState != ConnectionState.done) {
-          return MeshBackground(
-            child: const Scaffold(
-              backgroundColor: Colors.transparent,
-              body: Center(child: CircularProgressIndicator()),
-            ),
+          return const PulseScaffold(
+            body: Center(child: CircularProgressIndicator()),
           );
         }
 
         if (profileSnapshot.hasError) {
           final error = profileSnapshot.error!;
           debugPrint('[ProfileBootstrap] $error');
-          return MeshBackground(
-            child: Scaffold(
-              backgroundColor: Colors.transparent,
-              body: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'No se pudo cargar el perfil:\n$error',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      FilledButton(
-                        onPressed: () => widget.authService.signOut(),
-                        child: const Text('Volver al inicio'),
-                      ),
-                    ],
-                  ),
+          return PulseScaffold(
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'No se pudo cargar el perfil:\n$error',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: () => widget.authService.signOut(),
+                      child: const Text('Volver al inicio'),
+                    ),
+                  ],
                 ),
               ),
             ),
@@ -205,10 +214,11 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
               );
             }
 
-            return HomeShell(
+            return PulseShell(
               authService: widget.authService,
               userRepository: widget.userRepository,
               profile: profile,
+              forumRepository: widget.forumRepository,
             );
           },
         );

@@ -11,12 +11,13 @@ class MeshBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
     return ColoredBox(
       color: colors.meshBase,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          CustomPaint(painter: _MeshPainter(colors: colors)),
+          CustomPaint(painter: _MeshPainter(colors: colors, brand: brand)),
           ?child,
         ],
       ),
@@ -25,9 +26,10 @@ class MeshBackground extends StatelessWidget {
 }
 
 class _MeshPainter extends CustomPainter {
-  const _MeshPainter({required this.colors});
+  const _MeshPainter({required this.colors, required this.brand});
 
   final AppColors colors;
+  final Color brand;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -55,7 +57,7 @@ class _MeshPainter extends CustomPainter {
       (
         Offset(size.width * 0.9, size.height * 0.75),
         size.width * 0.5,
-        AppColors.brand.withValues(alpha: isLight ? 0.04 : 0.12),
+        brand.withValues(alpha: isLight ? 0.04 : 0.12),
       ),
     ];
 
@@ -70,5 +72,5 @@ class _MeshPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _MeshPainter oldDelegate) =>
-      oldDelegate.colors != colors;
+      oldDelegate.colors != colors || oldDelegate.brand != brand;
 }
