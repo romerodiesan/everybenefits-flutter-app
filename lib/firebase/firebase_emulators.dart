@@ -17,14 +17,29 @@ bool get useFirebaseEmulators {
   return kDebugMode;
 }
 
+/// Optional host override for physical devices on the same LAN.
+///
+/// Example (iPhone + Mac Wi‑Fi):
+/// `flutter run --dart-define=FIREBASE_EMULATOR_HOST=192.168.1.20`
+const String kFirebaseEmulatorHostOverride =
+    String.fromEnvironment('FIREBASE_EMULATOR_HOST');
+
 /// Host reachable from the current platform to the machine running emulators.
+///
+/// - Android emulator → `10.0.2.2` (host loopback)
+/// - iOS Simulator / desktop → `127.0.0.1`
+/// - Physical phone → must pass [kFirebaseEmulatorHostOverride] (your Mac LAN IP)
 String firebaseEmulatorHost() {
+  final override = kFirebaseEmulatorHostOverride.trim();
+  if (override.isNotEmpty) return override;
+
   if (kIsWeb) return '127.0.0.1';
   switch (defaultTargetPlatform) {
     case TargetPlatform.android:
       return '10.0.2.2';
     default:
-      // IPv4 loopback — `localhost` can resolve to ::1 and miss the emulator.
+      // IPv4 loopback — works for simulators only.
+      // Physical devices need FIREBASE_EMULATOR_HOST=<Mac LAN IP>.
       return '127.0.0.1';
   }
 }
@@ -81,10 +96,13 @@ Future<void> connectFirebaseEmulators({
 
   final boundHost = FirebaseFirestore.instance.settings.host;
   final sslEnabled = FirebaseFirestore.instance.settings.sslEnabled ?? true;
+  final physicalHint = emulatorHost == '127.0.0.1' || emulatorHost == 'localhost'
+      ? ' (physical device? pass --dart-define=FIREBASE_EMULATOR_HOST=<Mac-LAN-IP>)'
+      : '';
   debugPrint(
     'Firebase emulators → $emulatorHost '
     '(auth:$authPort firestore:$firestorePort storage:$storagePort) '
-    'firestore.settings.host=$boundHost ssl=$sslEnabled',
+    'firestore.settings.host=$boundHost ssl=$sslEnabled$physicalHint',
   );
 }
 

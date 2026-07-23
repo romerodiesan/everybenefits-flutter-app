@@ -1,5 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 
+import '../firebase/firebase_emulators.dart';
+
 class AuthException implements Exception {
   const AuthException({
     required this.code,
@@ -61,6 +63,12 @@ class AuthException implements Exception {
       case 'too-many-requests':
         return 'Demasiados intentos. Espera un momento e inténtalo de nuevo.';
       case 'network-request-failed':
+        if (useFirebaseEmulators) {
+          return 'No se pudo llegar a los emuladores. '
+              'En un iPhone físico usa: '
+              'flutter run --dart-define=FIREBASE_EMULATOR_HOST=<IP-de-tu-Mac> '
+              '(misma Wi‑Fi; reinicia emuladores con host 0.0.0.0).';
+        }
         return 'Sin conexión. Revisa tu red e inténtalo de nuevo.';
       case 'emulator-unreachable':
         return 'No se pudo conectar con Firebase. '

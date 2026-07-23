@@ -81,5 +81,12 @@
 	<string>Every Insurance necesita acceso a tus fotos para actualizar tu avatar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Every Insurance necesita la cámara para tomar tu foto de perfil.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Every Insurance usa la red local en desarrollo para hablar con los emuladores de Firebase en tu Mac.</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
 </dict>
 </plist>
