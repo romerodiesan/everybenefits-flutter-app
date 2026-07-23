@@ -55,6 +55,10 @@ bool looksLikeEmulatorFirestoreHost(String? host, {int port = 8080}) {
 ///
 /// Call immediately after [Firebase.initializeApp], before any other
 /// Firestore / Database use.
+///
+/// Idempotent across hot restart: native channels survive Dart restarts, and
+/// re-binding stacks gRPC connections until the Firestore emulator replies
+/// with `GOAWAY too_many_pings`.
 Future<void> connectFirebaseEmulators({
   String? host,
   int authPort = 9099,
@@ -67,8 +71,27 @@ Future<void> connectFirebaseEmulators({
   final emulatorHost = host ?? firebaseEmulatorHost();
   final firestoreEmulator = '$emulatorHost:$firestorePort';
 
-  // 1) Firestore settings FIRST — before Auth or any Firestore API that
-  //    materializes the native pigeon app.
+  // Hot restart resets Dart but keeps the native Firestore client. Re-binding
+  // stacks gRPC channels until the emulator replies GOAWAY too_many_pings.
+  // Skip whenever we are already talking to *an* emulator on this port
+  // (exact host string can differ after IP / override changes mid-session).
+  final existingHost = FirebaseFirestore.instance.settings.host;
+  if (looksLikeEmulatorFirestoreHost(existingHost, port: firestorePort)) {
+    debugPrint(
+      'Firebase emulators already bound → $existingHost '
+      '(skip rebind; avoids gRPC too_many_pings). '
+      'If Auth/Storage seem wrong, fully quit the app and run again.',
+    );
+    return;
+  }
+
+  // 1) Firestore FIRST — before Auth or any API that materializes the native
+  //    pigeon app. Prefer the official helper, then force persistence off.
+  FirebaseFirestore.instance.useFirestoreEmulator(
+    emulatorHost,
+    firestorePort,
+    automaticHostMapping: false,
+  );
   FirebaseFirestore.instance.settings = Settings(
     persistenceEnabled: false,
     sslEnabled: false,
@@ -87,6 +110,7 @@ Future<void> connectFirebaseEmulators({
   FirebaseDatabase.instance.useDatabaseEmulator(emulatorHost, databasePort);
 
   // Avoid mixing a persisted production session with emulator backends.
+  // Only on a real (re)bind — not on the hot-restart skip path above.
   await FirebaseAuth.instance.signOut();
 
   final boundHost = FirebaseFirestore.instance.settings.host;

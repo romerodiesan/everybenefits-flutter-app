@@ -13,6 +13,10 @@ import 'firebase_emulators.dart';
 /// in Firebase Console → App Check → Manage debug tokens.
 Future<void> activateFirebaseAppCheck() async {
   if (useFirebaseEmulators) {
+    // Prevent leftover DeviceCheck / attestation traffic after hot restart.
+    try {
+      await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);
+    } catch (_) {}
     debugPrint('App Check skipped (Firebase emulators)');
     return;
   }

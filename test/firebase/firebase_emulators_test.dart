@@ -29,6 +29,7 @@ void main() {
   test('looksLikeEmulatorFirestoreHost detects bound host', () {
     expect(looksLikeEmulatorFirestoreHost('127.0.0.1:8080'), isTrue);
     expect(looksLikeEmulatorFirestoreHost('192.168.1.10:8080'), isTrue);
+    expect(looksLikeEmulatorFirestoreHost('10.0.0.77:8080'), isTrue);
     expect(looksLikeEmulatorFirestoreHost('firestore.googleapis.com'), isFalse);
   });
 }
