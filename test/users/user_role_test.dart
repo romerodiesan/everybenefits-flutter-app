@@ -12,9 +12,9 @@ void main() {
       expect(UserRole.parse('admin'), UserRole.admin);
     });
 
-    test('falls back to agent for unknown values', () {
-      expect(UserRole.parse('unknown'), UserRole.agent);
-      expect(UserRole.parse(null), UserRole.agent);
+    test('falls back to guest for unknown values', () {
+      expect(UserRole.parse('unknown'), UserRole.guest);
+      expect(UserRole.parse(null), UserRole.guest);
     });
 
     test('serializes to wire values', () {

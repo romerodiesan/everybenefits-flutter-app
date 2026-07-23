@@ -46,11 +46,14 @@ class FakeChatStore implements ChatStore {
   }
 
   @override
-  Stream<List<ChatMessage>> watchMessages(String chatId) async* {
+  Stream<List<ChatMessage>> watchMessages(
+    String chatId, {
+    int limit = kChatMessagePageSize,
+  }) async* {
     List<ChatMessage> current() {
       final list = List<ChatMessage>.from(messages[chatId] ?? const []);
-      list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      return list;
+      list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list.take(limit).toList();
     }
 
     yield current();

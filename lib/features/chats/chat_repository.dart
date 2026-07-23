@@ -5,13 +5,19 @@ import 'chat_models.dart';
 
 typedef ChatIdFactory = String Function();
 
+const kChatMessagePageSize = 40;
+
 /// Persistence port for chats (testable without Firestore).
 abstract class ChatStore {
   Stream<List<ChatConversation>> watchChats(String uid);
 
   Stream<ChatConversation?> watchChat(String chatId);
 
-  Stream<List<ChatMessage>> watchMessages(String chatId);
+  /// Newest messages first (for reverse ListView). Limited page size.
+  Stream<List<ChatMessage>> watchMessages(
+    String chatId, {
+    int limit = kChatMessagePageSize,
+  });
 
   Future<ChatConversation?> findDmByKey(
     String dmKey, {
@@ -59,9 +65,13 @@ class FirestoreChatStore implements ChatStore {
   }
 
   @override
-  Stream<List<ChatMessage>> watchMessages(String chatId) {
+  Stream<List<ChatMessage>> watchMessages(
+    String chatId, {
+    int limit = kChatMessagePageSize,
+  }) {
     return _messages(chatId)
-        .orderBy('createdAt')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map(
           (snap) => snap.docs
@@ -109,7 +119,16 @@ class FirestoreChatStore implements ChatStore {
 
   @override
   Future<void> updateChat(ChatConversation chat) async {
-    await _chats.doc(chat.id).update(chat.toMap());
+    // Patch only mutable metadata so rules `diff().affectedKeys()` stays tight.
+    await _chats.doc(chat.id).update({
+      'memberNames': chat.memberNames,
+      'title': chat.title,
+      'lastMessage': chat.lastMessage,
+      'lastMessageAt': Timestamp.fromDate(chat.lastMessageAt.toUtc()),
+      'lastMessageSenderId': chat.lastMessageSenderId,
+      'unreadCounts': chat.unreadCounts,
+      'pinnedBy': chat.pinnedBy,
+    });
   }
 
   @override
@@ -142,8 +161,11 @@ class ChatRepository {
   Stream<ChatConversation?> watchChat(String chatId) =>
       _store.watchChat(chatId);
 
-  Stream<List<ChatMessage>> watchMessages(String chatId) =>
-      _store.watchMessages(chatId);
+  Stream<List<ChatMessage>> watchMessages(
+    String chatId, {
+    int limit = kChatMessagePageSize,
+  }) =>
+      _store.watchMessages(chatId, limit: limit);
 
   Future<ChatConversation> getOrCreateDm({
     required UserProfile me,

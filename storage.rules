@@ -9,11 +9,17 @@ service firebase.storage {
       return isSignedIn() && fileName == request.auth.uid + '.jpg';
     }
 
+    function isAllowedImageType() {
+      return request.resource.contentType == 'image/jpeg'
+        || request.resource.contentType == 'image/png'
+        || request.resource.contentType == 'image/webp';
+    }
+
     match /avatars/{fileName} {
       allow read: if isSignedIn();
       allow write: if isOwnerFile(fileName)
         && request.resource.size < 5 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && isAllowedImageType();
     }
   }
 }

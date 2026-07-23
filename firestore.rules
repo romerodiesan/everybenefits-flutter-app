@@ -9,8 +9,17 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isAnonymousAuth() {
+      return isSignedIn()
+        && request.auth.token.firebase.sign_in_provider == 'anonymous';
+    }
+
     function userDoc(uid) {
       return get(/databases/$(database)/documents/users/$(uid));
+    }
+
+    function callerProfile() {
+      return userDoc(request.auth.uid).data;
     }
 
     function hasUserProfile() {
@@ -19,7 +28,7 @@ service cloud.firestore {
     }
 
     function callerRole() {
-      return userDoc(request.auth.uid).data.role;
+      return callerProfile().role;
     }
 
     function isAdmin() {
@@ -28,11 +37,8 @@ service cloud.firestore {
 
     function isForumParticipant() {
       return hasUserProfile()
+        && !callerProfile().isAnonymous
         && callerRole() in ['student', 'agent', 'instructor', 'admin'];
-    }
-
-    function isBootstrapRole() {
-      return request.resource.data.role in ['guest', 'student', 'agent'];
     }
 
     function isProtectedRole(role) {
@@ -43,7 +49,41 @@ service cloud.firestore {
       return value is string && value.size() > 0;
     }
 
-    // Score deltas are applied by the client transaction; self-vote is blocked here.
+    function boundedString(value, maxLen) {
+      return value is string && value.size() > 0 && value.size() <= maxLen;
+    }
+
+    function optionalBoundedString(value, maxLen) {
+      return value == null
+        || (value is string && value.size() <= maxLen);
+    }
+
+    function validTags(tags) {
+      return tags is list
+        && tags.size() > 0
+        && tags.size() <= 5
+        && tags[0] is string
+        && tags[0].size() > 0
+        && tags[0].size() <= 32;
+    }
+
+    // Client denormalizes headlineName (displayName || email || 'Usuario').
+    function callerHeadlineName() {
+      return callerProfile().displayName is string
+          && callerProfile().displayName.size() > 0
+        ? callerProfile().displayName
+        : (callerProfile().email is string
+            && callerProfile().email.size() > 0
+          ? callerProfile().email
+          : 'Usuario');
+    }
+
+    function matchesCallerIdentity(authorId, authorName, authorRole) {
+      return authorId == request.auth.uid
+        && authorName == callerHeadlineName()
+        && authorRole == callerRole();
+    }
+
     function notVotingOwnThread(threadId) {
       return get(/databases/$(database)/documents/threads/$(threadId)).data.authorId
         != request.auth.uid;
@@ -60,31 +100,56 @@ service cloud.firestore {
         && request.resource.data.authorRole == resource.data.authorRole;
     }
 
-    function threadContentUnchanged() {
-      return request.resource.data.title == resource.data.title
-        && request.resource.data.body == resource.data.body
-        && request.resource.data.tags == resource.data.tags;
-    }
-
     function replyAuthorUnchanged() {
       return request.resource.data.authorId == resource.data.authorId
         && request.resource.data.authorName == resource.data.authorName
         && request.resource.data.authorRole == resource.data.authorRole;
     }
 
+    function scoreDeltaWithinVoteRange() {
+      return request.resource.data.score is int
+        && resource.data.score is int
+        && request.resource.data.score - resource.data.score <= 2
+        && request.resource.data.score - resource.data.score >= -2;
+    }
+
     match /users/{uid} {
-      // Owner/admin full access; participants can read peers for chat contacts.
+      // Directory: participants may list peers; full PII still readable to
+      // participants (narrowed projection is a follow-up schema change).
       allow read: if isOwner(uid) || isAdmin() || isForumParticipant();
+
       allow create: if isOwner(uid)
-        && isBootstrapRole()
-        && request.resource.data.uid == uid;
+        && request.resource.data.uid == uid
+        && request.resource.data.isAnonymous is bool
+        && (
+          (
+            isAnonymousAuth()
+            && request.resource.data.role == 'guest'
+            && request.resource.data.isAnonymous == true
+          )
+          || (
+            !isAnonymousAuth()
+            && request.resource.data.role in ['student', 'agent']
+            && request.resource.data.isAnonymous == false
+            && !isProtectedRole(request.resource.data.role)
+          )
+        );
+
+      // Owners may edit profile fields. Role is frozen except student↔agent
+      // (profile completion). Privileged roles require Admin SDK / callable.
       allow update: if isOwner(uid)
         && request.resource.data.uid == resource.data.uid
+        && request.resource.data.isAnonymous == resource.data.isAnonymous
         && !isProtectedRole(request.resource.data.role)
+        && !isProtectedRole(resource.data.role)
         && (
           request.resource.data.role == resource.data.role
-          || !isProtectedRole(resource.data.role)
+          || (
+            resource.data.role in ['student', 'agent']
+            && request.resource.data.role in ['student', 'agent']
+          )
         );
+
       allow update, delete: if isAdmin();
     }
 
@@ -102,10 +167,21 @@ service cloud.firestore {
         && request.auth.uid in data.memberIds;
     }
 
+    function chatUpdateKeysOk() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'lastMessage',
+          'lastMessageAt',
+          'lastMessageSenderId',
+          'unreadCounts',
+          'pinnedBy',
+          'memberNames',
+          'title',
+        ]);
+    }
+
     match /chats/{chatId} {
-      // Missing docs: allow get so DM bootstrap can doc(dmKey).get() before create.
-      // Existing docs: membership only. list must stay arrayContains-compatible.
-      allow get: if isSignedIn() && (
+      allow get: if isForumParticipant() && (
         resource == null
         || isChatMemberData(resource.data)
       );
@@ -115,15 +191,20 @@ service cloud.firestore {
       allow create: if isForumParticipant()
         && request.resource.data.createdBy == request.auth.uid
         && isChatMemberData(request.resource.data)
-        && request.resource.data.memberIds.size() >= 2
-        && request.resource.data.memberIds.size() <= 20
         && request.resource.data.isGroup is bool
         && request.resource.data.lastMessage is string
+        && request.resource.data.lastMessage.size() <= 2000
         && (
-          request.resource.data.isGroup == true
-          || (
-            request.resource.data.dmKey is string
+          (
+            request.resource.data.isGroup == false
+            && request.resource.data.memberIds.size() == 2
+            && request.resource.data.dmKey is string
             && request.resource.data.dmKey == chatId
+          )
+          || (
+            request.resource.data.isGroup == true
+            && request.resource.data.memberIds.size() >= 2
+            && request.resource.data.memberIds.size() <= 20
           )
         );
 
@@ -132,7 +213,10 @@ service cloud.firestore {
         && request.resource.data.memberIds == resource.data.memberIds
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.dmKey == resource.data.dmKey
-        && request.resource.data.isGroup == resource.data.isGroup;
+        && request.resource.data.isGroup == resource.data.isGroup
+        && chatUpdateKeysOk()
+        && request.resource.data.lastMessage is string
+        && request.resource.data.lastMessage.size() <= 2000;
 
       allow delete: if isAdmin();
 
@@ -143,9 +227,19 @@ service cloud.firestore {
           && isForumParticipant()
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.senderName is string
+          && request.resource.data.senderName.size() <= 120
+          && request.resource.data.senderName == callerHeadlineName()
           && (
-            isNonEmptyString(request.resource.data.body)
-            || request.resource.data.keys().hasAll(['sharedPost'])
+            (
+              boundedString(request.resource.data.body, 4000)
+            )
+            || (
+              request.resource.data.keys().hasAll(['sharedPost'])
+              && request.resource.data.sharedPost.keys()
+                .hasAll(['threadId', 'title'])
+              && boundedString(request.resource.data.sharedPost.threadId, 128)
+              && boundedString(request.resource.data.sharedPost.title, 200)
+            )
           );
 
         allow update, delete: if false;
@@ -157,31 +251,61 @@ service cloud.firestore {
 
       allow create: if isForumParticipant()
         && request.resource.data.authorId == request.auth.uid
-        && isNonEmptyString(request.resource.data.title)
-        && isNonEmptyString(request.resource.data.body)
-        && request.resource.data.tags is list
-        && request.resource.data.tags.size() > 0
-        && request.resource.data.tags.size() <= 5
+        && matchesCallerIdentity(
+          request.resource.data.authorId,
+          request.resource.data.authorName,
+          request.resource.data.authorRole
+        )
+        && boundedString(request.resource.data.title, 200)
+        && boundedString(request.resource.data.body, 20000)
+        && validTags(request.resource.data.tags)
         && request.resource.data.replyCount == 0
         && request.resource.data.score is int
         && request.resource.data.score == 0;
 
-      // Author/admin: full content edits. Participants: counters/score/accept only.
       allow update: if isSignedIn()
         && threadAuthorUnchanged()
         && request.resource.data.score is int
         && (
+          // Author/admin content edit — immutable counters/score/accept.
           (
             (resource.data.authorId == request.auth.uid || isAdmin())
-            && isNonEmptyString(request.resource.data.title)
-            && isNonEmptyString(request.resource.data.body)
-            && request.resource.data.tags is list
-            && request.resource.data.tags.size() > 0
-            && request.resource.data.tags.size() <= 5
+            && boundedString(request.resource.data.title, 200)
+            && boundedString(request.resource.data.body, 20000)
+            && validTags(request.resource.data.tags)
+            && request.resource.data.score == resource.data.score
+            && request.resource.data.replyCount == resource.data.replyCount
+            && request.resource.data.acceptedReplyId == resource.data.acceptedReplyId
           )
+          // Author/admin accept an answer.
+          || (
+            (resource.data.authorId == request.auth.uid || isAdmin())
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['acceptedReplyId', 'updatedAt'])
+          )
+          // Vote score bump (max ±2 per write).
           || (
             isForumParticipant()
-            && threadContentUnchanged()
+            && request.resource.data.title == resource.data.title
+            && request.resource.data.body == resource.data.body
+            && request.resource.data.tags == resource.data.tags
+            && request.resource.data.replyCount == resource.data.replyCount
+            && request.resource.data.acceptedReplyId == resource.data.acceptedReplyId
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['score', 'updatedAt'])
+            && scoreDeltaWithinVoteRange()
+          )
+          // Reply create/delete counters (accept may clear only with replyCount).
+          || (
+            isForumParticipant()
+            && request.resource.data.title == resource.data.title
+            && request.resource.data.body == resource.data.body
+            && request.resource.data.tags == resource.data.tags
+            && request.resource.data.score == resource.data.score
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['replyCount', 'lastReplyAt', 'updatedAt', 'acceptedReplyId'])
+            && request.resource.data.diff(resource.data).affectedKeys()
+              .hasAny(['replyCount'])
           )
         );
 
@@ -205,7 +329,12 @@ service cloud.firestore {
 
         allow create: if isForumParticipant()
           && request.resource.data.authorId == request.auth.uid
-          && isNonEmptyString(request.resource.data.body)
+          && matchesCallerIdentity(
+            request.resource.data.authorId,
+            request.resource.data.authorName,
+            request.resource.data.authorRole
+          )
+          && boundedString(request.resource.data.body, 20000)
           && request.resource.data.score is int
           && request.resource.data.score == 0;
 
@@ -215,11 +344,15 @@ service cloud.firestore {
           && (
             (
               (resource.data.authorId == request.auth.uid || isAdmin())
-              && isNonEmptyString(request.resource.data.body)
+              && boundedString(request.resource.data.body, 20000)
+              && request.resource.data.score == resource.data.score
             )
             || (
               isForumParticipant()
               && request.resource.data.body == resource.data.body
+              && request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['score', 'updatedAt'])
+              && scoreDeltaWithinVoteRange()
             )
           );
 

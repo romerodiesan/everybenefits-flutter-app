@@ -53,8 +53,19 @@ class FirestoreUserProfileStore implements UserProfileStore {
 
   @override
   Future<UserProfile?> get(String uid) async {
+    // Prefer cache for first paint; fall back to server when cold.
+    try {
+      final cached = await _users.doc(uid).get(
+            const GetOptions(source: Source.cache),
+          );
+      if (cached.exists && cached.data() != null) {
+        return UserProfile.fromMap(cached.data()!);
+      }
+    } catch (_) {
+      // Cache miss is expected on first launch / emulator without persistence.
+    }
     final snapshot = await _users.doc(uid).get(
-          const GetOptions(source: Source.server),
+          const GetOptions(source: Source.serverAndCache),
         );
     if (!snapshot.exists || snapshot.data() == null) return null;
     return UserProfile.fromMap(snapshot.data()!);
@@ -143,7 +154,7 @@ class UserRepository {
         email: user.email,
         displayName: user.displayName,
         photoUrl: user.photoURL,
-        role: isAnonymous ? UserRole.guest : UserRole.agent,
+        role: isAnonymous ? UserRole.guest : UserRole.student,
         isAnonymous: isAnonymous,
         profileCompleted: isAnonymous,
         createdAt: now,

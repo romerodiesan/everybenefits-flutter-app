@@ -113,3 +113,11 @@ pubsub-debug.log
 storage-debug.log
 database-debug.log
 *.rules.local
+
+# Rules unit-test node deps
+test/rules/node_modules/
+test/rules/package-lock.json
+
+# Cloud Functions
+functions/node_modules/
+functions/lib/

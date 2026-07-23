@@ -15,10 +15,11 @@ enum UserRole {
         UserRole.admin => 'Admin',
       };
 
+  /// Unknown / missing values fail closed as [guest] (no elevated privileges).
   static UserRole parse(String? value) {
     return UserRole.values.firstWhere(
       (role) => role.wireValue == value,
-      orElse: () => UserRole.agent,
+      orElse: () => UserRole.guest,
     );
   }
 }

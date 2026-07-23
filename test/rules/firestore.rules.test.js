@@ -1,0 +1,197 @@
+/**
+ * Firestore security rules unit tests (Phase 1).
+ * Requires emulators: firebase emulators:start --only firestore,auth
+ * Or: FIRESTORE_EMULATOR_HOST=127.0.0.1:8080 npm test
+ */
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { after, before, beforeEach, describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  assertFails,
+  assertSucceeds,
+  initializeTestEnvironment,
+} from '@firebase/rules-unit-testing';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const RULES = readFileSync(join(__dirname, '../../firestore.rules'), 'utf8');
+const PROJECT_ID = 'every-insurance-rules-test';
+
+let testEnv;
+
+before(async () => {
+  testEnv = await initializeTestEnvironment({
+    projectId: PROJECT_ID,
+    firestore: { rules: RULES, host: '127.0.0.1', port: 8080 },
+  });
+});
+
+after(async () => {
+  await testEnv?.cleanup();
+});
+
+beforeEach(async () => {
+  await testEnv.clearFirestore();
+});
+
+function authedDb(uid, { provider = 'password', email } = {}) {
+  const token = {
+    firebase: { sign_in_provider: provider },
+  };
+  if (email) token.email = email;
+  return testEnv.authenticatedContext(uid, token).firestore();
+}
+
+function anonDb(uid) {
+  return authedDb(uid, { provider: 'anonymous' });
+}
+
+async function seedUser(uid, data) {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    await ctx.firestore().doc(`users/${uid}`).set({
+      uid,
+      email: `${uid}@example.com`,
+      displayName: uid,
+      role: 'student',
+      isAnonymous: false,
+      profileCompleted: true,
+      ...data,
+    });
+  });
+}
+
+describe('users create', () => {
+  it('blocks anonymous escalate to agent', async () => {
+    const db = anonDb('anon1');
+    await assertFails(
+      db.doc('users/anon1').set({
+        uid: 'anon1',
+        role: 'agent',
+        isAnonymous: true,
+        profileCompleted: true,
+      }),
+    );
+  });
+
+  it('allows anonymous guest bootstrap', async () => {
+    const db = anonDb('anon2');
+    await assertSucceeds(
+      db.doc('users/anon2').set({
+        uid: 'anon2',
+        role: 'guest',
+        isAnonymous: true,
+        profileCompleted: true,
+      }),
+    );
+  });
+
+  it('allows registered student create', async () => {
+    const db = authedDb('u1', { email: 'u1@example.com' });
+    await assertSucceeds(
+      db.doc('users/u1').set({
+        uid: 'u1',
+        role: 'student',
+        isAnonymous: false,
+        profileCompleted: false,
+        displayName: 'Ada',
+        email: 'u1@example.com',
+      }),
+    );
+  });
+
+  it('blocks owner role self-promotion on update', async () => {
+    await seedUser('u2', { role: 'student' });
+    const db = authedDb('u2');
+    await assertFails(
+      db.doc('users/u2').update({ role: 'admin' }),
+    );
+  });
+});
+
+describe('thread score forge', () => {
+  beforeEach(async () => {
+    await seedUser('author', { displayName: 'author', role: 'agent' });
+    await seedUser('voter', { displayName: 'voter', role: 'agent' });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('threads/t1').set({
+        authorId: 'author',
+        authorName: 'author',
+        authorRole: 'agent',
+        title: 'Hello',
+        body: 'World body long enough',
+        tags: ['general'],
+        replyCount: 0,
+        score: 0,
+        acceptedReplyId: null,
+      });
+    });
+  });
+
+  it('blocks forging score by +100', async () => {
+    const db = authedDb('voter');
+    await assertFails(
+      db.doc('threads/t1').update({ score: 100, updatedAt: new Date() }),
+    );
+  });
+
+  it('allows vote-sized score delta', async () => {
+    const db = authedDb('voter');
+    await assertSucceeds(
+      db.doc('threads/t1').update({ score: 1, updatedAt: new Date() }),
+    );
+  });
+
+  it('blocks non-author accept reply', async () => {
+    const db = authedDb('voter');
+    await assertFails(
+      db.doc('threads/t1').update({ acceptedReplyId: 'r1', updatedAt: new Date() }),
+    );
+  });
+
+  it('allows author accept reply', async () => {
+    const db = authedDb('author');
+    await assertSucceeds(
+      db.doc('threads/t1').update({ acceptedReplyId: 'r1', updatedAt: new Date() }),
+    );
+  });
+});
+
+describe('chat DM create', () => {
+  beforeEach(async () => {
+    await seedUser('a', { displayName: 'a', role: 'agent' });
+    await seedUser('b', { displayName: 'b', role: 'agent' });
+  });
+
+  it('requires exactly 2 members and dmKey == chatId for DMs', async () => {
+    const db = authedDb('a');
+    const dmKey = 'a_b';
+    await assertFails(
+      db.doc(`chats/${dmKey}`).set({
+        memberIds: ['a', 'b', 'c'],
+        memberNames: { a: 'a', b: 'b', c: 'c' },
+        isGroup: false,
+        dmKey,
+        createdBy: 'a',
+        lastMessage: '',
+        lastMessageAt: new Date(),
+        unreadCounts: {},
+        pinnedBy: {},
+      }),
+    );
+
+    await assertSucceeds(
+      db.doc(`chats/${dmKey}`).set({
+        memberIds: ['a', 'b'],
+        memberNames: { a: 'a', b: 'b' },
+        isGroup: false,
+        dmKey,
+        createdBy: 'a',
+        lastMessage: '',
+        lastMessageAt: new Date(),
+        unreadCounts: { a: 0, b: 0 },
+        pinnedBy: {},
+      }),
+    );
+  });
+});

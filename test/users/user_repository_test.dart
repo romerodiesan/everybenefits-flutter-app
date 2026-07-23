@@ -94,7 +94,7 @@ void main() {
       expect(store.profiles['anon-1']?.role, UserRole.guest);
     });
 
-    test('creates incomplete agent profile for registered users', () async {
+    test('creates incomplete student profile for registered users', () async {
       when(() => user.uid).thenReturn('user-1');
       when(() => user.isAnonymous).thenReturn(false);
       when(() => user.email).thenReturn('a@b.com');
@@ -102,7 +102,7 @@ void main() {
 
       final profile = await repository.ensureProfile(user);
 
-      expect(profile.role, UserRole.agent);
+      expect(profile.role, UserRole.student);
       expect(profile.email, 'a@b.com');
       expect(profile.displayName, 'Ada');
       expect(profile.profileCompleted, isFalse);
