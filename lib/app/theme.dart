@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import 'app_spacing.dart';
 import 'theme_controller.dart';
@@ -116,6 +115,29 @@ Color onBrandFor(Color brand) {
   return brand.computeLuminance() > 0.45 ? AppColors.inkBrand : Colors.white;
 }
 
+TextStyle? _withFamily(
+  TextStyle? base, {
+  required String family,
+  FontWeight? weight,
+  double? fontSize,
+  double? letterSpacing,
+  double? height,
+  Color? color,
+}) {
+  final resolvedWeight = weight ?? base?.fontWeight ?? FontWeight.w400;
+  return base?.copyWith(
+    fontFamily: family,
+    fontWeight: resolvedWeight,
+    fontSize: fontSize,
+    letterSpacing: letterSpacing,
+    height: height,
+    color: color,
+    fontVariations: [
+      FontVariation('wght', resolvedWeight.value.toDouble()),
+    ],
+  );
+}
+
 ThemeData buildEveryInsuranceTheme(
   Brightness brightness, {
   Color brand = AppColors.brand,
@@ -125,57 +147,83 @@ ThemeData buildEveryInsuranceTheme(
   final baseText = brightness == Brightness.dark
       ? ThemeData.dark().textTheme
       : ThemeData.light().textTheme;
-  final body = GoogleFonts.figtreeTextTheme(baseText);
-  final display = GoogleFonts.outfitTextTheme(baseText);
   final onBrand = onBrandFor(brand);
 
-  final textTheme = body
+  final textTheme = baseText
       .apply(bodyColor: colors.ink, displayColor: colors.ink)
       .copyWith(
-        displayLarge: display.displayLarge?.copyWith(
-          fontWeight: FontWeight.w800,
+        displayLarge: _withFamily(
+          baseText.displayLarge,
+          family: 'Outfit',
+          weight: FontWeight.w800,
           letterSpacing: -2.4,
           height: 0.9,
           color: colors.ink,
           fontSize: 56,
         ),
-        displaySmall: display.displaySmall?.copyWith(
-          fontWeight: FontWeight.w800,
+        displaySmall: _withFamily(
+          baseText.displaySmall,
+          family: 'Outfit',
+          weight: FontWeight.w800,
           letterSpacing: -1.6,
           height: 0.95,
           color: colors.ink,
           fontSize: 40,
         ),
-        headlineMedium: display.headlineMedium?.copyWith(
-          fontWeight: FontWeight.w700,
+        headlineMedium: _withFamily(
+          baseText.headlineMedium,
+          family: 'Outfit',
+          weight: FontWeight.w700,
           letterSpacing: -0.9,
           color: colors.ink,
           fontSize: 28,
         ),
-        titleLarge: display.titleLarge?.copyWith(
-          fontWeight: FontWeight.w700,
+        titleLarge: _withFamily(
+          baseText.titleLarge,
+          family: 'Outfit',
+          weight: FontWeight.w700,
           letterSpacing: -0.5,
           color: colors.ink,
           fontSize: 22,
         ),
-        titleMedium: body.titleMedium?.copyWith(
-          fontWeight: FontWeight.w600,
+        titleMedium: _withFamily(
+          baseText.titleMedium,
+          family: 'Figtree',
+          weight: FontWeight.w600,
           color: colors.ink,
         ),
-        bodyLarge: body.bodyLarge?.copyWith(
-          fontWeight: FontWeight.w500,
+        bodyLarge: _withFamily(
+          baseText.bodyLarge,
+          family: 'Figtree',
+          weight: FontWeight.w500,
           height: 1.5,
           color: colors.ink,
         ),
-        bodyMedium: body.bodyMedium?.copyWith(
-          fontWeight: FontWeight.w500,
+        bodyMedium: _withFamily(
+          baseText.bodyMedium,
+          family: 'Figtree',
+          weight: FontWeight.w500,
           height: 1.5,
           color: colors.muted,
         ),
-        labelLarge: body.labelLarge?.copyWith(
-          fontWeight: FontWeight.w700,
+        labelLarge: _withFamily(
+          baseText.labelLarge,
+          family: 'Figtree',
+          weight: FontWeight.w700,
           letterSpacing: 0.15,
           color: colors.ink,
+        ),
+        labelSmall: _withFamily(
+          baseText.labelSmall,
+          family: 'Figtree',
+          weight: FontWeight.w600,
+          color: colors.muted,
+        ),
+        bodySmall: _withFamily(
+          baseText.bodySmall,
+          family: 'Figtree',
+          weight: FontWeight.w500,
+          color: colors.muted,
         ),
       );
 
@@ -198,6 +246,7 @@ ThemeData buildEveryInsuranceTheme(
     colorScheme: scheme,
     scaffoldBackgroundColor: colors.meshBase,
     textTheme: textTheme,
+    fontFamily: 'Figtree',
     extensions: [colors],
     appBarTheme: AppBarTheme(
       elevation: 0,
