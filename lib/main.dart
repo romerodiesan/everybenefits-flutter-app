@@ -89,6 +89,13 @@ class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
                   brand: brand,
                 ),
                 themeMode: widget.themeController.mode,
+                builder: (context, child) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.translucent,
+                    onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                    child: child,
+                  );
+                },
                 home: _AuthHome(
                   authService: widget.authService,
                   userRepository: widget.userRepository,
