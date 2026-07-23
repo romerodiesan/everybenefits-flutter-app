@@ -29,9 +29,23 @@ abstract class ChatStore {
 
   Future<ChatConversation> createChat(ChatConversation chat);
 
+  /// True when `userChats/{uid}/{chatId}` exists (safe existence probe).
+  Future<bool> hasUserChatIndex({
+    required String uid,
+    required String chatId,
+  });
+
   Future<void> updateChat(ChatConversation chat);
 
   Future<ChatMessage> addMessage(ChatMessage message);
+
+  /// Sets or clears `messages/{chatId}/{messageId}/reactions/{uid}`.
+  Future<void> setMessageReaction({
+    required String chatId,
+    required String messageId,
+    required String uid,
+    String? emoji,
+  });
 }
 
 /// Realtime Database chat persistence.
@@ -175,6 +189,15 @@ class RtdbChatStore implements ChatStore {
   }
 
   @override
+  Future<bool> hasUserChatIndex({
+    required String uid,
+    required String chatId,
+  }) async {
+    final snap = await _root.child('userChats/$uid/$chatId').get();
+    return snap.exists;
+  }
+
+  @override
   Future<ChatConversation> createChat(ChatConversation chat) async {
     final ref = chat.id.isEmpty
         ? _root.child('chats').push()
@@ -195,13 +218,14 @@ class RtdbChatStore implements ChatStore {
       createdAt: chat.createdAt,
       createdBy: chat.createdBy,
       isDefaultAgentGroup: chat.isDefaultAgentGroup,
+      isSupportChat: chat.isSupportChat,
     );
 
     final updates = <String, Object?>{
       'chats/$id': saved.toRtdbMap(),
     };
     final at = saved.lastMessageAt.toUtc().millisecondsSinceEpoch;
-    for (final memberId in saved.memberIds) {
+    for (final memberId in userChatIndexMemberIds(saved.memberIds)) {
       updates['userChats/$memberId/$id'] = {'lastMessageAt': at};
     }
     if (saved.dmKey != null && saved.dmKey!.isNotEmpty) {
@@ -226,7 +250,7 @@ class RtdbChatStore implements ChatStore {
           if (e.value) e.key: true,
       },
     };
-    for (final memberId in chat.memberIds) {
+    for (final memberId in userChatIndexMemberIds(chat.memberIds)) {
       updates['userChats/$memberId/${chat.id}/lastMessageAt'] = at;
     }
     await _root.update(updates);
@@ -236,13 +260,31 @@ class RtdbChatStore implements ChatStore {
   Future<ChatMessage> addMessage(ChatMessage message) async {
     final ref = _root.child('messages/${message.chatId}').push();
     final id = ref.key!;
-    final payload = message.toMap()..remove('chatId');
+    final payload = message.toMap()
+      ..remove('chatId')
+      ..remove('reactions');
     await ref.set(payload);
     return ChatMessage.fromMap(id, {
       ...payload,
       'chatId': message.chatId,
       'createdAt': message.createdAt,
     });
+  }
+
+  @override
+  Future<void> setMessageReaction({
+    required String chatId,
+    required String messageId,
+    required String uid,
+    String? emoji,
+  }) async {
+    final ref = _root.child('messages/$chatId/$messageId/reactions/$uid');
+    final trimmed = emoji?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      await ref.remove();
+    } else {
+      await ref.set(trimmed);
+    }
   }
 
   int _readMillis(Object? value) {
@@ -360,8 +402,113 @@ class ChatRepository {
       unreadCounts: {for (final p in all) p.uid: 0},
       pinnedBy: const {},
       isDefaultAgentGroup: false,
+      isSupportChat: false,
     );
     return _store.createChat(chat);
+  }
+
+  /// One hybrid support thread per user (AI assistant + human agents).
+  Future<ChatConversation> getOrCreateSupportChat({
+    required UserProfile me,
+    String aiName = 'Support Assistant',
+    String? welcomeMessage,
+  }) async {
+    _ensureCanChat(me);
+    final id = supportChatIdFor(me.uid);
+    // Probe via userChats (always readable by owner). Reading chats/$id when
+    // missing is denied by membership rules and surfaces as permission-denied.
+    if (await _store.hasUserChatIndex(uid: me.uid, chatId: id)) {
+      final existing = await _store.watchChat(id).first;
+      if (existing != null) return existing;
+    }
+
+    final now = _clock();
+    final chat = await _store.createChat(
+      ChatConversation(
+        id: id,
+        memberIds: [me.uid, ChatConversation.supportAiUid]..sort(),
+        memberNames: {
+          me.uid: me.headlineName,
+          ChatConversation.supportAiUid: aiName,
+        },
+        isGroup: true,
+        title: 'Support',
+        lastMessage: '',
+        lastMessageAt: now,
+        createdAt: now,
+        createdBy: me.uid,
+        unreadCounts: {
+          me.uid: 0,
+          ChatConversation.supportAiUid: 0,
+        },
+        pinnedBy: const {},
+        isDefaultAgentGroup: false,
+        isSupportChat: true,
+      ),
+    );
+
+    final welcome = welcomeMessage?.trim();
+    if (welcome != null && welcome.isNotEmpty) {
+      await sendSupportAiReply(
+        chatId: chat.id,
+        body: welcome,
+        aiName: aiName,
+      );
+      return (await _store.watchChat(chat.id).first) ?? chat;
+    }
+    return chat;
+  }
+
+  /// Posts an automated support reply as the synthetic AI member.
+  Future<ChatMessage> sendSupportAiReply({
+    required String chatId,
+    required String body,
+    String aiName = 'Support Assistant',
+  }) async {
+    final text = body.trim();
+    if (text.isEmpty) {
+      throw ArgumentError('Write a message.');
+    }
+    final chat = await _requireChat(chatId);
+    if (!chat.isSupportChat) {
+      throw StateError('Not a support chat.');
+    }
+
+    final now = _clock();
+    final message = await _store.addMessage(
+      ChatMessage(
+        id: '',
+        chatId: chatId,
+        body: text,
+        senderId: ChatConversation.supportAiUid,
+        senderName: aiName,
+        createdAt: now,
+        isAi: true,
+      ),
+    );
+
+    final nextUnread = Map<String, int>.from(chat.unreadCounts);
+    for (final memberId in chat.memberIds) {
+      if (memberId == ChatConversation.supportAiUid) {
+        nextUnread[memberId] = 0;
+      } else {
+        nextUnread[memberId] = (nextUnread[memberId] ?? 0) + 1;
+      }
+    }
+
+    await _store.updateChat(
+      chat.copyWith(
+        lastMessage: text,
+        lastMessageAt: now,
+        lastMessageSenderId: ChatConversation.supportAiUid,
+        unreadCounts: nextUnread,
+        memberNames: {
+          ...chat.memberNames,
+          ChatConversation.supportAiUid: aiName,
+        },
+      ),
+    );
+    return message;
   }
 
   Future<ChatMessage> sendMessage({
@@ -425,6 +572,43 @@ class ChatRepository {
     }
     final nextPinned = Map<String, bool>.from(chat.pinnedBy)..[uid] = pinned;
     await _store.updateChat(chat.copyWith(pinnedBy: nextPinned));
+  }
+
+  /// Toggles [emoji] for [uid] on a message (same emoji again clears).
+  Future<void> toggleReaction({
+    required String chatId,
+    required String messageId,
+    required String uid,
+    required String emoji,
+  }) async {
+    final chat = await _requireChat(chatId);
+    if (!chat.memberIds.contains(uid)) {
+      throw StateError('No eres miembro de este chat.');
+    }
+    final trimmed = emoji.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Pick a reaction.');
+    }
+
+    final messages = await _store.watchMessages(chatId).first;
+    ChatMessage? target;
+    for (final m in messages) {
+      if (m.id == messageId) {
+        target = m;
+        break;
+      }
+    }
+    if (target == null) {
+      throw StateError('Este chat ya no existe.');
+    }
+
+    final current = target.reactions[uid];
+    await _store.setMessageReaction(
+      chatId: chatId,
+      messageId: messageId,
+      uid: uid,
+      emoji: current == trimmed ? null : trimmed,
+    );
   }
 
   Future<ChatMessage> _appendMessage({

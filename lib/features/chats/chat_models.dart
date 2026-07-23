@@ -58,10 +58,14 @@ class ChatConversation {
     this.unreadCounts = const {},
     this.pinnedBy = const {},
     this.isDefaultAgentGroup = false,
+    this.isSupportChat = false,
   });
 
   /// Fixed RTDB path id for the system agents community chat.
   static const defaultAgentGroupId = 'agents-default';
+
+  /// Synthetic member that posts automated support replies.
+  static const supportAiUid = 'support-ai';
 
   final String id;
   final List<String> memberIds;
@@ -77,14 +81,18 @@ class ChatConversation {
   final DateTime createdAt;
   final String createdBy;
   final bool isDefaultAgentGroup;
+  final bool isSupportChat;
 
   int unreadFor(String uid) => unreadCounts[uid] ?? 0;
 
   bool isPinnedFor(String uid) => pinnedBy[uid] == true;
 
   String titleFor(String viewerUid, {AppLocalizations? l10n}) {
+    if (isSupportChat) {
+      return l10n?.chatsSupportTitle ?? title?.trim() ?? 'Support';
+    }
     if (isDefaultAgentGroup) {
-      return l10n?.chatsDefaultGroupTitle ?? title?.trim() ?? 'Agents';
+      return l10n?.chatsDefaultGroupTitle ?? title?.trim() ?? 'Team';
     }
     if (isGroup && title != null && title!.trim().isNotEmpty) {
       return title!.trim();
@@ -109,6 +117,7 @@ class ChatConversation {
     Map<String, String>? memberNames,
     String? title,
     bool? isDefaultAgentGroup,
+    bool? isSupportChat,
   }) {
     return ChatConversation(
       id: id,
@@ -125,6 +134,7 @@ class ChatConversation {
       createdAt: createdAt,
       createdBy: createdBy,
       isDefaultAgentGroup: isDefaultAgentGroup ?? this.isDefaultAgentGroup,
+      isSupportChat: isSupportChat ?? this.isSupportChat,
     );
   }
 
@@ -147,6 +157,7 @@ class ChatConversation {
       'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
       'createdBy': createdBy,
       'isDefaultAgentGroup': isDefaultAgentGroup,
+      'isSupportChat': isSupportChat,
     };
   }
 
@@ -165,6 +176,7 @@ class ChatConversation {
       'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
       'createdBy': createdBy,
       'isDefaultAgentGroup': isDefaultAgentGroup,
+      'isSupportChat': isSupportChat,
     };
   }
 
@@ -223,18 +235,22 @@ class ChatConversation {
       createdBy: data['createdBy'] as String? ?? '',
       isDefaultAgentGroup: data['isDefaultAgentGroup'] as bool? ??
           id == ChatConversation.defaultAgentGroupId,
+      isSupportChat: data['isSupportChat'] as bool? ??
+          id.startsWith('support_'),
     );
   }
 }
 
-/// Inbox buckets: default community group(s), then pins, then recent.
+/// Inbox buckets: support, community, pins, then recent.
 class ChatInboxSections {
   const ChatInboxSections({
+    required this.support,
     required this.community,
     required this.pinned,
     required this.recent,
   });
 
+  final List<ChatConversation> support;
   final List<ChatConversation> community;
   final List<ChatConversation> pinned;
   final List<ChatConversation> recent;
@@ -244,11 +260,14 @@ ChatInboxSections partitionChatInbox(
   List<ChatConversation> chats,
   String viewerUid,
 ) {
+  final support = <ChatConversation>[];
   final community = <ChatConversation>[];
   final pinned = <ChatConversation>[];
   final recent = <ChatConversation>[];
   for (final chat in chats) {
-    if (chat.isDefaultAgentGroup) {
+    if (chat.isSupportChat) {
+      support.add(chat);
+    } else if (chat.isDefaultAgentGroup) {
       community.add(chat);
     } else if (chat.isPinnedFor(viewerUid)) {
       pinned.add(chat);
@@ -257,6 +276,7 @@ ChatInboxSections partitionChatInbox(
     }
   }
   return ChatInboxSections(
+    support: support,
     community: community,
     pinned: pinned,
     recent: recent,
@@ -272,7 +292,12 @@ class ChatMessage {
     required this.senderName,
     required this.createdAt,
     this.sharedPost,
+    this.isAi = false,
+    this.reactions = const {},
   });
+
+  /// Quick-reaction strip shown on long-press.
+  static const reactionEmojis = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 
   final String id;
   final String chatId;
@@ -281,8 +306,21 @@ class ChatMessage {
   final String senderName;
   final DateTime createdAt;
   final SharedPostPreview? sharedPost;
+  final bool isAi;
 
-  bool isMine(String uid) => senderId == uid;
+  /// uid → emoji (one reaction per user).
+  final Map<String, String> reactions;
+
+  bool isMine(String uid) => senderId == uid && !isAi;
+
+  /// Aggregated emoji → count for chips.
+  Map<String, int> reactionCounts() {
+    final counts = <String, int>{};
+    for (final emoji in reactions.values) {
+      counts[emoji] = (counts[emoji] ?? 0) + 1;
+    }
+    return counts;
+  }
 
   Map<String, Object?> toMap() {
     return {
@@ -292,11 +330,21 @@ class ChatMessage {
       'senderName': senderName,
       'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
       if (sharedPost != null) 'sharedPost': sharedPost!.toMap(),
+      if (isAi) 'isAi': true,
+      if (reactions.isNotEmpty) 'reactions': reactions,
     };
   }
 
   factory ChatMessage.fromMap(String id, Map<String, dynamic> data) {
     final sharedRaw = data['sharedPost'];
+    final reactionsRaw = data['reactions'];
+    final reactions = <String, String>{};
+    if (reactionsRaw is Map) {
+      for (final entry in reactionsRaw.entries) {
+        final value = '${entry.value}'.trim();
+        if (value.isNotEmpty) reactions['${entry.key}'] = value;
+      }
+    }
     return ChatMessage(
       id: id,
       chatId: data['chatId'] as String? ?? '',
@@ -309,6 +357,23 @@ class ChatMessage {
           : sharedRaw is Map
               ? SharedPostPreview.fromMap(Map<String, dynamic>.from(sharedRaw))
               : null,
+      isAi: data['isAi'] == true ||
+          data['senderId'] == ChatConversation.supportAiUid,
+      reactions: reactions,
+    );
+  }
+
+  ChatMessage copyWith({Map<String, String>? reactions}) {
+    return ChatMessage(
+      id: id,
+      chatId: chatId,
+      body: body,
+      senderId: senderId,
+      senderName: senderName,
+      createdAt: createdAt,
+      sharedPost: sharedPost,
+      isAi: isAi,
+      reactions: reactions ?? this.reactions,
     );
   }
 }
@@ -316,6 +381,17 @@ class ChatMessage {
 String dmKeyFor(String a, String b) {
   final parts = [a, b]..sort();
   return '${parts[0]}_${parts[1]}';
+}
+
+String supportChatIdFor(String uid) => 'support_$uid';
+
+/// Members that get an inbox row under `userChats/{uid}`.
+/// Synthetic bots (support AI) never own an inbox.
+List<String> userChatIndexMemberIds(Iterable<String> memberIds) {
+  return [
+    for (final id in memberIds)
+      if (id != ChatConversation.supportAiUid) id,
+  ];
 }
 
 String chatInitials(String name) {

@@ -76,6 +76,15 @@ class FakeChatStore implements ChatStore {
   }
 
   @override
+  Future<bool> hasUserChatIndex({
+    required String uid,
+    required String chatId,
+  }) async {
+    final chat = chats[chatId];
+    return chat != null && chat.memberIds.contains(uid);
+  }
+
+  @override
   Future<ChatConversation> createChat(ChatConversation chat) async {
     final id = chat.id.isEmpty ? 'c-${chats.length + 1}' : chat.id;
     final saved = ChatConversation(
@@ -93,6 +102,7 @@ class FakeChatStore implements ChatStore {
       createdAt: chat.createdAt,
       createdBy: chat.createdBy,
       isDefaultAgentGroup: chat.isDefaultAgentGroup,
+      isSupportChat: chat.isSupportChat,
     );
     chats[id] = saved;
     messages.putIfAbsent(id, () => []);
@@ -119,10 +129,34 @@ class FakeChatStore implements ChatStore {
       senderName: message.senderName,
       createdAt: message.createdAt,
       sharedPost: message.sharedPost,
+      isAi: message.isAi,
+      reactions: message.reactions,
     );
     final list = messages.putIfAbsent(message.chatId, () => []);
     list.add(saved);
     _messagesBump(message.chatId).add(null);
     return saved;
+  }
+
+  @override
+  Future<void> setMessageReaction({
+    required String chatId,
+    required String messageId,
+    required String uid,
+    String? emoji,
+  }) async {
+    final list = messages[chatId];
+    if (list == null) return;
+    final index = list.indexWhere((m) => m.id == messageId);
+    if (index < 0) return;
+    final current = Map<String, String>.from(list[index].reactions);
+    final trimmed = emoji?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      current.remove(uid);
+    } else {
+      current[uid] = trimmed;
+    }
+    list[index] = list[index].copyWith(reactions: current);
+    _messagesBump(chatId).add(null);
   }
 }

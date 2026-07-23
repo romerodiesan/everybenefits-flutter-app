@@ -49,13 +49,40 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get supportSheetBody =>
-      'Need help with your account or the app? Reach us and we’ll get back to you.';
+      'Need help with your account or the app? Start a support chat — an assistant replies right away and our team can join.';
 
   @override
   String get supportSheetEmail => 'support@everybenefits.com';
 
   @override
+  String get supportSheetEmailSubject => 'Support request — Every Benefits';
+
+  @override
+  String get supportSheetEmailFailed =>
+      'Couldn\'t open your email app. You can write to support@everybenefits.com.';
+
+  @override
   String get supportSheetClose => 'Close';
+
+  @override
+  String get supportSheetOpenChat => 'Open support chat';
+
+  @override
+  String get supportChatAiName => 'Support Assistant';
+
+  @override
+  String get supportChatWelcome =>
+      'Hi! I’m the support assistant. Tell me what you need — a teammate can join this chat anytime.';
+
+  @override
+  String get supportChatAiReply =>
+      'Thanks for the details. I’m here to help while a human teammate reviews this thread.';
+
+  @override
+  String get supportChatSubtitle => 'AI + human support';
+
+  @override
+  String get supportChatOpening => 'Opening support chat…';
 
   @override
   String get editProfileNameFrozen => 'Your name is locked after setup.';
@@ -860,10 +887,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsSectionCommunity => 'Community';
 
   @override
+  String get chatsSectionSupport => 'Support';
+
+  @override
   String get chatsDefaultGroupBadge => 'Community';
 
   @override
-  String get chatsDefaultGroupTitle => 'Agents';
+  String get chatsDefaultGroupTitle => 'Team';
+
+  @override
+  String get chatsSupportTitle => 'Support';
+
+  @override
+  String get chatsSupportBadge => 'AI + human';
 
   @override
   String get chatsNoMessagesYet => 'No messages yet';
@@ -919,6 +955,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatMessageHint => 'Write a message…';
+
+  @override
+  String get chatEmojiPicker => 'Emojis';
+
+  @override
+  String get chatReact => 'React';
 
   @override
   String get chatInfoTitle => 'Info';

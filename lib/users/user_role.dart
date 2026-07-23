@@ -34,3 +34,11 @@ bool canCreateChatGroups(UserRole role) {
       role == UserRole.instructor ||
       role == UserRole.manager;
 }
+
+/// Roles auto-joined into the default staff/agents community chat.
+bool belongsInDefaultAgentGroup(UserRole role) {
+  return role == UserRole.agent ||
+      role == UserRole.instructor ||
+      role == UserRole.manager ||
+      role == UserRole.admin;
+}

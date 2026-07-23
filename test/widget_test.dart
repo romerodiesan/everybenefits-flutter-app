@@ -455,4 +455,10 @@ class _EmptyForumStore implements ForumStore {
     required String uid,
     required RelevanceVote vote,
   }) async {}
+
+  @override
+  Future<void> syncAuthorPhotoUrl({
+    required String authorId,
+    required String? photoUrl,
+  }) async {}
 }

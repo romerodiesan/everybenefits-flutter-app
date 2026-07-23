@@ -57,7 +57,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
 
   Future<void> _maybeJoinDefaultAgentGroup() async {
     if (_defaultJoinAttempted) return;
-    if (widget.profile.role != UserRole.agent) return;
+    if (!belongsInDefaultAgentGroup(widget.profile.role)) return;
     _defaultJoinAttempted = true;
     try {
       await DefaultAgentGroupCallable().ensureMembership();
@@ -226,10 +226,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   int _inboxItemCount(ChatInboxSections sections) {
-    if (sections.community.isEmpty && sections.pinned.isEmpty) {
+    if (sections.support.isEmpty &&
+        sections.community.isEmpty &&
+        sections.pinned.isEmpty) {
       return sections.recent.length;
     }
     var count = 0;
+    if (sections.support.isNotEmpty) {
+      count += 1 + sections.support.length;
+    }
     if (sections.community.isNotEmpty) {
       count += 1 + sections.community.length;
     }
@@ -266,15 +271,37 @@ class _ChatsScreenState extends State<ChatsScreen> {
       );
     }
 
-    if (sections.community.isEmpty && sections.pinned.isEmpty) {
+    if (sections.support.isEmpty &&
+        sections.community.isEmpty &&
+        sections.pinned.isEmpty) {
       return row(sections.recent[index]);
     }
 
     var cursor = 0;
-    if (sections.community.isNotEmpty) {
+    if (sections.support.isNotEmpty) {
       if (index == cursor) {
         return Padding(
           padding: const EdgeInsets.only(bottom: 8),
+          child: _SectionLabel(label: l10n.chatsSectionSupport),
+        );
+      }
+      cursor += 1;
+      if (index < cursor + sections.support.length) {
+        return row(
+          sections.support[index - cursor],
+          keyPrefix: 'support-',
+        );
+      }
+      cursor += sections.support.length;
+    }
+
+    if (sections.community.isNotEmpty) {
+      if (index == cursor) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: sections.support.isEmpty ? 0 : 8,
+            bottom: 8,
+          ),
           child: _SectionLabel(label: l10n.chatsSectionCommunity),
         );
       }
@@ -292,7 +319,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
       if (index == cursor) {
         return Padding(
           padding: EdgeInsets.only(
-            top: sections.community.isEmpty ? 0 : 8,
+            top: sections.support.isEmpty && sections.community.isEmpty
+                ? 0
+                : 8,
             bottom: 8,
           ),
           child: _SectionLabel(label: l10n.chatsSectionPinned),
@@ -413,11 +442,15 @@ class _ChatRow extends StatelessWidget {
     final unread = chat.unreadFor(viewerUid);
     final hasUnread = unread > 0;
     final title = chat.titleFor(viewerUid, l10n: l10n);
-    final preview = chat.isDefaultAgentGroup && chat.lastMessage.isEmpty
-        ? l10n.chatsDefaultGroupBadge
-        : (chat.lastMessage.isEmpty
-            ? l10n.chatsNoMessagesYet
-            : chat.lastMessage);
+    final preview = chat.isSupportChat
+        ? (chat.lastMessage.isEmpty
+            ? l10n.chatsSupportBadge
+            : chat.lastMessage)
+        : chat.isDefaultAgentGroup && chat.lastMessage.isEmpty
+            ? l10n.chatsDefaultGroupBadge
+            : (chat.lastMessage.isEmpty
+                ? l10n.chatsNoMessagesYet
+                : chat.lastMessage);
 
     return Material(
       color: colors.sheet,

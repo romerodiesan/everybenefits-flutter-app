@@ -49,6 +49,8 @@ dependencies:
     sdk: flutter
   intl: any
   firebase_database: ^12.4.6
+  url_launcher: ^6.3.2
+  emoji_picker_flutter: ^4.5.2
 
 dev_dependencies:
   flutter_test:

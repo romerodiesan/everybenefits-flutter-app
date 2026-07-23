@@ -158,6 +158,37 @@ class PulseShellState extends State<PulseShell> {
     }
   }
 
+  Future<void> _openSupportChat() async {
+    final l10n = context.l10n;
+    final messenger = ScaffoldMessenger.of(context);
+    final repo = widget.chatRepository ?? ChatRepository();
+    messenger.showSnackBar(
+      SnackBar(content: Text(l10n.supportChatOpening)),
+    );
+    try {
+      final chat = await repo.getOrCreateSupportChat(
+        me: widget.profile,
+        aiName: l10n.supportChatAiName,
+        welcomeMessage: l10n.supportChatWelcome,
+      );
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      selectTab(1);
+      openChat(
+        context,
+        chat: chat,
+        profile: widget.profile,
+        chatRepository: repo,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      messenger.hideCurrentSnackBar();
+      messenger.showSnackBar(
+        SnackBar(content: Text(friendlyChatError(error, l10n))),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
@@ -184,6 +215,7 @@ class PulseShellState extends State<PulseShell> {
         authService: widget.authService,
         userRepository: widget.userRepository,
         profile: profile,
+        onOpenSupportChat: _openSupportChat,
       ),
     ];
 

@@ -5,20 +5,34 @@
 
     "chats": {
       "$chatId": {
-        ".read": "auth != null && data.child('members').child(auth.uid).val() === true",
+        // Allow missing nodes so clients can probe before create (null).
+        // Existing chats still require membership.
+        ".read": "auth != null && (
+          !data.exists()
+          || data.child('members').child(auth.uid).val() === true
+        )",
 
         // Create only (Admin SDK bypasses for agents-default).
-        // Field updates use the child rules below — do not compare maps with ===
-        // (RTDB object equality is unreliable and was denying lastMessage updates).
         ".write": "auth != null
           && !data.exists()
           && newData.child('createdBy').val() === auth.uid
           && newData.child('members').child(auth.uid).val() === true
           && newData.child('isDefaultAgentGroup').val() !== true
           && (
-            (newData.child('isGroup').val() === false
-              && newData.child('dmKey').val() === $chatId)
-            || newData.child('isGroup').val() === true
+            (
+              newData.child('isSupportChat').val() === true
+              && newData.child('isGroup').val() === true
+              && $chatId === ('support_' + auth.uid)
+              && newData.child('members').child('support-ai').val() === true
+            )
+            || (
+              newData.child('isSupportChat').val() !== true
+              && (
+                (newData.child('isGroup').val() === false
+                  && newData.child('dmKey').val() === $chatId)
+                || newData.child('isGroup').val() === true
+              )
+            )
           )",
 
         "lastMessage": {
@@ -52,8 +66,23 @@
         "$messageId": {
           ".write": "auth != null
             && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
-            && newData.child('senderId').val() === auth.uid
-            && !data.exists()"
+            && !data.exists()
+            && (
+              newData.child('senderId').val() === auth.uid
+              || (
+                root.child('chats').child($chatId).child('isSupportChat').val() === true
+                && newData.child('senderId').val() === 'support-ai'
+                && newData.child('isAi').val() === true
+              )
+            )",
+          "reactions": {
+            "$uid": {
+              ".write": "auth != null
+                && auth.uid === $uid
+                && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
+                && (!newData.exists() || newData.isString())"
+            }
+          }
         }
       }
     },
@@ -63,9 +92,16 @@
         ".read": "auth != null && auth.uid === $uid",
         ".indexOn": ["lastMessageAt"],
         "$chatId": {
+          // Own inbox always; other members' rows when already in the chat;
+          // or same multi-path update that creates the chat (root is pre-write).
           ".write": "auth != null && (
             auth.uid === $uid
             || root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
+            || (
+              !root.child('chats').child($chatId).exists()
+              && newData.parent().parent().parent().child('chats').child($chatId).child('members').child(auth.uid).val() === true
+              && newData.parent().parent().parent().child('chats').child($chatId).child('createdBy').val() === auth.uid
+            )
           )"
         }
       }

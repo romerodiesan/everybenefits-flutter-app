@@ -1,3 +1,5 @@
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
@@ -38,6 +40,7 @@ class ChatConversationScreen extends StatefulWidget {
 class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
+  final _focusNode = FocusNode();
   late final ChatRepository _repo =
       widget.chatRepository ?? ChatRepository();
   late final Stream<ChatConversation?> _chatStream =
@@ -46,6 +49,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       _repo.watchMessages(widget.chat.id);
   var _sending = false;
   var _sharedBootstrapped = false;
+  var _emojiOpen = false;
 
   @override
   void initState() {
@@ -79,14 +83,42 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   void dispose() {
     _controller.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
+  }
+
+  void _toggleEmojiPicker() {
+    PulseHaptics.selection();
+    setState(() => _emojiOpen = !_emojiOpen);
+    if (_emojiOpen) {
+      _focusNode.unfocus();
+    } else {
+      _focusNode.requestFocus();
+    }
+  }
+
+  void _insertEmoji(String emoji) {
+    final text = _controller.text;
+    final selection = _controller.selection;
+    final start = selection.start >= 0 ? selection.start : text.length;
+    final end = selection.end >= 0 ? selection.end : text.length;
+    final next = text.replaceRange(start, end, emoji);
+    final cursor = start + emoji.length;
+    _controller.value = TextEditingValue(
+      text: next,
+      selection: TextSelection.collapsed(offset: cursor),
+    );
   }
 
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
     PulseHaptics.light();
-    setState(() => _sending = true);
+    final l10n = context.l10n;
+    setState(() {
+      _sending = true;
+      _emojiOpen = false;
+    });
     try {
       await _repo.sendMessage(
         chatId: widget.chat.id,
@@ -94,7 +126,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         author: widget.profile,
       );
       _controller.clear();
-      // reverse:true ListView — offset 0 is the newest (bottom).
+      if (widget.chat.isSupportChat) {
+        await _repo.sendSupportAiReply(
+          chatId: widget.chat.id,
+          body: l10n.supportChatAiReply,
+          aiName: l10n.supportChatAiName,
+        );
+        await _repo.markRead(
+          chatId: widget.chat.id,
+          uid: widget.profile.uid,
+        );
+      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_scrollController.hasClients) return;
         _scrollController.animateTo(
@@ -106,11 +148,89 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyChatError(error, context.l10n))),
+        SnackBar(content: Text(friendlyChatError(error, l10n))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
     }
+  }
+
+  Future<void> _react(ChatMessage msg, String emoji) async {
+    PulseHaptics.selection();
+    try {
+      await _repo.toggleReaction(
+        chatId: widget.chat.id,
+        messageId: msg.id,
+        uid: widget.profile.uid,
+        emoji: emoji,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyChatError(error, context.l10n))),
+      );
+    }
+  }
+
+  Future<void> _showReactionPicker(ChatMessage msg) async {
+    PulseHaptics.medium();
+    final l10n = context.l10n;
+    final colors = AppColors.of(context);
+    final mine = msg.reactions[widget.profile.uid];
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: colors.sheet,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  l10n.chatReact,
+                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    for (final emoji in ChatMessage.reactionEmojis)
+                      InkWell(
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _react(msg, emoji);
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: mine == emoji
+                                ? AppColors.brandOf(ctx).withValues(alpha: 0.15)
+                                : colors.glassFill,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: mine == emoji
+                                  ? AppColors.brandOf(ctx)
+                                  : colors.border,
+                            ),
+                          ),
+                          child: Text(emoji, style: const TextStyle(fontSize: 26)),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   void _openSharedPost(SharedPostPreview preview) {
@@ -178,11 +298,13 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             ),
                           ),
                           Text(
-                            chat.isDefaultAgentGroup
-                                ? l10n.chatsDefaultGroupBadge
-                                : (chat.isGroup
-                                    ? l10n.chatTypeGroup
-                                    : l10n.chatTypePrivate),
+                            chat.isSupportChat
+                                ? l10n.supportChatSubtitle
+                                : chat.isDefaultAgentGroup
+                                    ? l10n.chatsDefaultGroupBadge
+                                    : (chat.isGroup
+                                        ? l10n.chatTypeGroup
+                                        : l10n.chatTypePrivate),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colors.muted,
                               fontWeight: FontWeight.w600,
@@ -231,96 +353,47 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   );
                 }
 
-                return ListView.builder(
-                  controller: _scrollController,
-                  reverse: true,
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    AppSpacing.md,
-                    AppSpacing.md,
-                    AppSpacing.sm,
-                  ),
-                  itemCount: messages.length,
-                  itemBuilder: (context, index) {
-                    final msg = messages[index];
-                    final mine = msg.isMine(uid);
-                    final shared = msg.sharedPost;
-                    final time = formatChatTime(msg.createdAt, l10n);
+                return StreamBuilder<ChatConversation?>(
+                  stream: _chatStream,
+                  initialData: widget.chat,
+                  builder: (context, chatSnap) {
+                    final chat = chatSnap.data ?? widget.chat;
+                    final showSenderNames = chat.isGroup;
 
-                    if (shared != null) {
-                      return Padding(
-                        key: ValueKey(msg.id),
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: Align(
-                          alignment: mine
-                              ? Alignment.centerRight
-                              : Alignment.centerLeft,
-                          child: ConstrainedBox(
-                            constraints: BoxConstraints(
-                              maxWidth:
-                                  MediaQuery.sizeOf(context).width * 0.82,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: mine
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              children: [
-                                SharedPostCard(
-                                  preview: shared,
-                                  onTap: () => _openSharedPost(shared),
-                                ),
-                                if (msg.body.trim().isNotEmpty) ...[
-                                  const SizedBox(height: 6),
-                                  _MessageBubble(
-                                    text: msg.body,
-                                    mine: mine,
-                                  ),
-                                ],
-                                const SizedBox(height: 4),
-                                Text(
-                                  time,
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: colors.muted,
-                                    fontSize: 11,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    }
-
-                    return Padding(
-                      key: ValueKey(msg.id),
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: Align(
-                        alignment: mine
-                            ? Alignment.centerRight
-                            : Alignment.centerLeft,
-                        child: ConstrainedBox(
-                          constraints: BoxConstraints(
-                            maxWidth:
-                                MediaQuery.sizeOf(context).width * 0.78,
-                          ),
-                          child: Column(
-                            crossAxisAlignment: mine
-                                ? CrossAxisAlignment.end
-                                : CrossAxisAlignment.start,
-                            children: [
-                              _MessageBubble(text: msg.body, mine: mine),
-                              const SizedBox(height: 4),
-                              Text(
-                                time,
-                                style: theme.textTheme.bodySmall?.copyWith(
-                                  color: colors.muted,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    return ListView.builder(
+                      controller: _scrollController,
+                      reverse: true,
+                      padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md,
+                        AppSpacing.md,
+                        AppSpacing.md,
+                        AppSpacing.sm,
                       ),
+                      itemCount: messages.length,
+                      itemBuilder: (context, index) {
+                        final msg = messages[index];
+                        final mine = msg.isMine(uid);
+                        final shared = msg.sharedPost;
+                        final time = formatChatTime(msg.createdAt, l10n);
+                        final showName = showSenderNames &&
+                            !mine &&
+                            msg.senderName.trim().isNotEmpty;
+
+                        return _MessageRow(
+                          key: ValueKey(msg.id),
+                          msg: msg,
+                          mine: mine,
+                          time: time,
+                          showName: showName,
+                          shared: shared,
+                          viewerUid: uid,
+                          onOpenShared: shared == null
+                              ? null
+                              : () => _openSharedPost(shared),
+                          onLongPress: () => _showReactionPicker(msg),
+                          onTapReaction: (emoji) => _react(msg, emoji),
+                        );
+                      },
                     );
                   },
                 );
@@ -334,79 +407,252 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ),
             child: SafeArea(
               top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _controller,
-                        minLines: 1,
-                        maxLines: 4,
-                        textCapitalization: TextCapitalization.sentences,
-                        enabled: !_sending,
-                        decoration: InputDecoration(
-                          hintText: l10n.chatMessageHint,
-                          hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                            color: colors.muted,
-                          ),
-                          filled: true,
-                          fillColor: colors.glassFill,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(color: colors.border),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(color: colors.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(22),
-                            borderSide: BorderSide(color: brand, width: 1.4),
-                          ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(8, 10, 10, 10),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        IconButton(
+                          tooltip: l10n.chatEmojiPicker,
+                          onPressed: _toggleEmojiPicker,
+                          icon: Icon(
+                            _emojiOpen
+                                ? Icons.keyboard_rounded
+                                : Icons.emoji_emotions_outlined,
+                            color: _emojiOpen ? brand : colors.muted,
                           ),
                         ),
-                        onSubmitted: (_) => _send(),
-                      ),
+                        Expanded(
+                          child: TextField(
+                            controller: _controller,
+                            focusNode: _focusNode,
+                            minLines: 1,
+                            maxLines: 4,
+                            textCapitalization: TextCapitalization.sentences,
+                            enabled: !_sending,
+                            onTap: () {
+                              if (_emojiOpen) {
+                                setState(() => _emojiOpen = false);
+                              }
+                            },
+                            decoration: InputDecoration(
+                              hintText: l10n.chatMessageHint,
+                              hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                                color: colors.muted,
+                              ),
+                              filled: true,
+                              fillColor: colors.glassFill,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: BorderSide(color: colors.border),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide: BorderSide(color: colors.border),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(22),
+                                borderSide:
+                                    BorderSide(color: brand, width: 1.4),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 12,
+                              ),
+                            ),
+                            onSubmitted: (_) => _send(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Material(
+                          color: brand,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: InkWell(
+                            onTap: _sending ? null : _send,
+                            borderRadius: BorderRadius.circular(16),
+                            child: SizedBox(
+                              width: 48,
+                              height: 48,
+                              child: _sending
+                                  ? Padding(
+                                      padding: const EdgeInsets.all(14),
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.onBrandOf(context),
+                                      ),
+                                    )
+                                  : Icon(
+                                      Icons.send_rounded,
+                                      size: 20,
+                                      color: AppColors.onBrandOf(context),
+                                    ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Material(
-                      color: brand,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: InkWell(
-                        onTap: _sending ? null : _send,
-                        borderRadius: BorderRadius.circular(16),
-                        child: SizedBox(
-                          width: 48,
-                          height: 48,
-                          child: _sending
-                              ? Padding(
-                                  padding: const EdgeInsets.all(14),
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: AppColors.onBrandOf(context),
-                                  ),
-                                )
-                              : Icon(
-                                  Icons.send_rounded,
-                                  size: 20,
-                                  color: AppColors.onBrandOf(context),
-                                ),
+                  ),
+                  if (_emojiOpen)
+                    SizedBox(
+                      height: 280,
+                      child: EmojiPicker(
+                        textEditingController: _controller,
+                        onEmojiSelected: (_, emoji) => _insertEmoji(emoji.emoji),
+                        config: Config(
+                          height: 280,
+                          checkPlatformCompatibility: true,
+                          emojiViewConfig: EmojiViewConfig(
+                            backgroundColor: colors.sheet,
+                            columns: 8,
+                            emojiSizeMax: 28 *
+                                (foundation.defaultTargetPlatform ==
+                                        TargetPlatform.iOS
+                                    ? 1.2
+                                    : 1.0),
+                          ),
+                          categoryViewConfig: CategoryViewConfig(
+                            backgroundColor: colors.sheet,
+                            indicatorColor: brand,
+                            iconColorSelected: brand,
+                          ),
+                          bottomActionBarConfig: const BottomActionBarConfig(
+                            enabled: false,
+                          ),
                         ),
                       ),
                     ),
-                  ],
-                ),
+                ],
               ),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _MessageRow extends StatelessWidget {
+  const _MessageRow({
+    super.key,
+    required this.msg,
+    required this.mine,
+    required this.time,
+    required this.showName,
+    required this.shared,
+    required this.viewerUid,
+    required this.onLongPress,
+    required this.onTapReaction,
+    this.onOpenShared,
+  });
+
+  final ChatMessage msg;
+  final bool mine;
+  final String time;
+  final bool showName;
+  final SharedPostPreview? shared;
+  final String viewerUid;
+  final VoidCallback onLongPress;
+  final ValueChanged<String> onTapReaction;
+  final VoidCallback? onOpenShared;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+    final counts = msg.reactionCounts();
+    final myEmoji = msg.reactions[viewerUid];
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Align(
+        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+          ),
+          child: GestureDetector(
+            onLongPress: onLongPress,
+            child: Column(
+              crossAxisAlignment:
+                  mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (showName)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 4),
+                    child: Text(
+                      msg.senderName,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.muted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                if (shared != null)
+                  SharedPostCard(
+                    preview: shared!,
+                    onTap: onOpenShared,
+                  ),
+                if (shared != null && msg.body.trim().isNotEmpty)
+                  const SizedBox(height: 6),
+                if (msg.body.trim().isNotEmpty || shared == null)
+                  _MessageBubble(text: msg.body, mine: mine),
+                if (counts.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 4,
+                    runSpacing: 4,
+                    children: [
+                      for (final entry in counts.entries)
+                        InkWell(
+                          onTap: () => onTapReaction(entry.key),
+                          borderRadius: BorderRadius.circular(999),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: myEmoji == entry.key
+                                  ? brand.withValues(alpha: 0.16)
+                                  : colors.glassFill,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(
+                                color: myEmoji == entry.key
+                                    ? brand.withValues(alpha: 0.45)
+                                    : colors.border,
+                              ),
+                            ),
+                            child: Text(
+                              '${entry.key} ${entry.value}',
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Text(
+                  time,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colors.muted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

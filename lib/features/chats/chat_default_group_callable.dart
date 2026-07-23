@@ -1,6 +1,6 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
-/// Ensures the signed-in agent is a member of the default agents group.
+/// Ensures the signed-in staff member is in the default community group.
 class DefaultAgentGroupCallable {
   DefaultAgentGroupCallable({FirebaseFunctions? functions})
       : _functions = functions ??

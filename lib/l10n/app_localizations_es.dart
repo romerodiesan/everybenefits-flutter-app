@@ -49,13 +49,41 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get supportSheetBody =>
-      '¿Necesitas ayuda con tu cuenta o la app? Contáctanos y te responderemos.';
+      '¿Necesitas ayuda con tu cuenta o la app? Abre el chat de soporte: un asistente responde al momento y nuestro equipo puede unirse.';
 
   @override
   String get supportSheetEmail => 'support@everybenefits.com';
 
   @override
+  String get supportSheetEmailSubject =>
+      'Solicitud de soporte — Every Benefits';
+
+  @override
+  String get supportSheetEmailFailed =>
+      'No se pudo abrir la app de correo. Puedes escribir a support@everybenefits.com.';
+
+  @override
   String get supportSheetClose => 'Cerrar';
+
+  @override
+  String get supportSheetOpenChat => 'Abrir chat de soporte';
+
+  @override
+  String get supportChatAiName => 'Asistente de soporte';
+
+  @override
+  String get supportChatWelcome =>
+      '¡Hola! Soy el asistente de soporte. Cuéntame qué necesitas — un compañero humano puede unirse a este chat cuando haga falta.';
+
+  @override
+  String get supportChatAiReply =>
+      'Gracias por los detalles. Estoy aquí para ayudarte mientras un compañero humano revisa este hilo.';
+
+  @override
+  String get supportChatSubtitle => 'Soporte AI + humano';
+
+  @override
+  String get supportChatOpening => 'Abriendo chat de soporte…';
 
   @override
   String get editProfileNameFrozen => 'Tu nombre queda bloqueado tras el alta.';
@@ -866,10 +894,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatsSectionCommunity => 'Comunidad';
 
   @override
+  String get chatsSectionSupport => 'Soporte';
+
+  @override
   String get chatsDefaultGroupBadge => 'Comunidad';
 
   @override
-  String get chatsDefaultGroupTitle => 'Agentes';
+  String get chatsDefaultGroupTitle => 'Equipo';
+
+  @override
+  String get chatsSupportTitle => 'Soporte';
+
+  @override
+  String get chatsSupportBadge => 'AI + humano';
 
   @override
   String get chatsNoMessagesYet => 'Sin mensajes todavía';
@@ -926,6 +963,12 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get chatMessageHint => 'Escribe un mensaje…';
+
+  @override
+  String get chatEmojiPicker => 'Emojis';
+
+  @override
+  String get chatReact => 'Reaccionar';
 
   @override
   String get chatInfoTitle => 'Info';

@@ -179,7 +179,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportSheetBody.
   ///
   /// In en, this message translates to:
-  /// **'Need help with your account or the app? Reach us and we’ll get back to you.'**
+  /// **'Need help with your account or the app? Start a support chat — an assistant replies right away and our team can join.'**
   String get supportSheetBody;
 
   /// No description provided for @supportSheetEmail.
@@ -188,11 +188,59 @@ abstract class AppLocalizations {
   /// **'support@everybenefits.com'**
   String get supportSheetEmail;
 
+  /// No description provided for @supportSheetEmailSubject.
+  ///
+  /// In en, this message translates to:
+  /// **'Support request — Every Benefits'**
+  String get supportSheetEmailSubject;
+
+  /// No description provided for @supportSheetEmailFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t open your email app. You can write to support@everybenefits.com.'**
+  String get supportSheetEmailFailed;
+
   /// No description provided for @supportSheetClose.
   ///
   /// In en, this message translates to:
   /// **'Close'**
   String get supportSheetClose;
+
+  /// No description provided for @supportSheetOpenChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Open support chat'**
+  String get supportSheetOpenChat;
+
+  /// No description provided for @supportChatAiName.
+  ///
+  /// In en, this message translates to:
+  /// **'Support Assistant'**
+  String get supportChatAiName;
+
+  /// No description provided for @supportChatWelcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Hi! I’m the support assistant. Tell me what you need — a teammate can join this chat anytime.'**
+  String get supportChatWelcome;
+
+  /// No description provided for @supportChatAiReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks for the details. I’m here to help while a human teammate reviews this thread.'**
+  String get supportChatAiReply;
+
+  /// No description provided for @supportChatSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI + human support'**
+  String get supportChatSubtitle;
+
+  /// No description provided for @supportChatOpening.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening support chat…'**
+  String get supportChatOpening;
 
   /// No description provided for @editProfileNameFrozen.
   ///
@@ -1694,6 +1742,12 @@ abstract class AppLocalizations {
   /// **'Community'**
   String get chatsSectionCommunity;
 
+  /// No description provided for @chatsSectionSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get chatsSectionSupport;
+
   /// No description provided for @chatsDefaultGroupBadge.
   ///
   /// In en, this message translates to:
@@ -1703,8 +1757,20 @@ abstract class AppLocalizations {
   /// No description provided for @chatsDefaultGroupTitle.
   ///
   /// In en, this message translates to:
-  /// **'Agents'**
+  /// **'Team'**
   String get chatsDefaultGroupTitle;
+
+  /// No description provided for @chatsSupportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Support'**
+  String get chatsSupportTitle;
+
+  /// No description provided for @chatsSupportBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'AI + human'**
+  String get chatsSupportBadge;
 
   /// No description provided for @chatsNoMessagesYet.
   ///
@@ -1813,6 +1879,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Write a message…'**
   String get chatMessageHint;
+
+  /// No description provided for @chatEmojiPicker.
+  ///
+  /// In en, this message translates to:
+  /// **'Emojis'**
+  String get chatEmojiPicker;
+
+  /// No description provided for @chatReact.
+  ///
+  /// In en, this message translates to:
+  /// **'React'**
+  String get chatReact;
 
   /// No description provided for @chatInfoTitle.
   ///
