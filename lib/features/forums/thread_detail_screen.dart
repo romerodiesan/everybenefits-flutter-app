@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../app/widgets/empty_state.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
+import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import '../chats/chat_repository.dart';
 import 'forum_models.dart';
@@ -75,7 +76,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   void _showError(Object error) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(friendlyForumError(error))),
+      SnackBar(content: Text(friendlyForumError(error, context.l10n))),
     );
   }
 
@@ -83,6 +84,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     required String title,
     required String message,
   }) async {
+    final l10n = context.l10n;
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -91,11 +93,11 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancelar'),
+            child: Text(l10n.actionCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Eliminar'),
+            child: Text(l10n.actionDelete),
           ),
         ],
       ),
@@ -123,9 +125,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _deleteThread(ForumThread thread) async {
+    final l10n = context.l10n;
     final confirmed = await _confirmDelete(
-      title: 'Eliminar pregunta',
-      message: 'Esta acción no se puede deshacer.',
+      title: l10n.deleteThreadTitle,
+      message: l10n.deleteIrreversible,
     );
     if (!confirmed) return;
     try {
@@ -141,9 +144,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _deleteReply(ForumReply reply) async {
+    final l10n = context.l10n;
     final confirmed = await _confirmDelete(
-      title: 'Eliminar respuesta',
-      message: 'Esta acción no se puede deshacer.',
+      title: l10n.deleteReplyTitle,
+      message: l10n.deleteIrreversible,
     );
     if (!confirmed) return;
     try {
@@ -265,6 +269,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return StreamBuilder<ForumThread?>(
       stream: _threadStream,
@@ -285,14 +290,14 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         return PulseScaffold(
           appBar: AppBar(
             title: Text(
-              thread?.title ?? 'Pregunta',
+              thread?.title ?? l10n.threadFallbackTitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
             actions: [
               if (thread != null)
                 IconButton(
-                  tooltip: 'Compartir en chat',
+                  tooltip: l10n.threadShareTooltip,
                   onPressed: () {
                     PulseHaptics.light();
                     showShareToChatSheet(
@@ -310,10 +315,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
           body: loading
               ? const PulseThreadSkeleton()
               : missing
-                  ? const EmptyState(
+                  ? EmptyState(
                       mark: '?',
-                      title: 'Pregunta no encontrada',
-                      subtitle: 'Puede haber sido eliminada.',
+                      title: l10n.threadNotFoundTitle,
+                      subtitle: l10n.threadNotFoundSubtitle,
                     )
                   : Column(
                       children: [
@@ -332,8 +337,8 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                               );
                               final count = thread.replyCount;
                               final answersLabel = count == 1
-                                  ? '1 respuesta'
-                                  : '$count respuestas';
+                                  ? l10n.replyCountOne
+                                  : l10n.replyCountOther(count);
 
                               return ListView(
                                 padding: const EdgeInsets.fromLTRB(
@@ -396,7 +401,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                   ),
                                   const SizedBox(height: 4),
                                   Text(
-                                    'Ordenadas por relevancia',
+                                    l10n.threadSortedByRelevance,
                                     style: theme.textTheme.bodySmall
                                         ?.copyWith(color: colors.muted),
                                   ),
@@ -407,7 +412,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                         vertical: AppSpacing.sm,
                                       ),
                                       child: Text(
-                                        'Sé el primero en responder.',
+                                        l10n.threadFirstToReply,
                                         style: theme.textTheme.bodyMedium
                                             ?.copyWith(color: colors.muted),
                                       ),
@@ -495,6 +500,7 @@ class _OriginalPost extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return PulseSheet(
       padding: const EdgeInsets.fromLTRB(10, 14, 14, 10),
@@ -533,7 +539,7 @@ class _OriginalPost extends StatelessWidget {
                     ),
                     if (canManage)
                       PopupMenuButton<_ThreadAction>(
-                        tooltip: 'Opciones',
+                        tooltip: l10n.actionOptions,
                         onSelected: (action) {
                           switch (action) {
                             case _ThreadAction.edit:
@@ -542,14 +548,14 @@ class _OriginalPost extends StatelessWidget {
                               onDelete?.call();
                           }
                         },
-                        itemBuilder: (context) => const [
+                        itemBuilder: (context) => [
                           PopupMenuItem(
                             value: _ThreadAction.edit,
-                            child: Text('Editar'),
+                            child: Text(l10n.actionEdit),
                           ),
                           PopupMenuItem(
                             value: _ThreadAction.delete,
-                            child: Text('Eliminar'),
+                            child: Text(l10n.actionDelete),
                           ),
                         ],
                       ),
@@ -586,12 +592,12 @@ class _OriginalPost extends StatelessWidget {
                   children: [
                     _PostAction(
                       icon: Icons.chat_bubble_outline_rounded,
-                      label: 'Responder',
+                      label: l10n.actionReply,
                       onTap: onAnswer,
                     ),
                     _PostAction(
                       icon: Icons.forum_outlined,
-                      label: 'Chats',
+                      label: l10n.actionShareChats,
                       onTap: onShare,
                     ),
                   ],
@@ -688,6 +694,7 @@ class _PulseAnswer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
     final canVote = canParticipate && reply.authorId != profile.uid;
     final accepted = reply.isAcceptedBy(thread);
 
@@ -747,7 +754,7 @@ class _PulseAnswer extends StatelessWidget {
                                     borderRadius: BorderRadius.circular(999),
                                   ),
                                   child: Text(
-                                    'Aceptada',
+                                    l10n.acceptedBadge,
                                     style: theme.textTheme.labelSmall?.copyWith(
                                       color: AppColors.brandOf(context),
                                       fontWeight: FontWeight.w800,
@@ -757,7 +764,7 @@ class _PulseAnswer extends StatelessWidget {
                                 ),
                               if (canManage)
                                 PopupMenuButton<_ThreadAction>(
-                                  tooltip: 'Opciones',
+                                  tooltip: l10n.actionOptions,
                                   padding: EdgeInsets.zero,
                                   onSelected: (action) {
                                     switch (action) {
@@ -767,14 +774,14 @@ class _PulseAnswer extends StatelessWidget {
                                         onDelete();
                                     }
                                   },
-                                  itemBuilder: (context) => const [
+                                  itemBuilder: (context) => [
                                     PopupMenuItem(
                                       value: _ThreadAction.edit,
-                                      child: Text('Editar'),
+                                      child: Text(l10n.actionEdit),
                                     ),
                                     PopupMenuItem(
                                       value: _ThreadAction.delete,
-                                      child: Text('Eliminar'),
+                                      child: Text(l10n.actionDelete),
                                     ),
                                   ],
                                 ),
@@ -799,7 +806,7 @@ class _PulseAnswer extends StatelessWidget {
                     child: Row(
                       children: [
                         Text(
-                          formatRelativeTime(reply.createdAt),
+                          formatRelativeTime(reply.createdAt, l10n),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: colors.muted,
                             fontWeight: FontWeight.w600,
@@ -820,7 +827,9 @@ class _PulseAnswer extends StatelessWidget {
                               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                             ),
                             child: Text(
-                              accepted ? 'Quitar aceptación' : 'Aceptar',
+                              accepted
+                                  ? l10n.actionUnaccept
+                                  : l10n.actionAccept,
                             ),
                           ),
                         ],
@@ -893,6 +902,7 @@ class _EditThreadSheetState extends State<_EditThreadSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Padding(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
@@ -906,16 +916,16 @@ class _EditThreadSheetState extends State<_EditThreadSheet> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              'Editar pregunta',
+              l10n.editThreadTitle,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: AppSpacing.md),
             TextField(
               controller: _title,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Título',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.fieldTitle,
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
@@ -924,9 +934,9 @@ class _EditThreadSheetState extends State<_EditThreadSheet> {
               textCapitalization: TextCapitalization.sentences,
               minLines: 4,
               maxLines: 8,
-              decoration: const InputDecoration(
-                labelText: 'Contenido',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.fieldContent,
+                border: const OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
             ),
@@ -934,9 +944,9 @@ class _EditThreadSheetState extends State<_EditThreadSheet> {
             TextField(
               controller: _tagInput,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Agregar tag',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: l10n.fieldAddTag,
+                border: const OutlineInputBorder(),
               ),
               onSubmitted: (_) => _addTag(),
             ),
@@ -960,7 +970,7 @@ class _EditThreadSheetState extends State<_EditThreadSheet> {
                   ),
                 );
               },
-              child: const Text('Guardar'),
+              child: Text(l10n.actionSave),
             ),
           ],
         ),
@@ -995,6 +1005,7 @@ class _EditReplySheetState extends State<_EditReplySheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Padding(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
@@ -1007,7 +1018,7 @@ class _EditReplySheetState extends State<_EditReplySheet> {
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'Editar respuesta',
+            l10n.editReplyTitle,
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppSpacing.md),
@@ -1017,16 +1028,16 @@ class _EditReplySheetState extends State<_EditReplySheet> {
             textCapitalization: TextCapitalization.sentences,
             minLines: 4,
             maxLines: 8,
-            decoration: const InputDecoration(
-              labelText: 'Respuesta',
-              border: OutlineInputBorder(),
+            decoration: InputDecoration(
+              labelText: l10n.fieldReply,
+              border: const OutlineInputBorder(),
               alignLabelWithHint: true,
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(_controller.text),
-            child: const Text('Guardar'),
+            child: Text(l10n.actionSave),
           ),
         ],
       ),
@@ -1057,6 +1068,7 @@ class _CommentComposerBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return Material(
       color: colors.sheet.withValues(alpha: 0.96),
@@ -1080,7 +1092,7 @@ class _CommentComposerBar extends StatelessWidget {
                       ForumAvatar(
                         name: profile.displayName?.trim().isNotEmpty == true
                             ? profile.displayName!
-                            : (profile.email ?? 'Tú'),
+                            : (profile.email ?? l10n.you),
                         photoUrl: profile.photoUrl,
                         size: 36,
                       ),
@@ -1095,7 +1107,7 @@ class _CommentComposerBar extends StatelessWidget {
                           textInputAction: TextInputAction.send,
                           onSubmitted: (_) => onSend(),
                           decoration: InputDecoration(
-                            hintText: 'Escribe una respuesta…',
+                            hintText: l10n.replyHint,
                             filled: true,
                             fillColor: colors.glassFill,
                             border: OutlineInputBorder(
@@ -1146,7 +1158,7 @@ class _CommentComposerBar extends StatelessWidget {
                       vertical: AppSpacing.sm,
                     ),
                     child: Text(
-                      'Regístrate para responder en la comunidad.',
+                      l10n.replyRegisterPrompt,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colors.muted,
                       ),

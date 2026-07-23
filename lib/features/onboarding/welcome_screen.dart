@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../auth/auth.dart';
+import '../../../l10n/l10n.dart';
 import 'login_screen.dart';
 import 'phone_auth_screen.dart';
 import 'register_screen.dart';
@@ -70,6 +71,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return Scaffold(
       backgroundColor: colors.canvas,
@@ -102,7 +104,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   ),
                   const SizedBox(height: AppSpacing.lg),
                   Text(
-                    'El pulso de tu comunidad profesional.',
+                    l10n.welcomeTagline,
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontSize: 26,
                       height: 1.2,
@@ -113,7 +115,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     onPressed: _busy
                         ? null
                         : () => _open(LoginScreen(authService: widget.authService)),
-                    child: const Text('Entrar'),
+                    child: Text(l10n.welcomeEnter),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   TextButton(
@@ -121,7 +123,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         ? null
                         : () => _run(widget.authService.signInAnonymously),
                     child: Text(
-                      'Soy invitado',
+                      l10n.welcomeGuest,
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: colors.muted,
                       ),
@@ -135,7 +137,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               RegisterScreen(authService: widget.authService),
                             ),
                     child: Text(
-                      'Crear cuenta',
+                      l10n.welcomeCreateAccount,
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: colors.muted,
                       ),
@@ -148,7 +150,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                               PhoneAuthScreen(authService: widget.authService),
                             ),
                     child: Text(
-                      'Teléfono',
+                      l10n.welcomePhone,
                       style: theme.textTheme.labelLarge?.copyWith(
                         color: colors.muted,
                       ),

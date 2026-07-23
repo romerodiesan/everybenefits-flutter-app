@@ -5,6 +5,7 @@ import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
+import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
@@ -69,7 +70,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyChatError(error))),
+        SnackBar(content: Text(friendlyChatError(error, context.l10n))),
       );
     }
   }
@@ -105,7 +106,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyChatError(error))),
+        SnackBar(content: Text(friendlyChatError(error, context.l10n))),
       );
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -129,6 +130,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
+    final l10n = context.l10n;
     final uid = widget.profile.uid;
 
     return PulseScaffold(
@@ -176,7 +178,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             ),
                           ),
                           Text(
-                            chat.isGroup ? 'Grupo' : 'Chat privado',
+                            chat.isGroup
+                                ? l10n.chatTypeGroup
+                                : l10n.chatTypePrivate,
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colors.muted,
                               fontWeight: FontWeight.w600,
@@ -202,7 +206,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 if (snapshot.hasError) {
                   return Center(
                     child: Text(
-                      friendlyChatError(snapshot.error!),
+                      friendlyChatError(snapshot.error!, l10n),
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colors.muted,
                       ),
@@ -216,7 +220,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 if (messages.isEmpty) {
                   return Center(
                     child: Text(
-                      'Di el primero. Los mensajes se sincronizan en vivo.',
+                      l10n.chatEmptyThread,
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colors.muted,
@@ -239,7 +243,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     final msg = messages[index];
                     final mine = msg.isMine(uid);
                     final shared = msg.sharedPost;
-                    final time = formatChatTime(msg.createdAt);
+                    final time = formatChatTime(msg.createdAt, l10n);
 
                     if (shared != null) {
                       return Padding(
@@ -341,7 +345,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         textCapitalization: TextCapitalization.sentences,
                         enabled: !_sending,
                         decoration: InputDecoration(
-                          hintText: 'Escribe un mensaje…',
+                          hintText: l10n.chatMessageHint,
                           hintStyle: theme.textTheme.bodyMedium?.copyWith(
                             color: colors.muted,
                           ),

@@ -4,6 +4,7 @@ import '../../app/app_spacing.dart';
 import '../../app/demo_content.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../l10n/l10n.dart';
 import 'course_detail_screen.dart';
 
 class MyLearningScreen extends StatelessWidget {
@@ -13,18 +14,19 @@ class MyLearningScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
     final mine = demoCourses.where((c) => c.progress != null).toList();
 
     return PulseScaffold(
-      appBar: AppBar(title: const Text('Mi aprendizaje')),
+      appBar: AppBar(title: Text(l10n.academyMyLearning)),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
-          Text('En progreso', style: theme.textTheme.titleLarge),
+          Text(l10n.myLearningInProgress, style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpacing.md),
           if (mine.isEmpty)
             Text(
-              'Aún no tienes cursos en progreso.',
+              l10n.myLearningEmpty,
               style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
             )
           else

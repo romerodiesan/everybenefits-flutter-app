@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/pulse_skeleton.dart';
+import '../../../l10n/l10n.dart';
 import '../../../users/user_profile.dart';
 import '../../chats/chat_conversation_screen.dart';
 import '../../chats/chat_models.dart';
@@ -35,6 +36,7 @@ Future<void> showShareToChatSheet({
   ChatRepository? chatRepository,
 }) {
   final colors = AppColors.of(context);
+  final l10n = context.l10n;
   final shared = sharedPostFromThread(thread);
   final forumRepo = forumRepository ?? ForumRepository();
   final chatRepo = chatRepository ?? ChatRepository();
@@ -71,12 +73,12 @@ Future<void> showShareToChatSheet({
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Compartir en chat',
+                l10n.shareToChatTitle,
                 style: Theme.of(sheetContext).textTheme.titleLarge,
               ),
               const SizedBox(height: 4),
               Text(
-                'Se envía como tarjeta. Al tocarla, abren la pregunta.',
+                l10n.shareToChatSubtitle,
                 style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
                       color: colors.muted,
                     ),
@@ -97,7 +99,7 @@ Future<void> showShareToChatSheet({
                       return Padding(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         child: Text(
-                          friendlyChatError(snapshot.error!),
+                          friendlyChatError(snapshot.error!, l10n),
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: colors.muted),
                         ),
@@ -117,7 +119,7 @@ Future<void> showShareToChatSheet({
                       return Padding(
                         padding: const EdgeInsets.all(AppSpacing.md),
                         child: Text(
-                          'Aún no tienes chats. Abre Chats y escribe a alguien primero.',
+                          l10n.shareNoChats,
                           style: Theme.of(context).textTheme.bodyMedium
                               ?.copyWith(color: colors.muted, height: 1.35),
                         ),
@@ -153,7 +155,9 @@ Future<void> showShareToChatSheet({
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           subtitle: Text(
-                            chat.isGroup ? 'Grupo' : 'Chat privado',
+                            chat.isGroup
+                                ? l10n.chatTypeGroup
+                                : l10n.chatTypePrivate,
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall
@@ -188,7 +192,9 @@ Future<void> showShareToChatSheet({
                               if (!context.mounted) return;
                               ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
-                                  content: Text(friendlyChatError(error)),
+                                  content: Text(
+                                    friendlyChatError(error, l10n),
+                                  ),
                                 ),
                               );
                             }
@@ -225,6 +231,7 @@ class SharedPostCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
+    final l10n = context.l10n;
 
     return Material(
       color: colors.glassFill,
@@ -262,8 +269,10 @@ class SharedPostCard extends StatelessWidget {
                           Expanded(
                             child: Text(
                               preview.authorName == null
-                                  ? 'Pregunta'
-                                  : 'Pregunta · ${preview.authorName}',
+                                  ? l10n.sharedPostLabel
+                                  : l10n.sharedPostLabelAuthor(
+                                      preview.authorName!,
+                                    ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelSmall?.copyWith(

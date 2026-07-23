@@ -1,3 +1,5 @@
+import '../l10n/app_localizations.dart';
+
 /// Shared placeholder demo data for academy / AI surfaces (no backend).
 class DemoCourse {
   const DemoCourse({
@@ -21,12 +23,17 @@ class DemoCourse {
   final double? progress;
 }
 
+/// Course level identifiers — resolve to display text via [courseLevelLabel].
+const kLevelBasic = 'basic';
+const kLevelIntermediate = 'intermediate';
+const kLevelAdvanced = 'advanced';
+
 const demoCourses = [
   DemoCourse(
     id: 'c1',
     title: 'Fundamentos de seguros de vida',
     teacher: 'Elena Vargas',
-    level: 'Básico',
+    level: kLevelBasic,
     hours: '8h',
     students: '1.2k',
     colorValue: 0xFF98CA3F,
@@ -36,7 +43,7 @@ const demoCourses = [
     id: 'c2',
     title: 'Objeciones en ventas consultivas',
     teacher: 'Diego Solano',
-    level: 'Intermedio',
+    level: kLevelIntermediate,
     hours: '6h',
     students: '890',
     colorValue: 0xFF33B1FF,
@@ -45,7 +52,7 @@ const demoCourses = [
     id: 'c3',
     title: 'Compliance y ética del agente',
     teacher: 'Patricia Gómez',
-    level: 'Básico',
+    level: kLevelBasic,
     hours: '4h',
     students: '2.4k',
     colorValue: 0xFFFF6B6B,
@@ -54,13 +61,25 @@ const demoCourses = [
     id: 'c4',
     title: 'Pitch de productos Every',
     teacher: 'Andrés Quirós',
-    level: 'Avanzado',
+    level: kLevelAdvanced,
     hours: '10h',
     students: '640',
     colorValue: 0xFFFFB84D,
     progress: 0.12,
   ),
 ];
+
+/// Resolves a [DemoCourse.level] identifier to its localized label.
+String courseLevelLabel(AppLocalizations l10n, String level) {
+  switch (level) {
+    case kLevelIntermediate:
+      return l10n.levelIntermediate;
+    case kLevelAdvanced:
+      return l10n.levelAdvanced;
+    default:
+      return l10n.levelBasic;
+  }
+}
 
 const demoAiChats = [
   'Resumen de objeciones comunes',

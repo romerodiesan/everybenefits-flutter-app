@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart' show FirebaseAuthException;
 
 import '../firebase/firebase_emulators.dart';
+import '../l10n/app_localizations.dart';
 
 class AuthException implements Exception {
   const AuthException({
@@ -44,53 +45,54 @@ class AuthException implements Exception {
     );
   }
 
-  /// Message suitable for SnackBars / form errors (ES).
-  String get userMessage {
+  /// Message suitable for SnackBars / form errors.
+  String localizedMessage(AppLocalizations l10n) {
     switch (code) {
       case 'invalid-email':
-        return 'El correo no es válido.';
+        return l10n.authErrInvalidEmail;
       case 'user-disabled':
-        return 'Esta cuenta está deshabilitada.';
+        return l10n.authErrUserDisabled;
       case 'user-not-found':
-        return 'No encontramos una cuenta con ese correo.';
+        return l10n.authErrUserNotFound;
       case 'wrong-password':
       case 'invalid-credential':
-        return 'Correo o contraseña incorrectos.';
+        return l10n.authErrWrongPassword;
       case 'email-already-in-use':
-        return 'Ya existe una cuenta con ese correo.';
+        return l10n.authErrEmailInUse;
       case 'weak-password':
-        return 'La contraseña es demasiado débil (mín. 6 caracteres).';
+        return l10n.authErrWeakPassword;
       case 'too-many-requests':
-        return 'Demasiados intentos. Espera un momento e inténtalo de nuevo.';
+        return l10n.authErrTooManyRequests;
       case 'network-request-failed':
         if (useFirebaseEmulators) {
-          return 'No se pudo llegar a los emuladores. '
-              'En un iPhone físico usa: '
-              'flutter run --dart-define=FIREBASE_EMULATOR_HOST=<IP-de-tu-Mac> '
-              '(misma Wi‑Fi; reinicia emuladores con host 0.0.0.0).';
+          return l10n.authErrEmulatorUnreachable;
         }
-        return 'Sin conexión. Revisa tu red e inténtalo de nuevo.';
+        return l10n.authErrNetwork;
       case 'emulator-unreachable':
-        return 'No se pudo conectar con Firebase. '
-            '¿Están corriendo los emuladores locales?';
+        return l10n.authErrEmulatorUnreachable;
       case 'permission-denied':
-        return 'No tienes permiso para esta acción '
-            '(revisa reglas o sesión en el emulador).';
+        return l10n.authErrPermission;
       case 'invalid-phone-number':
-        return 'Número de teléfono inválido. Usa formato internacional (+506…).';
+        return l10n.authErrInvalidPhone;
       case 'invalid-verification-code':
-        return 'El código SMS no es válido.';
+        return l10n.authErrInvalidSms;
       case 'session-expired':
-        return 'El código expiró. Solicita uno nuevo.';
+        return l10n.authErrSmsExpired;
       case 'operation-not-allowed':
-        return 'Este método de acceso no está habilitado.';
+        return l10n.authErrOpNotAllowed;
       default:
         return message?.trim().isNotEmpty == true
             ? message!
-            : 'No se pudo completar la autenticación ($code).';
+            : l10n.authErrUnknown(code);
     }
   }
 
   @override
   String toString() => 'AuthException($code): ${message ?? ''}';
+}
+
+/// Resolves [AuthException] (or unknown) into a localized user message.
+String authErrorMessage(Object error, AppLocalizations l10n) {
+  if (error is AuthException) return error.localizedMessage(l10n);
+  return AuthException.fromUnknown(error).localizedMessage(l10n);
 }

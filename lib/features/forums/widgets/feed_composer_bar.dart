@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/pulse_chrome.dart';
+import '../../../l10n/l10n.dart';
 import '../../../users/user_profile.dart';
 import 'forum_avatar.dart';
 
@@ -22,9 +23,10 @@ class FeedComposerBar extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
+    final l10n = context.l10n;
     final name = profile.displayName?.trim().isNotEmpty == true
         ? profile.displayName!.trim()
-        : (profile.email ?? 'Tú');
+        : (profile.email ?? l10n.you);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(
@@ -50,7 +52,7 @@ class FeedComposerBar extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Haz una pregunta a la comunidad',
+                    l10n.composerAskCommunity,
                     style: theme.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                       letterSpacing: -0.2,
@@ -59,7 +61,7 @@ class FeedComposerBar extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'NPN, productos, ventas… alguien ya pudo resolverlo.',
+                    l10n.composerAskHint,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(

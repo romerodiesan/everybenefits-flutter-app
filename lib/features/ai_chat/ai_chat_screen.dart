@@ -5,6 +5,7 @@ import '../../app/demo_content.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../l10n/l10n.dart';
 import 'ai_settings_screen.dart';
 
 /// Minimal AI assistant chat.
@@ -19,13 +20,13 @@ class AiChatScreenState extends State<AiChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   final List<_AiBubble> _messages = [];
-  String _title = 'Nueva conversación';
+  String? _title;
   bool _thinking = false;
 
   void startNewConversation() {
     setState(() {
       _messages.clear();
-      _title = 'Nueva conversación';
+      _title = null;
     });
   }
 
@@ -44,17 +45,14 @@ class AiChatScreenState extends State<AiChatScreen> {
       _messages.add(_AiBubble(text: text, isUser: true));
       _controller.clear();
       _thinking = true;
-      if (_title == 'Nueva conversación') {
-        _title = text.length > 28 ? '${text.substring(0, 28)}…' : text;
-      }
+      _title ??= text.length > 28 ? '${text.substring(0, 28)}…' : text;
     });
     await Future<void>.delayed(const Duration(milliseconds: 600));
     if (!mounted) return;
     setState(() {
       _messages.add(
-        const _AiBubble(
-          text:
-              'Respuesta demo. Cuando conectemos Gemini, verás ayuda real aquí.',
+        _AiBubble(
+          text: context.l10n.aiDemoReply,
           isUser: false,
         ),
       );
@@ -71,6 +69,7 @@ class AiChatScreenState extends State<AiChatScreen> {
   }
 
   void _showHistory() {
+    final l10n = context.l10n;
     showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.of(context).sheet,
@@ -84,12 +83,12 @@ class AiChatScreenState extends State<AiChatScreen> {
             children: [
               ListTile(
                 leading: const Icon(Icons.edit_square),
-                title: const Text('Nueva conversación'),
+                title: Text(l10n.aiNewConversation),
                 onTap: () {
                   Navigator.pop(context);
                   setState(() {
                     _messages.clear();
-                    _title = 'Nueva conversación';
+                    _title = null;
                   });
                 },
               ),
@@ -109,7 +108,7 @@ class AiChatScreenState extends State<AiChatScreen> {
                 ),
               ListTile(
                 leading: const Icon(Icons.settings_outlined),
-                title: const Text('Ajustes'),
+                title: Text(l10n.aiSettings),
                 onTap: () {
                   Navigator.pop(context);
                   Navigator.of(context).push(
@@ -130,22 +129,23 @@ class AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return PulseScaffold(
       appBar: AppBar(
         leading: IconButton(
-          tooltip: 'Historial',
+          tooltip: l10n.aiHistoryTooltip,
           onPressed: _showHistory,
           icon: const Icon(Icons.menu_rounded),
         ),
         title: Text(
-          _title,
+          _title ?? l10n.aiNewConversation,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
           IconButton(
-            tooltip: 'Nueva',
+            tooltip: l10n.aiNewTooltip,
             onPressed: startNewConversation,
             icon: const Icon(Icons.edit_square),
           ),
@@ -170,7 +170,7 @@ class AiChatScreenState extends State<AiChatScreen> {
                         return Padding(
                           padding: const EdgeInsets.symmetric(vertical: 12),
                           child: Text(
-                            'Pensando…',
+                            l10n.aiThinking,
                             style: theme.textTheme.bodyMedium?.copyWith(
                               color: colors.muted,
                             ),
@@ -196,7 +196,7 @@ class AiChatScreenState extends State<AiChatScreen> {
                 maxLines: 4,
                 textCapitalization: TextCapitalization.sentences,
                 decoration: InputDecoration(
-                  hintText: 'Pregunta lo que sea',
+                  hintText: l10n.aiInputHint,
                   filled: true,
                   fillColor: colors.sheet,
                   suffixIcon: IconButton(
@@ -285,7 +285,7 @@ class _EmptyState extends StatelessWidget {
       children: [
         const SizedBox(height: 48),
         Text(
-          '¿En qué puedo ayudarte?',
+          context.l10n.aiEmptyPrompt,
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineMedium,
         ),

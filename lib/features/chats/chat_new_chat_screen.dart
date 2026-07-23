@@ -4,6 +4,7 @@ import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
+import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_repository.dart';
 import 'chat_conversation_screen.dart';
@@ -62,7 +63,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyChatError(error))),
+        SnackBar(content: Text(friendlyChatError(error, context.l10n))),
       );
       setState(() => _openingUid = null);
     }
@@ -72,11 +73,12 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return PulseScaffold(
       appBar: AppBar(
         title: Text(
-          'Nuevo chat',
+          l10n.newChatTitle,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
           ),
@@ -90,7 +92,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Text(
-                  friendlyChatError(snapshot.error!),
+                  friendlyChatError(snapshot.error!, l10n),
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colors.muted,
@@ -109,7 +111,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Text(
-                  'No hay otros usuarios todavía. Cuando alguien se registre, aparecerá aquí.',
+                  l10n.newChatEmpty,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: colors.muted,
@@ -129,7 +131,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
             ),
             children: [
               Text(
-                'CONTACTOS',
+                l10n.newChatContactsHeader,
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: colors.muted,
                   fontSize: 11,

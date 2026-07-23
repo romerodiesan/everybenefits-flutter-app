@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../app/widgets/empty_state.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
+import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import 'create_thread_screen.dart';
 import 'forum_models.dart';
@@ -102,7 +103,7 @@ class ForumsScreenState extends State<ForumsScreen> {
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _error = friendlyForumError(error);
+        _error = friendlyForumError(error, context.l10n);
         _loading = false;
       });
     }
@@ -130,7 +131,7 @@ class ForumsScreenState extends State<ForumsScreen> {
       if (!mounted) return;
       setState(() => _loadingMore = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyForumError(error))),
+        SnackBar(content: Text(friendlyForumError(error, context.l10n))),
       );
     }
   }
@@ -218,6 +219,7 @@ class ForumsScreenState extends State<ForumsScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
     final visible = filterAndSortThreads(
       _threads,
       query: _query,
@@ -232,7 +234,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                 autofocus: true,
                 textInputAction: TextInputAction.search,
                 decoration: InputDecoration(
-                  hintText: 'Buscar preguntas…',
+                  hintText: l10n.forumsSearchHint,
                   border: InputBorder.none,
                   enabledBorder: InputBorder.none,
                   focusedBorder: InputBorder.none,
@@ -253,12 +255,14 @@ class ForumsScreenState extends State<ForumsScreen> {
                 onChanged: (value) => setState(() => _query = value),
               )
             : Text(
-                'Inicio',
+                l10n.forumsTitle,
                 style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
               ),
         actions: [
           IconButton(
-            tooltip: _searchOpen ? 'Cerrar búsqueda' : 'Buscar preguntas',
+            tooltip: _searchOpen
+                ? l10n.forumsSearchClose
+                : l10n.forumsSearchOpen,
             onPressed: () {
               setState(() {
                 _searchOpen = !_searchOpen;
@@ -273,17 +277,17 @@ class ForumsScreenState extends State<ForumsScreen> {
             ),
           ),
           PopupMenuButton<ForumSort>(
-            tooltip: 'Ordenar',
+            tooltip: l10n.forumsSortTooltip,
             initialValue: _sort,
             onSelected: _setSort,
-            itemBuilder: (context) => const [
+            itemBuilder: (context) => [
               PopupMenuItem(
                 value: ForumSort.recent,
-                child: Text('Más recientes'),
+                child: Text(l10n.forumsSortRecent),
               ),
               PopupMenuItem(
                 value: ForumSort.relevant,
-                child: Text('Más relevantes'),
+                child: Text(l10n.forumsSortRelevant),
               ),
             ],
             icon: const Icon(Icons.sort_rounded),
@@ -297,7 +301,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                 PulseHaptics.light();
                 openCreate();
               },
-              tooltip: 'Nueva pregunta',
+              tooltip: l10n.fabNewQuestion,
               child: const Icon(Icons.question_mark_rounded),
             )
           : null,
@@ -316,7 +320,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                 children: [
                   Expanded(
                     child: Text(
-                      _activeFilterLabel,
+                      _activeFilterLabel(l10n),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colors.muted,
                         fontWeight: FontWeight.w500,
@@ -336,7 +340,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                         visualDensity: VisualDensity.compact,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                       ),
-                      child: const Text('Limpiar'),
+                      child: Text(l10n.forumsClearFilters),
                     ),
                 ],
               ),
@@ -350,7 +354,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 children: [
                   ForumFilterChip(
-                    label: 'Mías',
+                    label: l10n.forumsFilterMine,
                     leading: Icons.person_outline_rounded,
                     selected: _mineOnly,
                     onTap: () => _setMineOnly(!_mineOnly),
@@ -358,8 +362,8 @@ class ForumsScreenState extends State<ForumsScreen> {
                   const SizedBox(width: 8),
                   ForumFilterChip(
                     label: _sort == ForumSort.relevant
-                        ? 'Relevantes'
-                        : 'Recientes',
+                        ? l10n.forumsFilterRelevant
+                        : l10n.forumsFilterRecent,
                     leading: Icons.swap_vert_rounded,
                     selected: false,
                     onTap: () {
@@ -411,7 +415,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                 AppSpacing.sm,
               ),
               child: Text(
-                'Modo lectura — regístrate para publicar.',
+                l10n.forumsReadOnlyBanner,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colors.muted,
                   fontSize: 13,
@@ -429,7 +433,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                           ? 'error'
                           : (_threads.isEmpty ? 'empty' : 'feed')),
                 ),
-                child: _buildFeed(context, visible),
+                child: _buildFeed(context, l10n, visible),
               ),
             ),
           ),
@@ -438,46 +442,52 @@ class ForumsScreenState extends State<ForumsScreen> {
     );
   }
 
-  String get _activeFilterLabel {
+  String _activeFilterLabel(AppLocalizations l10n) {
     final parts = <String>[];
-    if (_mineOnly) parts.add('Tus preguntas');
+    if (_mineOnly) parts.add(l10n.forumsFilterYourQuestions);
     if (_selectedTag != null) parts.add('#$_selectedTag');
-    if (_isSearching) parts.add('búsqueda en resultados cargados');
+    if (_isSearching) parts.add(l10n.forumsFilterSearchLoaded);
     if (parts.isEmpty) return '';
     return parts.join(' · ');
   }
 
-  Widget _buildFeed(BuildContext context, List<ForumThread> visible) {
+  Widget _buildFeed(
+    BuildContext context,
+    AppLocalizations l10n,
+    List<ForumThread> visible,
+  ) {
     if (_loading) {
       return const PulseFeedSkeleton();
     }
     if (_error != null) {
       return EmptyState(
         mark: '!',
-        title: 'No se pudo cargar',
+        title: l10n.forumsLoadErrorTitle,
         subtitle: _error!,
-        actionLabel: 'Reintentar',
+        actionLabel: l10n.actionRetry,
         onAction: _reload,
       );
     }
     if (_threads.isEmpty) {
       return EmptyState(
         mark: 'P',
-        title: _mineOnly ? 'Aún no has preguntado' : 'El feed está en calma',
+        title: _mineOnly
+            ? l10n.forumsEmptyMineTitle
+            : l10n.forumsEmptyFeedTitle,
         subtitle: _mineOnly
-            ? 'Publica tu primera pregunta para verla aquí.'
-            : 'Sé el primero en publicar una pregunta.',
-        actionLabel: _canPost ? 'Nueva pregunta' : null,
+            ? l10n.forumsEmptyMineSubtitle
+            : l10n.forumsEmptyFeedSubtitle,
+        actionLabel: _canPost ? l10n.fabNewQuestion : null,
         onAction: _canPost ? openCreate : null,
       );
     }
     if (visible.isEmpty) {
       return EmptyState(
         mark: '?',
-        title: 'Sin coincidencias',
+        title: l10n.forumsNoMatchesTitle,
         subtitle: _isSearching
-            ? 'No hay preguntas para “${_query.trim()}”.'
-            : 'Prueba otro filtro o tag.',
+            ? l10n.forumsNoMatchesQuery(_query.trim())
+            : l10n.forumsNoMatchesFilter,
       );
     }
 
@@ -507,7 +517,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                     )
                   : TextButton(
                       onPressed: _loadMore,
-                      child: const Text('Cargar más'),
+                      child: Text(l10n.forumsLoadMore),
                     ),
             ),
           );

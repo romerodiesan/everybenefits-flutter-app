@@ -4,6 +4,7 @@ import '../../app/app_spacing.dart';
 import '../../app/demo_content.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../l10n/l10n.dart';
 import 'course_detail_screen.dart';
 import 'learning_path_screen.dart';
 import 'my_learning_screen.dart';
@@ -17,16 +18,17 @@ class UniversityScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return PulseScaffold(
       appBar: AppBar(
         title: Text(
-          'Academia',
+          l10n.academyTitle,
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
         ),
         actions: [
           IconButton(
-            tooltip: 'Buscar',
+            tooltip: l10n.actionSearch,
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -63,7 +65,7 @@ class UniversityScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Mi aprendizaje',
+                          l10n.academyMyLearning,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -91,7 +93,7 @@ class UniversityScreen extends StatelessWidget {
                       const SizedBox(width: 8),
                       Expanded(
                         child: Text(
-                          'Rutas',
+                          l10n.academyPaths,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleMedium?.copyWith(
@@ -106,7 +108,7 @@ class UniversityScreen extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.xl),
-          Text('Cursos', style: theme.textTheme.titleLarge),
+          Text(l10n.academyCourses, style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpacing.md),
           for (final course in demoCourses) ...[
             PulseSheet(
@@ -130,7 +132,7 @@ class UniversityScreen extends StatelessWidget {
                     alignment: Alignment.bottomLeft,
                     padding: const EdgeInsets.all(12),
                     child: Text(
-                      course.level.toUpperCase(),
+                      courseLevelLabel(l10n, course.level).toUpperCase(),
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w800,
                         letterSpacing: 1,
@@ -169,7 +171,7 @@ class UniversityScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(top: AppSpacing.md),
             child: Text(
-              'Catálogo demo — cursos reales próximamente.',
+              l10n.academyCatalogDemo,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
             ),

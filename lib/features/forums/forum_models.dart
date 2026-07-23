@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../users/user_role.dart';
 import 'forum_tags.dart';
 
@@ -368,29 +369,71 @@ List<ForumReply> sortRepliesByRelevance(
   return list;
 }
 
-String friendlyForumError(Object error) {
+String friendlyForumError(Object error, AppLocalizations l10n) {
   final raw = '$error';
   if (raw.contains('permission') || raw.contains('PERMISSION')) {
-    return 'No tienes permiso para esta acción.';
+    return l10n.errNoPermission;
   }
-  if (raw.contains('StateError:')) {
-    return raw.replaceFirst('Bad state: ', '').replaceFirst('StateError: ', '');
+
+  final cleaned = raw
+      .replaceFirst(RegExp(r'^.*?Exception:\s*'), '')
+      .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+      .replaceFirst(RegExp(r'^Invalid argument\(s\):\s*'), '')
+      .replaceFirst('StateError: ', '')
+      .replaceFirst('ArgumentError: ', '')
+      .trim();
+
+  final known = <String, String Function(AppLocalizations)>{
+    'No tienes permiso para publicar en la comunidad.': (l) =>
+        l.errForumNoPostPermission,
+    "You don't have permission to post in the community.": (l) =>
+        l.errForumNoPostPermission,
+    'Título y contenido son obligatorios.': (l) => l.errForumTitleBodyRequired,
+    'Title and body are required.': (l) => l.errForumTitleBodyRequired,
+    'Agrega al menos un tag.': (l) => l.errForumNeedTag,
+    'Add at least one tag.': (l) => l.errForumNeedTag,
+    'No puedes editar esta pregunta.': (l) => l.errForumCantEditQuestion,
+    "You can't edit this question.": (l) => l.errForumCantEditQuestion,
+    'No tienes permiso para responder.': (l) => l.errForumNoReplyPermission,
+    "You don't have permission to reply.": (l) => l.errForumNoReplyPermission,
+    'La respuesta no puede estar vacía.': (l) => l.errForumEmptyReply,
+    "The reply can't be empty.": (l) => l.errForumEmptyReply,
+    'No puedes editar esta respuesta.': (l) => l.errForumCantEditReply,
+    "You can't edit this reply.": (l) => l.errForumCantEditReply,
+    'No puedes eliminar esta pregunta.': (l) => l.errForumCantDeleteQuestion,
+    "You can't delete this question.": (l) => l.errForumCantDeleteQuestion,
+    'No puedes eliminar esta respuesta.': (l) => l.errForumCantDeleteReply,
+    "You can't delete this reply.": (l) => l.errForumCantDeleteReply,
+    'Solo el autor de la pregunta puede aceptar respuestas.': (l) =>
+        l.errForumOnlyAuthorAccept,
+    'Only the question author can accept replies.': (l) =>
+        l.errForumOnlyAuthorAccept,
+    'La respuesta no pertenece a esta pregunta.': (l) =>
+        l.errForumReplyNotOnThread,
+    "The reply doesn't belong to this question.": (l) =>
+        l.errForumReplyNotOnThread,
+    'Regístrate para marcar relevancia.': (l) => l.errForumRegisterToVote,
+    'Sign up to mark relevance.': (l) => l.errForumRegisterToVote,
+    'No puedes votar tu propia pregunta.': (l) => l.errForumCantVoteOwnQuestion,
+    "You can't vote on your own question.": (l) =>
+        l.errForumCantVoteOwnQuestion,
+    'No puedes votar tu propia respuesta.': (l) => l.errForumCantVoteOwnReply,
+    "You can't vote on your own reply.": (l) => l.errForumCantVoteOwnReply,
+  };
+
+  final mapped = known[cleaned];
+  if (mapped != null) return mapped(l10n);
+  if (cleaned.isNotEmpty &&
+      (cleaned.contains('No tienes') ||
+          cleaned.contains('No puedes') ||
+          cleaned.contains('Regístrate') ||
+          cleaned.contains("You don't") ||
+          cleaned.contains("You can't") ||
+          cleaned.contains('Sign up') ||
+          cleaned.contains('Add at least') ||
+          cleaned.contains('required'))) {
+    return cleaned;
   }
-  if (raw.contains('ArgumentError:')) {
-    return raw.replaceFirst('Invalid argument(s): ', '').replaceFirst(
-          'ArgumentError: ',
-          '',
-        );
-  }
-  if (raw.contains('No tienes') ||
-      raw.contains('No puedes') ||
-      raw.contains('Regístrate') ||
-      raw.contains('Agrega') ||
-      raw.contains('obligator')) {
-    return raw
-        .replaceFirst(RegExp(r'^.*?Exception:\s*'), '')
-        .replaceFirst(RegExp(r'^Bad state:\s*'), '')
-        .trim();
-  }
-  return 'Algo salió mal. Intenta de nuevo.';
+  return l10n.errGenericRetry;
 }
+

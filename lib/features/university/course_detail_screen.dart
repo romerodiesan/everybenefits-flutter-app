@@ -4,6 +4,7 @@ import '../../app/app_spacing.dart';
 import '../../app/demo_content.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../l10n/l10n.dart';
 import 'course_player_screen.dart';
 
 class CourseDetailScreen extends StatelessWidget {
@@ -15,9 +16,10 @@ class CourseDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return PulseScaffold(
-      appBar: AppBar(title: const Text('Curso')),
+      appBar: AppBar(title: Text(l10n.courseDetailTitle)),
       body: ListView(
         padding: const EdgeInsets.all(AppSpacing.lg),
         children: [
@@ -27,21 +29,23 @@ class CourseDetailScreen extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Por ${course.teacher}',
+            l10n.courseByTeacher(course.teacher),
             style: theme.textTheme.bodyLarge?.copyWith(color: colors.muted),
           ),
           const SizedBox(height: AppSpacing.md),
           Wrap(
             spacing: 8,
             children: [
-              _Chip(course.level),
+              _Chip(courseLevelLabel(l10n, course.level)),
               _Chip(course.hours),
-              _Chip('${course.students} estudiantes'),
+              _Chip(l10n.courseStudents(course.students)),
             ],
           ),
           const SizedBox(height: AppSpacing.xl),
           SignalButton(
-            label: course.progress == null ? 'Empezar curso' : 'Continuar',
+            label: course.progress == null
+                ? l10n.courseStart
+                : l10n.courseContinue,
             onPressed: () {
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
@@ -51,10 +55,10 @@ class CourseDetailScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: AppSpacing.xl),
-          Text('Sobre este curso', style: theme.textTheme.titleLarge),
+          Text(l10n.courseAbout, style: theme.textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
-            'Contenido demo. Los módulos reales llegarán cuando conectemos el LMS.',
+            l10n.courseAboutDemo,
             style: theme.textTheme.bodyLarge?.copyWith(color: colors.muted),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -65,8 +69,8 @@ class CourseDetailScreen extends StatelessWidget {
                 backgroundColor: colors.sheet,
                 child: Text('$i', style: theme.textTheme.labelLarge),
               ),
-              title: Text('Módulo $i'),
-              subtitle: const Text('4 clases'),
+              title: Text(l10n.courseModule(i)),
+              subtitle: Text(l10n.courseLessonsCount),
             ),
         ],
       ),

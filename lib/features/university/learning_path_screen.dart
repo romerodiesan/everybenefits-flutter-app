@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../l10n/l10n.dart';
 
 class LearningPathScreen extends StatelessWidget {
   const LearningPathScreen({super.key});
@@ -11,14 +12,15 @@ class LearningPathScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
     final paths = [
-      ('Agente nuevo', '5 cursos · 28h', 0.2),
-      ('Cierre de ventas', '4 cursos · 18h', 0.0),
-      ('Liderazgo de agencia', '6 cursos · 32h', 0.55),
+      (l10n.pathNewAgent, l10n.pathMetaCoursesHours(5, 28), 0.2),
+      (l10n.pathClosing, l10n.pathMetaCoursesHours(4, 18), 0.0),
+      (l10n.pathLeadership, l10n.pathMetaCoursesHours(6, 32), 0.55),
     ];
 
     return PulseScaffold(
-      appBar: AppBar(title: const Text('Rutas')),
+      appBar: AppBar(title: Text(l10n.academyPaths)),
       body: ListView.separated(
         padding: const EdgeInsets.all(AppSpacing.lg),
         itemCount: paths.length,

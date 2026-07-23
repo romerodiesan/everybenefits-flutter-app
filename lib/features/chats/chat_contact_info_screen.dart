@@ -4,6 +4,7 @@ import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
@@ -44,7 +45,7 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyChatError(error))),
+        SnackBar(content: Text(friendlyChatError(error, context.l10n))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -55,12 +56,13 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
     final uid = widget.profile.uid;
 
     return PulseScaffold(
       appBar: AppBar(
         title: Text(
-          'Info',
+          l10n.chatInfoTitle,
           style: theme.textTheme.titleLarge?.copyWith(
             fontWeight: FontWeight.w800,
           ),
@@ -95,7 +97,7 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                chat.isGroup ? 'Grupo' : 'Chat privado',
+                chat.isGroup ? l10n.chatTypeGroup : l10n.chatTypePrivate,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
               ),
@@ -111,7 +113,7 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
                             : Icons.push_pin_outlined,
                         color: colors.muted,
                       ),
-                      title: Text(pinned ? 'Quitar de fijados' : 'Fijar chat'),
+                      title: Text(pinned ? l10n.chatUnpin : l10n.chatPin),
                       trailing: _busy
                           ? const SizedBox(
                               width: 18,

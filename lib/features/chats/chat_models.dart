@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../users/user_role.dart';
 
 /// Compact post reference shared into a private chat.
@@ -251,7 +252,11 @@ String chatInitials(String name) {
   return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
 }
 
-String formatChatTime(DateTime at, {DateTime? now}) {
+String formatChatTime(
+  DateTime at,
+  AppLocalizations l10n, {
+  DateTime? now,
+}) {
   final local = at.toLocal();
   final n = (now ?? DateTime.now()).toLocal();
   final today = DateTime(n.year, n.month, n.day);
@@ -262,8 +267,16 @@ String formatChatTime(DateTime at, {DateTime? now}) {
     final m = local.minute.toString().padLeft(2, '0');
     return '$h:$m';
   }
-  if (diff == 1) return 'Ayer';
-  const weekdays = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  if (diff == 1) return l10n.chatTimeYesterday;
+  final weekdays = [
+    l10n.weekdayMon,
+    l10n.weekdayTue,
+    l10n.weekdayWed,
+    l10n.weekdayThu,
+    l10n.weekdayFri,
+    l10n.weekdaySat,
+    l10n.weekdaySun,
+  ];
   if (diff < 7) return weekdays[local.weekday - 1];
   return '${local.day}/${local.month}';
 }
@@ -287,26 +300,46 @@ bool canParticipateInChats({
       role == UserRole.admin;
 }
 
-String friendlyChatError(Object error) {
+String friendlyChatError(Object error, AppLocalizations l10n) {
   final raw = '$error';
   if (raw.contains('permission') || raw.contains('PERMISSION')) {
-    return 'No tienes permiso para esta acción.';
+    return l10n.errNoPermission;
   }
-  if (raw.contains('StateError:')) {
-    return raw.replaceFirst('Bad state: ', '').replaceFirst('StateError: ', '');
+
+  final cleaned = raw
+      .replaceFirst(RegExp(r'^.*?Exception:\s*'), '')
+      .replaceFirst(RegExp(r'^Bad state:\s*'), '')
+      .replaceFirst(RegExp(r'^Invalid argument\(s\):\s*'), '')
+      .replaceFirst('StateError: ', '')
+      .replaceFirst('ArgumentError: ', '')
+      .trim();
+
+  final known = <String, String Function(AppLocalizations)>{
+    'No puedes chatear contigo mismo.': (l) => l.errChatCantChatSelf,
+    "You can't chat with yourself.": (l) => l.errChatCantChatSelf,
+    'Escribe un mensaje.': (l) => l.errChatEmptyMessage,
+    'Write a message.': (l) => l.errChatEmptyMessage,
+    'La pregunta a compartir no es válida.': (l) => l.errChatInvalidShare,
+    "The question to share isn't valid.": (l) => l.errChatInvalidShare,
+    'No eres miembro de este chat.': (l) => l.errChatNotMember,
+    "You're not a member of this chat.": (l) => l.errChatNotMember,
+    'Este chat ya no existe.': (l) => l.errChatGone,
+    'This chat no longer exists.': (l) => l.errChatGone,
+    'Regístrate con una cuenta para usar los chats.': (l) => l.errChatRegister,
+    'Sign up with an account to use chats.': (l) => l.errChatRegister,
+  };
+
+  final mapped = known[cleaned];
+  if (mapped != null) return mapped(l10n);
+  if (cleaned.isNotEmpty &&
+      (cleaned.contains('No tienes') ||
+          cleaned.contains('No puedes') ||
+          cleaned.contains('Regístrate') ||
+          cleaned.contains("You don't") ||
+          cleaned.contains("You can't") ||
+          cleaned.contains('Sign up'))) {
+    return cleaned;
   }
-  if (raw.contains('ArgumentError:')) {
-    return raw
-        .replaceFirst('Invalid argument(s): ', '')
-        .replaceFirst('ArgumentError: ', '');
-  }
-  if (raw.contains('No tienes') ||
-      raw.contains('Regístrate') ||
-      raw.contains('No puedes')) {
-    return raw
-        .replaceFirst(RegExp(r'^.*?Exception:\s*'), '')
-        .replaceFirst(RegExp(r'^Bad state:\s*'), '')
-        .trim();
-  }
-  return 'Algo salió mal. Intenta de nuevo.';
+  return l10n.errGenericRetry;
 }
+

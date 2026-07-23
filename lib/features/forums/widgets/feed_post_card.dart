@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/pulse_chrome.dart';
+import '../../../l10n/l10n.dart';
 import '../forum_models.dart';
 import 'forum_avatar.dart';
 import 'forum_meta_line.dart';
@@ -32,12 +33,13 @@ class FeedPostCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
     final body = thread.body.trim().replaceAll(RegExp(r'\s+'), ' ');
     final commentsLabel = thread.replyCount == 0
-        ? 'Responder'
+        ? l10n.actionReply
         : thread.replyCount == 1
-            ? '1 respuesta'
-            : '${thread.replyCount} respuestas';
+            ? l10n.replyCountOne
+            : l10n.replyCountOther(thread.replyCount);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
@@ -130,7 +132,7 @@ class FeedPostCard extends StatelessWidget {
                 ),
                 _Action(
                   icon: Icons.forum_outlined,
-                  label: 'Chats',
+                  label: l10n.actionShareChats,
                   onTap: onShare ?? () {},
                 ),
               ],

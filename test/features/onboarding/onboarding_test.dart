@@ -10,6 +10,8 @@ import 'package:every_benefits/features/onboarding/forgot_password_screen.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/phone_auth_screen.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
+import 'package:every_benefits/l10n/app_localizations.dart';
+import 'package:every_benefits/l10n/app_localizations_en.dart';
 
 class MockAuthService extends Mock implements AuthService {}
 
@@ -30,6 +32,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildEveryInsuranceTheme(Brightness.dark),
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: home,
       ),
     );
@@ -48,7 +53,7 @@ void main() {
 
     await tester.enterText(find.byType(TextFormField).at(0), 'agent@every.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'secret12');
-    await tester.tap(find.text('Entrar'));
+    await tester.tap(find.text('Sign in').last);
     await tester.pump();
 
     verify(
@@ -65,10 +70,10 @@ void main() {
     await tester.enterText(find.byType(TextFormField).at(0), 'agent@every.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'secret12');
     await tester.enterText(find.byType(TextFormField).at(2), 'different');
-    await tester.tap(find.text('Crear cuenta').last);
+    await tester.tap(find.text('Create account').last);
     await tester.pump();
 
-    expect(find.text('Las contraseñas no coinciden.'), findsOneWidget);
+    expect(find.text('Passwords do not match.'), findsOneWidget);
     verifyNever(
       () => auth.signUpWithEmail(
         email: any(named: 'email'),
@@ -88,35 +93,37 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Enviar enlace'));
+    await tester.tap(find.text('Send link'));
     await tester.pump();
 
     verify(() => auth.sendPasswordResetEmail('agent@every.com')).called(1);
-    expect(find.text('Reenviar enlace'), findsOneWidget);
+    expect(find.text('Resend link'), findsOneWidget);
   });
 
   testWidgets('phone auth requires international format', (tester) async {
     await pumpAuth(tester, PhoneAuthScreen(authService: auth));
 
     await tester.enterText(find.byType(TextFormField), '88887777');
-    await tester.tap(find.text('Enviar código'));
+    await tester.tap(find.text('Send code'));
     await tester.pump();
 
-    expect(find.textContaining('código de país'), findsOneWidget);
+    expect(find.textContaining('country code'), findsWidgets);
   });
 
-  test('AuthException maps known codes to Spanish copy', () {
+  test('AuthException maps known codes to localized copy', () {
+    final l10n = AppLocalizationsEn();
     expect(
-      const AuthException(code: 'wrong-password').userMessage,
-      contains('incorrectos'),
+      const AuthException(code: 'wrong-password').localizedMessage(l10n),
+      contains('Incorrect'),
     );
     expect(
-      const AuthException(code: 'email-already-in-use').userMessage,
-      contains('Ya existe'),
+      const AuthException(code: 'email-already-in-use')
+          .localizedMessage(l10n),
+      contains('already exists'),
     );
     expect(
-      const AuthException(code: 'emulator-unreachable').userMessage,
-      contains('emuladores'),
+      const AuthException(code: 'emulator-unreachable').localizedMessage(l10n),
+      contains('emulators'),
     );
     expect(
       AuthException.fromUnknown(

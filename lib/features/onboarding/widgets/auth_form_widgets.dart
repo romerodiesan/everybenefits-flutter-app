@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/pulse_chrome.dart';
+import '../../../l10n/l10n.dart';
 
 export '../../../app/app_feedback.dart'
     show showAuthError, showAppError, showAppSuccess;
@@ -57,14 +58,14 @@ class AuthPasswordField extends StatefulWidget {
   const AuthPasswordField({
     super.key,
     required this.controller,
-    this.label = 'Contraseña',
+    this.label,
     this.validator,
     this.textInputAction = TextInputAction.done,
     this.onFieldSubmitted,
   });
 
   final TextEditingController controller;
-  final String label;
+  final String? label;
   final FormFieldValidator<String>? validator;
   final TextInputAction textInputAction;
   final ValueChanged<String>? onFieldSubmitted;
@@ -85,7 +86,7 @@ class _AuthPasswordFieldState extends State<AuthPasswordField> {
       onFieldSubmitted: widget.onFieldSubmitted,
       validator: widget.validator,
       decoration: InputDecoration(
-        labelText: widget.label,
+        labelText: widget.label ?? context.l10n.fieldPassword,
         suffixIcon: IconButton(
           onPressed: () => setState(() => _obscure = !_obscure),
           icon: Icon(
@@ -163,9 +164,9 @@ class AuthLinkRow extends StatelessWidget {
 }
 
 class AuthDivider extends StatelessWidget {
-  const AuthDivider({super.key, this.label = 'o continúa con'});
+  const AuthDivider({super.key, this.label});
 
-  final String label;
+  final String? label;
 
   @override
   Widget build(BuildContext context) {
@@ -175,7 +176,10 @@ class AuthDivider extends StatelessWidget {
         const Expanded(child: Divider()),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-          child: Text(label, style: muted),
+          child: Text(
+            label ?? context.l10n.authDividerContinueWith,
+            style: muted,
+          ),
         ),
         const Expanded(child: Divider()),
       ],
@@ -203,12 +207,12 @@ class GoogleAuthButton extends StatelessWidget {
               height: 22,
               child: CircularProgressIndicator(strokeWidth: 2),
             )
-          : const Row(
+          : Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.g_mobiledata_rounded, size: 28),
-                SizedBox(width: 4),
-                Text('Continuar con Google'),
+                const Icon(Icons.g_mobiledata_rounded, size: 28),
+                const SizedBox(width: 4),
+                Text(context.l10n.authContinueGoogle),
               ],
             ),
     );
@@ -225,7 +229,7 @@ class PhoneAuthButton extends StatelessWidget {
     return OutlinedButton.icon(
       onPressed: onPressed,
       icon: const Icon(Icons.phone_iphone_rounded),
-      label: const Text('Continuar con teléfono'),
+      label: Text(context.l10n.authContinuePhone),
     );
   }
 }

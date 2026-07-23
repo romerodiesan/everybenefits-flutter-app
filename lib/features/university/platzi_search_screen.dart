@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/demo_content.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../l10n/l10n.dart';
 import 'course_detail_screen.dart';
 
 class PlatziSearchScreen extends StatelessWidget {
@@ -11,13 +12,14 @@ class PlatziSearchScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
 
     return PulseScaffold(
       appBar: AppBar(
         title: TextField(
           autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'Buscar cursos…',
+          decoration: InputDecoration(
+            hintText: l10n.searchCoursesHint,
             border: InputBorder.none,
             enabledBorder: InputBorder.none,
             focusedBorder: InputBorder.none,

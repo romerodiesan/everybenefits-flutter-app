@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../auth/auth.dart';
+import '../../../l10n/l10n.dart';
 import 'login_screen.dart';
 import 'phone_auth_screen.dart';
 import 'widgets/auth_form_widgets.dart';
@@ -55,9 +56,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AuthFlowScaffold(
-      title: 'Crear cuenta',
-      subtitle: 'Únete como agente y desbloquea la comunidad completa.',
+      title: l10n.registerTitle,
+      subtitle: l10n.registerSubtitle,
       child: AutofillGroup(
         child: Form(
           key: _formKey,
@@ -69,10 +71,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 autofillHints: const [AutofillHints.email],
-                decoration: const InputDecoration(labelText: 'Correo'),
+                decoration: InputDecoration(labelText: l10n.fieldEmail),
                 validator: (value) {
                   if (value == null || !value.contains('@')) {
-                    return 'Ingresa un correo válido.';
+                    return l10n.validationEmail;
                   }
                   return null;
                 },
@@ -85,13 +87,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               const SizedBox(height: AppSpacing.md),
               AuthPasswordField(
                 controller: _confirm,
-                label: 'Confirmar contraseña',
+                label: l10n.fieldConfirmPassword,
                 validator: (value) {
                   if (value != _password.text) {
-                    return 'Las contraseñas no coinciden.';
+                    return l10n.validationPasswordsMismatch;
                   }
                   if (value == null || value.length < 6) {
-                    return 'Mínimo 6 caracteres.';
+                    return l10n.validationPasswordMin;
                   }
                   return null;
                 },
@@ -106,7 +108,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         height: 22,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Crear cuenta'),
+                    : Text(l10n.registerSubmit),
               ),
               const SizedBox(height: AppSpacing.lg),
               const AuthDivider(),
@@ -144,7 +146,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         );
                       },
-                child: const Text('¿Ya tienes cuenta? Iniciar sesión'),
+                child: Text(l10n.registerHaveAccount),
               ),
             ],
           ),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../auth/auth.dart';
+import '../../../l10n/l10n.dart';
 import 'forgot_password_screen.dart';
 import 'phone_auth_screen.dart';
 import 'register_screen.dart';
@@ -54,13 +55,14 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _sendMagicLink() async {
+    final l10n = context.l10n;
     final email = _email.text.trim();
     if (email.isEmpty || !email.contains('@')) {
       showAuthError(
         context,
-        const AuthException(
+        AuthException(
           code: 'invalid-email',
-          message: 'Ingresa un correo válido para el enlace mágico.',
+          message: l10n.loginMagicLinkInvalid,
         ),
       );
       return;
@@ -72,15 +74,16 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (!mounted) return;
       setState(() => _magicLinkSent = true);
-      showAppSuccess(context, 'Enlace enviado a $email');
+      showAppSuccess(context, l10n.loginMagicLinkSent(email));
     });
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AuthFlowScaffold(
-      title: 'Iniciar sesión',
-      subtitle: 'Accede a tu comunidad profesional de agentes.',
+      title: l10n.loginTitle,
+      subtitle: l10n.loginSubtitle,
       child: AutofillGroup(
         child: Form(
           key: _formKey,
@@ -92,10 +95,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 keyboardType: TextInputType.emailAddress,
                 textInputAction: TextInputAction.next,
                 autofillHints: const [AutofillHints.email],
-                decoration: const InputDecoration(labelText: 'Correo'),
+                decoration: InputDecoration(labelText: l10n.fieldEmail),
                 validator: (value) {
                   if (value == null || !value.contains('@')) {
-                    return 'Ingresa un correo válido.';
+                    return l10n.validationEmail;
                   }
                   return null;
                 },
@@ -120,7 +123,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           );
                         },
-                  child: const Text('¿Olvidaste tu contraseña?'),
+                  child: Text(l10n.loginForgotPassword),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
@@ -132,15 +135,15 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 22,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Entrar'),
+                    : Text(l10n.loginSubmit),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextButton(
                 onPressed: _busy ? null : _sendMagicLink,
                 child: Text(
                   _magicLinkSent
-                      ? 'Reenviar enlace mágico'
-                      : 'Entrar con enlace mágico',
+                      ? l10n.loginMagicLinkResend
+                      : l10n.loginMagicLink,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -179,7 +182,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         );
                       },
-                child: const Text('¿No tienes cuenta? Crear cuenta'),
+                child: Text(l10n.loginNoAccount),
               ),
             ],
           ),

@@ -9,6 +9,7 @@ import 'package:every_benefits/features/chats/chat_repository.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/forums/forums_screen.dart';
+import 'package:every_benefits/l10n/app_localizations.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_role.dart';
 
@@ -183,14 +184,23 @@ UserProfile _profile({required UserRole role, bool anonymous = false}) {
   );
 }
 
+Widget _wrap(Widget child) {
+  return MaterialApp(
+    theme: buildEveryInsuranceTheme(Brightness.dark),
+    locale: const Locale('en'),
+    localizationsDelegates: AppLocalizations.localizationsDelegates,
+    supportedLocales: AppLocalizations.supportedLocales,
+    home: child,
+  );
+}
+
 void main() {
   testWidgets('shows feed cards, composer and FAB for agents', (tester) async {
     final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
-        home: ForumsScreen(
+      _wrap(
+        ForumsScreen(
           profile: _profile(role: UserRole.agent),
           forumRepository: repo,
         ),
@@ -200,21 +210,20 @@ void main() {
     await tester.pump();
 
     expect(find.text('Bienvenidos a la comunidad'), findsOneWidget);
-    expect(find.textContaining('Haz una pregunta'), findsOneWidget);
-    expect(find.text('Relevancia'), findsWidgets);
+    expect(find.textContaining('Ask the community'), findsOneWidget);
+    expect(find.text('Relevance'), findsWidgets);
     expect(find.text('Chats'), findsWidgets);
     expect(find.byType(FloatingActionButton), findsOneWidget);
-    expect(find.byTooltip('Buscar preguntas'), findsOneWidget);
-    expect(find.text('Mías'), findsOneWidget);
+    expect(find.byTooltip('Search questions'), findsOneWidget);
+    expect(find.text('Mine'), findsOneWidget);
   });
 
   testWidgets('guest is read-only without composer or FAB', (tester) async {
     final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
-        home: ForumsScreen(
+      _wrap(
+        ForumsScreen(
           profile: _profile(role: UserRole.guest, anonymous: true),
           forumRepository: repo,
         ),
@@ -223,9 +232,9 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.textContaining('Haz una pregunta'), findsNothing);
+    expect(find.textContaining('Ask the community'), findsNothing);
     expect(find.byType(FloatingActionButton), findsNothing);
-    expect(find.textContaining('Modo lectura'), findsOneWidget);
+    expect(find.textContaining('Read-only'), findsOneWidget);
   });
 
   testWidgets('search filters previously asked questions', (tester) async {
@@ -241,9 +250,8 @@ void main() {
     );
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
-        home: ForumsScreen(
+      _wrap(
+        ForumsScreen(
           profile: _profile(role: UserRole.agent),
           forumRepository: repo,
         ),
@@ -252,23 +260,22 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(find.byTooltip('Buscar preguntas'));
+    await tester.tap(find.byTooltip('Search questions'));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, 'NPN');
     await tester.pumpAndSettle();
 
     expect(find.text('Cómo renovar NPN'), findsOneWidget);
     expect(find.text('Cierre de ventas'), findsNothing);
-    expect(find.textContaining('búsqueda en resultados cargados'), findsOneWidget);
+    expect(find.textContaining('search in loaded results'), findsOneWidget);
   });
 
   testWidgets('tapping post opens conversation detail', (tester) async {
     final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
-        home: ForumsScreen(
+      _wrap(
+        ForumsScreen(
           profile: _profile(role: UserRole.agent),
           forumRepository: repo,
         ),
@@ -284,8 +291,8 @@ void main() {
       find.text('Este es el primer hilo de prueba para agentes.'),
       findsOneWidget,
     );
-    expect(find.text('3 respuestas'), findsOneWidget);
-    expect(find.textContaining('Escribe una respuesta'), findsOneWidget);
+    expect(find.text('3 replies'), findsOneWidget);
+    expect(find.textContaining('Write a reply'), findsOneWidget);
     expect(find.text('Chats'), findsWidgets);
   });
 
@@ -312,9 +319,8 @@ void main() {
     final chats = ChatRepository(store: chatStore);
 
     await tester.pumpWidget(
-      MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
-        home: ForumsScreen(
+      _wrap(
+        ForumsScreen(
           profile: _profile(role: UserRole.agent),
           forumRepository: repo,
           chatRepository: chats,
@@ -327,9 +333,9 @@ void main() {
     await tester.tap(find.text('Chats').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('Compartir en chat'), findsOneWidget);
+    expect(find.text('Share to chat'), findsOneWidget);
     expect(find.text('Equipo Ventas CR'), findsOneWidget);
-    expect(find.textContaining('Chat privado'), findsWidgets);
+    expect(find.textContaining('Private chat'), findsWidgets);
     expect(find.text('Bienvenidos a la comunidad'), findsWidgets);
 
     chatStore.dispose();

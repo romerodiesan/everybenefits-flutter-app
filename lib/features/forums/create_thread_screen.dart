@@ -4,6 +4,7 @@ import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import 'forum_models.dart';
 import 'forum_repository.dart';
@@ -61,7 +62,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
     }
     if (_tags.length >= 5) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Máximo 5 tags por hilo.')),
+        SnackBar(content: Text(context.l10n.createMaxTags)),
       );
       return;
     }
@@ -83,7 +84,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
     if (!_formKey.currentState!.validate()) return;
     if (_tags.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Agrega al menos un tag.')),
+        SnackBar(content: Text(context.l10n.createNeedTag)),
       );
       return;
     }
@@ -109,7 +110,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
     } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyForumError(error))),
+        SnackBar(content: Text(friendlyForumError(error, context.l10n))),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -142,9 +143,10 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return PulseScaffold(
-      appBar: AppBar(title: const Text('Nueva publicación')),
+      appBar: AppBar(title: Text(l10n.createThreadTitle)),
       body: SafeArea(
         child: Form(
           key: _formKey,
@@ -162,12 +164,12 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                   textInputAction: TextInputAction.next,
                   decoration: _decoration(
                     context,
-                    label: 'Pregunta',
-                    hint: '¿Qué necesitas resolver?',
+                    label: l10n.createFieldQuestion,
+                    hint: l10n.createQuestionHint,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().length < 4) {
-                      return 'Escribe un título más descriptivo.';
+                      return l10n.validationTitleShort;
                     }
                     return null;
                   },
@@ -180,22 +182,22 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                   maxLines: 14,
                   decoration: _decoration(
                     context,
-                    label: 'Contexto',
-                    hint: 'Detalles, lo que ya intentaste, y el resultado esperado…',
+                    label: l10n.createFieldContext,
+                    hint: l10n.createContextHint,
                     alignHint: true,
                   ),
                   validator: (value) {
                     if (value == null || value.trim().length < 8) {
-                      return 'Añade un poco más de contexto.';
+                      return l10n.validationBodyShort;
                     }
                     return null;
                   },
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                Text('Temas', style: theme.textTheme.titleMedium),
+                Text(l10n.createTopics, style: theme.textTheme.titleMedium),
                 const SizedBox(height: 4),
                 Text(
-                  'Hasta 5 etiquetas para que otros encuentren tu pregunta.',
+                  l10n.createTopicsHelp,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colors.muted,
                   ),
@@ -210,15 +212,15 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                         onSubmitted: (_) => _addTag(),
                         decoration: _decoration(
                           context,
-                          label: 'Etiqueta',
-                          hint: 'ej. npn',
+                          label: l10n.fieldTag,
+                          hint: l10n.fieldTagHint,
                         ),
                       ),
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     TextButton(
                       onPressed: _addTag,
-                      child: const Text('Agregar'),
+                      child: Text(l10n.actionAdd),
                     ),
                   ],
                 ),
@@ -231,7 +233,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                 ],
                 const SizedBox(height: AppSpacing.md),
                 Text(
-                  'Temas frecuentes',
+                  l10n.createFrequentTopics,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: colors.muted,
                     fontWeight: FontWeight.w600,
@@ -268,7 +270,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
                           height: 22,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Text('Publicar'),
+                      : Text(l10n.actionPublish),
                 ),
               ],
             ),

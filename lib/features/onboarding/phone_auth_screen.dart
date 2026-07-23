@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../auth/auth.dart';
+import '../../../l10n/l10n.dart';
 import 'widgets/auth_form_widgets.dart';
 
 class PhoneAuthScreen extends StatefulWidget {
@@ -60,7 +61,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
             _codeSent = true;
             _busy = false;
           });
-          showAppSuccess(context, 'Código SMS enviado');
+          showAppSuccess(context, context.l10n.phoneSmsSent);
         },
         onCodeAutoRetrievalTimeout: (verificationId) {
           _verificationId = verificationId;
@@ -79,9 +80,9 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
     if (_code.text.trim().length < 6) {
       showAuthError(
         context,
-        const AuthException(
+        AuthException(
           code: 'invalid-verification-code',
-          message: 'Ingresa el código de 6 dígitos.',
+          message: context.l10n.validationSmsCode,
         ),
       );
       return;
@@ -103,11 +104,12 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AuthFlowScaffold(
-      title: _codeSent ? 'Código SMS' : 'Teléfono',
+      title: _codeSent ? l10n.phoneCodeTitle : l10n.phoneTitle,
       subtitle: _codeSent
-          ? 'Escribe el código que enviamos a ${_phone.text.trim()}.'
-          : 'Usa formato internacional, por ejemplo +50688887777.',
+          ? l10n.phoneSubtitleCode(_phone.text.trim())
+          : l10n.validationPhoneCountry,
       child: Form(
         key: _formKey,
         child: Column(
@@ -122,14 +124,14 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                 inputFormatters: [
                   FilteringTextInputFormatter.allow(RegExp(r'[0-9+]')),
                 ],
-                decoration: const InputDecoration(
-                  labelText: 'Número de teléfono',
+                decoration: InputDecoration(
+                  labelText: l10n.fieldPhoneNumber,
                   hintText: '+506…',
                 ),
                 validator: (value) {
                   final phone = value?.trim() ?? '';
                   if (!phone.startsWith('+') || phone.length < 10) {
-                    return 'Incluye el código de país (+…)';
+                    return l10n.validationPhoneCountry;
                   }
                   return null;
                 },
@@ -144,7 +146,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                         height: 22,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Enviar código'),
+                    : Text(l10n.phoneSendCode),
               ),
             ] else ...[
               TextFormField(
@@ -153,8 +155,8 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                 textInputAction: TextInputAction.done,
                 maxLength: 6,
                 inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: const InputDecoration(
-                  labelText: 'Código de verificación',
+                decoration: InputDecoration(
+                  labelText: l10n.fieldVerificationCode,
                   counterText: '',
                 ),
                 onFieldSubmitted: (_) => _verifyCode(),
@@ -168,7 +170,7 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                         height: 22,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('Verificar y entrar'),
+                    : Text(l10n.phoneVerifyEnter),
               ),
               const SizedBox(height: AppSpacing.sm),
               TextButton(
@@ -180,11 +182,11 @@ class _PhoneAuthScreenState extends State<PhoneAuthScreen> {
                           _code.clear();
                         });
                       },
-                child: const Text('Cambiar número'),
+                child: Text(l10n.phoneChangeNumber),
               ),
               TextButton(
                 onPressed: _busy ? null : _sendCode,
-                child: const Text('Reenviar código'),
+                child: Text(l10n.phoneResendCode),
               ),
             ],
           ],

@@ -7,6 +7,7 @@ import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
+import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_repository.dart';
 import 'chat_conversation_screen.dart';
@@ -77,6 +78,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _syncListen(TickerMode.valuesOf(context).enabled);
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
     final profile = widget.profile;
     final canChat = canParticipateInChats(
       role: profile.role,
@@ -86,7 +88,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
     return PulseScaffold(
       appBar: AppBar(
         title: Text(
-          'Chats',
+          l10n.chatsTitle,
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
         ),
       ),
@@ -102,7 +104,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   userRepository: widget.userRepository ?? UserRepository(),
                 );
               },
-              tooltip: 'Nuevo chat',
+              tooltip: l10n.fabNewChat,
               child: const Icon(Icons.chat_rounded),
             )
           : null,
@@ -111,7 +113,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Text(
-                  'Regístrate con una cuenta para enviar y recibir mensajes.',
+                  l10n.chatsGuestPrompt,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: colors.muted,
@@ -131,7 +133,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.xl),
                       child: Text(
-                        friendlyChatError(snapshot.error!),
+                        friendlyChatError(snapshot.error!, l10n),
                         textAlign: TextAlign.center,
                         style: theme.textTheme.bodyLarge?.copyWith(
                           color: colors.muted,
@@ -152,14 +154,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              'Aún no tienes chats',
+                              l10n.chatsEmptyTitle,
                               style: theme.textTheme.titleLarge?.copyWith(
                                 fontWeight: FontWeight.w800,
                               ),
                             ),
                             const SizedBox(height: 8),
                             Text(
-                              'Toca + para escribirle a un compañero.',
+                              l10n.chatsEmptySubtitle,
                               textAlign: TextAlign.center,
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: colors.muted,
@@ -187,6 +189,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                       itemBuilder: (context, index) {
                         return _inboxItem(
                           context,
+                          l10n,
                           index: index,
                           pinned: pinned,
                           rest: rest,
@@ -213,7 +216,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   Widget _inboxItem(
-    BuildContext context, {
+    BuildContext context,
+    AppLocalizations l10n, {
     required int index,
     required List<ChatConversation> pinned,
     required List<ChatConversation> rest,
@@ -238,9 +242,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
     }
 
     if (index == 0) {
-      return const Padding(
-        padding: EdgeInsets.only(bottom: 8),
-        child: _SectionLabel(label: 'Fijados'),
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: _SectionLabel(label: l10n.chatsSectionPinned),
       );
     }
     if (index <= pinned.length) {
@@ -261,9 +265,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
       );
     }
     if (index == pinned.length + 1) {
-      return const Padding(
-        padding: EdgeInsets.only(top: 8, bottom: 8),
-        child: _SectionLabel(label: 'Recientes'),
+      return Padding(
+        padding: const EdgeInsets.only(top: 8, bottom: 8),
+        child: _SectionLabel(label: l10n.chatsSectionRecent),
       );
     }
     final chat = rest[index - pinned.length - 2];
@@ -353,11 +357,12 @@ class _ChatRow extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
+    final l10n = context.l10n;
     final unread = chat.unreadFor(viewerUid);
     final hasUnread = unread > 0;
     final title = chat.titleFor(viewerUid);
     final preview = chat.lastMessage.isEmpty
-        ? 'Sin mensajes todavía'
+        ? l10n.chatsNoMessagesYet
         : chat.lastMessage;
 
     return Material(
@@ -408,7 +413,7 @@ class _ChatRow extends StatelessWidget {
                         ),
                         const SizedBox(width: 8),
                         Text(
-                          formatChatTime(chat.lastMessageAt),
+                          formatChatTime(chat.lastMessageAt, l10n),
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: hasUnread ? brand : colors.muted,
                             fontSize: 11.5,

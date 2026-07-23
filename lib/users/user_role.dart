@@ -1,3 +1,5 @@
+import '../l10n/app_localizations.dart';
+
 enum UserRole {
   guest,
   student,
@@ -7,12 +9,12 @@ enum UserRole {
 
   String get wireValue => name;
 
-  String get label => switch (this) {
-        UserRole.guest => 'Invitado',
-        UserRole.student => 'Estudiante',
-        UserRole.agent => 'Agente',
-        UserRole.instructor => 'Instructor',
-        UserRole.admin => 'Admin',
+  String label(AppLocalizations l10n) => switch (this) {
+        UserRole.guest => l10n.roleGuest,
+        UserRole.student => l10n.roleStudent,
+        UserRole.agent => l10n.roleAgent,
+        UserRole.instructor => l10n.roleInstructor,
+        UserRole.admin => l10n.roleAdmin,
       };
 
   /// Unknown / missing values fail closed as [guest] (no elevated privileges).

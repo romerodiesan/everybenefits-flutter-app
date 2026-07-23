@@ -1,0 +1,516 @@
+{
+  "@@locale": "es",
+  "appTitle": "Every Insurance",
+  "navHome": "Inicio",
+  "navChats": "Chats",
+  "navAi": "IA",
+  "navAcademy": "Academia",
+  "navProfile": "Perfil",
+  "fabNewQuestion": "Nueva pregunta",
+  "fabNewChat": "Nuevo chat",
+  "fabNewConversation": "Nueva conversación",
+  "fabSearchCourses": "Buscar cursos",
+  "fabEditProfile": "Editar perfil",
+  "fabSupport": "Soporte",
+  "supportSheetTitle": "Soporte",
+  "supportSheetBody": "¿Necesitas ayuda con tu cuenta o la app? Contáctanos y te responderemos.",
+  "supportSheetEmail": "support@everybenefits.com",
+  "supportSheetClose": "Cerrar",
+  "editProfileNameFrozen": "Tu nombre queda bloqueado tras el alta.",
+  "editProfileNpnFrozen": "Tu NPN queda bloqueado tras el alta.",
+  "roleGuest": "Invitado",
+  "roleStudent": "Estudiante",
+  "roleAgent": "Agente",
+  "roleInstructor": "Instructor",
+  "roleAdmin": "Admin",
+  "you": "Tú",
+  "welcomeTagline": "El pulso de tu comunidad profesional.",
+  "welcomeEnter": "Entrar",
+  "welcomeGuest": "Soy invitado",
+  "welcomeCreateAccount": "Crear cuenta",
+  "welcomePhone": "Teléfono",
+  "loginTitle": "Iniciar sesión",
+  "loginSubtitle": "Accede a tu comunidad profesional de agentes.",
+  "fieldEmail": "Correo",
+  "validationEmail": "Ingresa un correo válido.",
+  "fieldPassword": "Contraseña",
+  "loginForgotPassword": "¿Olvidaste tu contraseña?",
+  "loginSubmit": "Entrar",
+  "loginMagicLink": "Entrar con enlace mágico",
+  "loginMagicLinkResend": "Reenviar enlace mágico",
+  "loginMagicLinkInvalid": "Ingresa un correo válido para el enlace mágico.",
+  "loginMagicLinkSent": "Enlace enviado a {email}",
+  "@loginMagicLinkSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "loginNoAccount": "¿No tienes cuenta? Crear cuenta",
+  "authDividerContinueWith": "o continúa con",
+  "authContinueGoogle": "Continuar con Google",
+  "authContinuePhone": "Continuar con teléfono",
+  "registerTitle": "Crear cuenta",
+  "registerSubtitle": "Únete como agente y desbloquea la comunidad completa.",
+  "fieldConfirmPassword": "Confirmar contraseña",
+  "validationPasswordsMismatch": "Las contraseñas no coinciden.",
+  "validationPasswordMin": "Mínimo 6 caracteres.",
+  "registerSubmit": "Crear cuenta",
+  "registerHaveAccount": "¿Ya tienes cuenta? Iniciar sesión",
+  "forgotTitle": "Recuperar acceso",
+  "forgotSubtitle": "Te enviaremos un enlace para restablecer tu contraseña.",
+  "forgotSubtitleSent": "Revisa tu correo y sigue el enlace para crear una nueva contraseña.",
+  "forgotSendLink": "Enviar enlace",
+  "forgotResendLink": "Reenviar enlace",
+  "forgotLinkSent": "Enviamos un enlace a {email}",
+  "@forgotLinkSent": {
+    "placeholders": {
+      "email": {
+        "type": "String"
+      }
+    }
+  },
+  "phoneTitle": "Teléfono",
+  "phoneCodeTitle": "Código SMS",
+  "phoneSubtitleCode": "Escribe el código que enviamos a {phone}.",
+  "@phoneSubtitleCode": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "fieldPhoneNumber": "Número de teléfono",
+  "validationPhoneCountry": "Incluye el código de país (+…)",
+  "phoneSendCode": "Enviar código",
+  "fieldVerificationCode": "Código de verificación",
+  "phoneVerifyEnter": "Verificar y entrar",
+  "phoneChangeNumber": "Cambiar número",
+  "phoneResendCode": "Reenviar código",
+  "phoneSmsSent": "Código SMS enviado",
+  "validationSmsCode": "Ingresa el código de 6 dígitos.",
+  "authErrInvalidEmail": "El correo no es válido.",
+  "authErrUserDisabled": "Esta cuenta está deshabilitada.",
+  "authErrUserNotFound": "No encontramos una cuenta con ese correo.",
+  "authErrWrongPassword": "Correo o contraseña incorrectos.",
+  "authErrEmailInUse": "Ya existe una cuenta con ese correo.",
+  "authErrWeakPassword": "La contraseña es demasiado débil (mín. 6 caracteres).",
+  "authErrTooManyRequests": "Demasiados intentos. Espera un momento e inténtalo de nuevo.",
+  "authErrNetwork": "Sin conexión. Revisa tu red e inténtalo de nuevo.",
+  "authErrEmulatorUnreachable": "No se pudo conectar con Firebase. ¿Están corriendo los emuladores locales?",
+  "authErrPermission": "No tienes permiso para esta acción (revisa reglas o sesión en el emulador).",
+  "authErrInvalidPhone": "Número de teléfono inválido. Usa formato internacional (+506…).",
+  "authErrInvalidSms": "El código SMS no es válido.",
+  "authErrSmsExpired": "El código expiró. Solicita uno nuevo.",
+  "authErrOpNotAllowed": "Este método de acceso no está habilitado.",
+  "authErrUnknown": "No se pudo completar la autenticación ({code}).",
+  "@authErrUnknown": {
+    "placeholders": {
+      "code": {
+        "type": "String"
+      }
+    }
+  },
+  "profileCompleteRoleTitle": "Tu rol",
+  "profileCompleteDataTitle": "Tus datos",
+  "profileCompleteSignOut": "Salir",
+  "profileCompleteHeadline": "¿Cómo late\ntu Pulse?",
+  "profileCompleteSubtitle": "Elige cómo participas. Puedes cambiarlo después.",
+  "profileCompleteAgentTitle": "Soy agente",
+  "profileCompleteAgentSubtitle": "NPN, agencia y comunidad profesional",
+  "profileCompleteStudentTitle": "Soy estudiante",
+  "profileCompleteStudentSubtitle": "Campus, práctica y networking",
+  "actionContinue": "Continuar",
+  "profileCompleteChangeRole": "← Cambiar rol",
+  "profileCompleteTellMore": "Cuéntanos un poco más",
+  "profileCompleteFinish": "Finalizar",
+  "profileSaveFailed": "No se pudo guardar el perfil.",
+  "fieldFullName": "Nombre completo",
+  "validationName": "Ingresa tu nombre.",
+  "countryCodePickerTitle": "País / código",
+  "fieldPhone": "Teléfono",
+  "validationPhone": "Número inválido.",
+  "fieldNpn": "NPN",
+  "fieldNpnHint": "National Producer Number",
+  "validationNpn": "Ingresa un NPN válido.",
+  "fieldAddress": "Dirección",
+  "validationAddress": "Ingresa tu dirección.",
+  "fieldAgency": "Agencia",
+  "fieldAgencyHelper": "Por defecto: Every Benefits",
+  "validationAgency": "Ingresa la agencia.",
+  "editProfileTitle": "Editar perfil",
+  "editProfileAccountType": "Tipo de cuenta",
+  "editProfileAgentSubtitle": "NPN, dirección y agencia",
+  "editProfileStudentSubtitle": "Nombre y teléfono",
+  "editProfileSave": "Guardar cambios",
+  "editProfileUpdateFailed": "No se pudo actualizar: {error}",
+  "@editProfileUpdateFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "profileTitle": "Perfil",
+  "profileSettingsTooltip": "Ajustes",
+  "profileBioGuest": "Invitado en Every Insurance. Únete para publicar.",
+  "profileBioMember": "Comunidad · Academia · Chats",
+  "profileAddPhoto": "Agregar foto de perfil",
+  "profilePickGallery": "Elegir de la galería",
+  "profileTakePhoto": "Tomar foto",
+  "profilePickImageFailed": "No se pudo elegir imagen: {error}",
+  "@profilePickImageFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "profileUploadFailed": "No se pudo subir la foto: {error}",
+  "@profileUploadFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsTitle": "Ajustes",
+  "settingsYourInfo": "Tu información",
+  "settingsLabelName": "Nombre",
+  "settingsLabelEmail": "Email",
+  "settingsNoEmail": "Sin email vinculado",
+  "settingsTheme": "Tema",
+  "themeModeAuto": "Auto",
+  "themeModeLight": "Claro",
+  "themeModeDark": "Oscuro",
+  "settingsLanguage": "Idioma",
+  "settingsLanguageSystem": "Sistema",
+  "settingsLanguageEnglish": "English",
+  "settingsLanguageSpanish": "Español",
+  "settingsAccentColor": "Color de acento",
+  "settingsAccentHint": "Se aplica a botones, tabs y acentos de la app.",
+  "settingsSignOut": "Cerrar sesión",
+  "seedGreen": "Verde",
+  "seedAmber": "Ámbar",
+  "seedTeal": "Teal",
+  "seedBlue": "Azul",
+  "seedViolet": "Violeta",
+  "seedRose": "Rosa",
+  "forumsTitle": "Inicio",
+  "forumsSearchHint": "Buscar preguntas…",
+  "forumsSearchOpen": "Buscar preguntas",
+  "forumsSearchClose": "Cerrar búsqueda",
+  "forumsSortTooltip": "Ordenar",
+  "forumsSortRecent": "Más recientes",
+  "forumsSortRelevant": "Más relevantes",
+  "forumsFilterMine": "Mías",
+  "forumsFilterRelevant": "Relevantes",
+  "forumsFilterRecent": "Recientes",
+  "forumsClearFilters": "Limpiar",
+  "forumsReadOnlyBanner": "Modo lectura — regístrate para publicar.",
+  "forumsFilterYourQuestions": "Tus preguntas",
+  "forumsFilterSearchLoaded": "búsqueda en resultados cargados",
+  "forumsLoadErrorTitle": "No se pudo cargar",
+  "actionRetry": "Reintentar",
+  "forumsEmptyMineTitle": "Aún no has preguntado",
+  "forumsEmptyFeedTitle": "El feed está en calma",
+  "forumsEmptyMineSubtitle": "Publica tu primera pregunta para verla aquí.",
+  "forumsEmptyFeedSubtitle": "Sé el primero en publicar una pregunta.",
+  "forumsNoMatchesTitle": "Sin coincidencias",
+  "forumsNoMatchesQuery": "No hay preguntas para “{query}”.",
+  "@forumsNoMatchesQuery": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "forumsNoMatchesFilter": "Prueba otro filtro o tag.",
+  "forumsLoadMore": "Cargar más",
+  "composerAskCommunity": "Haz una pregunta a la comunidad",
+  "composerAskHint": "NPN, productos, ventas… alguien ya pudo resolverlo.",
+  "createThreadTitle": "Nueva publicación",
+  "createFieldQuestion": "Pregunta",
+  "createQuestionHint": "¿Qué necesitas resolver?",
+  "validationTitleShort": "Escribe un título más descriptivo.",
+  "createFieldContext": "Contexto",
+  "createContextHint": "Detalles, lo que ya intentaste, y el resultado esperado…",
+  "validationBodyShort": "Añade un poco más de contexto.",
+  "createTopics": "Temas",
+  "createTopicsHelp": "Hasta 5 etiquetas para que otros encuentren tu pregunta.",
+  "fieldTag": "Etiqueta",
+  "fieldTagHint": "ej. npn",
+  "actionAdd": "Agregar",
+  "createFrequentTopics": "Temas frecuentes",
+  "actionPublish": "Publicar",
+  "createMaxTags": "Máximo 5 tags por hilo.",
+  "createNeedTag": "Agrega al menos un tag.",
+  "actionReply": "Responder",
+  "actionShareChats": "Chats",
+  "replyCountOne": "1 respuesta",
+  "replyCountOther": "{count} respuestas",
+  "@replyCountOther": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "relevanceLabel": "Relevancia",
+  "relevanceScoreShort": "{score} relev.",
+  "@relevanceScoreShort": {
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "relevanceUpTooltip": "Más relevante",
+  "relevanceDownTooltip": "Menos relevante",
+  "threadFallbackTitle": "Pregunta",
+  "threadShareTooltip": "Compartir en chat",
+  "threadNotFoundTitle": "Pregunta no encontrada",
+  "threadNotFoundSubtitle": "Puede haber sido eliminada.",
+  "threadSortedByRelevance": "Ordenadas por relevancia",
+  "threadFirstToReply": "Sé el primero en responder.",
+  "actionOptions": "Opciones",
+  "actionEdit": "Editar",
+  "actionDelete": "Eliminar",
+  "actionCancel": "Cancelar",
+  "actionSave": "Guardar",
+  "deleteThreadTitle": "Eliminar pregunta",
+  "deleteReplyTitle": "Eliminar respuesta",
+  "deleteIrreversible": "Esta acción no se puede deshacer.",
+  "acceptedBadge": "Aceptada",
+  "actionAccept": "Aceptar",
+  "actionUnaccept": "Quitar aceptación",
+  "editThreadTitle": "Editar pregunta",
+  "fieldTitle": "Título",
+  "fieldContent": "Contenido",
+  "fieldAddTag": "Agregar tag",
+  "editReplyTitle": "Editar respuesta",
+  "fieldReply": "Respuesta",
+  "replyHint": "Escribe una respuesta…",
+  "replyRegisterPrompt": "Regístrate para responder en la comunidad.",
+  "shareToChatTitle": "Compartir en chat",
+  "shareToChatSubtitle": "Se envía como tarjeta. Al tocarla, abren la pregunta.",
+  "shareNoChats": "Aún no tienes chats. Abre Chats y escribe a alguien primero.",
+  "sharedPostLabel": "Pregunta",
+  "sharedPostLabelAuthor": "Pregunta · {name}",
+  "@sharedPostLabelAuthor": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "timeNow": "ahora",
+  "timeMinutesOne": "hace 1 min",
+  "timeMinutesOther": "hace {count} min",
+  "@timeMinutesOther": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeHoursOne": "hace 1 h",
+  "timeHoursOther": "hace {count} h",
+  "@timeHoursOther": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "timeYesterday": "ayer",
+  "timeDays": "hace {count} d",
+  "@timeDays": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "errNoPermission": "No tienes permiso para esta acción.",
+  "errGenericRetry": "Algo salió mal. Intenta de nuevo.",
+  "errForumNoPostPermission": "No tienes permiso para publicar en la comunidad.",
+  "errForumTitleBodyRequired": "Título y contenido son obligatorios.",
+  "errForumNeedTag": "Agrega al menos un tag.",
+  "errForumCantEditQuestion": "No puedes editar esta pregunta.",
+  "errForumNoReplyPermission": "No tienes permiso para responder.",
+  "errForumEmptyReply": "La respuesta no puede estar vacía.",
+  "errForumCantEditReply": "No puedes editar esta respuesta.",
+  "errForumCantDeleteQuestion": "No puedes eliminar esta pregunta.",
+  "errForumCantDeleteReply": "No puedes eliminar esta respuesta.",
+  "errForumOnlyAuthorAccept": "Solo el autor de la pregunta puede aceptar respuestas.",
+  "errForumReplyNotOnThread": "La respuesta no pertenece a esta pregunta.",
+  "errForumRegisterToVote": "Regístrate para marcar relevancia.",
+  "errForumCantVoteOwnQuestion": "No puedes votar tu propia pregunta.",
+  "errForumCantVoteOwnReply": "No puedes votar tu propia respuesta.",
+  "errChatCantChatSelf": "No puedes chatear contigo mismo.",
+  "errChatEmptyMessage": "Escribe un mensaje.",
+  "errChatInvalidShare": "La pregunta a compartir no es válida.",
+  "errChatNotMember": "No eres miembro de este chat.",
+  "errChatGone": "Este chat ya no existe.",
+  "errChatRegister": "Regístrate con una cuenta para usar los chats.",
+  "chatsTitle": "Chats",
+  "chatsGuestPrompt": "Regístrate con una cuenta para enviar y recibir mensajes.",
+  "chatsEmptyTitle": "Aún no tienes chats",
+  "chatsEmptySubtitle": "Toca + para escribirle a un compañero.",
+  "chatsSectionPinned": "Fijados",
+  "chatsSectionRecent": "Recientes",
+  "chatsNoMessagesYet": "Sin mensajes todavía",
+  "chatTypeGroup": "Grupo",
+  "chatTypePrivate": "Chat privado",
+  "newChatTitle": "Nuevo chat",
+  "newChatEmpty": "No hay otros usuarios todavía. Cuando alguien se registre, aparecerá aquí.",
+  "newChatContactsHeader": "CONTACTOS",
+  "chatEmptyThread": "Di el primero. Los mensajes se sincronizan en vivo.",
+  "chatMessageHint": "Escribe un mensaje…",
+  "chatInfoTitle": "Info",
+  "chatPin": "Fijar chat",
+  "chatUnpin": "Quitar de fijados",
+  "chatTimeYesterday": "Ayer",
+  "weekdayMon": "Lun",
+  "weekdayTue": "Mar",
+  "weekdayWed": "Mié",
+  "weekdayThu": "Jue",
+  "weekdayFri": "Vie",
+  "weekdaySat": "Sáb",
+  "weekdaySun": "Dom",
+  "aiNewConversation": "Nueva conversación",
+  "aiDemoReply": "Respuesta demo. Cuando conectemos Gemini, verás ayuda real aquí.",
+  "aiHistoryTooltip": "Historial",
+  "aiNewTooltip": "Nueva",
+  "aiThinking": "Pensando…",
+  "aiInputHint": "Pregunta lo que sea",
+  "aiEmptyPrompt": "¿En qué puedo ayudarte?",
+  "aiSettings": "Ajustes",
+  "aiSettingsTitle": "Ajustes de IA",
+  "aiModelSection": "Modelo",
+  "aiModelSubtitle": "Próximamente vía Firebase AI Logic",
+  "academyTitle": "Academia",
+  "actionSearch": "Buscar",
+  "academyMyLearning": "Mi aprendizaje",
+  "academyPaths": "Rutas",
+  "academyCourses": "Cursos",
+  "academyCatalogDemo": "Catálogo demo — cursos reales próximamente.",
+  "searchCoursesHint": "Buscar cursos…",
+  "myLearningInProgress": "En progreso",
+  "myLearningEmpty": "Aún no tienes cursos en progreso.",
+  "courseDetailTitle": "Curso",
+  "courseByTeacher": "Por {name}",
+  "@courseByTeacher": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "courseStudents": "{count} estudiantes",
+  "@courseStudents": {
+    "placeholders": {
+      "count": {
+        "type": "String"
+      }
+    }
+  },
+  "courseStart": "Empezar curso",
+  "courseContinue": "Continuar",
+  "courseAbout": "Sobre este curso",
+  "courseAboutDemo": "Contenido demo. Los módulos reales llegarán cuando conectemos el LMS.",
+  "courseModule": "Módulo {index}",
+  "@courseModule": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "courseLessonsCount": "4 clases",
+  "playerVideoSoon": "Video próximamente",
+  "playerVideoSoonBody": "Aquí irá el reproductor cuando haya contenido.",
+  "playerClasses": "Clases",
+  "playerClass": "Clase {index}",
+  "@playerClass": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      }
+    }
+  },
+  "levelBasic": "Básico",
+  "levelIntermediate": "Intermedio",
+  "levelAdvanced": "Avanzado",
+  "pathNewAgent": "Agente nuevo",
+  "pathClosing": "Cierre de ventas",
+  "pathLeadership": "Liderazgo de agencia",
+  "pathMetaCoursesHours": "{courses} cursos · {hours}h",
+  "@pathMetaCoursesHours": {
+    "placeholders": {
+      "courses": {
+        "type": "int"
+      },
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "profileBootstrapFailed": "No se pudo cargar el perfil:\n{error}",
+  "@profileBootstrapFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "profileBootstrapBack": "Volver al inicio",
+  "profilePulseEyebrow": "Tu Pulse",
+  "profileChangePhoto": "Cambiar foto",
+  "profileTapToAddPhoto": "Toca para agregar una foto",
+  "profileQuickEdit": "Editar",
+  "profileQuickSettings": "Ajustes",
+  "profileDetailAgency": "Agencia",
+  "profileDetailNpn": "NPN",
+  "profileDetailPhone": "Teléfono",
+  "profileDetailEmail": "Correo",
+  "profileDetailAddress": "Dirección",
+  "profileDossierEyebrow": "Expediente",
+  "profileRoleLockedHint": "Tu tipo de cuenta queda fijo tras el alta. Contacta a un admin para ser agente.",
+  "fieldAddressStreet": "Calle y número",
+  "fieldAddressApt": "Apto / Suite",
+  "fieldAddressCity": "Ciudad",
+  "fieldAddressState": "Estado",
+  "fieldAddressZip": "ZIP",
+  "validationAddressStreet": "Ingresa la calle y número.",
+  "validationAddressCity": "Ingresa la ciudad.",
+  "validationAddressState": "Usa el código de estado de 2 letras.",
+  "validationAddressZip": "Ingresa un ZIP válido.",
+  "editProfileRoleSection": "Tipo de cuenta",
+  "editProfileBasicsSection": "Datos básicos",
+  "editProfileCredentialsSection": "Licencia y ubicación",
+  "editProfileRoleFrozen": "Elegido al registrarte — solo un admin puede cambiarlo.",
+  "settingsAdmin": "Admin",
+  "settingsAdminHint": "Promueve estudiantes a agentes.",
+  "settingsAdminPromote": "Promover a agente",
+  "settingsAdminEmpty": "No hay estudiantes para promover.",
+  "settingsAdminPromoteOk": "Promovido a agente.",
+  "settingsAdminPromoteFailed": "No se pudo promover: {error}",
+  "@settingsAdminPromoteFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "settingsAppearance": "Apariencia",
+  "settingsPreferences": "Preferencias",
+  "settingsAccount": "Cuenta",
+  "settingsThemeHint": "Sigue el sistema o fija claro / oscuro.",
+  "settingsLanguageHint": "Idioma de la interfaz de Every Insurance.",
+  "settingsAccentStudio": "Señal de marca",
+  "settingsEditAccount": "Editar datos de la cuenta",
+  "settingsSignOutHint": "Necesitarás iniciar sesión de nuevo para volver."
+}

@@ -1,8 +1,11 @@
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:every_benefits/l10n/app_localizations_en.dart';
 import 'package:every_benefits/users/user_role.dart';
 
 void main() {
+  final l10n = AppLocalizationsEn();
+
   group('UserRole', () {
     test('parses known values', () {
       expect(UserRole.parse('guest'), UserRole.guest);
@@ -26,11 +29,11 @@ void main() {
     });
 
     test('label is human readable', () {
-      expect(UserRole.guest.label, 'Invitado');
-      expect(UserRole.student.label, 'Estudiante');
-      expect(UserRole.agent.label, 'Agente');
-      expect(UserRole.instructor.label, 'Instructor');
-      expect(UserRole.admin.label, 'Admin');
+      expect(UserRole.guest.label(l10n), 'Guest');
+      expect(UserRole.student.label(l10n), 'Student');
+      expect(UserRole.agent.label(l10n), 'Agent');
+      expect(UserRole.instructor.label(l10n), 'Instructor');
+      expect(UserRole.admin.label(l10n), 'Admin');
     });
   });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
+import '../../../l10n/l10n.dart';
 import '../forum_models.dart';
 
 /// Stack Overflow–style relevance: up / score / down.
@@ -26,6 +27,7 @@ class RelevanceControls extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
+    final l10n = context.l10n;
     final iconSize = compact ? 20.0 : 24.0;
     final scoreStyle = Theme.of(context).textTheme.labelLarge?.copyWith(
           fontWeight: FontWeight.w800,
@@ -37,7 +39,7 @@ class RelevanceControls extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          tooltip: 'Más relevante',
+          tooltip: l10n.relevanceUpTooltip,
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: BoxConstraints.tightFor(
@@ -55,7 +57,7 @@ class RelevanceControls extends StatelessWidget {
         ),
         Text('$score', style: scoreStyle),
         IconButton(
-          tooltip: 'Menos relevante',
+          tooltip: l10n.relevanceDownTooltip,
           visualDensity: VisualDensity.compact,
           padding: EdgeInsets.zero,
           constraints: BoxConstraints.tightFor(
@@ -91,6 +93,7 @@ class RelevanceScoreChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
+    final l10n = context.l10n;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(8),
@@ -103,7 +106,7 @@ class RelevanceScoreChip extends StatelessWidget {
             const SizedBox(width: 4),
             Flexible(
               child: Text(
-                score == 0 ? 'Relevancia' : '$score relev.',
+                score == 0 ? l10n.relevanceLabel : l10n.relevanceScoreShort(score),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(

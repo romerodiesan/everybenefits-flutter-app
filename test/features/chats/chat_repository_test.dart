@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:every_benefits/features/chats/chat_models.dart';
 import 'package:every_benefits/features/chats/chat_repository.dart';
+import 'package:every_benefits/l10n/app_localizations_en.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_role.dart';
 
@@ -165,14 +166,15 @@ void main() {
 
   group('formatChatTime', () {
     test('formats today as time and older as weekday-ish labels', () {
+      final l10n = AppLocalizationsEn();
       final now = DateTime(2024, 6, 12, 15, 30);
       expect(
-        formatChatTime(DateTime(2024, 6, 12, 9, 5), now: now),
+        formatChatTime(DateTime(2024, 6, 12, 9, 5), l10n, now: now),
         '09:05',
       );
       expect(
-        formatChatTime(DateTime(2024, 6, 11, 9, 5), now: now),
-        'Ayer',
+        formatChatTime(DateTime(2024, 6, 11, 9, 5), l10n, now: now),
+        'Yesterday',
       );
     });
   });

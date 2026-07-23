@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../auth/auth.dart';
+import '../../../l10n/l10n.dart';
 import 'widgets/auth_form_widgets.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
@@ -40,7 +41,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       setState(() => _sent = true);
       showAppSuccess(
         context,
-        'Enviamos un enlace a ${_email.text.trim()}',
+        context.l10n.forgotLinkSent(_email.text.trim()),
       );
     } catch (error, stackTrace) {
       if (!mounted) return;
@@ -52,11 +53,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return AuthFlowScaffold(
-      title: 'Recuperar acceso',
-      subtitle: _sent
-          ? 'Revisa tu correo y sigue el enlace para crear una nueva contraseña.'
-          : 'Te enviaremos un enlace para restablecer tu contraseña.',
+      title: l10n.forgotTitle,
+      subtitle: _sent ? l10n.forgotSubtitleSent : l10n.forgotSubtitle,
       child: Form(
         key: _formKey,
         child: Column(
@@ -67,10 +67,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               keyboardType: TextInputType.emailAddress,
               textInputAction: TextInputAction.done,
               autofillHints: const [AutofillHints.email],
-              decoration: const InputDecoration(labelText: 'Correo'),
+              decoration: InputDecoration(labelText: l10n.fieldEmail),
               validator: (value) {
                 if (value == null || !value.contains('@')) {
-                  return 'Ingresa un correo válido.';
+                  return l10n.validationEmail;
                 }
                 return null;
               },
@@ -85,7 +85,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                       height: 22,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                  : Text(_sent ? 'Reenviar enlace' : 'Enviar enlace'),
+                  : Text(_sent ? l10n.forgotResendLink : l10n.forgotSendLink),
             ),
           ],
         ),

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../auth/auth_exception.dart';
+import '../l10n/l10n.dart';
 
 /// Logs [error] to the debug console and shows a visible floating SnackBar.
 void showAppError(
@@ -12,7 +13,7 @@ void showAppError(
   StackTrace? stackTrace,
   String? fallbackMessage,
 }) {
-  final message = _userMessage(error, fallbackMessage);
+  final message = fallbackMessage ?? authErrorMessage(error, context.l10n);
   _logError(error, stackTrace, message);
 
   if (!context.mounted) return;
@@ -67,12 +68,6 @@ void showAppSuccess(BuildContext context, String message) {
         duration: const Duration(seconds: 3),
       ),
     );
-}
-
-String _userMessage(Object error, String? fallback) {
-  if (error is AuthException) return error.userMessage;
-  return fallback ??
-      AuthException.fromUnknown(error).userMessage;
 }
 
 void _logError(Object error, StackTrace? stackTrace, String userMessage) {

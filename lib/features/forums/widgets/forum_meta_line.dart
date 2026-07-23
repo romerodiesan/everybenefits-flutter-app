@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
+import '../../../l10n/l10n.dart';
 import '../../../users/user_role.dart';
 import 'relative_time.dart';
 
@@ -28,9 +29,10 @@ class ForumMetaLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = context.l10n;
     final muted = AppColors.of(context).muted;
     final size = dense ? 12.0 : 13.0;
-    final time = formatRelativeTime(at);
+    final time = formatRelativeTime(at, l10n);
 
     if (social) {
       return Text.rich(
@@ -50,7 +52,7 @@ class ForumMetaLine extends StatelessWidget {
             ),
             if (showRole)
               TextSpan(
-                text: ' · ${role.label}',
+                text: ' · ${role.label(l10n)}',
                 style: TextStyle(
                   color: muted,
                   fontWeight: FontWeight.w500,
@@ -83,7 +85,7 @@ class ForumMetaLine extends StatelessWidget {
             ),
           ),
           TextSpan(
-            text: showRole ? ' · ${role.label} · $time' : ' · $time',
+            text: showRole ? ' · ${role.label(l10n)} · $time' : ' · $time',
           ),
         ],
       ),
