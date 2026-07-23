@@ -64,7 +64,7 @@ class SettingsScreen extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
           ),
           const SizedBox(height: AppSpacing.md),
-          _ModePicker(
+          _ThemeModeDropdown(
             selected: themeController.mode,
             onChanged: (mode) {
               PulseHaptics.selection();
@@ -94,7 +94,7 @@ class SettingsScreen extends StatelessWidget {
             style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
           ),
           const SizedBox(height: AppSpacing.md),
-          _LanguagePicker(
+          _LanguageDropdown(
             selected: localeController.locale?.languageCode ?? 'system',
             onChanged: (code) {
               PulseHaptics.selection();
@@ -325,8 +325,8 @@ class _AccountStrip extends StatelessWidget {
   }
 }
 
-class _ModePicker extends StatelessWidget {
-  const _ModePicker({
+class _ThemeModeDropdown extends StatelessWidget {
+  const _ThemeModeDropdown({
     required this.selected,
     required this.onChanged,
   });
@@ -337,35 +337,36 @@ class _ModePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Column(
-      children: [
-        _ChoiceTile(
-          selected: selected == ThemeMode.system,
-          icon: Icons.brightness_auto_rounded,
-          title: l10n.themeModeAuto,
-          onTap: () => onChanged(ThemeMode.system),
+    return _SettingsDropdown<ThemeMode>(
+      value: selected,
+      icon: switch (selected) {
+        ThemeMode.light => Icons.light_mode_rounded,
+        ThemeMode.dark => Icons.dark_mode_rounded,
+        ThemeMode.system => Icons.brightness_auto_rounded,
+      },
+      items: [
+        DropdownMenuItem(
+          value: ThemeMode.system,
+          child: Text(l10n.themeModeAuto),
         ),
-        const SizedBox(height: 8),
-        _ChoiceTile(
-          selected: selected == ThemeMode.light,
-          icon: Icons.light_mode_rounded,
-          title: l10n.themeModeLight,
-          onTap: () => onChanged(ThemeMode.light),
+        DropdownMenuItem(
+          value: ThemeMode.light,
+          child: Text(l10n.themeModeLight),
         ),
-        const SizedBox(height: 8),
-        _ChoiceTile(
-          selected: selected == ThemeMode.dark,
-          icon: Icons.dark_mode_rounded,
-          title: l10n.themeModeDark,
-          onTap: () => onChanged(ThemeMode.dark),
+        DropdownMenuItem(
+          value: ThemeMode.dark,
+          child: Text(l10n.themeModeDark),
         ),
       ],
+      onChanged: (mode) {
+        if (mode != null) onChanged(mode);
+      },
     );
   }
 }
 
-class _LanguagePicker extends StatelessWidget {
-  const _LanguagePicker({
+class _LanguageDropdown extends StatelessWidget {
+  const _LanguageDropdown({
     required this.selected,
     required this.onChanged,
   });
@@ -376,45 +377,42 @@ class _LanguagePicker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final l10n = context.l10n;
-    return Column(
-      children: [
-        _ChoiceTile(
-          selected: selected == 'system',
-          icon: Icons.language_rounded,
-          title: l10n.settingsLanguageSystem,
-          onTap: () => onChanged('system'),
+    return _SettingsDropdown<String>(
+      value: selected,
+      icon: Icons.language_rounded,
+      items: [
+        DropdownMenuItem(
+          value: 'system',
+          child: Text(l10n.settingsLanguageSystem),
         ),
-        const SizedBox(height: 8),
-        _ChoiceTile(
-          selected: selected == 'en',
-          icon: Icons.translate_rounded,
-          title: l10n.settingsLanguageEnglish,
-          onTap: () => onChanged('en'),
+        DropdownMenuItem(
+          value: 'en',
+          child: Text(l10n.settingsLanguageEnglish),
         ),
-        const SizedBox(height: 8),
-        _ChoiceTile(
-          selected: selected == 'es',
-          icon: Icons.translate_rounded,
-          title: l10n.settingsLanguageSpanish,
-          onTap: () => onChanged('es'),
+        DropdownMenuItem(
+          value: 'es',
+          child: Text(l10n.settingsLanguageSpanish),
         ),
       ],
+      onChanged: (code) {
+        if (code != null) onChanged(code);
+      },
     );
   }
 }
 
-class _ChoiceTile extends StatelessWidget {
-  const _ChoiceTile({
-    required this.selected,
+class _SettingsDropdown<T> extends StatelessWidget {
+  const _SettingsDropdown({
+    required this.value,
     required this.icon,
-    required this.title,
-    required this.onTap,
+    required this.items,
+    required this.onChanged,
   });
 
-  final bool selected;
+  final T value;
   final IconData icon;
-  final String title;
-  final VoidCallback onTap;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -422,60 +420,39 @@ class _ChoiceTile extends StatelessWidget {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
+    return DecoratedBox(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: selected ? brand.withValues(alpha: 0.65) : colors.border,
-          width: selected ? 1.6 : 1,
-        ),
-        color: selected ? brand.withValues(alpha: 0.12) : colors.glassFill,
+        border: Border.all(color: colors.border),
+        color: colors.glassFill,
       ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            child: Row(
-              children: [
-                Icon(icon, color: selected ? brand : colors.muted),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: colors.ink,
-                    ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          children: [
+            Icon(icon, color: brand),
+            const SizedBox(width: 12),
+            Expanded(
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<T>(
+                  value: value,
+                  isExpanded: true,
+                  borderRadius: BorderRadius.circular(16),
+                  dropdownColor: colors.sheet,
+                  icon: Icon(
+                    Icons.expand_more_rounded,
+                    color: colors.muted,
                   ),
-                ),
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 22,
-                  height: 22,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: selected ? brand : colors.border,
-                      width: 2,
-                    ),
-                    color: selected ? brand : Colors.transparent,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    color: colors.ink,
                   ),
-                  child: selected
-                      ? Icon(
-                          Icons.check_rounded,
-                          size: 14,
-                          color: onBrandFor(brand),
-                        )
-                      : null,
+                  items: items,
+                  onChanged: onChanged,
                 ),
-              ],
+              ),
             ),
-          ),
+          ],
         ),
       ),
     );
