@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../users/users.dart';
@@ -94,6 +95,7 @@ class _CreateThreadScreenState extends State<CreateThreadScreen> {
         body: _body.text,
         author: widget.profile,
       );
+      PulseHaptics.medium();
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         MaterialPageRoute<void>(

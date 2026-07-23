@@ -19,6 +19,11 @@ class PlatziSearchScreen extends StatelessWidget {
           decoration: const InputDecoration(
             hintText: 'Buscar cursos…',
             border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: InputBorder.none,
+            filled: false,
+            isDense: true,
+            contentPadding: EdgeInsets.zero,
           ),
         ),
       ),

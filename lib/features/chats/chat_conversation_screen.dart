@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../users/user_profile.dart';
 import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
@@ -78,6 +80,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
+    PulseHaptics.light();
     setState(() => _sending = true);
     try {
       await _repo.sendMessage(
@@ -203,7 +206,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 }
                 final messages = snapshot.data;
                 if (messages == null) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const PulseMessageListSkeleton();
                 }
                 if (messages.isEmpty) {
                   return Center(

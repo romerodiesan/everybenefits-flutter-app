@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
+import '../../../app/widgets/pulse_skeleton.dart';
 import '../../../users/user_profile.dart';
 import '../../chats/chat_conversation_screen.dart';
 import '../../chats/chat_models.dart';
@@ -104,8 +105,11 @@ Future<void> showShareToChatSheet({
                     }
                     if (!snapshot.hasData) {
                       return const Padding(
-                        padding: EdgeInsets.all(AppSpacing.lg),
-                        child: Center(child: CircularProgressIndicator()),
+                        padding: EdgeInsets.symmetric(vertical: AppSpacing.md),
+                        child: SizedBox(
+                          height: 160,
+                          child: PulseChatListSkeleton(itemCount: 3),
+                        ),
                       );
                     }
                     final chats = snapshot.data!;

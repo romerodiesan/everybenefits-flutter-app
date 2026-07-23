@@ -25,10 +25,10 @@ class ProfileScreen extends StatefulWidget {
   final UserProfile profile;
 
   @override
-  State<ProfileScreen> createState() => _ProfileScreenState();
+  State<ProfileScreen> createState() => ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class ProfileScreenState extends State<ProfileScreen> {
   bool _uploading = false;
 
   Future<void> _pickAvatar() async {
@@ -90,6 +90,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  void openEdit() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => EditProfileScreen(
+          profile: widget.profile,
+          userRepository: widget.userRepository,
+        ),
+      ),
+    );
+  }
+
   void _openSettings() {
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -97,18 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           authService: widget.authService,
           userRepository: widget.userRepository,
           profile: widget.profile,
-          onEditProfile: _openEdit,
-        ),
-      ),
-    );
-  }
-
-  void _openEdit() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EditProfileScreen(
-          profile: widget.profile,
-          userRepository: widget.userRepository,
+          onEditProfile: openEdit,
         ),
       ),
     );
@@ -191,7 +191,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           const SizedBox(height: AppSpacing.xl),
           SignalButton(
             label: 'Editar perfil',
-            onPressed: _openEdit,
+            onPressed: openEdit,
           ),
           const SizedBox(height: AppSpacing.sm),
           OutlinedButton(

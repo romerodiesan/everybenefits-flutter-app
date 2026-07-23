@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_repository.dart';
 import 'chat_conversation_screen.dart';
@@ -99,7 +100,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
             );
           }
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const PulseContactListSkeleton();
           }
 
           final contacts = snapshot.data!;

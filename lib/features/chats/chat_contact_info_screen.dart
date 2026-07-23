@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../users/user_profile.dart';
@@ -31,6 +32,7 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
 
   Future<void> _togglePin(ChatConversation chat) async {
     if (_busy) return;
+    PulseHaptics.selection();
     setState(() => _busy = true);
     try {
       final pinned = !chat.isPinnedFor(widget.profile.uid);

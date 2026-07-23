@@ -1,6 +1,170 @@
 import 'package:flutter/material.dart';
 
+import '../pulse_haptics.dart';
 import '../theme.dart';
+
+/// Visual height of the floating tab pill (excluding safe-area inset).
+const double kPulseTabBarPillHeight = 54;
+
+/// Extra gap between FAB / list content and the floating tab pill.
+const double kPulseTabBarFabGap = 20;
+
+/// Matches Material [kFloatingActionButtonMargin].
+const double _kFabMargin = 16;
+
+/// Distance from the physical bottom to the top of [PulseTabBar].
+double pulseTabBarTopInset(BuildContext context) {
+  final viewBottom = MediaQuery.viewPaddingOf(context).bottom;
+  final safe = viewBottom > 0 ? viewBottom : 8.0;
+  // Tab bar outer bottom pad is `(safe) + 6`, then the pill itself.
+  return safe + 6 + kPulseTabBarPillHeight;
+}
+
+/// Extra bottom inset so nested FABs clear [PulseTabBar] under [extendBody].
+///
+/// Scaffold already lifts the FAB by [MediaQuery.padding] + [_kFabMargin];
+/// this only adds what's still needed above the floating pill.
+double pulseFabClearance(BuildContext context) {
+  final padBottom = MediaQuery.paddingOf(context).bottom;
+  final alreadyCleared = padBottom + _kFabMargin;
+  final needed = pulseTabBarTopInset(context) + kPulseTabBarFabGap - alreadyCleared;
+  return needed < kPulseTabBarFabGap ? kPulseTabBarFabGap : needed;
+}
+
+/// List / scroll bottom padding that clears the floating tab bar.
+double pulseShellListBottomPad(
+  BuildContext context, {
+  bool hasFab = false,
+}) {
+  final clearance = pulseTabBarTopInset(context) + kPulseTabBarFabGap;
+  return hasFab ? clearance + 56 : clearance;
+}
+
+EdgeInsets pulseFabPadding(BuildContext context) {
+  return EdgeInsets.only(bottom: pulseFabClearance(context));
+}
+
+/// Tab body that keeps all children alive (like [IndexedStack]) and cross-fades
+/// with a light directional slide when [index] changes.
+class PulseTabBody extends StatefulWidget {
+  const PulseTabBody({
+    super.key,
+    required this.index,
+    required this.children,
+    this.duration = const Duration(milliseconds: 320),
+  });
+
+  final int index;
+  final List<Widget> children;
+  final Duration duration;
+
+  @override
+  State<PulseTabBody> createState() => _PulseTabBodyState();
+}
+
+class _PulseTabBodyState extends State<PulseTabBody>
+    with SingleTickerProviderStateMixin {
+  static const _curve = Curves.easeOutCubic;
+  static const _slidePx = 22.0;
+
+  late final AnimationController _controller;
+  late int _current;
+  int? _outgoing;
+  int _direction = 1;
+  int _transitionGen = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _current = widget.index;
+    _controller = AnimationController(vsync: this, duration: widget.duration)
+      ..value = 1;
+  }
+
+  @override
+  void didUpdateWidget(covariant PulseTabBody oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.duration != oldWidget.duration) {
+      _controller.duration = widget.duration;
+    }
+    if (widget.index == _current) return;
+
+    _direction = widget.index >= _current ? 1 : -1;
+    _outgoing = _current;
+    _current = widget.index;
+    final gen = ++_transitionGen;
+    _controller.forward(from: 0).whenComplete(() {
+      if (!mounted || gen != _transitionGen) return;
+      setState(() => _outgoing = null);
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        return Stack(
+          fit: StackFit.expand,
+          children: [
+            for (var i = 0; i < widget.children.length; i++) _buildLayer(i),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildLayer(int i) {
+    final isCurrent = i == _current;
+    final isOutgoing = i == _outgoing;
+    final child = widget.children[i];
+
+    if (!isCurrent && !isOutgoing) {
+      return Offstage(
+        offstage: true,
+        child: TickerMode(
+          enabled: false,
+          child: child,
+        ),
+      );
+    }
+
+    final t = _curve.transform(_controller.value);
+    late final double opacity;
+    late final double dx;
+
+    if (_outgoing == null) {
+      opacity = isCurrent ? 1 : 0;
+      dx = 0;
+    } else if (isCurrent) {
+      opacity = t;
+      dx = _slidePx * _direction * (1 - t);
+    } else {
+      opacity = 1 - t;
+      dx = -_slidePx * _direction * t;
+    }
+
+    return IgnorePointer(
+      ignoring: !isCurrent,
+      child: TickerMode(
+        enabled: isCurrent,
+        child: Opacity(
+          opacity: opacity.clamp(0.0, 1.0),
+          child: Transform.translate(
+            offset: Offset(dx, 0),
+            child: child,
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class PulseScaffold extends StatelessWidget {
   const PulseScaffold({
@@ -10,6 +174,7 @@ class PulseScaffold extends StatelessWidget {
     this.floatingActionButton,
     this.bottomNavigationBar,
     this.extendBody = false,
+    this.clearFabForTabBar = false,
   });
 
   final PreferredSizeWidget? appBar;
@@ -18,14 +183,25 @@ class PulseScaffold extends StatelessWidget {
   final Widget? bottomNavigationBar;
   final bool extendBody;
 
+  /// Lift [floatingActionButton] above the shell's floating [PulseTabBar].
+  final bool clearFabForTabBar;
+
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    final fab = floatingActionButton;
+    final liftedFab = fab == null || !clearFabForTabBar
+        ? fab
+        : Padding(
+            padding: pulseFabPadding(context),
+            child: fab,
+          );
+
     return Scaffold(
       backgroundColor: colors.canvas,
       appBar: appBar,
       body: body,
-      floatingActionButton: floatingActionButton,
+      floatingActionButton: liftedFab,
       bottomNavigationBar: bottomNavigationBar,
       extendBody: extendBody,
     );
@@ -115,6 +291,19 @@ class PulseTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onSelect;
 
+  void _selectIndex(int index) {
+    final next = index.clamp(0, items.length - 1);
+    if (next == selectedIndex) return;
+    PulseHaptics.selection();
+    onSelect(next);
+  }
+
+  void _selectAtX(double dx, double width) {
+    if (width <= 0 || items.isEmpty) return;
+    final index = (dx / width * items.length).floor();
+    _selectIndex(index);
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
@@ -141,20 +330,38 @@ class PulseTabBar extends StatelessWidget {
           ),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-            child: Row(
-              children: [
-                for (var i = 0; i < items.length; i++)
-                  Expanded(
-                    flex: wide && i == selectedIndex ? 16 : 12,
-                    child: _PulseTab(
-                      item: items[i],
-                      selected: i == selectedIndex,
-                      showLabel: wide && i == selectedIndex,
-                      brand: brand,
-                      onTap: () => onSelect(i),
-                    ),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                return GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onHorizontalDragUpdate: (details) {
+                    _selectAtX(details.localPosition.dx, constraints.maxWidth);
+                  },
+                  onHorizontalDragEnd: (details) {
+                    final velocity = details.primaryVelocity ?? 0;
+                    if (velocity <= -450) {
+                      _selectIndex(selectedIndex + 1);
+                    } else if (velocity >= 450) {
+                      _selectIndex(selectedIndex - 1);
+                    }
+                  },
+                  child: Row(
+                    children: [
+                      for (var i = 0; i < items.length; i++)
+                        Expanded(
+                          flex: wide && i == selectedIndex ? 16 : 12,
+                          child: _PulseTab(
+                            item: items[i],
+                            selected: i == selectedIndex,
+                            showLabel: wide && i == selectedIndex,
+                            brand: brand,
+                            onTap: () => _selectIndex(i),
+                          ),
+                        ),
+                    ],
                   ),
-              ],
+                );
+              },
             ),
           ),
         ),

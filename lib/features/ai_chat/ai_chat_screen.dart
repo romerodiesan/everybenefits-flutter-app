@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/demo_content.dart';
+import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import 'ai_settings_screen.dart';
@@ -11,15 +12,22 @@ class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
 
   @override
-  State<AiChatScreen> createState() => _AiChatScreenState();
+  State<AiChatScreen> createState() => AiChatScreenState();
 }
 
-class _AiChatScreenState extends State<AiChatScreen> {
+class AiChatScreenState extends State<AiChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   final List<_AiBubble> _messages = [];
   String _title = 'Nueva conversación';
   bool _thinking = false;
+
+  void startNewConversation() {
+    setState(() {
+      _messages.clear();
+      _title = 'Nueva conversación';
+    });
+  }
 
   @override
   void dispose() {
@@ -31,6 +39,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   Future<void> _send([String? preset]) async {
     final text = (preset ?? _controller.text).trim();
     if (text.isEmpty || _thinking) return;
+    PulseHaptics.light();
     setState(() {
       _messages.add(_AiBubble(text: text, isUser: true));
       _controller.clear();
@@ -137,12 +146,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
         actions: [
           IconButton(
             tooltip: 'Nueva',
-            onPressed: () {
-              setState(() {
-                _messages.clear();
-                _title = 'Nueva conversación';
-              });
-            },
+            onPressed: startNewConversation,
             icon: const Icon(Icons.edit_square),
           ),
         ],
