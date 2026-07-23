@@ -37,9 +37,8 @@ class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
     _future = _load();
   }
 
-  Future<List<UserProfile>> _load() async {
-    final all = await widget.userRepository.listDirectory(limit: 120);
-    return all.where((p) => p.role == UserRole.student).toList();
+  Future<List<UserProfile>> _load() {
+    return _callable.listStudentsForPromotion();
   }
 
   Future<void> _promote(UserProfile profile) async {
