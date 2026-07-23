@@ -553,6 +553,10 @@ void main() {
       canParticipateInForums(role: UserRole.agent, isAnonymous: false),
       isTrue,
     );
+    expect(
+      canParticipateInForums(role: UserRole.manager, isAnonymous: false),
+      isTrue,
+    );
   });
 
   test('updateThread allows author and rejects strangers', () async {

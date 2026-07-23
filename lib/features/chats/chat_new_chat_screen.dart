@@ -7,8 +7,10 @@ import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_repository.dart';
+import '../../users/user_role.dart';
 import 'chat_conversation_screen.dart';
 import 'chat_models.dart';
+import 'chat_new_group_screen.dart';
 import 'chat_repository.dart';
 import 'widgets/chat_avatar.dart';
 
@@ -130,6 +132,41 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
               AppSpacing.xl,
             ),
             children: [
+              if (canCreateChatGroups(widget.profile.role)) ...[
+                Material(
+                  color: colors.sheet,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(18),
+                    side: BorderSide(color: colors.border),
+                  ),
+                  clipBehavior: Clip.antiAlias,
+                  child: ListTile(
+                    leading: Icon(
+                      Icons.groups_rounded,
+                      color: AppColors.brandOf(context),
+                    ),
+                    title: Text(
+                      l10n.newChatCreateGroup,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded),
+                    onTap: () {
+                      Navigator.of(context).pushReplacement(
+                        MaterialPageRoute<void>(
+                          builder: (_) => ChatNewGroupScreen(
+                            profile: widget.profile,
+                            chatRepository: _chatRepo,
+                            userRepository: _users,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+              ],
               Text(
                 l10n.newChatContactsHeader,
                 style: theme.textTheme.labelLarge?.copyWith(

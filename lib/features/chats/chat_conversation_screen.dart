@@ -159,7 +159,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 child: Row(
                   children: [
                     ChatAvatar(
-                      initials: chat.initialsFor(uid),
+                      initials: chat.initialsFor(uid, l10n: context.l10n),
                       isGroup: chat.isGroup,
                       size: 38,
                     ),
@@ -169,7 +169,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            chat.titleFor(uid),
+                            chat.titleFor(uid, l10n: l10n),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleMedium?.copyWith(
@@ -178,9 +178,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             ),
                           ),
                           Text(
-                            chat.isGroup
-                                ? l10n.chatTypeGroup
-                                : l10n.chatTypePrivate,
+                            chat.isDefaultAgentGroup
+                                ? l10n.chatsDefaultGroupBadge
+                                : (chat.isGroup
+                                    ? l10n.chatTypeGroup
+                                    : l10n.chatTypePrivate),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colors.muted,
                               fontWeight: FontWeight.w600,

@@ -10,9 +10,12 @@ import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_repository.dart';
+import '../../users/user_role.dart';
 import 'chat_conversation_screen.dart';
+import 'chat_default_group_callable.dart';
 import 'chat_models.dart';
 import 'chat_new_chat_screen.dart';
+import 'chat_new_group_screen.dart';
 import 'chat_repository.dart';
 import 'widgets/chat_avatar.dart';
 
@@ -40,18 +43,35 @@ class ChatsScreen extends StatefulWidget {
 class _ChatsScreenState extends State<ChatsScreen> {
   late final ChatRepository _repo =
       widget.chatRepository ?? ChatRepository();
-  late final Stream<List<ChatConversation>> _source =
-      _repo.watchChats(widget.profile.uid);
   final _gate = StreamController<List<ChatConversation>>.broadcast();
   StreamSubscription<List<ChatConversation>>? _sub;
   List<ChatConversation>? _latest;
   bool? _listening;
+  bool _defaultJoinAttempted = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _maybeJoinDefaultAgentGroup();
+  }
+
+  Future<void> _maybeJoinDefaultAgentGroup() async {
+    if (_defaultJoinAttempted) return;
+    if (widget.profile.role != UserRole.agent) return;
+    _defaultJoinAttempted = true;
+    try {
+      await DefaultAgentGroupCallable().ensureMembership();
+    } catch (_) {
+      // Soft backfill — inbox still works without membership.
+    }
+  }
 
   void _syncListen(bool shouldListen) {
     if (_listening == shouldListen) return;
     _listening = shouldListen;
     if (shouldListen) {
-      _sub = _source.listen(
+      // Fresh RTDB subscription each time TickerMode re-enables the tab.
+      _sub = _repo.watchChats(widget.profile.uid).listen(
         (chats) {
           _latest = chats;
           if (!_gate.isClosed) _gate.add(chats);
@@ -172,11 +192,8 @@ class _ChatsScreenState extends State<ChatsScreen> {
                       ),
                     );
                   } else {
-                    final pinned =
-                        chats.where((c) => c.isPinnedFor(profile.uid)).toList();
-                    final rest = chats
-                        .where((c) => !c.isPinnedFor(profile.uid))
-                        .toList();
+                    final sections =
+                        partitionChatInbox(chats, profile.uid);
                     child = ListView.builder(
                       key: const ValueKey('list'),
                       padding: EdgeInsets.fromLTRB(
@@ -185,14 +202,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
                         AppSpacing.md,
                         pulseShellListBottomPad(context, hasFab: true),
                       ),
-                      itemCount: _inboxItemCount(pinned, rest),
+                      itemCount: _inboxItemCount(sections),
                       itemBuilder: (context, index) {
                         return _inboxItem(
                           context,
                           l10n,
                           index: index,
-                          pinned: pinned,
-                          rest: rest,
+                          sections: sections,
                           profile: profile,
                         );
                       },
@@ -209,24 +225,33 @@ class _ChatsScreenState extends State<ChatsScreen> {
     );
   }
 
-  int _inboxItemCount(List<ChatConversation> pinned, List<ChatConversation> rest) {
-    if (pinned.isEmpty) return rest.length;
-    // section + gap + pinned rows + gap + section + gap + rest
-    return 1 + pinned.length + 1 + rest.length;
+  int _inboxItemCount(ChatInboxSections sections) {
+    if (sections.community.isEmpty && sections.pinned.isEmpty) {
+      return sections.recent.length;
+    }
+    var count = 0;
+    if (sections.community.isNotEmpty) {
+      count += 1 + sections.community.length;
+    }
+    if (sections.pinned.isNotEmpty) {
+      count += 1 + sections.pinned.length;
+    }
+    if (sections.recent.isNotEmpty) {
+      count += 1 + sections.recent.length;
+    }
+    return count;
   }
 
   Widget _inboxItem(
     BuildContext context,
     AppLocalizations l10n, {
     required int index,
-    required List<ChatConversation> pinned,
-    required List<ChatConversation> rest,
+    required ChatInboxSections sections,
     required UserProfile profile,
   }) {
-    if (pinned.isEmpty) {
-      final chat = rest[index];
+    Widget row(ChatConversation chat, {String? keyPrefix}) {
       return Padding(
-        key: ValueKey(chat.id),
+        key: ValueKey('${keyPrefix ?? ''}${chat.id}'),
         padding: const EdgeInsets.only(bottom: 8),
         child: _ChatRow(
           chat: chat,
@@ -241,50 +266,60 @@ class _ChatsScreenState extends State<ChatsScreen> {
       );
     }
 
-    if (index == 0) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: _SectionLabel(label: l10n.chatsSectionPinned),
-      );
+    if (sections.community.isEmpty && sections.pinned.isEmpty) {
+      return row(sections.recent[index]);
     }
-    if (index <= pinned.length) {
-      final chat = pinned[index - 1];
-      return Padding(
-        key: ValueKey('pin-${chat.id}'),
-        padding: const EdgeInsets.only(bottom: 8),
-        child: _ChatRow(
-          chat: chat,
-          viewerUid: profile.uid,
-          onTap: () => openChat(
-            context,
-            chat: chat,
-            profile: profile,
-            chatRepository: _repo,
+
+    var cursor = 0;
+    if (sections.community.isNotEmpty) {
+      if (index == cursor) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 8),
+          child: _SectionLabel(label: l10n.chatsSectionCommunity),
+        );
+      }
+      cursor += 1;
+      if (index < cursor + sections.community.length) {
+        return row(
+          sections.community[index - cursor],
+          keyPrefix: 'community-',
+        );
+      }
+      cursor += sections.community.length;
+    }
+
+    if (sections.pinned.isNotEmpty) {
+      if (index == cursor) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: sections.community.isEmpty ? 0 : 8,
+            bottom: 8,
           ),
-        ),
-      );
+          child: _SectionLabel(label: l10n.chatsSectionPinned),
+        );
+      }
+      cursor += 1;
+      if (index < cursor + sections.pinned.length) {
+        return row(
+          sections.pinned[index - cursor],
+          keyPrefix: 'pin-',
+        );
+      }
+      cursor += sections.pinned.length;
     }
-    if (index == pinned.length + 1) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 8, bottom: 8),
-        child: _SectionLabel(label: l10n.chatsSectionRecent),
-      );
+
+    if (sections.recent.isNotEmpty) {
+      if (index == cursor) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 8, bottom: 8),
+          child: _SectionLabel(label: l10n.chatsSectionRecent),
+        );
+      }
+      cursor += 1;
+      return row(sections.recent[index - cursor]);
     }
-    final chat = rest[index - pinned.length - 2];
-    return Padding(
-      key: ValueKey(chat.id),
-      padding: const EdgeInsets.only(bottom: 8),
-      child: _ChatRow(
-        chat: chat,
-        viewerUid: profile.uid,
-        onTap: () => openChat(
-          context,
-          chat: chat,
-          profile: profile,
-          chatRepository: _repo,
-        ),
-      ),
-    );
+
+    return const SizedBox.shrink();
   }
 }
 
@@ -297,6 +332,23 @@ void openNewChat(
   Navigator.of(context).push(
     MaterialPageRoute<void>(
       builder: (_) => ChatNewChatScreen(
+        profile: profile,
+        chatRepository: chatRepository,
+        userRepository: userRepository ?? UserRepository(),
+      ),
+    ),
+  );
+}
+
+void openNewGroup(
+  BuildContext context, {
+  required UserProfile profile,
+  ChatRepository? chatRepository,
+  UserRepository? userRepository,
+}) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => ChatNewGroupScreen(
         profile: profile,
         chatRepository: chatRepository,
         userRepository: userRepository ?? UserRepository(),
@@ -360,10 +412,12 @@ class _ChatRow extends StatelessWidget {
     final l10n = context.l10n;
     final unread = chat.unreadFor(viewerUid);
     final hasUnread = unread > 0;
-    final title = chat.titleFor(viewerUid);
-    final preview = chat.lastMessage.isEmpty
-        ? l10n.chatsNoMessagesYet
-        : chat.lastMessage;
+    final title = chat.titleFor(viewerUid, l10n: l10n);
+    final preview = chat.isDefaultAgentGroup && chat.lastMessage.isEmpty
+        ? l10n.chatsDefaultGroupBadge
+        : (chat.lastMessage.isEmpty
+            ? l10n.chatsNoMessagesYet
+            : chat.lastMessage);
 
     return Material(
       color: colors.sheet,
@@ -379,7 +433,7 @@ class _ChatRow extends StatelessWidget {
           child: Row(
             children: [
               ChatAvatar(
-                initials: chat.initialsFor(viewerUid),
+                initials: chat.initialsFor(viewerUid, l10n: l10n),
                 isGroup: chat.isGroup,
                 size: 50,
               ),

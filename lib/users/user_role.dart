@@ -5,6 +5,7 @@ enum UserRole {
   student,
   agent,
   instructor,
+  manager,
   admin;
 
   String get wireValue => name;
@@ -14,6 +15,7 @@ enum UserRole {
         UserRole.student => l10n.roleStudent,
         UserRole.agent => l10n.roleAgent,
         UserRole.instructor => l10n.roleInstructor,
+        UserRole.manager => l10n.roleManager,
         UserRole.admin => l10n.roleAdmin,
       };
 
@@ -24,4 +26,11 @@ enum UserRole {
       orElse: () => UserRole.guest,
     );
   }
+}
+
+/// Roles that may create group chats (teacher = instructor).
+bool canCreateChatGroups(UserRole role) {
+  return role == UserRole.admin ||
+      role == UserRole.instructor ||
+      role == UserRole.manager;
 }

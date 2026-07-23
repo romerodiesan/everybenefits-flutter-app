@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 
@@ -50,23 +51,16 @@ bool looksLikeEmulatorFirestoreHost(String? host, {int port = 8080}) {
   return host.contains(':$port') || host.endsWith('$port');
 }
 
-/// Connects Auth, Firestore, and Storage SDKs to local emulators.
+/// Connects Auth, Firestore, Realtime Database, and Storage SDKs to emulators.
 ///
 /// Call immediately after [Firebase.initializeApp], before any other
-/// Firestore use (including [UserRepository]).
-///
-/// Critical FlutterFire/iOS detail: the native pigeon app captures Firestore
-/// settings on **first** real Firestore call (`collection` / `doc` / etc.) and
-/// never updates them afterwards. Calling [FirebaseFirestore.terminate] or
-/// [FirebaseFirestore.clearPersistence] before the emulator host is set creates
-/// that snapshot with production defaults — Dart will still report an emulator
-/// host later, but traffic goes to production (permission-denied for emulator
-/// Auth tokens). So: set settings first, and never terminate/clear here.
+/// Firestore / Database use.
 Future<void> connectFirebaseEmulators({
   String? host,
   int authPort = 9099,
   int firestorePort = 8080,
   int storagePort = 9199,
+  int databasePort = 9000,
 }) async {
   if (!useFirebaseEmulators) return;
 
@@ -81,7 +75,7 @@ Future<void> connectFirebaseEmulators({
     host: firestoreEmulator,
   );
 
-  // 2) Auth + Storage emulators.
+  // 2) Auth + Storage + Realtime Database emulators.
   await FirebaseAuth.instance.useAuthEmulator(emulatorHost, authPort);
   await FirebaseAuth.instance.setSettings(
     appVerificationDisabledForTesting: true,
@@ -90,8 +84,9 @@ Future<void> connectFirebaseEmulators({
     emulatorHost,
     storagePort,
   );
+  FirebaseDatabase.instance.useDatabaseEmulator(emulatorHost, databasePort);
 
-  // Avoid mixing a persisted production session with emulator Firestore.
+  // Avoid mixing a persisted production session with emulator backends.
   await FirebaseAuth.instance.signOut();
 
   final boundHost = FirebaseFirestore.instance.settings.host;
@@ -101,7 +96,8 @@ Future<void> connectFirebaseEmulators({
       : '';
   debugPrint(
     'Firebase emulators → $emulatorHost '
-    '(auth:$authPort firestore:$firestorePort storage:$storagePort) '
+    '(auth:$authPort firestore:$firestorePort database:$databasePort '
+    'storage:$storagePort) '
     'firestore.settings.host=$boundHost ssl=$sslEnabled$physicalHint',
   );
 }

@@ -2,7 +2,8 @@
   "project_info": {
     "project_number": "978334689853",
     "project_id": "every-insurance",
-    "storage_bucket": "every-insurance.firebasestorage.app"
+    "storage_bucket": "every-insurance.firebasestorage.app",
+    "firebase_url": "https://every-insurance-default-rtdb.firebaseio.com"
   },
   "client": [
     {

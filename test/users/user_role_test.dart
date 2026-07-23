@@ -12,6 +12,7 @@ void main() {
       expect(UserRole.parse('student'), UserRole.student);
       expect(UserRole.parse('agent'), UserRole.agent);
       expect(UserRole.parse('instructor'), UserRole.instructor);
+      expect(UserRole.parse('manager'), UserRole.manager);
       expect(UserRole.parse('admin'), UserRole.admin);
     });
 
@@ -25,6 +26,7 @@ void main() {
       expect(UserRole.student.wireValue, 'student');
       expect(UserRole.agent.wireValue, 'agent');
       expect(UserRole.instructor.wireValue, 'instructor');
+      expect(UserRole.manager.wireValue, 'manager');
       expect(UserRole.admin.wireValue, 'admin');
     });
 
@@ -33,6 +35,7 @@ void main() {
       expect(UserRole.student.label(l10n), 'Student');
       expect(UserRole.agent.label(l10n), 'Agent');
       expect(UserRole.instructor.label(l10n), 'Instructor');
+      expect(UserRole.manager.label(l10n), 'Manager');
       expect(UserRole.admin.label(l10n), 'Admin');
     });
   });

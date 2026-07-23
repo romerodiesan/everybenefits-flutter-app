@@ -35,7 +35,20 @@ Future<void> main() async {
 
   final themeFuture = ThemeController.load();
   final localeFuture = LocaleController.load();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // Hot restart resets Dart Firebase state but native [DEFAULT] remains.
+  // Re-init throws duplicate-app if options changed (e.g. added databaseURL).
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+  } catch (e, st) {
+    final duplicate = (e is FirebaseException && e.code == 'duplicate-app') ||
+        '$e'.contains('duplicate-app');
+    if (!duplicate) {
+      Error.throwWithStackTrace(e, st);
+    }
+    debugPrint('[Firebase] Reusing existing [DEFAULT] app after hot restart');
+  }
   await connectFirebaseEmulators();
   connectFunctionsEmulator();
 

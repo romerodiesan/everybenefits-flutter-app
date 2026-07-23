@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../../l10n/app_localizations.dart';
 import '../../users/user_role.dart';
 
@@ -59,7 +57,11 @@ class ChatConversation {
     this.lastMessageSenderId,
     this.unreadCounts = const {},
     this.pinnedBy = const {},
+    this.isDefaultAgentGroup = false,
   });
+
+  /// Fixed RTDB path id for the system agents community chat.
+  static const defaultAgentGroupId = 'agents-default';
 
   final String id;
   final List<String> memberIds;
@@ -74,12 +76,16 @@ class ChatConversation {
   final Map<String, bool> pinnedBy;
   final DateTime createdAt;
   final String createdBy;
+  final bool isDefaultAgentGroup;
 
   int unreadFor(String uid) => unreadCounts[uid] ?? 0;
 
   bool isPinnedFor(String uid) => pinnedBy[uid] == true;
 
-  String titleFor(String viewerUid) {
+  String titleFor(String viewerUid, {AppLocalizations? l10n}) {
+    if (isDefaultAgentGroup) {
+      return l10n?.chatsDefaultGroupTitle ?? title?.trim() ?? 'Agents';
+    }
     if (isGroup && title != null && title!.trim().isNotEmpty) {
       return title!.trim();
     }
@@ -90,8 +96,8 @@ class ChatConversation {
     return memberNames[other.first] ?? 'Chat';
   }
 
-  String initialsFor(String viewerUid) {
-    return chatInitials(titleFor(viewerUid));
+  String initialsFor(String viewerUid, {AppLocalizations? l10n}) {
+    return chatInitials(titleFor(viewerUid, l10n: l10n));
   }
 
   ChatConversation copyWith({
@@ -101,13 +107,15 @@ class ChatConversation {
     Map<String, int>? unreadCounts,
     Map<String, bool>? pinnedBy,
     Map<String, String>? memberNames,
+    String? title,
+    bool? isDefaultAgentGroup,
   }) {
     return ChatConversation(
       id: id,
       memberIds: memberIds,
       memberNames: memberNames ?? this.memberNames,
       isGroup: isGroup,
-      title: title,
+      title: title ?? this.title,
       dmKey: dmKey,
       lastMessage: lastMessage ?? this.lastMessage,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
@@ -116,7 +124,30 @@ class ChatConversation {
       pinnedBy: pinnedBy ?? this.pinnedBy,
       createdAt: createdAt,
       createdBy: createdBy,
+      isDefaultAgentGroup: isDefaultAgentGroup ?? this.isDefaultAgentGroup,
     );
+  }
+
+  /// RTDB payload (members as map for security rules).
+  Map<String, Object?> toRtdbMap() {
+    return {
+      'members': {for (final id in memberIds) id: true},
+      'memberNames': memberNames,
+      'isGroup': isGroup,
+      'title': title,
+      'dmKey': dmKey,
+      'lastMessage': lastMessage,
+      'lastMessageAt': lastMessageAt.toUtc().millisecondsSinceEpoch,
+      'lastMessageSenderId': lastMessageSenderId,
+      'unreadCounts': unreadCounts,
+      'pinnedBy': {
+        for (final e in pinnedBy.entries)
+          if (e.value) e.key: true,
+      },
+      'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
+      'createdBy': createdBy,
+      'isDefaultAgentGroup': isDefaultAgentGroup,
+    };
   }
 
   Map<String, Object?> toMap() {
@@ -127,12 +158,13 @@ class ChatConversation {
       'title': title,
       'dmKey': dmKey,
       'lastMessage': lastMessage,
-      'lastMessageAt': Timestamp.fromDate(lastMessageAt.toUtc()),
+      'lastMessageAt': lastMessageAt.toUtc().millisecondsSinceEpoch,
       'lastMessageSenderId': lastMessageSenderId,
       'unreadCounts': unreadCounts,
       'pinnedBy': pinnedBy,
-      'createdAt': Timestamp.fromDate(createdAt.toUtc()),
+      'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
       'createdBy': createdBy,
+      'isDefaultAgentGroup': isDefaultAgentGroup,
     };
   }
 
@@ -150,7 +182,9 @@ class ChatConversation {
     if (unreadRaw is Map) {
       for (final entry in unreadRaw.entries) {
         final v = entry.value;
-        unread['${entry.key}'] = v is int ? v : int.tryParse('$v') ?? 0;
+        unread['${entry.key}'] = v is int
+            ? v
+            : (v is num ? v.toInt() : int.tryParse('$v') ?? 0);
       }
     }
 
@@ -162,12 +196,20 @@ class ChatConversation {
       }
     }
 
-    return ChatConversation(
-      id: id,
-      memberIds: (data['memberIds'] as List<dynamic>?)
+    final membersRaw = data['members'];
+    final List<String> memberIds;
+    if (membersRaw is Map) {
+      memberIds = membersRaw.keys.map((e) => '$e').toList()..sort();
+    } else {
+      memberIds = (data['memberIds'] as List<dynamic>?)
               ?.map((e) => '$e')
               .toList() ??
-          const [],
+          const [];
+    }
+
+    return ChatConversation(
+      id: id,
+      memberIds: memberIds,
       memberNames: names,
       isGroup: data['isGroup'] as bool? ?? false,
       title: data['title'] as String?,
@@ -179,8 +221,46 @@ class ChatConversation {
       pinnedBy: pinned,
       createdAt: _readDate(data['createdAt']) ?? DateTime.now().toUtc(),
       createdBy: data['createdBy'] as String? ?? '',
+      isDefaultAgentGroup: data['isDefaultAgentGroup'] as bool? ??
+          id == ChatConversation.defaultAgentGroupId,
     );
   }
+}
+
+/// Inbox buckets: default community group(s), then pins, then recent.
+class ChatInboxSections {
+  const ChatInboxSections({
+    required this.community,
+    required this.pinned,
+    required this.recent,
+  });
+
+  final List<ChatConversation> community;
+  final List<ChatConversation> pinned;
+  final List<ChatConversation> recent;
+}
+
+ChatInboxSections partitionChatInbox(
+  List<ChatConversation> chats,
+  String viewerUid,
+) {
+  final community = <ChatConversation>[];
+  final pinned = <ChatConversation>[];
+  final recent = <ChatConversation>[];
+  for (final chat in chats) {
+    if (chat.isDefaultAgentGroup) {
+      community.add(chat);
+    } else if (chat.isPinnedFor(viewerUid)) {
+      pinned.add(chat);
+    } else {
+      recent.add(chat);
+    }
+  }
+  return ChatInboxSections(
+    community: community,
+    pinned: pinned,
+    recent: recent,
+  );
 }
 
 class ChatMessage {
@@ -210,7 +290,7 @@ class ChatMessage {
       'body': body,
       'senderId': senderId,
       'senderName': senderName,
-      'createdAt': Timestamp.fromDate(createdAt.toUtc()),
+      'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
       if (sharedPost != null) 'sharedPost': sharedPost!.toMap(),
     };
   }
@@ -284,8 +364,13 @@ String formatChatTime(
 DateTime? _readDate(Object? value) {
   if (value == null) return null;
   if (value is DateTime) return value.toUtc();
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value, isUtc: true);
+  }
+  if (value is num) {
+    return DateTime.fromMillisecondsSinceEpoch(value.toInt(), isUtc: true);
+  }
   if (value is String) return DateTime.tryParse(value)?.toUtc();
-  if (value is Timestamp) return value.toDate().toUtc();
   return null;
 }
 
@@ -297,6 +382,7 @@ bool canParticipateInChats({
   return role == UserRole.student ||
       role == UserRole.agent ||
       role == UserRole.instructor ||
+      role == UserRole.manager ||
       role == UserRole.admin;
 }
 
@@ -327,6 +413,13 @@ String friendlyChatError(Object error, AppLocalizations l10n) {
     'This chat no longer exists.': (l) => l.errChatGone,
     'Regístrate con una cuenta para usar los chats.': (l) => l.errChatRegister,
     'Sign up with an account to use chats.': (l) => l.errChatRegister,
+    'Only admins, instructors, and managers can create groups.': (l) =>
+        l.errChatCannotCreateGroup,
+    'Solo admins, instructores y managers pueden crear grupos.': (l) =>
+        l.errChatCannotCreateGroup,
+    'Enter a group name.': (l) => l.newGroupNeedTitle,
+    'Pick at least one other member.': (l) => l.newGroupNeedMembers,
+    'Groups can have at most 20 members.': (l) => l.newGroupTooMany,
   };
 
   final mapped = known[cleaned];

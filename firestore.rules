@@ -38,11 +38,11 @@ service cloud.firestore {
     function isForumParticipant() {
       return hasUserProfile()
         && !callerProfile().isAnonymous
-        && callerRole() in ['student', 'agent', 'instructor', 'admin'];
+        && callerRole() in ['student', 'agent', 'instructor', 'manager', 'admin'];
     }
 
     function isProtectedRole(role) {
-      return role in ['instructor', 'admin'];
+      return role in ['instructor', 'manager', 'admin'];
     }
 
     function boundedString(value, maxLen) {
@@ -147,97 +147,9 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
-    function isChatMember(chatId) {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/chats/$(chatId))
-        && isChatMemberData(
-          get(/databases/$(database)/documents/chats/$(chatId)).data
-        );
-    }
-
-    function isChatMemberData(data) {
-      return data.keys().hasAll(['memberIds'])
-        && data.memberIds is list
-        && request.auth.uid in data.memberIds;
-    }
-
-    function chatUpdateKeysOk() {
-      return request.resource.data.diff(resource.data).affectedKeys()
-        .hasOnly([
-          'lastMessage',
-          'lastMessageAt',
-          'lastMessageSenderId',
-          'unreadCounts',
-          'pinnedBy',
-          'memberNames',
-          'title',
-        ]);
-    }
-
-    match /chats/{chatId} {
-      allow get: if isForumParticipant() && (
-        resource == null
-        || isChatMemberData(resource.data)
-      );
-      allow list: if isSignedIn()
-        && request.auth.uid in resource.data.memberIds;
-
-      allow create: if isForumParticipant()
-        && request.resource.data.createdBy == request.auth.uid
-        && isChatMemberData(request.resource.data)
-        && request.resource.data.isGroup is bool
-        && request.resource.data.lastMessage is string
-        && request.resource.data.lastMessage.size() <= 2000
-        && (
-          (
-            request.resource.data.isGroup == false
-            && request.resource.data.memberIds.size() == 2
-            && request.resource.data.dmKey is string
-            && request.resource.data.dmKey == chatId
-          )
-          || (
-            request.resource.data.isGroup == true
-            && request.resource.data.memberIds.size() >= 2
-            && request.resource.data.memberIds.size() <= 20
-          )
-        );
-
-      allow update: if isSignedIn()
-        && isChatMemberData(resource.data)
-        && request.resource.data.memberIds == resource.data.memberIds
-        && request.resource.data.createdBy == resource.data.createdBy
-        && request.resource.data.dmKey == resource.data.dmKey
-        && request.resource.data.isGroup == resource.data.isGroup
-        && chatUpdateKeysOk()
-        && request.resource.data.lastMessage is string
-        && request.resource.data.lastMessage.size() <= 2000;
-
-      allow delete: if isAdmin();
-
-      match /messages/{messageId} {
-        allow read: if isChatMember(chatId);
-
-        allow create: if isChatMember(chatId)
-          && isForumParticipant()
-          && request.resource.data.senderId == request.auth.uid
-          && request.resource.data.senderName is string
-          && request.resource.data.senderName.size() <= 120
-          && request.resource.data.senderName == callerHeadlineName()
-          && (
-            (
-              boundedString(request.resource.data.body, 4000)
-            )
-            || (
-              request.resource.data.keys().hasAll(['sharedPost'])
-              && request.resource.data.sharedPost.keys()
-                .hasAll(['threadId', 'title'])
-              && boundedString(request.resource.data.sharedPost.threadId, 128)
-              && boundedString(request.resource.data.sharedPost.title, 200)
-            )
-          );
-
-        allow update, delete: if false;
-      }
+    // Chats live in Realtime Database (see database.rules.json).
+    match /chats/{document=**} {
+      allow read, write: if false;
     }
 
     match /threads/{threadId} {

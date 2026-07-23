@@ -80,14 +80,14 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
             children: [
               Center(
                 child: ChatAvatar(
-                  initials: chat.initialsFor(uid),
+                  initials: chat.initialsFor(uid, l10n: l10n),
                   isGroup: chat.isGroup,
                   size: 84,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                chat.titleFor(uid),
+                chat.titleFor(uid, l10n: l10n),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontSize: 22,
@@ -97,35 +97,38 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
               ),
               const SizedBox(height: 4),
               Text(
-                chat.isGroup ? l10n.chatTypeGroup : l10n.chatTypePrivate,
+                chat.isDefaultAgentGroup
+                    ? l10n.chatsDefaultGroupBadge
+                    : (chat.isGroup ? l10n.chatTypeGroup : l10n.chatTypePrivate),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
               ),
               const SizedBox(height: AppSpacing.xl),
-              PulseSheet(
-                child: Column(
-                  children: [
-                    ListTile(
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(
-                        pinned
-                            ? Icons.push_pin_rounded
-                            : Icons.push_pin_outlined,
-                        color: colors.muted,
+              if (!chat.isDefaultAgentGroup)
+                PulseSheet(
+                  child: Column(
+                    children: [
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          pinned
+                              ? Icons.push_pin_rounded
+                              : Icons.push_pin_outlined,
+                          color: colors.muted,
+                        ),
+                        title: Text(pinned ? l10n.chatUnpin : l10n.chatPin),
+                        trailing: _busy
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : null,
+                        onTap: _busy ? null : () => _togglePin(chat),
                       ),
-                      title: Text(pinned ? l10n.chatUnpin : l10n.chatPin),
-                      trailing: _busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : null,
-                      onTap: _busy ? null : () => _togglePin(chat),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
             ],
           );
         },

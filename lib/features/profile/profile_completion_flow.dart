@@ -7,6 +7,7 @@ import '../../app/widgets/pulse_chrome.dart';
 import '../../auth/auth.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
+import '../chats/chat_default_group_callable.dart';
 import 'widgets/profile_form_widgets.dart';
 
 class ProfileCompletionFlow extends StatefulWidget {
@@ -54,6 +55,13 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
         clearAgency: type == UserRole.student,
       );
       await widget.userRepository.updateProfile(completed);
+      if (type == UserRole.agent) {
+        try {
+          await DefaultAgentGroupCallable().ensureMembership();
+        } catch (_) {
+          // Membership can be repaired on next Chats open.
+        }
+      }
     } catch (error, stackTrace) {
       if (!mounted) return;
       showAppError(

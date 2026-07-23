@@ -202,40 +202,16 @@ describe('thread score forge', () => {
   });
 });
 
-describe('chat DM create', () => {
-  beforeEach(async () => {
-    await seedUser('a', { displayName: 'a', role: 'agent' });
-    await seedUser('b', { displayName: 'b', role: 'agent' });
-  });
-
-  it('requires exactly 2 members and dmKey == chatId for DMs', async () => {
+describe('chats moved to Realtime Database', () => {
+  it('denies all Firestore chat writes', async () => {
+    await seedUser('a', { displayName: 'a', role: 'manager' });
     const db = authedDb('a');
-    const dmKey = 'a_b';
     await assertFails(
-      db.doc(`chats/${dmKey}`).set({
-        memberIds: ['a', 'b', 'c'],
-        memberNames: { a: 'a', b: 'b', c: 'c' },
-        isGroup: false,
-        dmKey,
-        createdBy: 'a',
-        lastMessage: '',
-        lastMessageAt: new Date(),
-        unreadCounts: {},
-        pinnedBy: {},
-      }),
-    );
-
-    await assertSucceeds(
-      db.doc(`chats/${dmKey}`).set({
+      db.doc('chats/any').set({
         memberIds: ['a', 'b'],
-        memberNames: { a: 'a', b: 'b' },
         isGroup: false,
-        dmKey,
         createdBy: 'a',
         lastMessage: '',
-        lastMessageAt: new Date(),
-        unreadCounts: { a: 0, b: 0 },
-        pinnedBy: {},
       }),
     );
   });

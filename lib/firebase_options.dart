@@ -35,6 +35,7 @@ class DefaultFirebaseOptions {
     projectId: 'every-insurance',
     authDomain: 'every-insurance.firebaseapp.com',
     storageBucket: 'every-insurance.firebasestorage.app',
+    databaseURL: 'https://every-insurance-default-rtdb.firebaseio.com',
     measurementId: 'G-N4LWJZR3TW',
   );
 
@@ -44,6 +45,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '978334689853',
     projectId: 'every-insurance',
     storageBucket: 'every-insurance.firebasestorage.app',
+    databaseURL: 'https://every-insurance-default-rtdb.firebaseio.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
@@ -52,6 +54,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '978334689853',
     projectId: 'every-insurance',
     storageBucket: 'every-insurance.firebasestorage.app',
+    databaseURL: 'https://every-insurance-default-rtdb.firebaseio.com',
     iosBundleId: 'com.everybenefits.everyinsurance',
   );
 }

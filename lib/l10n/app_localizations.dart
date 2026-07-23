@@ -230,6 +230,12 @@ abstract class AppLocalizations {
   /// **'Instructor'**
   String get roleInstructor;
 
+  /// No description provided for @roleManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Manager'**
+  String get roleManager;
+
   /// No description provided for @roleAdmin.
   ///
   /// In en, this message translates to:
@@ -1640,6 +1646,12 @@ abstract class AppLocalizations {
   /// **'Sign up with an account to use chats.'**
   String get errChatRegister;
 
+  /// No description provided for @errChatCannotCreateGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Only admins, instructors, and managers can create groups.'**
+  String get errChatCannotCreateGroup;
+
   /// No description provided for @chatsTitle.
   ///
   /// In en, this message translates to:
@@ -1676,6 +1688,24 @@ abstract class AppLocalizations {
   /// **'Recent'**
   String get chatsSectionRecent;
 
+  /// No description provided for @chatsSectionCommunity.
+  ///
+  /// In en, this message translates to:
+  /// **'Community'**
+  String get chatsSectionCommunity;
+
+  /// No description provided for @chatsDefaultGroupBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Community'**
+  String get chatsDefaultGroupBadge;
+
+  /// No description provided for @chatsDefaultGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Agents'**
+  String get chatsDefaultGroupTitle;
+
   /// No description provided for @chatsNoMessagesYet.
   ///
   /// In en, this message translates to:
@@ -1687,6 +1717,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Group'**
   String get chatTypeGroup;
+
+  /// No description provided for @newGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New group'**
+  String get newGroupTitle;
+
+  /// No description provided for @newGroupNameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Group name'**
+  String get newGroupNameLabel;
+
+  /// No description provided for @newGroupNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Miami cohort'**
+  String get newGroupNameHint;
+
+  /// No description provided for @newGroupMembersHeader.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get newGroupMembersHeader;
+
+  /// No description provided for @newGroupCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create group'**
+  String get newGroupCreate;
+
+  /// No description provided for @newGroupNeedMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick at least one other member.'**
+  String get newGroupNeedMembers;
+
+  /// No description provided for @newGroupNeedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a group name.'**
+  String get newGroupNeedTitle;
+
+  /// No description provided for @newGroupTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Groups can have at most 20 members.'**
+  String get newGroupTooMany;
+
+  /// No description provided for @newChatCreateGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a group'**
+  String get newChatCreateGroup;
+
+  /// No description provided for @fabNewGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'New group'**
+  String get fabNewGroup;
 
   /// No description provided for @chatTypePrivate.
   ///

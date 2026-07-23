@@ -76,6 +76,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String get roleInstructor => 'Instructor';
 
   @override
+  String get roleManager => 'Gerente';
+
+  @override
   String get roleAdmin => 'Admin';
 
   @override
@@ -837,6 +840,10 @@ class AppLocalizationsEs extends AppLocalizations {
       'Regístrate con una cuenta para usar los chats.';
 
   @override
+  String get errChatCannotCreateGroup =>
+      'Solo admins, instructores y managers pueden crear grupos.';
+
+  @override
   String get chatsTitle => 'Chats';
 
   @override
@@ -856,10 +863,49 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatsSectionRecent => 'Recientes';
 
   @override
+  String get chatsSectionCommunity => 'Comunidad';
+
+  @override
+  String get chatsDefaultGroupBadge => 'Comunidad';
+
+  @override
+  String get chatsDefaultGroupTitle => 'Agentes';
+
+  @override
   String get chatsNoMessagesYet => 'Sin mensajes todavía';
 
   @override
   String get chatTypeGroup => 'Grupo';
+
+  @override
+  String get newGroupTitle => 'Nuevo grupo';
+
+  @override
+  String get newGroupNameLabel => 'Nombre del grupo';
+
+  @override
+  String get newGroupNameHint => 'ej. Cohorte Miami';
+
+  @override
+  String get newGroupMembersHeader => 'Miembros';
+
+  @override
+  String get newGroupCreate => 'Crear grupo';
+
+  @override
+  String get newGroupNeedMembers => 'Elige al menos otro miembro.';
+
+  @override
+  String get newGroupNeedTitle => 'Ingresa un nombre de grupo.';
+
+  @override
+  String get newGroupTooMany => 'Los grupos pueden tener máximo 20 miembros.';
+
+  @override
+  String get newChatCreateGroup => 'Crear un grupo';
+
+  @override
+  String get fabNewGroup => 'Nuevo grupo';
 
   @override
   String get chatTypePrivate => 'Chat privado';

@@ -1,13 +1,16 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:async';
+
+import 'package:firebase_database/firebase_database.dart';
 
 import '../../users/user_profile.dart';
+import '../../users/user_role.dart';
 import 'chat_models.dart';
 
 typedef ChatIdFactory = String Function();
 
 const kChatMessagePageSize = 40;
 
-/// Persistence port for chats (testable without Firestore).
+/// Persistence port for chats (testable without Firebase).
 abstract class ChatStore {
   Stream<List<ChatConversation>> watchChats(String uid);
 
@@ -31,36 +34,86 @@ abstract class ChatStore {
   Future<ChatMessage> addMessage(ChatMessage message);
 }
 
-class FirestoreChatStore implements ChatStore {
-  FirestoreChatStore({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+/// Realtime Database chat persistence.
+///
+/// Paths:
+/// - `chats/{id}` — conversation meta (`members` map for rules)
+/// - `messages/{chatId}/{messageId}` — message bodies
+/// - `userChats/{uid}/{chatId}` — inbox index (`lastMessageAt`)
+/// - `dmIndex/{dmKey}` — DM id lookup
+class RtdbChatStore implements ChatStore {
+  RtdbChatStore({FirebaseDatabase? database})
+      : _db = database ?? FirebaseDatabase.instance;
 
-  final FirebaseFirestore _firestore;
+  final FirebaseDatabase _db;
 
-  CollectionReference<Map<String, dynamic>> get _chats =>
-      _firestore.collection('chats');
+  DatabaseReference get _root => _db.ref();
 
-  CollectionReference<Map<String, dynamic>> _messages(String chatId) =>
-      _chats.doc(chatId).collection('messages');
+  Map<String, dynamic> _asStringKeyedMap(Object? raw) {
+    if (raw is! Map) return {};
+    return raw.map((key, value) => MapEntry('$key', value));
+  }
 
+  Future<List<ChatConversation>> _inboxFromIndex(Object? raw) async {
+    if (raw is! Map || raw.isEmpty) return <ChatConversation>[];
+
+    final entries = raw.entries.toList();
+    entries.sort((a, b) {
+      final aAt = _readMillis(_asStringKeyedMap(a.value)['lastMessageAt']);
+      final bAt = _readMillis(_asStringKeyedMap(b.value)['lastMessageAt']);
+      return bAt.compareTo(aAt);
+    });
+
+    final chats = <ChatConversation>[];
+    for (final entry in entries) {
+      final chatId = '${entry.key}';
+      final snap = await _root.child('chats/$chatId').get();
+      if (!snap.exists || snap.value is! Map) continue;
+      chats.add(
+        ChatConversation.fromMap(chatId, _asStringKeyedMap(snap.value)),
+      );
+    }
+    return chats;
+  }
+
+  /// RTDB `onValue` streams are single-subscription; [Stream.multi] makes each
+  /// `.listen` start a fresh native subscription (needed when the inbox pauses).
   @override
   Stream<List<ChatConversation>> watchChats(String uid) {
-    return _chats
-        .where('memberIds', arrayContains: uid)
-        .orderBy('lastMessageAt', descending: true)
-        .snapshots()
-        .map(
-          (snap) => snap.docs
-              .map((d) => ChatConversation.fromMap(d.id, d.data()))
-              .toList(),
-        );
+    return Stream.multi((controller) {
+      final sub = _root.child('userChats/$uid').onValue.listen(
+        (event) async {
+          try {
+            controller.add(await _inboxFromIndex(event.snapshot.value));
+          } catch (e, st) {
+            controller.addError(e, st);
+          }
+        },
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    });
   }
 
   @override
   Stream<ChatConversation?> watchChat(String chatId) {
-    return _chats.doc(chatId).snapshots().map((snap) {
-      if (!snap.exists || snap.data() == null) return null;
-      return ChatConversation.fromMap(snap.id, snap.data()!);
+    return Stream.multi((controller) {
+      final sub = _root.child('chats/$chatId').onValue.listen(
+        (event) {
+          final snap = event.snapshot;
+          if (!snap.exists || snap.value is! Map) {
+            controller.add(null);
+            return;
+          }
+          controller.add(
+            ChatConversation.fromMap(chatId, _asStringKeyedMap(snap.value)),
+          );
+        },
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
     });
   }
 
@@ -69,15 +122,34 @@ class FirestoreChatStore implements ChatStore {
     String chatId, {
     int limit = kChatMessagePageSize,
   }) {
-    return _messages(chatId)
-        .orderBy('createdAt', descending: true)
-        .limit(limit)
-        .snapshots()
-        .map(
-          (snap) => snap.docs
-              .map((d) => ChatMessage.fromMap(d.id, d.data()))
-              .toList(),
-        );
+    return Stream.multi((controller) {
+      final query = _root
+          .child('messages/$chatId')
+          .orderByChild('createdAt')
+          .limitToLast(limit);
+      final sub = query.onValue.listen(
+        (event) {
+          final raw = event.snapshot.value;
+          if (raw is! Map) {
+            controller.add(<ChatMessage>[]);
+            return;
+          }
+          final list = <ChatMessage>[];
+          for (final entry in raw.entries) {
+            final data = _asStringKeyedMap(entry.value);
+            list.add(ChatMessage.fromMap('${entry.key}', {
+              ...data,
+              'chatId': chatId,
+            }));
+          }
+          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+          controller.add(list);
+        },
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    });
   }
 
   @override
@@ -85,61 +157,98 @@ class FirestoreChatStore implements ChatStore {
     String dmKey, {
     required String viewerUid,
   }) async {
-    // Prefer deterministic doc id (= dmKey) so reads are single-get and
-    // allowed by membership rules. Fall back to a membership-scoped query
-    // for chats created before that convention.
-    final byId = await _chats.doc(dmKey).get();
-    if (byId.exists && byId.data() != null) {
-      final chat = ChatConversation.fromMap(byId.id, byId.data()!);
+    final byId = await _root.child('chats/$dmKey').get();
+    if (byId.exists && byId.value is Map) {
+      final chat = ChatConversation.fromMap(dmKey, _asStringKeyedMap(byId.value));
       if (chat.memberIds.contains(viewerUid)) return chat;
-      return null;
     }
 
-    final snap = await _chats
-        .where('memberIds', arrayContains: viewerUid)
-        .where('dmKey', isEqualTo: dmKey)
-        .limit(1)
-        .get();
-    if (snap.docs.isEmpty) return null;
-    final doc = snap.docs.first;
-    return ChatConversation.fromMap(doc.id, doc.data());
+    final index = await _root.child('dmIndex/$dmKey').get();
+    final mappedId = index.value?.toString();
+    if (mappedId == null || mappedId.isEmpty) return null;
+    final snap = await _root.child('chats/$mappedId').get();
+    if (!snap.exists || snap.value is! Map) return null;
+    final chat =
+        ChatConversation.fromMap(mappedId, _asStringKeyedMap(snap.value));
+    if (!chat.memberIds.contains(viewerUid)) return null;
+    return chat;
   }
 
   @override
   Future<ChatConversation> createChat(ChatConversation chat) async {
-    final ref = chat.id.isEmpty ? _chats.doc() : _chats.doc(chat.id);
-    final payload = chat.toMap();
-    await ref.set(payload);
-    return ChatConversation.fromMap(ref.id, {
-      ...payload,
-      'lastMessageAt': chat.lastMessageAt,
-      'createdAt': chat.createdAt,
-    });
+    final ref = chat.id.isEmpty
+        ? _root.child('chats').push()
+        : _root.child('chats/${chat.id}');
+    final id = ref.key!;
+    final saved = ChatConversation(
+      id: id,
+      memberIds: chat.memberIds,
+      memberNames: chat.memberNames,
+      isGroup: chat.isGroup,
+      title: chat.title,
+      dmKey: chat.dmKey,
+      lastMessage: chat.lastMessage,
+      lastMessageAt: chat.lastMessageAt,
+      lastMessageSenderId: chat.lastMessageSenderId,
+      unreadCounts: chat.unreadCounts,
+      pinnedBy: chat.pinnedBy,
+      createdAt: chat.createdAt,
+      createdBy: chat.createdBy,
+      isDefaultAgentGroup: chat.isDefaultAgentGroup,
+    );
+
+    final updates = <String, Object?>{
+      'chats/$id': saved.toRtdbMap(),
+    };
+    final at = saved.lastMessageAt.toUtc().millisecondsSinceEpoch;
+    for (final memberId in saved.memberIds) {
+      updates['userChats/$memberId/$id'] = {'lastMessageAt': at};
+    }
+    if (saved.dmKey != null && saved.dmKey!.isNotEmpty) {
+      updates['dmIndex/${saved.dmKey}'] = id;
+    }
+    await _root.update(updates);
+    return saved;
   }
 
   @override
   Future<void> updateChat(ChatConversation chat) async {
-    // Patch only mutable metadata so rules `diff().affectedKeys()` stays tight.
-    await _chats.doc(chat.id).update({
-      'memberNames': chat.memberNames,
-      'title': chat.title,
-      'lastMessage': chat.lastMessage,
-      'lastMessageAt': Timestamp.fromDate(chat.lastMessageAt.toUtc()),
-      'lastMessageSenderId': chat.lastMessageSenderId,
-      'unreadCounts': chat.unreadCounts,
-      'pinnedBy': chat.pinnedBy,
-    });
+    final at = chat.lastMessageAt.toUtc().millisecondsSinceEpoch;
+    final updates = <String, Object?>{
+      'chats/${chat.id}/memberNames': chat.memberNames,
+      'chats/${chat.id}/title': chat.title,
+      'chats/${chat.id}/lastMessage': chat.lastMessage,
+      'chats/${chat.id}/lastMessageAt': at,
+      'chats/${chat.id}/lastMessageSenderId': chat.lastMessageSenderId,
+      'chats/${chat.id}/unreadCounts': chat.unreadCounts,
+      'chats/${chat.id}/pinnedBy': {
+        for (final e in chat.pinnedBy.entries)
+          if (e.value) e.key: true,
+      },
+    };
+    for (final memberId in chat.memberIds) {
+      updates['userChats/$memberId/${chat.id}/lastMessageAt'] = at;
+    }
+    await _root.update(updates);
   }
 
   @override
   Future<ChatMessage> addMessage(ChatMessage message) async {
-    final ref = _messages(message.chatId).doc();
-    final payload = message.toMap();
+    final ref = _root.child('messages/${message.chatId}').push();
+    final id = ref.key!;
+    final payload = message.toMap()..remove('chatId');
     await ref.set(payload);
-    return ChatMessage.fromMap(ref.id, {
+    return ChatMessage.fromMap(id, {
       ...payload,
+      'chatId': message.chatId,
       'createdAt': message.createdAt,
     });
+  }
+
+  int _readMillis(Object? value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return 0;
   }
 }
 
@@ -148,7 +257,7 @@ class ChatRepository {
     ChatStore? store,
     this._idFactory,
     DateTime Function()? clock,
-  })  : _store = store ?? FirestoreChatStore(),
+  })  : _store = store ?? RtdbChatStore(),
         _clock = clock ?? (() => DateTime.now().toUtc());
 
   final ChatStore _store;
@@ -198,6 +307,59 @@ class ChatRepository {
       createdBy: me.uid,
       unreadCounts: {me.uid: 0, other.uid: 0},
       pinnedBy: const {},
+    );
+    return _store.createChat(chat);
+  }
+
+  /// Creates a group chat. Only admin / instructor / manager.
+  Future<ChatConversation> createGroup({
+    required UserProfile creator,
+    required String title,
+    required List<UserProfile> members,
+  }) async {
+    _ensureCanChat(creator);
+    if (!canCreateChatGroups(creator.role)) {
+      throw StateError(
+        'Only admins, instructors, and managers can create groups.',
+      );
+    }
+    final trimmed = title.trim();
+    if (trimmed.isEmpty) {
+      throw ArgumentError('Enter a group name.');
+    }
+    final others = <UserProfile>[];
+    final seen = <String>{creator.uid};
+    for (final member in members) {
+      if (seen.add(member.uid)) {
+        _ensureCanChat(member);
+        others.add(member);
+      }
+    }
+    if (others.isEmpty) {
+      throw ArgumentError('Pick at least one other member.');
+    }
+    final all = [creator, ...others];
+    if (all.length > 20) {
+      throw ArgumentError('Groups can have at most 20 members.');
+    }
+
+    final now = _clock();
+    final id = _idFactory?.call() ?? '';
+    final chat = ChatConversation(
+      id: id,
+      memberIds: all.map((p) => p.uid).toList()..sort(),
+      memberNames: {
+        for (final p in all) p.uid: p.headlineName,
+      },
+      isGroup: true,
+      title: trimmed,
+      lastMessage: '',
+      lastMessageAt: now,
+      createdAt: now,
+      createdBy: creator.uid,
+      unreadCounts: {for (final p in all) p.uid: 0},
+      pinnedBy: const {},
+      isDefaultAgentGroup: false,
     );
     return _store.createChat(chat);
   }

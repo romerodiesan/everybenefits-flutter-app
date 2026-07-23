@@ -92,6 +92,7 @@ class FakeChatStore implements ChatStore {
       pinnedBy: chat.pinnedBy,
       createdAt: chat.createdAt,
       createdBy: chat.createdBy,
+      isDefaultAgentGroup: chat.isDefaultAgentGroup,
     );
     chats[id] = saved;
     messages.putIfAbsent(id, () => []);

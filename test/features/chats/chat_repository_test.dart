@@ -164,6 +164,36 @@ void main() {
     });
   });
 
+  group('createGroup', () {
+    test('rejects agents', () async {
+      final me = _user('me');
+      final other = _user('other');
+      expect(
+        () => repo.createGroup(
+          creator: me,
+          title: 'Team',
+          members: [other],
+        ),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('creates group for manager', () async {
+      final me = _user('me', role: UserRole.manager, name: 'Mgr');
+      final other = _user('other', name: 'Peer');
+      final chat = await repo.createGroup(
+        creator: me,
+        title: ' Cohort A ',
+        members: [other],
+      );
+      expect(chat.isGroup, isTrue);
+      expect(chat.title, 'Cohort A');
+      expect(chat.isDefaultAgentGroup, isFalse);
+      expect(chat.memberIds, containsAll(['me', 'other']));
+      expect(chat.createdBy, 'me');
+    });
+  });
+
   group('formatChatTime', () {
     test('formats today as time and older as weekday-ish labels', () {
       final l10n = AppLocalizationsEn();

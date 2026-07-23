@@ -262,6 +262,7 @@ bool canParticipateInForums({
   return role == UserRole.student ||
       role == UserRole.agent ||
       role == UserRole.instructor ||
+      role == UserRole.manager ||
       role == UserRole.admin;
 }
 
