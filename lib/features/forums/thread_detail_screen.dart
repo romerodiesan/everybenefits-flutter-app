@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/empty_state.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../users/users.dart';
 import '../chats/chat_repository.dart';
 import 'forum_models.dart';
@@ -143,114 +145,20 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _editThread(ForumThread thread) async {
-    final titleController = TextEditingController(text: thread.title);
-    final bodyController = TextEditingController(text: thread.body);
-    final tagInput = TextEditingController();
-    var tags = {...thread.tags};
-
-    final saved = await showModalBottomSheet<bool>(
+    final result = await showModalBottomSheet<_EditThreadResult>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
-            top: AppSpacing.sm,
-          ),
-          child: StatefulBuilder(
-            builder: (context, setModalState) {
-              return SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      'Editar pregunta',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextField(
-                      controller: titleController,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: const InputDecoration(
-                        labelText: 'Título',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextField(
-                      controller: bodyController,
-                      textCapitalization: TextCapitalization.sentences,
-                      minLines: 4,
-                      maxLines: 8,
-                      decoration: const InputDecoration(
-                        labelText: 'Contenido',
-                        border: OutlineInputBorder(),
-                        alignLabelWithHint: true,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                    TextField(
-                      controller: tagInput,
-                      textInputAction: TextInputAction.done,
-                      decoration: const InputDecoration(
-                        labelText: 'Agregar tag',
-                        border: OutlineInputBorder(),
-                      ),
-                      onSubmitted: (_) {
-                        final tag = normalizeForumTag(tagInput.text);
-                        if (tag.isEmpty || tags.contains(tag)) {
-                          tagInput.clear();
-                          return;
-                        }
-                        if (tags.length >= 5) return;
-                        setModalState(() {
-                          tags.add(tag);
-                          tagInput.clear();
-                        });
-                      },
-                    ),
-                    if (tags.isNotEmpty) ...[
-                      const SizedBox(height: AppSpacing.sm),
-                      ForumTagWrap(
-                        tags: tags.toList(),
-                        onTagRemove: (tag) {
-                          setModalState(() => tags.remove(tag));
-                        },
-                      ),
-                    ],
-                    const SizedBox(height: AppSpacing.lg),
-                    FilledButton(
-                      onPressed: () => Navigator.of(context).pop(true),
-                      child: const Text('Guardar'),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        );
-      },
+      builder: (context) => _EditThreadSheet(thread: thread),
     );
-
-    final title = titleController.text;
-    final body = bodyController.text;
-    final tagList = tags.toList();
-    titleController.dispose();
-    bodyController.dispose();
-    tagInput.dispose();
-
-    if (saved != true) return;
+    if (result == null || !mounted) return;
     try {
       await widget.forumRepository.updateThread(
         thread: thread,
         actor: widget.profile,
-        title: title,
-        body: body,
-        tags: tagList,
+        title: result.title,
+        body: result.body,
+        tags: result.tags,
       );
     } catch (error) {
       _showError(error);
@@ -258,54 +166,13 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _editReply(ForumReply reply) async {
-    final bodyController = TextEditingController(text: reply.body);
-    final saved = await showModalBottomSheet<bool>(
+    final body = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
-      builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
-            top: AppSpacing.sm,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Editar respuesta',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.md),
-              TextField(
-                controller: bodyController,
-                autofocus: true,
-                textCapitalization: TextCapitalization.sentences,
-                minLines: 4,
-                maxLines: 8,
-                decoration: const InputDecoration(
-                  labelText: 'Respuesta',
-                  border: OutlineInputBorder(),
-                  alignLabelWithHint: true,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                child: const Text('Guardar'),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (context) => _EditReplySheet(initialBody: reply.body),
     );
-
-    final body = bodyController.text;
-    bodyController.dispose();
-    if (saved != true) return;
+    if (body == null || !mounted) return;
     try {
       await widget.forumRepository.updateReply(
         reply: reply,
@@ -330,6 +197,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _voteThread(ForumThread thread, RelevanceVote next) async {
+    PulseHaptics.selection();
     try {
       await widget.forumRepository.setThreadRelevance(
         thread: thread,
@@ -342,6 +210,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _voteReply(ForumReply reply, RelevanceVote next) async {
+    PulseHaptics.selection();
     try {
       await widget.forumRepository.setReplyRelevance(
         reply: reply,
@@ -389,19 +258,22 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
               if (thread != null)
                 IconButton(
                   tooltip: 'Compartir en chat',
-                  onPressed: () => showShareToChatSheet(
-                    context: context,
-                    thread: thread,
-                    profile: widget.profile,
-                    forumRepository: widget.forumRepository,
-                    chatRepository: widget.chatRepository,
-                  ),
+                  onPressed: () {
+                    PulseHaptics.light();
+                    showShareToChatSheet(
+                      context: context,
+                      thread: thread,
+                      profile: widget.profile,
+                      forumRepository: widget.forumRepository,
+                      chatRepository: widget.chatRepository,
+                    );
+                  },
                   icon: const Icon(Icons.forum_outlined),
                 ),
             ],
           ),
           body: loading
-              ? const Center(child: CircularProgressIndicator())
+              ? const PulseThreadSkeleton()
               : missing
                   ? const EmptyState(
                       mark: '?',
@@ -456,14 +328,18 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                             ? () =>
                                                 _replyFocus.requestFocus()
                                             : null,
-                                        onShare: () => showShareToChatSheet(
-                                          context: context,
-                                          thread: thread,
-                                          profile: widget.profile,
-                                          forumRepository:
-                                              widget.forumRepository,
-                                          chatRepository: widget.chatRepository,
-                                        ),
+                                        onShare: () {
+                                          PulseHaptics.light();
+                                          showShareToChatSheet(
+                                            context: context,
+                                            thread: thread,
+                                            profile: widget.profile,
+                                            forumRepository:
+                                                widget.forumRepository,
+                                            chatRepository:
+                                                widget.chatRepository,
+                                          );
+                                        },
                                         onEdit: () => _editThread(thread),
                                         onDelete: () =>
                                             _deleteThread(thread),
@@ -926,6 +802,205 @@ class _PulseAnswer extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _EditThreadResult {
+  const _EditThreadResult({
+    required this.title,
+    required this.body,
+    required this.tags,
+  });
+
+  final String title;
+  final String body;
+  final List<String> tags;
+}
+
+class _EditThreadSheet extends StatefulWidget {
+  const _EditThreadSheet({required this.thread});
+
+  final ForumThread thread;
+
+  @override
+  State<_EditThreadSheet> createState() => _EditThreadSheetState();
+}
+
+class _EditThreadSheetState extends State<_EditThreadSheet> {
+  late final TextEditingController _title;
+  late final TextEditingController _body;
+  late final TextEditingController _tagInput;
+  late final Set<String> _tags;
+
+  @override
+  void initState() {
+    super.initState();
+    _title = TextEditingController(text: widget.thread.title);
+    _body = TextEditingController(text: widget.thread.body);
+    _tagInput = TextEditingController();
+    _tags = {...widget.thread.tags};
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _body.dispose();
+    _tagInput.dispose();
+    super.dispose();
+  }
+
+  void _addTag() {
+    final tag = normalizeForumTag(_tagInput.text);
+    if (tag.isEmpty || _tags.contains(tag) || _tags.length >= 5) {
+      _tagInput.clear();
+      return;
+    }
+    setState(() {
+      _tags.add(tag);
+      _tagInput.clear();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.lg,
+        right: AppSpacing.lg,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+        top: AppSpacing.sm,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Editar pregunta',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _title,
+              textCapitalization: TextCapitalization.sentences,
+              decoration: const InputDecoration(
+                labelText: 'Título',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _body,
+              textCapitalization: TextCapitalization.sentences,
+              minLines: 4,
+              maxLines: 8,
+              decoration: const InputDecoration(
+                labelText: 'Contenido',
+                border: OutlineInputBorder(),
+                alignLabelWithHint: true,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextField(
+              controller: _tagInput,
+              textInputAction: TextInputAction.done,
+              decoration: const InputDecoration(
+                labelText: 'Agregar tag',
+                border: OutlineInputBorder(),
+              ),
+              onSubmitted: (_) => _addTag(),
+            ),
+            if (_tags.isNotEmpty) ...[
+              const SizedBox(height: AppSpacing.sm),
+              ForumTagWrap(
+                tags: _tags.toList(),
+                onTagRemove: (tag) {
+                  setState(() => _tags.remove(tag));
+                },
+              ),
+            ],
+            const SizedBox(height: AppSpacing.lg),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pop(
+                  _EditThreadResult(
+                    title: _title.text,
+                    body: _body.text,
+                    tags: _tags.toList(),
+                  ),
+                );
+              },
+              child: const Text('Guardar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EditReplySheet extends StatefulWidget {
+  const _EditReplySheet({required this.initialBody});
+
+  final String initialBody;
+
+  @override
+  State<_EditReplySheet> createState() => _EditReplySheetState();
+}
+
+class _EditReplySheetState extends State<_EditReplySheet> {
+  late final TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialBody);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: AppSpacing.lg,
+        right: AppSpacing.lg,
+        bottom: MediaQuery.viewInsetsOf(context).bottom + AppSpacing.lg,
+        top: AppSpacing.sm,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            'Editar respuesta',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          TextField(
+            controller: _controller,
+            autofocus: true,
+            textCapitalization: TextCapitalization.sentences,
+            minLines: 4,
+            maxLines: 8,
+            decoration: const InputDecoration(
+              labelText: 'Respuesta',
+              border: OutlineInputBorder(),
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(_controller.text),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
     );
   }
 }

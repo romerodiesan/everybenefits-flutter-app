@@ -264,6 +264,74 @@ bool canParticipateInForums({
       role == UserRole.admin;
 }
 
+/// Aggregate relevance for a discovery tag chip in the feed.
+class ForumTagStat {
+  const ForumTagStat({
+    required this.tag,
+    required this.questionCount,
+    required this.totalScore,
+    required this.latestActivity,
+  });
+
+  final String tag;
+  final int questionCount;
+  final int totalScore;
+  final DateTime latestActivity;
+}
+
+/// Builds tag chips from threads that actually have questions.
+///
+/// Empty tags are omitted. Ordering follows [sort]:
+/// - [ForumSort.relevant]: higher total score, then more questions
+/// - [ForumSort.recent]: more recent activity, then more questions
+List<ForumTagStat> rankForumTags(
+  Iterable<ForumThread> threads, {
+  ForumSort sort = ForumSort.relevant,
+}) {
+  final counts = <String, int>{};
+  final scores = <String, int>{};
+  final latest = <String, DateTime>{};
+
+  for (final thread in threads) {
+    for (final tag in thread.tags) {
+      if (tag.isEmpty) continue;
+      counts[tag] = (counts[tag] ?? 0) + 1;
+      scores[tag] = (scores[tag] ?? 0) + thread.score;
+      final prev = latest[tag];
+      if (prev == null || thread.lastReplyAt.isAfter(prev)) {
+        latest[tag] = thread.lastReplyAt;
+      }
+    }
+  }
+
+  final ranked = [
+    for (final tag in counts.keys)
+      ForumTagStat(
+        tag: tag,
+        questionCount: counts[tag]!,
+        totalScore: scores[tag] ?? 0,
+        latestActivity: latest[tag] ?? DateTime.fromMillisecondsSinceEpoch(0),
+      ),
+  ]..sort((a, b) {
+      switch (sort) {
+        case ForumSort.relevant:
+          final byScore = b.totalScore.compareTo(a.totalScore);
+          if (byScore != 0) return byScore;
+          final byCount = b.questionCount.compareTo(a.questionCount);
+          if (byCount != 0) return byCount;
+          return a.tag.compareTo(b.tag);
+        case ForumSort.recent:
+          final byTime = b.latestActivity.compareTo(a.latestActivity);
+          if (byTime != 0) return byTime;
+          final byCount = b.questionCount.compareTo(a.questionCount);
+          if (byCount != 0) return byCount;
+          return a.tag.compareTo(b.tag);
+      }
+    });
+
+  return ranked;
+}
+
 /// Client-side helpers for discovery over an already-loaded page.
 List<ForumThread> filterAndSortThreads(
   List<ForumThread> threads, {

@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/empty_state.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../users/users.dart';
 import 'create_thread_screen.dart';
 import 'forum_models.dart';
 import 'forum_repository.dart';
-import 'forum_tags.dart';
 import '../chats/chat_repository.dart';
 import 'thread_detail_screen.dart';
 import 'widgets/feed_composer_bar.dart';
@@ -32,10 +33,10 @@ class ForumsScreen extends StatefulWidget {
   final bool embeddedInShell;
 
   @override
-  State<ForumsScreen> createState() => _ForumsScreenState();
+  State<ForumsScreen> createState() => ForumsScreenState();
 }
 
-class _ForumsScreenState extends State<ForumsScreen> {
+class ForumsScreenState extends State<ForumsScreen> {
   late final ForumRepository _repository =
       widget.forumRepository ?? ForumRepository();
   final _searchController = TextEditingController();
@@ -51,6 +52,10 @@ class _ForumsScreenState extends State<ForumsScreen> {
   ForumSort _sort = ForumSort.recent;
   String _query = '';
   bool _searchOpen = false;
+
+  /// Threads used to rank discovery tags (kept when filtering by tag / mine).
+  List<ForumThread> _tagCatalog = const [];
+
 
   bool get _canPost => canParticipateInForums(
         role: widget.profile.role,
@@ -92,6 +97,7 @@ class _ForumsScreenState extends State<ForumsScreen> {
         _cursor = page.nextCursor;
         _hasMore = page.hasMore;
         _loading = false;
+        _refreshTagCatalog();
       });
     } catch (error) {
       if (!mounted) return;
@@ -118,6 +124,7 @@ class _ForumsScreenState extends State<ForumsScreen> {
         _cursor = page.nextCursor;
         _hasMore = page.hasMore;
         _loadingMore = false;
+        _refreshTagCatalog();
       });
     } catch (error) {
       if (!mounted) return;
@@ -126,6 +133,21 @@ class _ForumsScreenState extends State<ForumsScreen> {
         SnackBar(content: Text(friendlyForumError(error))),
       );
     }
+  }
+
+  void _refreshTagCatalog() {
+    if (_selectedTag == null && !_mineOnly) {
+      _tagCatalog = _threads;
+      return;
+    }
+    if (_tagCatalog.isEmpty) {
+      _tagCatalog = _threads;
+    }
+  }
+
+  List<ForumTagStat> get _rankedTags {
+    final source = _tagCatalog.isNotEmpty ? _tagCatalog : _threads;
+    return rankForumTags(source, sort: _sort);
   }
 
   void _setSelectedTag(String? tag) {
@@ -146,7 +168,7 @@ class _ForumsScreenState extends State<ForumsScreen> {
     _reload();
   }
 
-  Future<void> _openCreate() async {
+  Future<void> openCreate() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => CreateThreadScreen(
@@ -193,11 +215,22 @@ class _ForumsScreenState extends State<ForumsScreen> {
                 decoration: InputDecoration(
                   hintText: 'Buscar preguntas…',
                   border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  disabledBorder: InputBorder.none,
+                  errorBorder: InputBorder.none,
+                  focusedErrorBorder: InputBorder.none,
+                  filled: false,
+                  isDense: true,
+                  contentPadding: EdgeInsets.zero,
                   hintStyle: theme.textTheme.titleMedium?.copyWith(
                     color: colors.muted,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                style: theme.textTheme.titleMedium,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
                 onChanged: (value) => setState(() => _query = value),
               )
             : Text(
@@ -238,12 +271,15 @@ class _ForumsScreenState extends State<ForumsScreen> {
           ),
         ],
       ),
-      floatingActionButton: _canPost
+      floatingActionButton: _canPost && !widget.embeddedInShell
           ? FloatingActionButton(
               heroTag: 'fab-inicio-compose',
-              onPressed: _openCreate,
+              onPressed: () {
+                PulseHaptics.light();
+                openCreate();
+              },
               tooltip: 'Nueva pregunta',
-              child: const Icon(Icons.add_rounded),
+              child: const Icon(Icons.question_answer_rounded),
             )
           : null,
       body: Column(
@@ -325,14 +361,14 @@ class _ForumsScreenState extends State<ForumsScreen> {
                       color: colors.border,
                     ),
                   ),
-                  for (final tag in kSuggestedForumTags) ...[
+                  for (final tag in _rankedTags) ...[
                     ForumFilterChip(
-                      label: tag,
+                      label: tag.tag,
                       showHash: true,
-                      selected: _selectedTag == tag,
+                      selected: _selectedTag == tag.tag,
                       onTap: () {
                         _setSelectedTag(
-                          _selectedTag == tag ? null : tag,
+                          _selectedTag == tag.tag ? null : tag.tag,
                         );
                       },
                     ),
@@ -345,7 +381,7 @@ class _ForumsScreenState extends State<ForumsScreen> {
           if (_canPost)
             FeedComposerBar(
               profile: widget.profile,
-              onTap: _openCreate,
+              onTap: openCreate,
             )
           else
             Padding(
@@ -363,7 +399,21 @@ class _ForumsScreenState extends State<ForumsScreen> {
                 ),
               ),
             ),
-          Expanded(child: _buildFeed(context, visible)),
+          Expanded(
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: KeyedSubtree(
+                key: ValueKey<String>(
+                  _loading
+                      ? 'loading'
+                      : (_error != null
+                          ? 'error'
+                          : (_threads.isEmpty ? 'empty' : 'feed')),
+                ),
+                child: _buildFeed(context, visible),
+              ),
+            ),
+          ),
         ],
       ),
     );
@@ -380,7 +430,7 @@ class _ForumsScreenState extends State<ForumsScreen> {
 
   Widget _buildFeed(BuildContext context, List<ForumThread> visible) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const PulseFeedSkeleton();
     }
     if (_error != null) {
       return EmptyState(
@@ -399,7 +449,7 @@ class _ForumsScreenState extends State<ForumsScreen> {
             ? 'Publica tu primera pregunta para verla aquí.'
             : 'Sé el primero en publicar una pregunta.',
         actionLabel: _canPost ? 'Nueva pregunta' : null,
-        onAction: _canPost ? _openCreate : null,
+        onAction: _canPost ? openCreate : null,
       );
     }
     if (visible.isEmpty) {
@@ -414,8 +464,8 @@ class _ForumsScreenState extends State<ForumsScreen> {
 
     final showLoadMore = _hasMore && !_isSearching;
     final double bottomPad = widget.embeddedInShell
-        ? (_canPost ? 108.0 : 88.0)
-        : (_canPost ? 88.0 : AppSpacing.xl.toDouble());
+        ? pulseShellListBottomPad(context, hasFab: _canPost)
+        : (_canPost ? 88.0 : AppSpacing.xl);
     return ListView.builder(
       padding: EdgeInsets.only(
         top: AppSpacing.xs,
@@ -451,13 +501,16 @@ class _ForumsScreenState extends State<ForumsScreen> {
             onTap: () => _openThread(thread),
             onComment: () => _openThread(thread),
             onRelevance: () => _openThread(thread),
-            onShare: () => showShareToChatSheet(
-              context: context,
-              thread: thread,
-              profile: widget.profile,
-              forumRepository: _repository,
-              chatRepository: widget.chatRepository,
-            ),
+            onShare: () {
+              PulseHaptics.light();
+              showShareToChatSheet(
+                context: context,
+                thread: thread,
+                profile: widget.profile,
+                forumRepository: _repository,
+                chatRepository: widget.chatRepository,
+              );
+            },
             onTagTap: _setSelectedTag,
           ),
         );
