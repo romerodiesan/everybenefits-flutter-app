@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/glass_card.dart';
+import '../../../l10n/l10n.dart';
 import '../../../users/users.dart';
 
 typedef ProfileFormData = ({
@@ -11,9 +12,16 @@ typedef ProfileFormData = ({
   String phoneCountryCode,
   String phoneNumber,
   String? npn,
-  String? address,
+  String? addressStreet,
+  String? addressApt,
+  String? addressCity,
+  String? addressState,
+  String? addressZip,
   String? agency,
 });
+
+final _usStatePattern = RegExp(r'^[A-Za-z]{2}$');
+final _usZipPattern = RegExp(r'^\d{5}(-\d{4})?$');
 
 class PhoneCountryField extends StatelessWidget {
   const PhoneCountryField({
@@ -44,7 +52,7 @@ class PhoneCountryField extends StatelessWidget {
                   AppSpacing.sm,
                 ),
                 child: Text(
-                  'País / código',
+                  context.l10n.countryCodePickerTitle,
                   style: Theme.of(context).textTheme.titleLarge,
                 ),
               ),
@@ -91,10 +99,16 @@ class ProfileDetailsForm extends StatefulWidget {
     this.initialCountryCode,
     this.initialPhoneNumber,
     this.initialNpn,
-    this.initialAddress,
+    this.initialAddressStreet,
+    this.initialAddressApt,
+    this.initialAddressCity,
+    this.initialAddressState,
+    this.initialAddressZip,
     this.initialAgency,
-    this.submitLabel = 'Continuar',
+    this.submitLabel,
     this.busy = false,
+    this.lockName = false,
+    this.lockNpn = false,
   });
 
   final UserRole accountType;
@@ -103,10 +117,16 @@ class ProfileDetailsForm extends StatefulWidget {
   final String? initialCountryCode;
   final String? initialPhoneNumber;
   final String? initialNpn;
-  final String? initialAddress;
+  final String? initialAddressStreet;
+  final String? initialAddressApt;
+  final String? initialAddressCity;
+  final String? initialAddressState;
+  final String? initialAddressZip;
   final String? initialAgency;
-  final String submitLabel;
+  final String? submitLabel;
   final bool busy;
+  final bool lockName;
+  final bool lockNpn;
 
   @override
   State<ProfileDetailsForm> createState() => _ProfileDetailsFormState();
@@ -117,11 +137,18 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   late final TextEditingController _name;
   late final TextEditingController _phone;
   late final TextEditingController _npn;
-  late final TextEditingController _address;
+  late final TextEditingController _street;
+  late final TextEditingController _apt;
+  late final TextEditingController _city;
+  late final TextEditingController _state;
+  late final TextEditingController _zip;
   late final TextEditingController _agency;
   late PhoneCountry _country;
 
-  bool get _isAgent => widget.accountType == UserRole.agent;
+  bool get _isAgent =>
+      widget.accountType == UserRole.agent ||
+      widget.accountType == UserRole.instructor ||
+      widget.accountType == UserRole.admin;
 
   @override
   void initState() {
@@ -129,7 +156,13 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
     _name = TextEditingController(text: widget.initialName ?? '');
     _phone = TextEditingController(text: widget.initialPhoneNumber ?? '');
     _npn = TextEditingController(text: widget.initialNpn ?? '');
-    _address = TextEditingController(text: widget.initialAddress ?? '');
+    _street = TextEditingController(text: widget.initialAddressStreet ?? '');
+    _apt = TextEditingController(text: widget.initialAddressApt ?? '');
+    _city = TextEditingController(text: widget.initialAddressCity ?? '');
+    _state = TextEditingController(
+      text: (widget.initialAddressState ?? '').toUpperCase(),
+    );
+    _zip = TextEditingController(text: widget.initialAddressZip ?? '');
     _agency = TextEditingController(
       text: widget.initialAgency?.trim().isNotEmpty == true
           ? widget.initialAgency!
@@ -143,7 +176,11 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
     _name.dispose();
     _phone.dispose();
     _npn.dispose();
-    _address.dispose();
+    _street.dispose();
+    _apt.dispose();
+    _city.dispose();
+    _state.dispose();
+    _zip.dispose();
     _agency.dispose();
     super.dispose();
   }
@@ -151,34 +188,69 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     await widget.onSubmit((
-      displayName: _name.text.trim(),
+      displayName: widget.lockName
+          ? (widget.initialName ?? '').trim()
+          : _name.text.trim(),
       phoneCountryCode: _country.dialCode,
       phoneNumber: _phone.text.trim(),
-      npn: _isAgent ? _npn.text.trim() : null,
-      address: _isAgent ? _address.text.trim() : null,
+      npn: _isAgent
+          ? (widget.lockNpn
+              ? widget.initialNpn?.trim()
+              : _npn.text.trim())
+          : null,
+      addressStreet: _isAgent ? _street.text.trim() : null,
+      addressApt: _isAgent
+          ? (_apt.text.trim().isEmpty ? null : _apt.text.trim())
+          : null,
+      addressCity: _isAgent ? _city.text.trim() : null,
+      addressState: _isAgent ? _state.text.trim().toUpperCase() : null,
+      addressZip: _isAgent ? _zip.text.trim() : null,
       agency: _isAgent ? _agency.text.trim() : null,
     ));
   }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final l10n = context.l10n;
+
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          TextFormField(
-            controller: _name,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(labelText: 'Nombre completo'),
-            validator: (value) {
-              if (value == null || value.trim().length < 2) {
-                return 'Ingresa tu nombre.';
-              }
-              return null;
-            },
+          Text(
+            l10n.editProfileBasicsSection.toUpperCase(),
+            style: theme.textTheme.labelLarge?.copyWith(
+              letterSpacing: 1.6,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
+              color: colors.muted,
+            ),
           ),
+          const SizedBox(height: AppSpacing.sm),
+          if (widget.lockName)
+            _LockedFieldStrip(
+              label: l10n.fieldFullName,
+              value: widget.initialName?.trim().isNotEmpty == true
+                  ? widget.initialName!.trim()
+                  : '—',
+              hint: l10n.editProfileNameFrozen,
+            )
+          else
+            TextFormField(
+              controller: _name,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(labelText: l10n.fieldFullName),
+              validator: (value) {
+                if (value == null || value.trim().length < 2) {
+                  return l10n.validationName;
+                }
+                return null;
+              },
+            ),
           const SizedBox(height: AppSpacing.md),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -197,10 +269,10 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
                   inputFormatters: [
                     FilteringTextInputFormatter.digitsOnly,
                   ],
-                  decoration: const InputDecoration(labelText: 'Teléfono'),
+                  decoration: InputDecoration(labelText: l10n.fieldPhone),
                   validator: (value) {
                     if (value == null || value.trim().length < 7) {
-                      return 'Número inválido.';
+                      return l10n.validationPhone;
                     }
                     return null;
                   },
@@ -209,49 +281,144 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
             ],
           ),
           if (_isAgent) ...[
+            const SizedBox(height: AppSpacing.xl),
+            Text(
+              l10n.editProfileCredentialsSection.toUpperCase(),
+              style: theme.textTheme.labelLarge?.copyWith(
+                letterSpacing: 1.6,
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: colors.muted,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            if (widget.lockNpn)
+              _LockedFieldStrip(
+                label: l10n.fieldNpn,
+                value: widget.initialNpn?.trim().isNotEmpty == true
+                    ? widget.initialNpn!.trim()
+                    : '—',
+                hint: l10n.editProfileNpnFrozen,
+              )
+            else
+              TextFormField(
+                controller: _npn,
+                keyboardType: TextInputType.number,
+                textInputAction: TextInputAction.next,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: InputDecoration(
+                  labelText: l10n.fieldNpn,
+                  hintText: l10n.fieldNpnHint,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().length < 5) {
+                    return l10n.validationNpn;
+                  }
+                  return null;
+                },
+              ),
             const SizedBox(height: AppSpacing.md),
             TextFormField(
-              controller: _npn,
-              keyboardType: TextInputType.number,
+              controller: _street,
+              textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-              decoration: const InputDecoration(
-                labelText: 'NPN',
-                hintText: 'National Producer Number',
-              ),
+              decoration: InputDecoration(labelText: l10n.fieldAddressStreet),
               validator: (value) {
-                if (value == null || value.trim().length < 5) {
-                  return 'Ingresa un NPN válido.';
+                if (value == null || value.trim().length < 3) {
+                  return l10n.validationAddressStreet;
                 }
                 return null;
               },
             ),
             const SizedBox(height: AppSpacing.md),
             TextFormField(
-              controller: _address,
-              textCapitalization: TextCapitalization.sentences,
+              controller: _apt,
+              textCapitalization: TextCapitalization.characters,
               textInputAction: TextInputAction.next,
-              maxLines: 2,
-              decoration: const InputDecoration(labelText: 'Dirección'),
+              decoration: InputDecoration(labelText: l10n.fieldAddressApt),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            TextFormField(
+              controller: _city,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(labelText: l10n.fieldAddressCity),
               validator: (value) {
-                if (value == null || value.trim().length < 5) {
-                  return 'Ingresa tu dirección.';
+                if (value == null || value.trim().length < 2) {
+                  return l10n.validationAddressCity;
                 }
                 return null;
               },
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 96,
+                  child: TextFormField(
+                    controller: _state,
+                    textCapitalization: TextCapitalization.characters,
+                    textInputAction: TextInputAction.next,
+                    maxLength: 2,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[A-Za-z]')),
+                      LengthLimitingTextInputFormatter(2),
+                    ],
+                    decoration: InputDecoration(
+                      labelText: l10n.fieldAddressState,
+                      counterText: '',
+                    ),
+                    validator: (value) {
+                      if (value == null || !_usStatePattern.hasMatch(value.trim())) {
+                        return l10n.validationAddressState;
+                      }
+                      return null;
+                    },
+                    onChanged: (value) {
+                      final upper = value.toUpperCase();
+                      if (value != upper) {
+                        _state.value = TextEditingValue(
+                          text: upper,
+                          selection: TextSelection.collapsed(offset: upper.length),
+                        );
+                      }
+                    },
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: TextFormField(
+                    controller: _zip,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[\d-]')),
+                      LengthLimitingTextInputFormatter(10),
+                    ],
+                    decoration: InputDecoration(labelText: l10n.fieldAddressZip),
+                    validator: (value) {
+                      if (value == null || !_usZipPattern.hasMatch(value.trim())) {
+                        return l10n.validationAddressZip;
+                      }
+                      return null;
+                    },
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: AppSpacing.md),
             TextFormField(
               controller: _agency,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.done,
-              decoration: const InputDecoration(
-                labelText: 'Agencia',
-                helperText: 'Por defecto: Every Benefits',
+              decoration: InputDecoration(
+                labelText: l10n.fieldAgency,
+                helperText: l10n.fieldAgencyHelper,
               ),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
-                  return 'Ingresa la agencia.';
+                  return l10n.validationAgency;
                 }
                 return null;
               },
@@ -266,9 +433,76 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
                     height: 22,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : Text(widget.submitLabel),
+                : Text(widget.submitLabel ?? l10n.actionContinue),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _LockedFieldStrip extends StatelessWidget {
+  const _LockedFieldStrip({
+    required this.label,
+    required this.value,
+    required this.hint,
+  });
+
+  final String label;
+  final String value;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colors.border),
+        color: colors.glassFill.withValues(alpha: 0.55),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label.toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: brand,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0.7,
+                      fontSize: 10,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    hint,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.muted,
+                      height: 1.3,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.lock_outline_rounded, color: colors.muted, size: 18),
+          ],
+        ),
       ),
     );
   }
@@ -300,7 +534,9 @@ class AccountTypeCard extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: selected ? AppColors.brandOf(context) : AppColors.of(context).muted,
+            color: selected
+                ? AppColors.brandOf(context)
+                : AppColors.of(context).muted,
             size: 28,
           ),
           const SizedBox(width: AppSpacing.md),
@@ -315,10 +551,10 @@ class AccountTypeCard extends StatelessWidget {
             ),
           ),
           Icon(
-            selected
-                ? Icons.check_circle_rounded
-                : Icons.circle_outlined,
-            color: selected ? AppColors.brandOf(context) : AppColors.of(context).muted,
+            selected ? Icons.check_circle_rounded : Icons.circle_outlined,
+            color: selected
+                ? AppColors.brandOf(context)
+                : AppColors.of(context).muted,
           ),
         ],
       ),

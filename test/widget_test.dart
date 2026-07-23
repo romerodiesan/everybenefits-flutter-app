@@ -7,6 +7,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:every_benefits/app/home_shell.dart';
+import 'package:every_benefits/app/locale_controller.dart';
 import 'package:every_benefits/app/theme.dart';
 import 'package:every_benefits/app/theme_controller.dart';
 import 'package:every_benefits/auth/auth_service.dart';
@@ -17,6 +18,7 @@ import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
 import 'package:every_benefits/features/profile/profile_completion_flow.dart';
 import 'package:every_benefits/features/profile/settings_screen.dart';
+import 'package:every_benefits/l10n/app_localizations.dart';
 import 'package:every_benefits/main.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_repository.dart';
@@ -58,6 +60,7 @@ void main() {
       authService: auth,
       userRepository: users,
       themeController: ThemeController(),
+      localeController: LocaleController(initialLocale: const Locale('en')),
       forumRepository: emptyForums,
       chatRepository: emptyChats,
     );
@@ -78,7 +81,13 @@ void main() {
       phoneCountryCode: anonymous ? null : '+506',
       phoneNumber: anonymous ? null : '88887777',
       npn: role == UserRole.agent ? '1234567' : null,
-      address: role == UserRole.agent ? 'San José' : null,
+      address: role == UserRole.agent
+          ? '100 Main St\nMiami, FL 33101'
+          : null,
+      addressStreet: role == UserRole.agent ? '100 Main St' : null,
+      addressCity: role == UserRole.agent ? 'Miami' : null,
+      addressState: role == UserRole.agent ? 'FL' : null,
+      addressZip: role == UserRole.agent ? '33101' : null,
       agency: role == UserRole.agent ? kDefaultAgency : null,
       createdAt: DateTime.utc(2024, 1, 1),
       updatedAt: DateTime.utc(2024, 1, 1),
@@ -102,8 +111,8 @@ void main() {
 
     expect(find.text('EVERY'), findsOneWidget);
     expect(find.text('INSURANCE'), findsOneWidget);
-    expect(find.text('Entrar'), findsOneWidget);
-    expect(find.text('Soy invitado'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Continue as guest'), findsOneWidget);
   });
 
   testWidgets('welcome navigates to login and register', (tester) async {
@@ -115,7 +124,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
-    await tester.tap(find.text('Entrar'));
+    await tester.tap(find.text('Sign in'));
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsOneWidget);
@@ -123,7 +132,7 @@ void main() {
     await tester.tap(find.byIcon(Icons.arrow_back_rounded));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('Crear cuenta'));
+    await tester.tap(find.text('Create account'));
     await tester.pumpAndSettle();
 
     expect(find.byType(RegisterScreen), findsOneWidget);
@@ -155,19 +164,19 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
-    await tester.tap(find.text('Entrar').first);
+    await tester.tap(find.text('Sign in').first);
     await tester.pumpAndSettle();
 
     await tester.enterText(find.byType(TextFormField).at(0), 'a@b.com');
     await tester.enterText(find.byType(TextFormField).at(1), 'secret12');
-    await tester.tap(find.text('Entrar').last);
+    await tester.tap(find.text('Sign in').last);
     await tester.pump();
     await tester.pumpAndSettle();
 
     expect(find.byType(LoginScreen), findsNothing);
-    expect(find.byTooltip('Inicio'), findsOneWidget);
+    expect(find.byTooltip('Home'), findsOneWidget);
     expect(find.byTooltip('Chats'), findsOneWidget);
-    expect(find.byTooltip('IA'), findsOneWidget);
+    expect(find.byTooltip('AI'), findsOneWidget);
 
     await authController.close();
   });
@@ -198,11 +207,11 @@ void main() {
     await tester.pump();
 
     expect(find.byType(ProfileCompletionFlow), findsOneWidget);
-    expect(find.textContaining('¿Cómo late'), findsOneWidget);
-    expect(find.text('Soy agente'), findsOneWidget);
-    expect(find.text('Soy estudiante'), findsOneWidget);
+    expect(find.textContaining('How does'), findsOneWidget);
+    expect(find.text("I'm an agent"), findsOneWidget);
+    expect(find.text("I'm a student"), findsOneWidget);
     expect(find.text('Desk'), findsNothing);
-    expect(find.text('Inicio'), findsNothing);
+    expect(find.text('Home'), findsNothing);
   });
 
   testWidgets('guest CTA signs in anonymously', (tester) async {
@@ -217,7 +226,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
-    await tester.tap(find.text('Soy invitado'));
+    await tester.tap(find.text('Continue as guest'));
     await tester.pump();
 
     verify(() => auth.signInAnonymously()).called(1);
@@ -237,11 +246,11 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.byTooltip('Inicio'), findsOneWidget);
+    expect(find.byTooltip('Home'), findsOneWidget);
     expect(find.byTooltip('Chats'), findsOneWidget);
-    expect(find.byTooltip('IA'), findsOneWidget);
-    expect(find.byTooltip('Academia'), findsOneWidget);
-    expect(find.byTooltip('Perfil'), findsOneWidget);
+    expect(find.byTooltip('AI'), findsOneWidget);
+    expect(find.byTooltip('Academy'), findsOneWidget);
+    expect(find.byTooltip('Profile'), findsOneWidget);
   });
 
   testWidgets('pulse shell tabs switch between feed chats and profile',
@@ -253,6 +262,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildEveryInsuranceTheme(Brightness.dark),
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: HomeShell(
           authService: authService,
           userRepository: usersRepo,
@@ -265,23 +277,29 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.textContaining('Modo lectura'), findsOneWidget);
+    expect(find.textContaining('Read-only'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Chats'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Regístrate con una cuenta'), findsOneWidget);
+    expect(find.textContaining('Sign up with an account'), findsOneWidget);
 
-    await tester.tap(find.byTooltip('Perfil'));
+    await tester.tap(find.byTooltip('Profile'));
     await tester.pumpAndSettle();
 
+    // headlineName is a denormalized Firestore field kept as-is (not localized).
     expect(find.text('Invitado'), findsOneWidget);
-    expect(find.byTooltip('Ajustes'), findsOneWidget);
-    expect(find.text('Agregar foto de perfil'), findsOneWidget);
+    expect(find.byTooltip('Settings'), findsOneWidget);
+    expect(find.text('Tap to add a photo'), findsOneWidget);
     expect(find.text('uid-1'), findsNothing);
   });
 
   testWidgets('theme and accent changes keep Settings on the stack',
       (tester) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final user = MockUser();
     when(() => user.uid).thenReturn('uid-1');
     // Simulate AuthService returning a fresh stream on every getter access.
@@ -296,6 +314,7 @@ void main() {
         authService: auth,
         userRepository: users,
         themeController: themeController,
+        localeController: LocaleController(initialLocale: const Locale('en')),
         forumRepository: emptyForums,
         chatRepository: emptyChats,
       ),
@@ -303,20 +322,23 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    await tester.tap(find.byTooltip('Perfil'));
+    await tester.tap(find.byTooltip('Profile'));
     await tester.pumpAndSettle();
-    await tester.tap(find.byTooltip('Ajustes'));
+    await tester.tap(find.byTooltip('Settings'));
     await tester.pumpAndSettle();
 
     expect(find.byType(SettingsScreen), findsOneWidget);
-    expect(find.text('Color de acento'), findsOneWidget);
+    expect(find.text('BRAND SIGNAL'), findsOneWidget);
 
-    await tester.tap(find.text('Oscuro'));
+    await tester.ensureVisible(find.text('Dark'));
+    await tester.tap(find.text('Dark'));
     await tester.pumpAndSettle();
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(themeController.mode, ThemeMode.dark);
 
-    await tester.tap(find.bySemanticsLabel('Ámbar'));
+    final amber = find.bySemanticsLabel('Amber');
+    await tester.ensureVisible(amber);
+    await tester.tap(amber);
     await tester.pumpAndSettle();
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(themeController.primarySeedId, 'amber');

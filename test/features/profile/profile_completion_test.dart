@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 import 'package:every_benefits/app/theme.dart';
 import 'package:every_benefits/auth/auth_service.dart';
 import 'package:every_benefits/features/profile/profile_completion_flow.dart';
+import 'package:every_benefits/l10n/app_localizations.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_repository.dart';
 import 'package:every_benefits/users/user_role.dart';
@@ -21,7 +22,7 @@ void main() {
     registerFallbackValue(
       UserProfile(
         uid: 'x',
-        role: UserRole.agent,
+        role: UserRole.student,
         isAnonymous: false,
         profileCompleted: false,
         createdAt: DateTime.utc(2024, 1, 1),
@@ -39,7 +40,7 @@ void main() {
     final incomplete = UserProfile(
       uid: 'uid-1',
       email: 's@b.com',
-      role: UserRole.agent,
+      role: UserRole.student,
       isAnonymous: false,
       profileCompleted: false,
       agency: kDefaultAgency,
@@ -54,6 +55,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildEveryInsuranceTheme(Brightness.dark),
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: ProfileCompletionFlow(
           profile: incomplete,
           userRepository: users,
@@ -62,18 +66,18 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Soy estudiante'));
+    await tester.tap(find.text("I'm a student"));
     await tester.pump();
-    await tester.tap(find.text('Continuar'));
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
     expect(find.text('NPN'), findsNothing);
-    expect(find.text('Dirección'), findsNothing);
-    expect(find.text('Agencia'), findsNothing);
+    expect(find.text('Street address'), findsNothing);
+    expect(find.text('Agency'), findsNothing);
 
     await tester.enterText(find.byType(TextFormField).at(0), 'Sam Student');
     await tester.enterText(find.byType(TextFormField).at(1), '88887777');
-    await tester.tap(find.text('Finalizar'));
+    await tester.tap(find.text('Finish'));
     await tester.pump();
 
     final captured = verify(() => users.updateProfile(captureAny())).captured.single
@@ -86,8 +90,9 @@ void main() {
     expect(captured.npn, isNull);
   });
 
-  testWidgets('agent path requires NPN address and agency default', (tester) async {
-    tester.view.physicalSize = const Size(800, 1400);
+  testWidgets('agent path requires NPN US address and agency default',
+      (tester) async {
+    tester.view.physicalSize = const Size(800, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
@@ -95,7 +100,7 @@ void main() {
     final incomplete = UserProfile(
       uid: 'uid-1',
       email: 'a@b.com',
-      role: UserRole.agent,
+      role: UserRole.student,
       isAnonymous: false,
       profileCompleted: false,
       agency: kDefaultAgency,
@@ -110,6 +115,9 @@ void main() {
     await tester.pumpWidget(
       MaterialApp(
         theme: buildEveryInsuranceTheme(Brightness.dark),
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: ProfileCompletionFlow(
           profile: incomplete,
           userRepository: users,
@@ -118,27 +126,36 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Soy agente'));
+    await tester.tap(find.text("I'm an agent"));
     await tester.pump();
-    await tester.tap(find.text('Continuar'));
+    await tester.tap(find.text('Continue'));
     await tester.pumpAndSettle();
 
     expect(find.text('NPN'), findsOneWidget);
+    expect(find.text('Street address'), findsOneWidget);
     expect(find.textContaining('Every Benefits'), findsWidgets);
 
     await tester.enterText(find.byType(TextFormField).at(0), 'Alex Agent');
     await tester.enterText(find.byType(TextFormField).at(1), '70001111');
     await tester.enterText(find.byType(TextFormField).at(2), '998877');
-    await tester.enterText(find.byType(TextFormField).at(3), 'Calle 1');
-    await tester.ensureVisible(find.text('Finalizar'));
-    await tester.tap(find.text('Finalizar'));
+    await tester.enterText(find.byType(TextFormField).at(3), '100 Main St');
+    // apt optional at index 4
+    await tester.enterText(find.byType(TextFormField).at(5), 'Miami');
+    await tester.enterText(find.byType(TextFormField).at(6), 'FL');
+    await tester.enterText(find.byType(TextFormField).at(7), '33101');
+    await tester.ensureVisible(find.text('Finish'));
+    await tester.tap(find.text('Finish'));
     await tester.pump();
 
     final captured = verify(() => users.updateProfile(captureAny())).captured.single
         as UserProfile;
     expect(captured.role, UserRole.agent);
     expect(captured.npn, '998877');
-    expect(captured.address, 'Calle 1');
+    expect(captured.addressStreet, '100 Main St');
+    expect(captured.addressCity, 'Miami');
+    expect(captured.addressState, 'FL');
+    expect(captured.addressZip, '33101');
+    expect(captured.address, contains('100 Main St'));
     expect(captured.agency, kDefaultAgency);
     expect(captured.profileCompleted, isTrue);
   });

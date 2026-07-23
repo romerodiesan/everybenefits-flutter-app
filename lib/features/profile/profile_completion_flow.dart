@@ -5,6 +5,7 @@ import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../auth/auth.dart';
+import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import 'widgets/profile_form_widgets.dart';
 
@@ -42,7 +43,11 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
         role: type,
         profileCompleted: true,
         npn: data.npn,
-        address: data.address,
+        addressStreet: data.addressStreet,
+        addressApt: data.addressApt,
+        addressCity: data.addressCity,
+        addressState: data.addressState,
+        addressZip: data.addressZip,
         agency: data.agency ?? kDefaultAgency,
         clearNpn: type == UserRole.student,
         clearAddress: type == UserRole.student,
@@ -55,7 +60,7 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
         context,
         error,
         stackTrace: stackTrace,
-        fallbackMessage: 'No se pudo guardar el perfil.',
+        fallbackMessage: context.l10n.profileSaveFailed,
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -66,14 +71,17 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final l10n = context.l10n;
 
     return PulseScaffold(
       appBar: AppBar(
-        title: Text(_step == 0 ? 'Tu rol' : 'Tus datos'),
+        title: Text(
+          _step == 0 ? l10n.profileCompleteRoleTitle : l10n.profileCompleteDataTitle,
+        ),
         actions: [
           TextButton(
             onPressed: _busy ? null : widget.authService.signOut,
-            child: const Text('Salir'),
+            child: Text(l10n.profileCompleteSignOut),
           ),
         ],
       ),
@@ -88,31 +96,31 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
           children: [
             if (_step == 0) ...[
               Text(
-                '¿Cómo late\ntu Pulse?',
+                l10n.profileCompleteHeadline,
                 style: theme.textTheme.displaySmall?.copyWith(fontSize: 34),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Elige cómo participas. Puedes cambiarlo después.',
+                l10n.profileCompleteSubtitle,
                 style: theme.textTheme.bodyLarge?.copyWith(color: colors.muted),
               ),
               const SizedBox(height: AppSpacing.xl),
               _RoleHeroCard(
-                title: 'Soy agente',
-                subtitle: 'NPN, agencia y comunidad profesional',
+                title: l10n.profileCompleteAgentTitle,
+                subtitle: l10n.profileCompleteAgentSubtitle,
                 selected: _type == UserRole.agent,
                 onTap: () => setState(() => _type = UserRole.agent),
               ),
               const SizedBox(height: AppSpacing.md),
               _RoleHeroCard(
-                title: 'Soy estudiante',
-                subtitle: 'Campus, práctica y networking',
+                title: l10n.profileCompleteStudentTitle,
+                subtitle: l10n.profileCompleteStudentSubtitle,
                 selected: _type == UserRole.student,
                 onTap: () => setState(() => _type = UserRole.student),
               ),
               const SizedBox(height: AppSpacing.xl),
               SignalButton(
-                label: 'Continuar',
+                label: l10n.actionContinue,
                 onPressed: _type == null
                     ? null
                     : () => setState(() => _step = 1),
@@ -120,26 +128,30 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
             ] else ...[
               TextButton(
                 onPressed: _busy ? null : () => setState(() => _step = 0),
-                child: const Align(
+                child: Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('← Cambiar rol'),
+                  child: Text(l10n.profileCompleteChangeRole),
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Cuéntanos un poco más',
+                l10n.profileCompleteTellMore,
                 style: theme.textTheme.headlineMedium,
               ),
               const SizedBox(height: AppSpacing.lg),
               ProfileDetailsForm(
                 accountType: _type!,
                 busy: _busy,
-                submitLabel: 'Finalizar',
+                submitLabel: l10n.profileCompleteFinish,
                 initialName: widget.profile.displayName,
                 initialCountryCode: widget.profile.phoneCountryCode,
                 initialPhoneNumber: widget.profile.phoneNumber,
                 initialNpn: widget.profile.npn,
-                initialAddress: widget.profile.address,
+                initialAddressStreet: widget.profile.effectiveAddressStreet,
+                initialAddressApt: widget.profile.addressApt,
+                initialAddressCity: widget.profile.addressCity,
+                initialAddressState: widget.profile.addressState,
+                initialAddressZip: widget.profile.addressZip,
                 initialAgency: widget.profile.agency ?? kDefaultAgency,
                 onSubmit: _save,
               ),

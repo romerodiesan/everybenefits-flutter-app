@@ -5,6 +5,36 @@ import 'user_role.dart';
 /// Default agency assigned to new agents.
 const String kDefaultAgency = 'Every Benefits';
 
+/// Composes a single-line US mailing address for display / legacy `address`.
+String? composeUsAddress({
+  String? street,
+  String? apt,
+  String? city,
+  String? state,
+  String? zip,
+}) {
+  final s = street?.trim() ?? '';
+  final a = apt?.trim() ?? '';
+  final c = city?.trim() ?? '';
+  final st = (state?.trim() ?? '').toUpperCase();
+  final z = zip?.trim() ?? '';
+
+  final line1 = [
+    if (s.isNotEmpty) s,
+    if (a.isNotEmpty) a,
+  ].join(', ');
+  final stateZip = [if (st.isNotEmpty) st, if (z.isNotEmpty) z].join(' ');
+  final line2 = [
+    if (c.isNotEmpty) c,
+    if (stateZip.isNotEmpty) stateZip,
+  ].join(', ');
+
+  if (line1.isEmpty && line2.isEmpty) return null;
+  if (line1.isEmpty) return line2;
+  if (line2.isEmpty) return line1;
+  return '$line1\n$line2';
+}
+
 class UserProfile {
   const UserProfile({
     required this.uid,
@@ -20,6 +50,11 @@ class UserProfile {
     this.phoneNumber,
     this.npn,
     this.address,
+    this.addressStreet,
+    this.addressApt,
+    this.addressCity,
+    this.addressState,
+    this.addressZip,
     this.agency,
   });
 
@@ -33,7 +68,13 @@ class UserProfile {
   final String? phoneCountryCode;
   final String? phoneNumber;
   final String? npn;
+  /// Legacy / composed display address (kept for compatibility).
   final String? address;
+  final String? addressStreet;
+  final String? addressApt;
+  final String? addressCity;
+  final String? addressState;
+  final String? addressZip;
   final String? agency;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -60,6 +101,35 @@ class UserProfile {
     return '$code$number';
   }
 
+  /// Prefer structured fields; fall back to legacy free-text `address`.
+  String? get formattedAddress {
+    final composed = composeUsAddress(
+      street: effectiveAddressStreet,
+      apt: addressApt,
+      city: addressCity,
+      state: addressState,
+      zip: addressZip,
+    );
+    if (composed != null) return composed;
+    final legacy = address?.trim();
+    return (legacy == null || legacy.isEmpty) ? null : legacy;
+  }
+
+  /// Street for forms: structured first, else legacy blob as street.
+  String? get effectiveAddressStreet {
+    if (addressStreet?.trim().isNotEmpty == true) return addressStreet!.trim();
+    if (_hasStructuredCityStateZip) return null;
+    final legacy = address?.trim();
+    return (legacy == null || legacy.isEmpty) ? null : legacy;
+  }
+
+  bool get _hasStructuredCityStateZip =>
+      addressCity?.trim().isNotEmpty == true ||
+      addressState?.trim().isNotEmpty == true ||
+      addressZip?.trim().isNotEmpty == true;
+
+  bool get hasAddressDetails => formattedAddress != null;
+
   UserProfile copyWith({
     String? email,
     String? displayName,
@@ -71,6 +141,11 @@ class UserProfile {
     String? phoneNumber,
     String? npn,
     String? address,
+    String? addressStreet,
+    String? addressApt,
+    String? addressCity,
+    String? addressState,
+    String? addressZip,
     String? agency,
     DateTime? updatedAt,
     bool clearPhotoUrl = false,
@@ -78,6 +153,24 @@ class UserProfile {
     bool clearAddress = false,
     bool clearAgency = false,
   }) {
+    final nextStreet =
+        clearAddress ? null : (addressStreet ?? this.addressStreet);
+    final nextApt = clearAddress ? null : (addressApt ?? this.addressApt);
+    final nextCity = clearAddress ? null : (addressCity ?? this.addressCity);
+    final nextState = clearAddress ? null : (addressState ?? this.addressState);
+    final nextZip = clearAddress ? null : (addressZip ?? this.addressZip);
+    final composed = clearAddress
+        ? null
+        : (address ??
+            composeUsAddress(
+              street: nextStreet,
+              apt: nextApt,
+              city: nextCity,
+              state: nextState,
+              zip: nextZip,
+            ) ??
+            this.address);
+
     return UserProfile(
       uid: uid,
       email: email ?? this.email,
@@ -89,7 +182,12 @@ class UserProfile {
       phoneCountryCode: phoneCountryCode ?? this.phoneCountryCode,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       npn: clearNpn ? null : (npn ?? this.npn),
-      address: clearAddress ? null : (address ?? this.address),
+      address: composed,
+      addressStreet: nextStreet,
+      addressApt: nextApt,
+      addressCity: nextCity,
+      addressState: nextState,
+      addressZip: nextZip,
       agency: clearAgency ? null : (agency ?? this.agency),
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -109,6 +207,11 @@ class UserProfile {
       'phoneNumber': phoneNumber,
       'npn': npn,
       'address': address,
+      'addressStreet': addressStreet,
+      'addressApt': addressApt,
+      'addressCity': addressCity,
+      'addressState': addressState,
+      'addressZip': addressZip,
       'agency': agency,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
@@ -116,6 +219,21 @@ class UserProfile {
   }
 
   factory UserProfile.fromMap(Map<String, dynamic> data) {
+    final street = data['addressStreet'] as String?;
+    final apt = data['addressApt'] as String?;
+    final city = data['addressCity'] as String?;
+    final state = data['addressState'] as String?;
+    final zip = data['addressZip'] as String?;
+    final legacy = data['address'] as String?;
+    final composed = composeUsAddress(
+          street: street,
+          apt: apt,
+          city: city,
+          state: state,
+          zip: zip,
+        ) ??
+        legacy;
+
     return UserProfile(
       uid: data['uid'] as String,
       email: data['email'] as String?,
@@ -127,7 +245,12 @@ class UserProfile {
       phoneCountryCode: data['phoneCountryCode'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
       npn: data['npn'] as String?,
-      address: data['address'] as String?,
+      address: composed,
+      addressStreet: street,
+      addressApt: apt,
+      addressCity: city,
+      addressState: state,
+      addressZip: zip,
       agency: data['agency'] as String?,
       createdAt: _readDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readDate(data['updatedAt']) ?? DateTime.now().toUtc(),

@@ -46,6 +46,11 @@ class FirestoreUserProfileStore implements UserProfileStore {
       'phoneNumber': profile.phoneNumber,
       'npn': profile.npn,
       'address': profile.address,
+      'addressStreet': profile.addressStreet,
+      'addressApt': profile.addressApt,
+      'addressCity': profile.addressCity,
+      'addressState': profile.addressState,
+      'addressZip': profile.addressZip,
       'agency': profile.agency,
       'updatedAt': FieldValue.serverTimestamp(),
     };

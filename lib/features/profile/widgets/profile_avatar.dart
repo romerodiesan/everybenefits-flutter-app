@@ -80,10 +80,10 @@ class ProfileAvatar extends StatelessWidget {
                 shape: BoxShape.circle,
                 border: Border.all(color: AppColors.of(context).meshBase, width: 2),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.camera_alt_rounded,
                 size: 16,
-                color: Color(0xFF04110C),
+                color: onBrandFor(AppColors.brandOf(context)),
               ),
             ),
           ),
