@@ -100,11 +100,56 @@ describe('users create', () => {
     );
   });
 
+  it('blocks registered agent create', async () => {
+    const db = authedDb('u1a', { email: 'u1a@example.com' });
+    await assertFails(
+      db.doc('users/u1a').set({
+        uid: 'u1a',
+        role: 'agent',
+        isAnonymous: false,
+        profileCompleted: false,
+        displayName: 'Ada',
+        email: 'u1a@example.com',
+      }),
+    );
+  });
+
   it('blocks owner role self-promotion on update', async () => {
     await seedUser('u2', { role: 'student' });
     const db = authedDb('u2');
     await assertFails(
       db.doc('users/u2').update({ role: 'admin' }),
+    );
+  });
+
+  it('allows one-time student→agent on profile completion', async () => {
+    await seedUser('u3', {
+      role: 'student',
+      profileCompleted: false,
+    });
+    const db = authedDb('u3');
+    await assertSucceeds(
+      db.doc('users/u3').update({
+        role: 'agent',
+        profileCompleted: true,
+        displayName: 'Agent Now',
+      }),
+    );
+  });
+
+  it('blocks agent→student downgrade', async () => {
+    await seedUser('u4', { role: 'agent', profileCompleted: true });
+    const db = authedDb('u4');
+    await assertFails(
+      db.doc('users/u4').update({ role: 'student' }),
+    );
+  });
+
+  it('blocks student→agent after profile is completed', async () => {
+    await seedUser('u5', { role: 'student', profileCompleted: true });
+    const db = authedDb('u5');
+    await assertFails(
+      db.doc('users/u5').update({ role: 'agent' }),
     );
   });
 });

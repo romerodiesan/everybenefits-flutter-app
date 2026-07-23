@@ -86,6 +86,7 @@ export const castForumVote = onCall(async (request) => {
 
 /**
  * Admin-only role assignment (instructor/admin/student/agent/guest).
+ * Blocks agent → student downgrades (and agent → guest).
  */
 export const setUserRole = onCall(async (request) => {
   if (!request.auth?.uid) {
@@ -102,6 +103,18 @@ export const setUserRole = onCall(async (request) => {
   const actor = await db.doc(`users/${actorUid}`).get();
   if (actor.data()?.role !== "admin") {
     throw new HttpsError("permission-denied", "Admins only.");
+  }
+
+  const target = await db.doc(`users/${targetUid}`).get();
+  if (!target.exists) {
+    throw new HttpsError("not-found", "User not found.");
+  }
+  const currentRole = String(target.data()?.role ?? "");
+  if (currentRole === "agent" && (role === "student" || role === "guest")) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Cannot downgrade an agent to student or guest.",
+    );
   }
 
   await db.doc(`users/${targetUid}`).update({

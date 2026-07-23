@@ -45,17 +45,8 @@ service cloud.firestore {
       return role in ['instructor', 'admin'];
     }
 
-    function isNonEmptyString(value) {
-      return value is string && value.size() > 0;
-    }
-
     function boundedString(value, maxLen) {
       return value is string && value.size() > 0 && value.size() <= maxLen;
-    }
-
-    function optionalBoundedString(value, maxLen) {
-      return value == null
-        || (value is string && value.size() <= maxLen);
     }
 
     function validTags(tags) {
@@ -129,14 +120,15 @@ service cloud.firestore {
           )
           || (
             !isAnonymousAuth()
-            && request.resource.data.role in ['student', 'agent']
+            && request.resource.data.role == 'student'
             && request.resource.data.isAnonymous == false
             && !isProtectedRole(request.resource.data.role)
           )
         );
 
-      // Owners may edit profile fields. Role is frozen except student↔agent
-      // (profile completion). Privileged roles require Admin SDK / callable.
+      // Owners may edit profile fields. Role is frozen except a one-time
+      // student → student|agent transition when completing the profile.
+      // Later upgrades and privileged roles require Admin SDK / setUserRole.
       allow update: if isOwner(uid)
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.isAnonymous == resource.data.isAnonymous
@@ -145,8 +137,10 @@ service cloud.firestore {
         && (
           request.resource.data.role == resource.data.role
           || (
-            resource.data.role in ['student', 'agent']
+            resource.data.profileCompleted == false
+            && resource.data.role == 'student'
             && request.resource.data.role in ['student', 'agent']
+            && request.resource.data.profileCompleted == true
           )
         );
 
