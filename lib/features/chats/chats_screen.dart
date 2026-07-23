@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_repository.dart';
 import 'chat_conversation_screen.dart';
@@ -18,11 +20,15 @@ class ChatsScreen extends StatelessWidget {
     required this.profile,
     this.chatRepository,
     this.userRepository,
+    this.showFab = true,
   });
 
   final UserProfile profile;
   final ChatRepository? chatRepository;
   final UserRepository? userRepository;
+
+  /// When false, the shell owns the FAB.
+  final bool showFab;
 
   @override
   Widget build(BuildContext context) {
@@ -40,21 +46,21 @@ class ChatsScreen extends StatelessWidget {
           'Chats',
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
         ),
-        actions: [
-          if (canChat)
-            IconButton(
-              tooltip: 'Nuevo chat',
-              onPressed: () => _openNewChat(context, repo),
-              icon: const Icon(Icons.edit_outlined),
-            ),
-        ],
       ),
-      floatingActionButton: canChat
+      floatingActionButton: canChat && showFab
           ? FloatingActionButton(
               heroTag: 'fab-chats-new',
-              onPressed: () => _openNewChat(context, repo),
+              onPressed: () {
+                PulseHaptics.light();
+                openNewChat(
+                  context,
+                  profile: profile,
+                  chatRepository: repo,
+                  userRepository: userRepository ?? UserRepository(),
+                );
+              },
               tooltip: 'Nuevo chat',
-              child: const Icon(Icons.add_rounded),
+              child: const Icon(Icons.chat_bubble_rounded),
             )
           : null,
       body: !canChat
@@ -74,8 +80,10 @@ class ChatsScreen extends StatelessWidget {
           : StreamBuilder<List<ChatConversation>>(
               stream: repo.watchChats(profile.uid),
               builder: (context, snapshot) {
+                Widget child;
                 if (snapshot.hasError) {
-                  return Center(
+                  child = Center(
+                    key: const ValueKey('error'),
                     child: Padding(
                       padding: const EdgeInsets.all(AppSpacing.xl),
                       child: Text(
@@ -87,109 +95,131 @@ class ChatsScreen extends StatelessWidget {
                       ),
                     ),
                   );
-                }
-                if (!snapshot.hasData) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                final chats = snapshot.data!;
-                if (chats.isEmpty) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            'Aún no tienes chats',
-                            style: theme.textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.w800,
+                } else if (!snapshot.hasData) {
+                  child = const PulseChatListSkeleton(key: ValueKey('loading'));
+                } else {
+                  final chats = snapshot.data!;
+                  if (chats.isEmpty) {
+                    child = Center(
+                      key: const ValueKey('empty'),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.xl),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Aún no tienes chats',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Toca + para escribirle a un compañero.',
+                              textAlign: TextAlign.center,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: colors.muted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  } else {
+                    final pinned =
+                        chats.where((c) => c.isPinnedFor(profile.uid)).toList();
+                    final rest = chats
+                        .where((c) => !c.isPinnedFor(profile.uid))
+                        .toList();
+                    child = ListView(
+                      key: const ValueKey('list'),
+                      padding: EdgeInsets.fromLTRB(
+                        AppSpacing.md,
+                        AppSpacing.sm,
+                        AppSpacing.md,
+                        pulseShellListBottomPad(context, hasFab: true),
+                      ),
+                      children: [
+                        if (pinned.isNotEmpty) ...[
+                          const _SectionLabel(label: 'Fijados'),
+                          const SizedBox(height: 8),
+                          for (final chat in pinned) ...[
+                            _ChatRow(
+                              chat: chat,
+                              viewerUid: profile.uid,
+                              onTap: () => openChat(
+                                context,
+                                chat: chat,
+                                profile: profile,
+                                chatRepository: repo,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          const SizedBox(height: 8),
+                          const _SectionLabel(label: 'Recientes'),
+                          const SizedBox(height: 8),
+                        ],
+                        for (final chat in rest) ...[
+                          _ChatRow(
+                            chat: chat,
+                            viewerUid: profile.uid,
+                            onTap: () => openChat(
+                              context,
+                              chat: chat,
+                              profile: profile,
+                              chatRepository: repo,
                             ),
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            'Toca + para escribirle a un compañero.',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colors.muted,
-                            ),
-                          ),
                         ],
-                      ),
-                    ),
-                  );
+                      ],
+                    );
+                  }
                 }
 
-                final pinned =
-                    chats.where((c) => c.isPinnedFor(profile.uid)).toList();
-                final rest =
-                    chats.where((c) => !c.isPinnedFor(profile.uid)).toList();
-
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpacing.md,
-                    AppSpacing.sm,
-                    AppSpacing.md,
-                    110,
-                  ),
-                  children: [
-                    if (pinned.isNotEmpty) ...[
-                      const _SectionLabel(label: 'Fijados'),
-                      const SizedBox(height: 8),
-                      for (final chat in pinned) ...[
-                        _ChatRow(
-                          chat: chat,
-                          viewerUid: profile.uid,
-                          onTap: () => _openChat(context, chat, repo),
-                        ),
-                        const SizedBox(height: 8),
-                      ],
-                      const SizedBox(height: 8),
-                      const _SectionLabel(label: 'Recientes'),
-                      const SizedBox(height: 8),
-                    ],
-                    for (final chat in rest) ...[
-                      _ChatRow(
-                        chat: chat,
-                        viewerUid: profile.uid,
-                        onTap: () => _openChat(context, chat, repo),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  ],
+                return AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 220),
+                  child: child,
                 );
               },
             ),
     );
   }
+}
 
-  void _openNewChat(BuildContext context, ChatRepository repo) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatNewChatScreen(
-          profile: profile,
-          chatRepository: repo,
-          userRepository: userRepository ?? UserRepository(),
-        ),
+void openNewChat(
+  BuildContext context, {
+  required UserProfile profile,
+  ChatRepository? chatRepository,
+  UserRepository? userRepository,
+}) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => ChatNewChatScreen(
+        profile: profile,
+        chatRepository: chatRepository,
+        userRepository: userRepository ?? UserRepository(),
       ),
-    );
-  }
+    ),
+  );
+}
 
-  void _openChat(
-    BuildContext context,
-    ChatConversation chat,
-    ChatRepository repo,
-  ) {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => ChatConversationScreen(
-          chat: chat,
-          profile: profile,
-          chatRepository: repo,
-        ),
+void openChat(
+  BuildContext context, {
+  required ChatConversation chat,
+  required UserProfile profile,
+  required ChatRepository chatRepository,
+}) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => ChatConversationScreen(
+        chat: chat,
+        profile: profile,
+        chatRepository: chatRepository,
       ),
-    );
-  }
+    ),
+  );
 }
 
 class _SectionLabel extends StatelessWidget {

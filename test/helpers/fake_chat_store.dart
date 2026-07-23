@@ -58,9 +58,16 @@ class FakeChatStore implements ChatStore {
   }
 
   @override
-  Future<ChatConversation?> findDmByKey(String dmKey) async {
+  Future<ChatConversation?> findDmByKey(
+    String dmKey, {
+    required String viewerUid,
+  }) async {
+    final byId = chats[dmKey];
+    if (byId != null && byId.memberIds.contains(viewerUid)) return byId;
     for (final chat in chats.values) {
-      if (chat.dmKey == dmKey) return chat;
+      if (chat.dmKey == dmKey && chat.memberIds.contains(viewerUid)) {
+        return chat;
+      }
     }
     return null;
   }

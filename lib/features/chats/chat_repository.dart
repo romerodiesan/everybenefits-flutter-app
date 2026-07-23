@@ -13,7 +13,10 @@ abstract class ChatStore {
 
   Stream<List<ChatMessage>> watchMessages(String chatId);
 
-  Future<ChatConversation?> findDmByKey(String dmKey);
+  Future<ChatConversation?> findDmByKey(
+    String dmKey, {
+    required String viewerUid,
+  });
 
   Future<ChatConversation> createChat(ChatConversation chat);
 
@@ -68,9 +71,25 @@ class FirestoreChatStore implements ChatStore {
   }
 
   @override
-  Future<ChatConversation?> findDmByKey(String dmKey) async {
-    final snap =
-        await _chats.where('dmKey', isEqualTo: dmKey).limit(1).get();
+  Future<ChatConversation?> findDmByKey(
+    String dmKey, {
+    required String viewerUid,
+  }) async {
+    // Prefer deterministic doc id (= dmKey) so reads are single-get and
+    // allowed by membership rules. Fall back to a membership-scoped query
+    // for chats created before that convention.
+    final byId = await _chats.doc(dmKey).get();
+    if (byId.exists && byId.data() != null) {
+      final chat = ChatConversation.fromMap(byId.id, byId.data()!);
+      if (chat.memberIds.contains(viewerUid)) return chat;
+      return null;
+    }
+
+    final snap = await _chats
+        .where('memberIds', arrayContains: viewerUid)
+        .where('dmKey', isEqualTo: dmKey)
+        .limit(1)
+        .get();
     if (snap.docs.isEmpty) return null;
     final doc = snap.docs.first;
     return ChatConversation.fromMap(doc.id, doc.data());
@@ -108,7 +127,7 @@ class FirestoreChatStore implements ChatStore {
 class ChatRepository {
   ChatRepository({
     ChatStore? store,
-    ChatIdFactory? this._idFactory,
+    this._idFactory,
     DateTime Function()? clock,
   })  : _store = store ?? FirestoreChatStore(),
         _clock = clock ?? (() => DateTime.now().toUtc());
@@ -137,11 +156,11 @@ class ChatRepository {
     }
 
     final key = dmKeyFor(me.uid, other.uid);
-    final existing = await _store.findDmByKey(key);
+    final existing = await _store.findDmByKey(key, viewerUid: me.uid);
     if (existing != null) return existing;
 
     final now = _clock();
-    final id = _idFactory?.call() ?? '';
+    final id = _idFactory?.call() ?? key;
     final chat = ChatConversation(
       id: id,
       memberIds: [me.uid, other.uid]..sort(),

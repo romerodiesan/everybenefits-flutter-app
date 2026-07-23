@@ -90,25 +90,45 @@ service cloud.firestore {
 
     function isChatMember(chatId) {
       return isSignedIn()
-        && request.auth.uid in
-          get(/databases/$(database)/documents/chats/$(chatId)).data.memberIds;
+        && exists(/databases/$(database)/documents/chats/$(chatId))
+        && isChatMemberData(
+          get(/databases/$(database)/documents/chats/$(chatId)).data
+        );
+    }
+
+    function isChatMemberData(data) {
+      return data.keys().hasAll(['memberIds'])
+        && data.memberIds is list
+        && request.auth.uid in data.memberIds;
     }
 
     match /chats/{chatId} {
-      allow read: if isSignedIn()
+      // Missing docs: allow get so DM bootstrap can doc(dmKey).get() before create.
+      // Existing docs: membership only. list must stay arrayContains-compatible.
+      allow get: if isSignedIn() && (
+        resource == null
+        || isChatMemberData(resource.data)
+      );
+      allow list: if isSignedIn()
         && request.auth.uid in resource.data.memberIds;
 
       allow create: if isForumParticipant()
         && request.resource.data.createdBy == request.auth.uid
-        && request.auth.uid in request.resource.data.memberIds
-        && request.resource.data.memberIds is list
+        && isChatMemberData(request.resource.data)
         && request.resource.data.memberIds.size() >= 2
         && request.resource.data.memberIds.size() <= 20
         && request.resource.data.isGroup is bool
-        && request.resource.data.lastMessage is string;
+        && request.resource.data.lastMessage is string
+        && (
+          request.resource.data.isGroup == true
+          || (
+            request.resource.data.dmKey is string
+            && request.resource.data.dmKey == chatId
+          )
+        );
 
       allow update: if isSignedIn()
-        && request.auth.uid in resource.data.memberIds
+        && isChatMemberData(resource.data)
         && request.resource.data.memberIds == resource.data.memberIds
         && request.resource.data.createdBy == resource.data.createdBy
         && request.resource.data.dmKey == resource.data.dmKey

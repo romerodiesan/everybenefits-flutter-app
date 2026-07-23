@@ -68,6 +68,19 @@ void main() {
       expect(second.id, first.id);
       expect(store.chats.length, 1);
     });
+
+    test('uses dmKey as document id when no id factory is set', () async {
+      final localStore = FakeChatStore();
+      addTearDown(localStore.dispose);
+      final localRepo = ChatRepository(store: localStore);
+      final me = _user('me', name: 'María');
+      final other = _user('other', name: 'Carlos');
+
+      final chat = await localRepo.getOrCreateDm(me: me, other: other);
+      expect(chat.id, 'me_other');
+      expect(chat.dmKey, 'me_other');
+      expect(localStore.chats.containsKey('me_other'), isTrue);
+    });
   });
 
   group('sendMessage', () {
