@@ -227,6 +227,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
   Future<void> _voteReply(ForumReply reply, RelevanceVote next) async {
     PulseHaptics.selection();
+    final previous = _replyVotes[reply.id] ?? RelevanceVote.none;
     setState(() => _replyVotes = {..._replyVotes, reply.id: next});
     try {
       await widget.forumRepository.setReplyRelevance(
@@ -235,6 +236,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
         vote: next,
       );
     } catch (error) {
+      if (mounted) {
+        setState(() => _replyVotes = {..._replyVotes, reply.id: previous});
+      }
       _showError(error);
     }
   }

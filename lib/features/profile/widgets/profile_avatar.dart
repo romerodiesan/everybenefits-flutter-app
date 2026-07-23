@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
+import '../../../users/avatar_storage.dart';
 import '../../../users/user_profile.dart';
 
 class ProfileAvatar extends StatelessWidget {
@@ -21,31 +22,42 @@ class ProfileAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final photoUrl = profile.photoUrl;
-    final avatar = Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
+    final photoUrl = sanitizeOptionalAvatarDownloadUrl(profile.photoUrl);
+    final initials = Text(
+      profile.initials,
+      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            color: AppColors.brandOf(context),
+            fontSize: size * 0.38,
+          ),
+    );
+    final avatar = ClipOval(
+      child: Container(
+        width: size,
+        height: size,
         color: AppColors.of(context).glassFill,
-        border: Border.all(color: AppColors.of(context).glassBorder, width: 1.5),
-        image: photoUrl == null
-            ? null
-            : DecorationImage(
-                image: NetworkImage(photoUrl),
+        foregroundDecoration: BoxDecoration(
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: AppColors.of(context).glassBorder,
+            width: 1.5,
+          ),
+        ),
+        alignment: Alignment.center,
+        child: photoUrl == null
+            ? initials
+            : Image.network(
+                photoUrl,
+                width: size,
+                height: size,
                 fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (context, error, stackTrace) => initials,
+                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                  if (wasSynchronouslyLoaded || frame != null) return child;
+                  return initials;
+                },
               ),
       ),
-      alignment: Alignment.center,
-      child: photoUrl == null
-          ? Text(
-              profile.initials,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: AppColors.brandOf(context),
-                    fontSize: size * 0.38,
-                  ),
-            )
-          : null,
     );
 
     final content = Stack(

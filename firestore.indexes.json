@@ -49,6 +49,13 @@
         { "fieldPath": "tags", "arrayConfig": "CONTAINS" },
         { "fieldPath": "score", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "replies",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "authorId", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

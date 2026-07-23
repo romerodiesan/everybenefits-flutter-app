@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
@@ -21,11 +22,13 @@ class ProfileScreen extends StatefulWidget {
     required this.authService,
     required this.userRepository,
     required this.profile,
+    this.onOpenSupportChat,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
   final UserProfile profile;
+  final Future<void> Function()? onOpenSupportChat;
 
   @override
   State<ProfileScreen> createState() => ProfileScreenState();
@@ -94,10 +97,19 @@ class ProfileScreenState extends State<ProfileScreen> {
 
       setState(() => _uploading = true);
       final bytes = await file.readAsBytes();
-      await widget.userRepository.updateAvatar(
+      final previousUrl = widget.profile.photoUrl;
+      final updated = await widget.userRepository.updateAvatar(
         profile: widget.profile,
         bytes: bytes,
       );
+      if (previousUrl != null) {
+        PaintingBinding.instance.imageCache
+            .evict(NetworkImage(previousUrl));
+      }
+      if (updated.photoUrl != null) {
+        PaintingBinding.instance.imageCache
+            .evict(NetworkImage(updated.photoUrl!));
+      }
     } on PlatformException catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,6 +139,36 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  Future<void> _openSupportEmail() async {
+    final l10n = context.l10n;
+    final email = l10n.supportSheetEmail;
+    final uri = Uri(
+      scheme: 'mailto',
+      path: email,
+      queryParameters: {
+        'subject': l10n.supportSheetEmailSubject,
+      },
+    );
+    // Uri.queryParameters encodes spaces as +; mailto prefers %20.
+    final mailto = Uri.parse(uri.toString().replaceAll('+', '%20'));
+    try {
+      final launched = await launchUrl(
+        mailto,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!launched && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.supportSheetEmailFailed)),
+        );
+      }
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.supportSheetEmailFailed)),
+      );
+    }
+  }
+
   void openSupport() {
     PulseHaptics.light();
     final l10n = context.l10n;
@@ -138,7 +180,7 @@ class ProfileScreenState extends State<ProfileScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
+      builder: (sheetContext) {
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(
@@ -168,9 +210,10 @@ class ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 10),
                     Text(
                       l10n.supportSheetTitle,
-                      style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                            fontSize: 22,
-                          ),
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineMedium
+                          ?.copyWith(fontSize: 22),
                     ),
                   ],
                 ),
@@ -183,16 +226,40 @@ class ProfileScreenState extends State<ProfileScreen> {
                       ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                SelectableText(
-                  l10n.supportSheetEmail,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                        color: brand,
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: InkWell(
+                    onTap: _openSupportEmail,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 4),
+                      child: Text(
+                        l10n.supportSheetEmail,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                  color: brand,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: brand,
+                                ),
                       ),
+                    ),
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
+                if (widget.onOpenSupportChat != null) ...[
+                  FilledButton.icon(
+                    onPressed: () async {
+                      Navigator.pop(sheetContext);
+                      await widget.onOpenSupportChat!();
+                    },
+                    icon: const Icon(Icons.chat_rounded),
+                    label: Text(l10n.supportSheetOpenChat),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
                 OutlinedButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () => Navigator.pop(sheetContext),
                   child: Text(l10n.supportSheetClose),
                 ),
               ],

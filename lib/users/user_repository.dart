@@ -120,15 +120,22 @@ class FirestoreUserProfileStore implements UserProfileStore {
   }
 }
 
+typedef AuthorPhotoChanged = Future<void> Function({
+  required String authorId,
+  required String? photoUrl,
+});
+
 class UserRepository {
   UserRepository({
     UserProfileStore? store,
     AvatarStorage? avatarStorage,
+    this.onAuthorPhotoChanged,
   })  : _store = store ?? FirestoreUserProfileStore(),
         _avatarStorageOverride = avatarStorage;
 
   final UserProfileStore _store;
   final AvatarStorage? _avatarStorageOverride;
+  final AuthorPhotoChanged? onAuthorPhotoChanged;
 
   AvatarStorage get _avatarStorage =>
       _avatarStorageOverride ?? AvatarStorage();
@@ -195,7 +202,20 @@ class UserRepository {
       uid: profile.uid,
       bytes: bytes,
     );
-    return updateProfile(profile.copyWith(photoUrl: url));
+    final next = await updateProfile(
+      profile.copyWith(photoUrl: sanitizeAvatarDownloadUrl(url)),
+    );
+    // Photo sync is best-effort — don't fail the avatar upload if cascade
+    // hits rules/index issues (e.g. collectionGroup without a matching rule).
+    try {
+      await onAuthorPhotoChanged?.call(
+        authorId: next.uid,
+        photoUrl: next.photoUrl,
+      );
+    } catch (error, stack) {
+      debugPrint('Author photo cascade failed: $error\n$stack');
+    }
+    return next;
   }
 
   Stream<UserProfile?> watchProfile(String uid) => _store.watch(uid);

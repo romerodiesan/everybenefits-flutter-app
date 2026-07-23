@@ -1,4 +1,5 @@
 import * as admin from "firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { setGlobalOptions } from "firebase-functions/v2";
 
@@ -12,6 +13,8 @@ const rtdb = admin.database();
 
 const DEFAULT_AGENT_GROUP_ID = "agents-default";
 const FORUM_ROLES = ["student", "agent", "instructor", "manager", "admin"];
+/** Roles that belong in the default staff community chat. */
+const DEFAULT_GROUP_ROLES = ["agent", "instructor", "manager", "admin"];
 
 type VoteValue = -1 | 0 | 1;
 
@@ -30,6 +33,10 @@ function headlineName(data: admin.firestore.DocumentData | undefined): string {
   return "Usuario";
 }
 
+function belongsInDefaultGroup(role: string): boolean {
+  return DEFAULT_GROUP_ROLES.includes(role);
+}
+
 async function addAgentToDefaultGroup(uid: string, displayName: string) {
   const chatRef = rtdb.ref(`chats/${DEFAULT_AGENT_GROUP_ID}`);
   const now = Date.now();
@@ -41,7 +48,7 @@ async function addAgentToDefaultGroup(uid: string, displayName: string) {
         memberNames: { [uid]: displayName },
         isGroup: true,
         isDefaultAgentGroup: true,
-        title: "Agents",
+        title: "Team",
         dmKey: null,
         lastMessage: "",
         lastMessageAt: now,
@@ -77,7 +84,11 @@ async function addAgentToDefaultGroup(uid: string, displayName: string) {
       unreadCounts,
       isGroup: true,
       isDefaultAgentGroup: true,
-      title: current.title ?? "Agents",
+      // Keep existing custom title; migrate legacy "Agents" label.
+      title:
+        current.title === "Agents" || current.title == null
+          ? "Team"
+          : current.title,
       createdBy: current.createdBy ?? "system",
     };
   });
@@ -141,14 +152,14 @@ export const castForumVote = onCall(async (request) => {
         voteRef,
         {
           value: next,
-          updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true },
       );
     }
     tx.update(targetRef, {
-      score: admin.firestore.FieldValue.increment(delta),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      score: FieldValue.increment(delta),
+      updatedAt: FieldValue.serverTimestamp(),
     });
   });
 
@@ -157,7 +168,7 @@ export const castForumVote = onCall(async (request) => {
 
 /**
  * Admin-only role assignment.
- * When promoting to agent, joins the default agents RTDB group.
+ * Staff roles (agent / instructor / manager / admin) join the default group.
  */
 export const setUserRole = onCall(async (request) => {
   if (!request.auth?.uid) {
@@ -197,10 +208,10 @@ export const setUserRole = onCall(async (request) => {
 
   await db.doc(`users/${targetUid}`).update({
     role,
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
 
-  if (role === "agent") {
+  if (belongsInDefaultGroup(role)) {
     await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
   }
 
@@ -208,7 +219,46 @@ export const setUserRole = onCall(async (request) => {
 });
 
 /**
- * Ensures the caller (agent) is a member of the default agents RTDB chat.
+ * Admin-only directory of students awaiting promotion.
+ * Uses Admin SDK so the client does not need a fragile users list rule.
+ */
+export const listStudentsForPromotion = onCall(async (request) => {
+  if (!request.auth?.uid) {
+    throw new HttpsError("unauthenticated", "Sign in required.");
+  }
+
+  const actor = await db.doc(`users/${request.auth.uid}`).get();
+  if (actor.data()?.role !== "admin") {
+    throw new HttpsError("permission-denied", "Admins only.");
+  }
+
+  const snap = await db
+    .collection("users")
+    .where("role", "==", "student")
+    .limit(120)
+    .get();
+
+  const students = snap.docs
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        uid: doc.id,
+        email: typeof data.email === "string" ? data.email : null,
+        displayName:
+          typeof data.displayName === "string" ? data.displayName : null,
+        photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
+        role: "student",
+        isAnonymous: data.isAnonymous === true,
+        profileCompleted: data.profileCompleted !== false,
+      };
+    })
+    .filter((row) => row.isAnonymous !== true);
+
+  return { students };
+});
+
+/**
+ * Ensures the caller (staff) is a member of the default community RTDB chat.
  */
 export const ensureDefaultAgentGroup = onCall(async (request) => {
   if (!request.auth?.uid) {
@@ -227,8 +277,12 @@ export const ensureDefaultAgentGroup = onCall(async (request) => {
   if (!target.exists) {
     throw new HttpsError("not-found", "User not found.");
   }
-  if (String(target.data()?.role ?? "") !== "agent") {
-    throw new HttpsError("failed-precondition", "Agents only.");
+  const targetRole = String(target.data()?.role ?? "");
+  if (!belongsInDefaultGroup(targetRole)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Agents, instructors, managers, and admins only.",
+    );
   }
 
   await addAgentToDefaultGroup(targetUid, headlineName(target.data()));

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../../users/avatar_storage.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_role.dart';
 import 'forum_models.dart';
@@ -95,6 +96,12 @@ abstract class ForumStore {
     required String replyId,
     required String uid,
     required RelevanceVote vote,
+  });
+
+  /// Propagates a new avatar URL onto denormalized author fields.
+  Future<void> syncAuthorPhotoUrl({
+    required String authorId,
+    required String? photoUrl,
   });
 }
 
@@ -472,6 +479,46 @@ class FirestoreForumStore implements ForumStore {
       next: vote,
     );
   }
+
+  @override
+  Future<void> syncAuthorPhotoUrl({
+    required String authorId,
+    required String? photoUrl,
+  }) async {
+    final threadsSnap =
+        await _threads.where('authorId', isEqualTo: authorId).get();
+    final repliesSnap = await _firestore
+        .collectionGroup('replies')
+        .where('authorId', isEqualTo: authorId)
+        .get();
+
+    const chunk = 450;
+    var batch = _firestore.batch();
+    var ops = 0;
+
+    Future<void> flush() async {
+      if (ops == 0) return;
+      await batch.commit();
+      batch = _firestore.batch();
+      ops = 0;
+    }
+
+    for (final doc in threadsSnap.docs) {
+      batch.update(doc.reference, {
+        'authorPhotoUrl': sanitizeOptionalAvatarDownloadUrl(photoUrl),
+      });
+      ops++;
+      if (ops >= chunk) await flush();
+    }
+    for (final doc in repliesSnap.docs) {
+      batch.update(doc.reference, {
+        'authorPhotoUrl': sanitizeOptionalAvatarDownloadUrl(photoUrl),
+      });
+      ops++;
+      if (ops >= chunk) await flush();
+    }
+    await flush();
+  }
 }
 
 class ForumRepository {
@@ -712,6 +759,12 @@ class ForumRepository {
       vote: vote,
     );
   }
+
+  Future<void> syncAuthorPhotoUrl({
+    required String authorId,
+    required String? photoUrl,
+  }) =>
+      _store.syncAuthorPhotoUrl(authorId: authorId, photoUrl: photoUrl);
 
   Future<void> setReplyRelevance({
     required ForumReply reply,

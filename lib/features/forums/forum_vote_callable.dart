@@ -26,10 +26,12 @@ class ForumVoteCallable {
       });
       return true;
     } on FirebaseFunctionsException catch (error) {
-      // Emulator / not-deployed → fall back to client transaction.
+      // Emulator / not-deployed / broken deploy → fall back to client path.
       if (error.code == 'unavailable' ||
           error.code == 'not-found' ||
-          error.code == 'unimplemented') {
+          error.code == 'unimplemented' ||
+          error.code == 'internal' ||
+          error.code == 'deadline-exceeded') {
         debugPrint(
           'castForumVote unavailable (${error.code}); using client path',
         );

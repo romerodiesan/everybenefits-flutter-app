@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import 'avatar_storage.dart';
 import 'user_role.dart';
 
 /// Default agency assigned to new agents.
@@ -238,7 +239,7 @@ class UserProfile {
       uid: data['uid'] as String,
       email: data['email'] as String?,
       displayName: data['displayName'] as String?,
-      photoUrl: data['photoUrl'] as String?,
+      photoUrl: sanitizeOptionalAvatarDownloadUrl(data['photoUrl'] as String?),
       role: UserRole.parse(data['role'] as String?),
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       profileCompleted: data['profileCompleted'] as bool? ?? true,

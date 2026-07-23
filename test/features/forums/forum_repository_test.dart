@@ -306,6 +306,35 @@ class FakeForumStore implements ForumStore {
     _repliesFor(threadId).add(list);
     _voteController(key).add(vote);
   }
+
+  @override
+  Future<void> syncAuthorPhotoUrl({
+    required String authorId,
+    required String? photoUrl,
+  }) async {
+    for (final entry in threads.entries.toList()) {
+      if (entry.value.authorId != authorId) continue;
+      threads[entry.key] = entry.value.copyWith(authorPhotoUrl: photoUrl);
+    }
+    for (final entry in replies.entries.toList()) {
+      final list = entry.value;
+      var changed = false;
+      final next = <ForumReply>[];
+      for (final reply in list) {
+        if (reply.authorId == authorId) {
+          next.add(reply.copyWith(authorPhotoUrl: photoUrl));
+          changed = true;
+        } else {
+          next.add(reply);
+        }
+      }
+      if (changed) {
+        replies[entry.key] = next;
+        _repliesFor(entry.key).add(next);
+      }
+    }
+    _emitThreads();
+  }
 }
 
 UserProfile _agent({String uid = 'agent-1'}) {
@@ -721,6 +750,51 @@ void main() {
     );
     expect(next.threads, hasLength(1));
     expect(next.hasMore, isFalse);
+  });
+
+  test('syncAuthorPhotoUrl updates threads and replies for that author only',
+      () async {
+    final author = _agent().copyWith(photoUrl: 'https://old/photo.jpg');
+    final other = UserProfile(
+      uid: 'other',
+      displayName: 'Other',
+      role: UserRole.agent,
+      isAnonymous: false,
+      profileCompleted: true,
+      photoUrl: 'https://other/old.jpg',
+      createdAt: DateTime.utc(2024, 1, 1),
+      updatedAt: DateTime.utc(2024, 1, 1),
+    );
+
+    final mine = await repository.createThread(
+      tags: ['general'],
+      title: 'Mi hilo con foto',
+      body: 'Cuerpo suficiente para el hilo',
+      author: author,
+    );
+    await repository.addReply(
+      threadId: mine.id,
+      body: 'Mi respuesta con foto vieja',
+      author: author,
+    );
+    final theirs = await repository.createThread(
+      tags: ['general'],
+      title: 'Hilo de otra persona',
+      body: 'Cuerpo del hilo de otro autor',
+      author: other,
+    );
+
+    await repository.syncAuthorPhotoUrl(
+      authorId: author.uid,
+      photoUrl: 'https://new/photo.jpg?v=1',
+    );
+
+    expect(store.threads[mine.id]!.authorPhotoUrl, 'https://new/photo.jpg?v=1');
+    expect(
+      store.replies[mine.id]!.single.authorPhotoUrl,
+      'https://new/photo.jpg?v=1',
+    );
+    expect(store.threads[theirs.id]!.authorPhotoUrl, 'https://other/old.jpg');
   });
 
   test('sortRepliesByRelevance puts accepted first', () {

@@ -18,27 +18,28 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(uid));
     }
 
+    // Prefer exists()+get() with Map.get defaults so missing fields never
+    // throw evaluation errors during list queries.
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).data.get('role', '') == 'admin';
+    }
+
+    function isForumParticipant() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).data.get('isAnonymous', true) == false
+        && userDoc(request.auth.uid).data.get('role', '') in
+          ['student', 'agent', 'instructor', 'manager', 'admin'];
+    }
+
     function callerProfile() {
       return userDoc(request.auth.uid).data;
     }
 
-    function hasUserProfile() {
-      return isSignedIn()
-        && exists(/databases/$(database)/documents/users/$(request.auth.uid));
-    }
-
     function callerRole() {
-      return callerProfile().role;
-    }
-
-    function isAdmin() {
-      return hasUserProfile() && callerRole() == 'admin';
-    }
-
-    function isForumParticipant() {
-      return hasUserProfile()
-        && !callerProfile().isAnonymous
-        && callerRole() in ['student', 'agent', 'instructor', 'manager', 'admin'];
+      return callerProfile().get('role', 'guest');
     }
 
     function isProtectedRole(role) {
@@ -60,12 +61,12 @@ service cloud.firestore {
 
     // Client denormalizes headlineName (displayName || email || 'Usuario').
     function callerHeadlineName() {
-      return callerProfile().displayName is string
-          && callerProfile().displayName.size() > 0
-        ? callerProfile().displayName
-        : (callerProfile().email is string
-            && callerProfile().email.size() > 0
-          ? callerProfile().email
+      return callerProfile().get('displayName', '') is string
+          && callerProfile().get('displayName', '').size() > 0
+        ? callerProfile().get('displayName', '')
+        : (callerProfile().get('email', '') is string
+            && callerProfile().get('email', '').size() > 0
+          ? callerProfile().get('email', '')
           : 'Usuario');
     }
 
@@ -105,9 +106,9 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      // Directory: participants may list peers; full PII still readable to
-      // participants (narrowed projection is a follow-up schema change).
-      allow read: if isOwner(uid) || isAdmin() || isForumParticipant();
+      // Directory queries must not depend on {uid} (null during list → Null value error).
+      allow get: if isOwner(uid) || isAdmin() || isForumParticipant();
+      allow list: if isAdmin() || isForumParticipant();
 
       allow create: if isOwner(uid)
         && request.resource.data.uid == uid
@@ -277,6 +278,12 @@ service cloud.firestore {
             && request.auth.uid == uid;
         }
       }
+    }
+
+    // Required for collectionGroup('replies') queries (avatar photo sync).
+    // Nested match /threads/.../replies alone does not cover collection groups.
+    match /{path=**}/replies/{replyId} {
+      allow read: if isSignedIn();
     }
 
     match /{document=**} {

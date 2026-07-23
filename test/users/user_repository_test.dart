@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:every_benefits/users/avatar_storage.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_repository.dart';
 import 'package:every_benefits/users/user_role.dart';
@@ -165,6 +167,83 @@ void main() {
       expect(updated.profileCompleted, isTrue);
       expect(updated.npn, isNull);
       expect(store.profiles['user-1']?.displayName, 'Sam');
+    });
+  });
+
+  group('updateAvatar', () {
+    test('persists photoUrl and notifies onAuthorPhotoChanged', () async {
+      final base = UserProfile(
+        uid: 'user-1',
+        role: UserRole.agent,
+        isAnonymous: false,
+        profileCompleted: true,
+        photoUrl: 'https://old/photo.jpg',
+        createdAt: DateTime.utc(2024, 1, 1),
+        updatedAt: DateTime.utc(2024, 1, 1),
+      );
+      store.profiles['user-1'] = base;
+
+      String? syncedAuthorId;
+      String? syncedPhotoUrl;
+      final repo = UserRepository(
+        store: store,
+        avatarStorage: AvatarStorage.test(
+          ({required uid, required bytes}) async =>
+              'https://cdn.example/avatars/$uid.jpg?alt=media&token=abc&v=99',
+        ),
+        onAuthorPhotoChanged: ({required authorId, required photoUrl}) async {
+          syncedAuthorId = authorId;
+          syncedPhotoUrl = photoUrl;
+        },
+      );
+
+      final updated = await repo.updateAvatar(
+        profile: base,
+        bytes: Uint8List.fromList([1, 2, 3]),
+      );
+
+      expect(
+        updated.photoUrl,
+        'https://cdn.example/avatars/user-1.jpg?alt=media&token=abc',
+      );
+      expect(store.profiles['user-1']?.photoUrl, updated.photoUrl);
+      expect(syncedAuthorId, 'user-1');
+      expect(syncedPhotoUrl, updated.photoUrl);
+    });
+
+    test('still persists photoUrl when onAuthorPhotoChanged throws', () async {
+      final base = UserProfile(
+        uid: 'user-1',
+        role: UserRole.agent,
+        isAnonymous: false,
+        profileCompleted: true,
+        photoUrl: 'https://old/photo.jpg',
+        createdAt: DateTime.utc(2024, 1, 1),
+        updatedAt: DateTime.utc(2024, 1, 1),
+      );
+      store.profiles['user-1'] = base;
+
+      final repo = UserRepository(
+        store: store,
+        avatarStorage: AvatarStorage.test(
+          ({required uid, required bytes}) async =>
+              'https://cdn.example/avatars/$uid.jpg?alt=media&token=abc',
+        ),
+        onAuthorPhotoChanged: ({required authorId, required photoUrl}) async {
+          throw StateError('permission-denied');
+        },
+      );
+
+      final updated = await repo.updateAvatar(
+        profile: base,
+        bytes: Uint8List.fromList([1, 2, 3]),
+      );
+
+      expect(
+        updated.photoUrl,
+        'https://cdn.example/avatars/user-1.jpg?alt=media&token=abc',
+      );
+      expect(store.profiles['user-1']?.photoUrl, updated.photoUrl);
     });
   });
 }

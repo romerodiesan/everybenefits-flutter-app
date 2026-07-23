@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../users/avatar_storage.dart';
 import '../../users/user_role.dart';
 import 'forum_tags.dart';
 
@@ -140,7 +141,8 @@ class ForumThread {
       body: data['body'] as String? ?? '',
       authorId: data['authorId'] as String? ?? '',
       authorName: data['authorName'] as String? ?? 'Usuario',
-      authorPhotoUrl: data['authorPhotoUrl'] as String?,
+      authorPhotoUrl:
+          sanitizeOptionalAvatarDownloadUrl(data['authorPhotoUrl'] as String?),
       authorRole: UserRole.parse(data['authorRole'] as String?),
       replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
       score: (data['score'] as num?)?.toInt() ?? 0,
@@ -233,7 +235,8 @@ class ForumReply {
       body: data['body'] as String? ?? '',
       authorId: data['authorId'] as String? ?? '',
       authorName: data['authorName'] as String? ?? 'Usuario',
-      authorPhotoUrl: data['authorPhotoUrl'] as String?,
+      authorPhotoUrl:
+          sanitizeOptionalAvatarDownloadUrl(data['authorPhotoUrl'] as String?),
       authorRole: UserRole.parse(data['authorRole'] as String?),
       score: (data['score'] as num?)?.toInt() ?? 0,
       createdAt: _readForumDate(data['createdAt']) ?? DateTime.now().toUtc(),
