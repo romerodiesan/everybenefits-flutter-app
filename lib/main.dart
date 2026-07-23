@@ -11,6 +11,7 @@ import 'features/chats/chat_repository.dart';
 import 'features/forums/forum_repository.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/profile/profile_completion_flow.dart';
+import 'firebase/firebase_app_check.dart';
 import 'firebase/firebase_emulators.dart';
 import 'firebase_options.dart';
 import 'users/users.dart';
@@ -26,16 +27,50 @@ Future<void> main() async {
     }
   };
 
+  // Paint a branded splash immediately while Firebase/theme warm up.
+  runApp(const _BootSplashApp());
+
+  final themeFuture = ThemeController.load();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await connectFirebaseEmulators();
-  final themeController = await ThemeController.load();
+  connectFunctionsEmulator();
+
+  final results = await Future.wait<Object?>([
+    activateFirebaseAppCheck(),
+    themeFuture,
+  ]);
+  final themeController = results[1]! as ThemeController;
+  final forumRepository = ForumRepository();
+  final chatRepository = ChatRepository();
+
   runApp(
     EveryInsuranceApp(
       authService: AuthService(),
       userRepository: UserRepository(),
       themeController: themeController,
+      forumRepository: forumRepository,
+      chatRepository: chatRepository,
     ),
   );
+}
+
+class _BootSplashApp extends StatelessWidget {
+  const _BootSplashApp();
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: AppColors.dark.meshBase,
+        body: Center(
+          child: CircularProgressIndicator(
+            color: AppColors.brand,
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class EveryInsuranceApp extends StatefulWidget {

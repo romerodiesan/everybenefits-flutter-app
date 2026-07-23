@@ -1,5 +1,9 @@
 // File generated manually for FlutterFire (flutterfire configure blocked by xcodeproj).
 // ignore_for_file: lines_longer_than_80_chars
+//
+// Security: restrict these browser/Android/iOS API keys in Google Cloud Console
+// (APIs & Services → Credentials) to the app package / bundle ID and enabled
+// APIs only. Keys in client apps are public; App Check + rules are the real gate.
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
