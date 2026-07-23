@@ -82,17 +82,13 @@ class FakeForumStore implements ForumStore {
   }
 
   @override
-  Stream<List<ForumReply>> watchReplies(String threadId) async* {
-    final accepted = threads[threadId]?.acceptedReplyId;
-    yield sortRepliesByRelevance(
-      replies[threadId] ?? const [],
-      acceptedReplyId: accepted,
-    );
+  Stream<List<ForumReply>> watchReplies(
+    String threadId, {
+    int limit = kForumReplyPageSize,
+  }) async* {
+    yield (replies[threadId] ?? const []).take(limit).toList();
     yield* _repliesFor(threadId).stream.map(
-          (list) => sortRepliesByRelevance(
-            list,
-            acceptedReplyId: threads[threadId]?.acceptedReplyId,
-          ),
+          (list) => list.take(limit).toList(),
         );
   }
 
@@ -115,6 +111,20 @@ class FakeForumStore implements ForumStore {
     final key = _replyVoteKey(threadId, replyId, uid);
     yield replyVotes[key] ?? RelevanceVote.none;
     yield* _voteController(key).stream;
+  }
+
+  @override
+  Future<Map<String, RelevanceVote>> fetchReplyVotes({
+    required String threadId,
+    required String uid,
+    required List<String> replyIds,
+  }) async {
+    final out = <String, RelevanceVote>{};
+    for (final id in replyIds) {
+      final key = _replyVoteKey(threadId, id, uid);
+      out[id] = replyVotes[key] ?? RelevanceVote.none;
+    }
+    return out;
   }
 
   @override

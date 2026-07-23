@@ -40,6 +40,18 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   final _replyController = TextEditingController();
   final _replyFocus = FocusNode();
   bool _sending = false;
+  Map<String, RelevanceVote> _replyVotes = {};
+  String? _replyVoteKey;
+
+  late final Stream<ForumThread?> _threadStream =
+      widget.forumRepository.watchThread(widget.threadId);
+  late final Stream<List<ForumReply>> _repliesStream =
+      widget.forumRepository.watchReplies(widget.threadId);
+  late final Stream<RelevanceVote> _threadVoteStream =
+      widget.forumRepository.watchThreadVote(
+    threadId: widget.threadId,
+    uid: widget.profile.uid,
+  );
 
   static const _composerRadius = BorderRadius.all(Radius.circular(20));
 
@@ -211,6 +223,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
   Future<void> _voteReply(ForumReply reply, RelevanceVote next) async {
     PulseHaptics.selection();
+    setState(() => _replyVotes = {..._replyVotes, reply.id: next});
     try {
       await widget.forumRepository.setReplyRelevance(
         reply: reply,
@@ -219,6 +232,28 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       );
     } catch (error) {
       _showError(error);
+    }
+  }
+
+  Future<void> _ensureReplyVotes(List<ForumReply> replies) async {
+    final ids = replies.map((r) => r.id).toList()..sort();
+    final key = ids.join('|');
+    if (key == _replyVoteKey) return;
+    _replyVoteKey = key;
+    if (ids.isEmpty) {
+      if (mounted) setState(() => _replyVotes = {});
+      return;
+    }
+    try {
+      final votes = await widget.forumRepository.fetchReplyVotes(
+        threadId: widget.threadId,
+        uid: widget.profile.uid,
+        replyIds: ids,
+      );
+      if (!mounted || _replyVoteKey != key) return;
+      setState(() => _replyVotes = votes);
+    } catch (_) {
+      // Votes are non-critical; controls stay at "none".
     }
   }
 
@@ -232,7 +267,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
     final colors = AppColors.of(context);
 
     return StreamBuilder<ForumThread?>(
-      stream: widget.forumRepository.watchThread(widget.threadId),
+      stream: _threadStream,
       builder: (context, threadSnapshot) {
         final thread = threadSnapshot.data;
         final loading =
@@ -284,12 +319,18 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                       children: [
                         Expanded(
                           child: StreamBuilder<List<ForumReply>>(
-                            stream: widget.forumRepository
-                                .watchReplies(widget.threadId),
+                            stream: _repliesStream,
                             builder: (context, repliesSnapshot) {
-                              final replies =
-                                  repliesSnapshot.data ?? const [];
-                              final count = thread!.replyCount;
+                              final raw =
+                                  repliesSnapshot.data ?? const <ForumReply>[];
+                              WidgetsBinding.instance.addPostFrameCallback((_) {
+                                _ensureReplyVotes(raw);
+                              });
+                              final replies = sortRepliesByRelevance(
+                                raw,
+                                acceptedReplyId: thread!.acceptedReplyId,
+                              );
+                              final count = thread.replyCount;
                               final answersLabel = count == 1
                                   ? '1 respuesta'
                                   : '$count respuestas';
@@ -303,11 +344,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                 ),
                                 children: [
                                   StreamBuilder<RelevanceVote>(
-                                    stream: widget.forumRepository
-                                        .watchThreadVote(
-                                      threadId: thread.id,
-                                      uid: widget.profile.uid,
-                                    ),
+                                    stream: _threadVoteStream,
                                     builder: (context, voteSnap) {
                                       final vote = voteSnap.data ??
                                           RelevanceVote.none;
@@ -384,16 +421,17 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                           height: AppSpacing.md,
                                         ),
                                       _PulseAnswer(
+                                        key: ValueKey(replies[i].id),
                                         thread: thread,
                                         reply: replies[i],
                                         profile: widget.profile,
+                                        vote: _replyVotes[replies[i].id] ??
+                                            RelevanceVote.none,
                                         canParticipate: _canPost,
                                         canManage: _isAuthorOrAdmin(
                                           replies[i].authorId,
                                         ),
                                         canAccept: canAccept,
-                                        forumRepository:
-                                            widget.forumRepository,
                                         onVote: (next) =>
                                             _voteReply(replies[i], next),
                                         onEdit: () =>
@@ -616,13 +654,14 @@ class _PostAction extends StatelessWidget {
 
 class _PulseAnswer extends StatelessWidget {
   const _PulseAnswer({
+    super.key,
     required this.thread,
     required this.reply,
     required this.profile,
+    required this.vote,
     required this.canParticipate,
     required this.canManage,
     required this.canAccept,
-    required this.forumRepository,
     required this.onVote,
     required this.onEdit,
     required this.onDelete,
@@ -632,10 +671,10 @@ class _PulseAnswer extends StatelessWidget {
   final ForumThread thread;
   final ForumReply reply;
   final UserProfile profile;
+  final RelevanceVote vote;
   final bool canParticipate;
   final bool canManage;
   final bool canAccept;
-  final ForumRepository forumRepository;
   final ValueChanged<RelevanceVote> onVote;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -652,51 +691,43 @@ class _PulseAnswer extends StatelessWidget {
     final canVote = canParticipate && reply.authorId != profile.uid;
     final accepted = reply.isAcceptedBy(thread);
 
-    return StreamBuilder<RelevanceVote>(
-      stream: forumRepository.watchReplyVote(
-        threadId: reply.threadId,
-        replyId: reply.id,
-        uid: profile.uid,
-      ),
-      builder: (context, voteSnap) {
-        final vote = voteSnap.data ?? RelevanceVote.none;
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            RelevanceControls(
-              score: reply.score,
-              vote: vote,
-              compact: true,
-              enabled: canVote,
-              onUp: () => onVote(_toggle(vote, RelevanceVote.up)),
-              onDown: () => onVote(_toggle(vote, RelevanceVote.down)),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: colors.glassFill,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: accepted
-                            ? AppColors.brandOf(context).withValues(alpha: 0.55)
-                            : colors.border,
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        RelevanceControls(
+          score: reply.score,
+          vote: vote,
+          compact: true,
+          enabled: canVote,
+          onUp: () => onVote(_toggle(vote, RelevanceVote.up)),
+          onDown: () => onVote(_toggle(vote, RelevanceVote.down)),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: colors.glassFill,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: accepted
+                        ? AppColors.brandOf(context).withValues(alpha: 0.55)
+                        : colors.border,
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
                         children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  reply.authorName,
-                                  style: theme.textTheme.labelLarge?.copyWith(
+                          Expanded(
+                            child: Text(
+                              reply.authorName,
+                              style: theme.textTheme.labelLarge?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13,
                                     letterSpacing: -0.1,
@@ -801,8 +832,6 @@ class _PulseAnswer extends StatelessWidget {
             ),
           ],
         );
-      },
-    );
   }
 }
 

@@ -34,7 +34,12 @@ class ForumAvatar extends StatelessWidget {
         border: Border.all(color: colors.glassBorder),
         image: hasPhoto
             ? DecorationImage(
-                image: NetworkImage(photoUrl!),
+                image: ResizeImage(
+                  NetworkImage(photoUrl!),
+                  width: (size * MediaQuery.devicePixelRatioOf(context))
+                      .round()
+                      .clamp(48, 256),
+                ),
                 fit: BoxFit.cover,
               )
             : null,

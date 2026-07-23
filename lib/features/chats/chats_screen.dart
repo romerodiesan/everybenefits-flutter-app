@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
@@ -14,7 +16,7 @@ import 'chat_repository.dart';
 import 'widgets/chat_avatar.dart';
 
 /// Chat inbox backed by [ChatRepository].
-class ChatsScreen extends StatelessWidget {
+class ChatsScreen extends StatefulWidget {
   const ChatsScreen({
     super.key,
     required this.profile,
@@ -31,10 +33,51 @@ class ChatsScreen extends StatelessWidget {
   final bool showFab;
 
   @override
+  State<ChatsScreen> createState() => _ChatsScreenState();
+}
+
+class _ChatsScreenState extends State<ChatsScreen> {
+  late final ChatRepository _repo =
+      widget.chatRepository ?? ChatRepository();
+  late final Stream<List<ChatConversation>> _source =
+      _repo.watchChats(widget.profile.uid);
+  final _gate = StreamController<List<ChatConversation>>.broadcast();
+  StreamSubscription<List<ChatConversation>>? _sub;
+  List<ChatConversation>? _latest;
+  bool? _listening;
+
+  void _syncListen(bool shouldListen) {
+    if (_listening == shouldListen) return;
+    _listening = shouldListen;
+    if (shouldListen) {
+      _sub = _source.listen(
+        (chats) {
+          _latest = chats;
+          if (!_gate.isClosed) _gate.add(chats);
+        },
+        onError: (Object error, StackTrace stack) {
+          if (!_gate.isClosed) _gate.addError(error, stack);
+        },
+      );
+    } else {
+      _sub?.cancel();
+      _sub = null;
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    _gate.close();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    _syncListen(TickerMode.valuesOf(context).enabled);
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
-    final repo = chatRepository ?? ChatRepository();
+    final profile = widget.profile;
     final canChat = canParticipateInChats(
       role: profile.role,
       isAnonymous: profile.isAnonymous,
@@ -47,7 +90,7 @@ class ChatsScreen extends StatelessWidget {
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
         ),
       ),
-      floatingActionButton: canChat && showFab
+      floatingActionButton: canChat && widget.showFab
           ? FloatingActionButton(
               heroTag: 'fab-chats-new',
               onPressed: () {
@@ -55,12 +98,12 @@ class ChatsScreen extends StatelessWidget {
                 openNewChat(
                   context,
                   profile: profile,
-                  chatRepository: repo,
-                  userRepository: userRepository ?? UserRepository(),
+                  chatRepository: _repo,
+                  userRepository: widget.userRepository ?? UserRepository(),
                 );
               },
               tooltip: 'Nuevo chat',
-              child: const Icon(Icons.chat_bubble_rounded),
+              child: const Icon(Icons.chat_rounded),
             )
           : null,
       body: !canChat
@@ -78,7 +121,8 @@ class ChatsScreen extends StatelessWidget {
               ),
             )
           : StreamBuilder<List<ChatConversation>>(
-              stream: repo.watchChats(profile.uid),
+              stream: _gate.stream,
+              initialData: _latest,
               builder: (context, snapshot) {
                 Widget child;
                 if (snapshot.hasError) {
@@ -131,7 +175,7 @@ class ChatsScreen extends StatelessWidget {
                     final rest = chats
                         .where((c) => !c.isPinnedFor(profile.uid))
                         .toList();
-                    child = ListView(
+                    child = ListView.builder(
                       key: const ValueKey('list'),
                       padding: EdgeInsets.fromLTRB(
                         AppSpacing.md,
@@ -139,41 +183,16 @@ class ChatsScreen extends StatelessWidget {
                         AppSpacing.md,
                         pulseShellListBottomPad(context, hasFab: true),
                       ),
-                      children: [
-                        if (pinned.isNotEmpty) ...[
-                          const _SectionLabel(label: 'Fijados'),
-                          const SizedBox(height: 8),
-                          for (final chat in pinned) ...[
-                            _ChatRow(
-                              chat: chat,
-                              viewerUid: profile.uid,
-                              onTap: () => openChat(
-                                context,
-                                chat: chat,
-                                profile: profile,
-                                chatRepository: repo,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          const SizedBox(height: 8),
-                          const _SectionLabel(label: 'Recientes'),
-                          const SizedBox(height: 8),
-                        ],
-                        for (final chat in rest) ...[
-                          _ChatRow(
-                            chat: chat,
-                            viewerUid: profile.uid,
-                            onTap: () => openChat(
-                              context,
-                              chat: chat,
-                              profile: profile,
-                              chatRepository: repo,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                        ],
-                      ],
+                      itemCount: _inboxItemCount(pinned, rest),
+                      itemBuilder: (context, index) {
+                        return _inboxItem(
+                          context,
+                          index: index,
+                          pinned: pinned,
+                          rest: rest,
+                          profile: profile,
+                        );
+                      },
                     );
                   }
                 }
@@ -184,6 +203,83 @@ class ChatsScreen extends StatelessWidget {
                 );
               },
             ),
+    );
+  }
+
+  int _inboxItemCount(List<ChatConversation> pinned, List<ChatConversation> rest) {
+    if (pinned.isEmpty) return rest.length;
+    // section + gap + pinned rows + gap + section + gap + rest
+    return 1 + pinned.length + 1 + rest.length;
+  }
+
+  Widget _inboxItem(
+    BuildContext context, {
+    required int index,
+    required List<ChatConversation> pinned,
+    required List<ChatConversation> rest,
+    required UserProfile profile,
+  }) {
+    if (pinned.isEmpty) {
+      final chat = rest[index];
+      return Padding(
+        key: ValueKey(chat.id),
+        padding: const EdgeInsets.only(bottom: 8),
+        child: _ChatRow(
+          chat: chat,
+          viewerUid: profile.uid,
+          onTap: () => openChat(
+            context,
+            chat: chat,
+            profile: profile,
+            chatRepository: _repo,
+          ),
+        ),
+      );
+    }
+
+    if (index == 0) {
+      return const Padding(
+        padding: EdgeInsets.only(bottom: 8),
+        child: _SectionLabel(label: 'Fijados'),
+      );
+    }
+    if (index <= pinned.length) {
+      final chat = pinned[index - 1];
+      return Padding(
+        key: ValueKey('pin-${chat.id}'),
+        padding: const EdgeInsets.only(bottom: 8),
+        child: _ChatRow(
+          chat: chat,
+          viewerUid: profile.uid,
+          onTap: () => openChat(
+            context,
+            chat: chat,
+            profile: profile,
+            chatRepository: _repo,
+          ),
+        ),
+      );
+    }
+    if (index == pinned.length + 1) {
+      return const Padding(
+        padding: EdgeInsets.only(top: 8, bottom: 8),
+        child: _SectionLabel(label: 'Recientes'),
+      );
+    }
+    final chat = rest[index - pinned.length - 2];
+    return Padding(
+      key: ValueKey(chat.id),
+      padding: const EdgeInsets.only(bottom: 8),
+      child: _ChatRow(
+        chat: chat,
+        viewerUid: profile.uid,
+        onTap: () => openChat(
+          context,
+          chat: chat,
+          profile: profile,
+          chatRepository: _repo,
+        ),
+      ),
     );
   }
 }

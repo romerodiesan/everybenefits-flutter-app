@@ -168,6 +168,25 @@ class ForumsScreenState extends State<ForumsScreen> {
     _reload();
   }
 
+  Future<void> _softRefresh() async {
+    try {
+      final page = await _repository.queryThreads(
+        tag: _selectedTag,
+        authorId: _mineOnly ? widget.profile.uid : null,
+        sort: _sort,
+      );
+      if (!mounted) return;
+      setState(() {
+        _threads = page.threads;
+        _cursor = page.nextCursor;
+        _hasMore = page.hasMore;
+        _refreshTagCatalog();
+      });
+    } catch (_) {
+      // Keep current list on background refresh failure.
+    }
+  }
+
   Future<void> openCreate() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -178,7 +197,7 @@ class ForumsScreenState extends State<ForumsScreen> {
         ),
       ),
     );
-    if (mounted) await _reload();
+    if (mounted) await _softRefresh();
   }
 
   Future<void> _openThread(ForumThread thread) async {
@@ -192,7 +211,7 @@ class ForumsScreenState extends State<ForumsScreen> {
         ),
       ),
     );
-    if (mounted) await _reload();
+    if (mounted) await _softRefresh();
   }
 
   @override
@@ -279,7 +298,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                 openCreate();
               },
               tooltip: 'Nueva pregunta',
-              child: const Icon(Icons.question_answer_rounded),
+              child: const Icon(Icons.question_mark_rounded),
             )
           : null,
       body: Column(
@@ -495,6 +514,7 @@ class ForumsScreenState extends State<ForumsScreen> {
         }
         final thread = visible[index];
         return Padding(
+          key: ValueKey(thread.id),
           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
           child: FeedPostCard(
             thread: thread,

@@ -39,6 +39,10 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _scrollController = ScrollController();
   late final ChatRepository _repo =
       widget.chatRepository ?? ChatRepository();
+  late final Stream<ChatConversation?> _chatStream =
+      _repo.watchChat(widget.chat.id);
+  late final Stream<List<ChatMessage>> _messagesStream =
+      _repo.watchMessages(widget.chat.id);
   var _sending = false;
   var _sharedBootstrapped = false;
 
@@ -89,10 +93,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         author: widget.profile,
       );
       _controller.clear();
+      // reverse:true ListView — offset 0 is the newest (bottom).
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_scrollController.hasClients) return;
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          0,
           duration: const Duration(milliseconds: 220),
           curve: Curves.easeOut,
         );
@@ -130,7 +135,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       appBar: AppBar(
         titleSpacing: 0,
         title: StreamBuilder<ChatConversation?>(
-          stream: _repo.watchChat(widget.chat.id),
+          stream: _chatStream,
           initialData: widget.chat,
           builder: (context, snapshot) {
             final chat = snapshot.data ?? widget.chat;
@@ -192,7 +197,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         children: [
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
-              stream: _repo.watchMessages(widget.chat.id),
+              stream: _messagesStream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -222,6 +227,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
                 return ListView.builder(
                   controller: _scrollController,
+                  reverse: true,
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.md,
                     AppSpacing.md,
@@ -237,6 +243,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
                     if (shared != null) {
                       return Padding(
+                        key: ValueKey(msg.id),
                         padding: const EdgeInsets.only(bottom: 12),
                         child: Align(
                           alignment: mine
@@ -279,6 +286,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                     }
 
                     return Padding(
+                      key: ValueKey(msg.id),
                       padding: const EdgeInsets.only(bottom: 10),
                       child: Align(
                         alignment: mine

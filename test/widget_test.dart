@@ -341,7 +341,10 @@ class _EmptyForumStore implements ForumStore {
   Stream<ForumThread?> watchThread(String threadId) => Stream.value(null);
 
   @override
-  Stream<List<ForumReply>> watchReplies(String threadId) =>
+  Stream<List<ForumReply>> watchReplies(
+    String threadId, {
+    int limit = kForumReplyPageSize,
+  }) =>
       Stream.value(const []);
 
   @override
@@ -358,6 +361,14 @@ class _EmptyForumStore implements ForumStore {
     required String uid,
   }) =>
       Stream.value(RelevanceVote.none);
+
+  @override
+  Future<Map<String, RelevanceVote>> fetchReplyVotes({
+    required String threadId,
+    required String uid,
+    required List<String> replyIds,
+  }) async =>
+      {for (final id in replyIds) id: RelevanceVote.none};
 
   @override
   Future<ForumThread> createThread({

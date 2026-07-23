@@ -51,7 +51,10 @@ class _MemoryForumStore implements ForumStore {
   }
 
   @override
-  Stream<List<ForumReply>> watchReplies(String threadId) async* {
+  Stream<List<ForumReply>> watchReplies(
+    String threadId, {
+    int limit = kForumReplyPageSize,
+  }) async* {
     yield const [];
   }
 
@@ -69,6 +72,14 @@ class _MemoryForumStore implements ForumStore {
     required String uid,
   }) =>
       Stream.value(RelevanceVote.none);
+
+  @override
+  Future<Map<String, RelevanceVote>> fetchReplyVotes({
+    required String threadId,
+    required String uid,
+    required List<String> replyIds,
+  }) async =>
+      {for (final id in replyIds) id: RelevanceVote.none};
 
   @override
   Future<ForumThread> createThread({

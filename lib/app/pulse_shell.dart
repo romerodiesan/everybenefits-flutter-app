@@ -93,7 +93,7 @@ class PulseShellState extends State<PulseShell> {
           return null;
         }
         return const _ShellFabConfig(
-          icon: Icons.question_answer_rounded,
+          icon: Icons.question_mark_rounded,
           tooltip: 'Nueva pregunta',
         );
       case 1:
@@ -104,7 +104,7 @@ class PulseShellState extends State<PulseShell> {
           return null;
         }
         return const _ShellFabConfig(
-          icon: Icons.chat_bubble_rounded,
+          icon: Icons.chat_rounded,
           tooltip: 'Nuevo chat',
         );
       case 2:

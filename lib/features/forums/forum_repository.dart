@@ -1,13 +1,13 @@
-import 'dart:async';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../users/user_profile.dart';
 import '../../users/user_role.dart';
 import 'forum_models.dart';
 import 'forum_tags.dart';
+import 'forum_vote_callable.dart';
 
 const kForumPageSize = 20;
+const kForumReplyPageSize = 50;
 
 /// Persistence port for forums (testable without Firestore).
 abstract class ForumStore {
@@ -21,7 +21,11 @@ abstract class ForumStore {
 
   Stream<ForumThread?> watchThread(String threadId);
 
-  Stream<List<ForumReply>> watchReplies(String threadId);
+  /// Live replies for a thread (newest page). Caller sorts with accepted id.
+  Stream<List<ForumReply>> watchReplies(
+    String threadId, {
+    int limit = kForumReplyPageSize,
+  });
 
   Stream<RelevanceVote> watchThreadVote({
     required String threadId,
@@ -32,6 +36,13 @@ abstract class ForumStore {
     required String threadId,
     required String replyId,
     required String uid,
+  });
+
+  /// One-shot batch of the viewer's votes for the given reply ids.
+  Future<Map<String, RelevanceVote>> fetchReplyVotes({
+    required String threadId,
+    required String uid,
+    required List<String> replyIds,
   });
 
   Future<ForumThread> createThread({
@@ -157,57 +168,37 @@ class FirestoreForumStore implements ForumStore {
   }
 
   @override
-  Stream<List<ForumReply>> watchReplies(String threadId) {
-    return _mergeThreadAndReplies(
-      _threads.doc(threadId).snapshots(),
-      _replies(threadId).snapshots(),
-      threadId,
-    );
+  Stream<List<ForumReply>> watchReplies(
+    String threadId, {
+    int limit = kForumReplyPageSize,
+  }) {
+    return _replies(threadId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map(
+          (snap) => snap.docs
+              .map((doc) => ForumReply.fromMap(threadId, doc.id, doc.data()))
+              .toList(),
+        );
   }
 
-  Stream<List<ForumReply>> _mergeThreadAndReplies(
-    Stream<DocumentSnapshot<Map<String, dynamic>>> threadStream,
-    Stream<QuerySnapshot<Map<String, dynamic>>> repliesStream,
-    String threadId,
-  ) {
-    late final StreamController<List<ForumReply>> controller;
-    String? accepted;
-    List<ForumReply> replies = const [];
-    var threadReady = false;
-    var repliesReady = false;
-    StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? threadSub;
-    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? repliesSub;
-
-    void emit() {
-      if (!threadReady || !repliesReady) return;
-      if (!controller.isClosed) {
-        controller.add(
-          sortRepliesByRelevance(replies, acceptedReplyId: accepted),
-        );
-      }
-    }
-
-    controller = StreamController<List<ForumReply>>(
-      onListen: () {
-        threadSub = threadStream.listen((snap) {
-          accepted = snap.data()?['acceptedReplyId'] as String?;
-          threadReady = true;
-          emit();
-        });
-        repliesSub = repliesStream.listen((snap) {
-          replies = snap.docs
-              .map((doc) => ForumReply.fromMap(threadId, doc.id, doc.data()))
-              .toList();
-          repliesReady = true;
-          emit();
-        });
-      },
-      onCancel: () async {
-        await threadSub?.cancel();
-        await repliesSub?.cancel();
-      },
+  @override
+  Future<Map<String, RelevanceVote>> fetchReplyVotes({
+    required String threadId,
+    required String uid,
+    required List<String> replyIds,
+  }) async {
+    if (replyIds.isEmpty) return {};
+    final snaps = await Future.wait(
+      replyIds.map((id) => _replyVote(threadId, id, uid).get()),
     );
-    return controller.stream;
+    final out = <String, RelevanceVote>{};
+    for (var i = 0; i < replyIds.length; i++) {
+      final value = (snaps[i].data()?['value'] as num?)?.toInt();
+      out[replyIds[i]] = RelevanceVote.fromValue(value);
+    }
+    return out;
   }
 
   @override
@@ -484,11 +475,21 @@ class FirestoreForumStore implements ForumStore {
 }
 
 class ForumRepository {
-  ForumRepository({ForumStore? store}) : _storeOverride = store;
+  ForumRepository({
+    ForumStore? store,
+    ForumVoteCallable? voteCallable,
+  })  : _storeOverride = store,
+        _voteCallableOverride = voteCallable;
 
   final ForumStore? _storeOverride;
+  final ForumVoteCallable? _voteCallableOverride;
+  ForumVoteCallable? _voteCallableLazy;
 
   ForumStore get _store => _storeOverride ?? FirestoreForumStore();
+
+  ForumVoteCallable get _voteCallable =>
+      _voteCallableOverride ??
+      (_voteCallableLazy ??= ForumVoteCallable());
 
   Future<ForumThreadPage> queryThreads({
     String? tag,
@@ -508,8 +509,11 @@ class ForumRepository {
   Stream<ForumThread?> watchThread(String threadId) =>
       _store.watchThread(threadId);
 
-  Stream<List<ForumReply>> watchReplies(String threadId) =>
-      _store.watchReplies(threadId);
+  Stream<List<ForumReply>> watchReplies(
+    String threadId, {
+    int limit = kForumReplyPageSize,
+  }) =>
+      _store.watchReplies(threadId, limit: limit);
 
   Stream<RelevanceVote> watchThreadVote({
     required String threadId,
@@ -526,6 +530,17 @@ class ForumRepository {
         threadId: threadId,
         replyId: replyId,
         uid: uid,
+      );
+
+  Future<Map<String, RelevanceVote>> fetchReplyVotes({
+    required String threadId,
+    required String uid,
+    required List<String> replyIds,
+  }) =>
+      _store.fetchReplyVotes(
+        threadId: threadId,
+        uid: uid,
+        replyIds: replyIds,
       );
 
   Future<ForumThread> createThread({
@@ -674,7 +689,7 @@ class ForumRepository {
     required ForumThread thread,
     required UserProfile actor,
     required RelevanceVote vote,
-  }) {
+  }) async {
     if (!canParticipateInForums(
       role: actor.role,
       isAnonymous: actor.isAnonymous,
@@ -684,7 +699,14 @@ class ForumRepository {
     if (thread.authorId == actor.uid) {
       throw StateError('No puedes votar tu propia pregunta.');
     }
-    return _store.setThreadRelevance(
+    if (_storeOverride == null) {
+      final viaCallable = await _voteCallable.cast(
+        threadId: thread.id,
+        vote: vote,
+      );
+      if (viaCallable) return;
+    }
+    await _store.setThreadRelevance(
       threadId: thread.id,
       uid: actor.uid,
       vote: vote,
@@ -695,7 +717,7 @@ class ForumRepository {
     required ForumReply reply,
     required UserProfile actor,
     required RelevanceVote vote,
-  }) {
+  }) async {
     if (!canParticipateInForums(
       role: actor.role,
       isAnonymous: actor.isAnonymous,
@@ -705,7 +727,15 @@ class ForumRepository {
     if (reply.authorId == actor.uid) {
       throw StateError('No puedes votar tu propia respuesta.');
     }
-    return _store.setReplyRelevance(
+    if (_storeOverride == null) {
+      final viaCallable = await _voteCallable.cast(
+        threadId: reply.threadId,
+        replyId: reply.id,
+        vote: vote,
+      );
+      if (viaCallable) return;
+    }
+    await _store.setReplyRelevance(
       threadId: reply.threadId,
       replyId: reply.id,
       uid: actor.uid,
