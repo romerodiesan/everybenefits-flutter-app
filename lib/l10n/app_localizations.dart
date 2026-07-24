@@ -326,6 +326,72 @@ abstract class AppLocalizations {
   /// **'Phone'**
   String get welcomePhone;
 
+  /// No description provided for @onboardingSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get onboardingSkip;
+
+  /// No description provided for @onboardingNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get onboardingNext;
+
+  /// No description provided for @onboardingGetStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get onboardingGetStarted;
+
+  /// No description provided for @onboardingCommunityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn out loud'**
+  String get onboardingCommunityTitle;
+
+  /// No description provided for @onboardingCommunityBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask questions, share wins, and grow with agents who do the same work you do.'**
+  String get onboardingCommunityBody;
+
+  /// No description provided for @onboardingChatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Stay in the loop'**
+  String get onboardingChatsTitle;
+
+  /// No description provided for @onboardingChatsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct messages and team groups keep mentorship and daily coordination in one place.'**
+  String get onboardingChatsBody;
+
+  /// No description provided for @onboardingAiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'An assistant on call'**
+  String get onboardingAiTitle;
+
+  /// No description provided for @onboardingAiBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse AI is ready when you need a quick answer — benefits, courses, or community context.'**
+  String get onboardingAiBody;
+
+  /// No description provided for @onboardingAcademyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Level up your craft'**
+  String get onboardingAcademyTitle;
+
+  /// No description provided for @onboardingAcademyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Paths and courses designed for insurance professionals — progress that actually sticks.'**
+  String get onboardingAcademyBody;
+
   /// No description provided for @loginTitle.
   ///
   /// In en, this message translates to:
@@ -1910,6 +1976,54 @@ abstract class AppLocalizations {
   /// **'Unpin chat'**
   String get chatUnpin;
 
+  /// No description provided for @chatDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatDelete;
+
+  /// No description provided for @chatDeleteConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete chat?'**
+  String get chatDeleteConfirmTitle;
+
+  /// No description provided for @chatDeleteConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This removes the chat from your inbox. It can come back if someone messages again.'**
+  String get chatDeleteConfirmBody;
+
+  /// No description provided for @chatDeleteConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatDeleteConfirmAction;
+
+  /// No description provided for @chatDeleteCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get chatDeleteCancel;
+
+  /// No description provided for @chatDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat deleted'**
+  String get chatDeleted;
+
+  /// No description provided for @chatPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat pinned'**
+  String get chatPinned;
+
+  /// No description provided for @chatUnpinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat unpinned'**
+  String get chatUnpinned;
+
   /// No description provided for @chatTimeYesterday.
   ///
   /// In en, this message translates to:
@@ -2000,6 +2114,18 @@ abstract class AppLocalizations {
   /// **'How can I help?'**
   String get aiEmptyPrompt;
 
+  /// No description provided for @aiEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about benefits, courses, or community — demo replies for now.'**
+  String get aiEmptySubtitle;
+
+  /// No description provided for @aiAssistantSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse AI'**
+  String get aiAssistantSubtitle;
+
   /// No description provided for @aiSettings.
   ///
   /// In en, this message translates to:
@@ -2017,6 +2143,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Model'**
   String get aiModelSection;
+
+  /// No description provided for @aiModelName.
+  ///
+  /// In en, this message translates to:
+  /// **'Gemini'**
+  String get aiModelName;
 
   /// No description provided for @aiModelSubtitle.
   ///

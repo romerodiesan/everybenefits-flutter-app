@@ -127,6 +127,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get welcomePhone => 'Phone';
 
   @override
+  String get onboardingSkip => 'Skip';
+
+  @override
+  String get onboardingNext => 'Next';
+
+  @override
+  String get onboardingGetStarted => 'Get started';
+
+  @override
+  String get onboardingCommunityTitle => 'Learn out loud';
+
+  @override
+  String get onboardingCommunityBody =>
+      'Ask questions, share wins, and grow with agents who do the same work you do.';
+
+  @override
+  String get onboardingChatsTitle => 'Stay in the loop';
+
+  @override
+  String get onboardingChatsBody =>
+      'Direct messages and team groups keep mentorship and daily coordination in one place.';
+
+  @override
+  String get onboardingAiTitle => 'An assistant on call';
+
+  @override
+  String get onboardingAiBody =>
+      'Pulse AI is ready when you need a quick answer — benefits, courses, or community context.';
+
+  @override
+  String get onboardingAcademyTitle => 'Level up your craft';
+
+  @override
+  String get onboardingAcademyBody =>
+      'Paths and courses designed for insurance professionals — progress that actually sticks.';
+
+  @override
   String get loginTitle => 'Sign in';
 
   @override
@@ -972,6 +1009,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatUnpin => 'Unpin chat';
 
   @override
+  String get chatDelete => 'Delete';
+
+  @override
+  String get chatDeleteConfirmTitle => 'Delete chat?';
+
+  @override
+  String get chatDeleteConfirmBody =>
+      'This removes the chat from your inbox. It can come back if someone messages again.';
+
+  @override
+  String get chatDeleteConfirmAction => 'Delete';
+
+  @override
+  String get chatDeleteCancel => 'Cancel';
+
+  @override
+  String get chatDeleted => 'Chat deleted';
+
+  @override
+  String get chatPinned => 'Chat pinned';
+
+  @override
+  String get chatUnpinned => 'Chat unpinned';
+
+  @override
   String get chatTimeYesterday => 'Yesterday';
 
   @override
@@ -1018,6 +1080,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiEmptyPrompt => 'How can I help?';
 
   @override
+  String get aiEmptySubtitle =>
+      'Ask about benefits, courses, or community — demo replies for now.';
+
+  @override
+  String get aiAssistantSubtitle => 'Pulse AI';
+
+  @override
   String get aiSettings => 'Settings';
 
   @override
@@ -1025,6 +1094,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiModelSection => 'Model';
+
+  @override
+  String get aiModelName => 'Gemini';
 
   @override
   String get aiModelSubtitle => 'Coming soon via Firebase AI Logic';

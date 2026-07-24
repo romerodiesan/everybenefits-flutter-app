@@ -15,7 +15,9 @@ import 'package:every_benefits/features/chats/chat_repository.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
+import 'package:every_benefits/features/onboarding/onboarding_prefs.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
+import 'package:every_benefits/features/onboarding/welcome_screen.dart';
 import 'package:every_benefits/features/profile/profile_completion_flow.dart';
 import 'package:every_benefits/features/profile/settings_screen.dart';
 import 'package:every_benefits/l10n/app_localizations.dart';
@@ -45,7 +47,10 @@ void main() {
   });
 
   setUp(() {
-    SharedPreferences.setMockInitialValues({});
+    SharedPreferences.setMockInitialValues({
+      OnboardingPrefs.prefsKey: true,
+    });
+    WelcomeScreen.debugAmbientMotion = false;
     auth = MockAuthService();
     users = MockUserRepository();
     emptyForums = ForumRepository(store: _EmptyForumStore());
@@ -53,7 +58,10 @@ void main() {
     emptyChats = ChatRepository(store: chatStore);
   });
 
-  tearDown(() => chatStore.dispose());
+  tearDown(() {
+    WelcomeScreen.debugAmbientMotion = true;
+    chatStore.dispose();
+  });
 
   Widget app() {
     return EveryInsuranceApp(
@@ -113,6 +121,27 @@ void main() {
     expect(find.text('INSURANCE'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
     expect(find.text('Continue as guest'), findsOneWidget);
+  });
+
+  testWidgets('first-run onboarding shows story pages before auth',
+      (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
+
+    await tester.pumpWidget(app());
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
+    expect(find.text('Learn out loud'), findsOneWidget);
+    expect(find.text('Next'), findsOneWidget);
+    expect(find.text('Skip'), findsOneWidget);
+    expect(find.text('Sign in'), findsNothing);
+
+    await tester.tap(find.text('Skip'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('EVERY'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
   });
 
   testWidgets('welcome navigates to login and register', (tester) async {

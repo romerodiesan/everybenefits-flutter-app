@@ -128,6 +128,43 @@ class AppLocalizationsEs extends AppLocalizations {
   String get welcomePhone => 'Teléfono';
 
   @override
+  String get onboardingSkip => 'Saltar';
+
+  @override
+  String get onboardingNext => 'Siguiente';
+
+  @override
+  String get onboardingGetStarted => 'Empezar';
+
+  @override
+  String get onboardingCommunityTitle => 'Aprende en voz alta';
+
+  @override
+  String get onboardingCommunityBody =>
+      'Haz preguntas, comparte logros y crece con agentes que hacen el mismo trabajo que tú.';
+
+  @override
+  String get onboardingChatsTitle => 'Mantente al día';
+
+  @override
+  String get onboardingChatsBody =>
+      'Mensajes directos y grupos de equipo reúnen mentoría y coordinación diaria en un solo lugar.';
+
+  @override
+  String get onboardingAiTitle => 'Un asistente a tu lado';
+
+  @override
+  String get onboardingAiBody =>
+      'Pulse AI responde cuando necesitas una ayuda rápida — beneficios, cursos o contexto de la comunidad.';
+
+  @override
+  String get onboardingAcademyTitle => 'Sube de nivel';
+
+  @override
+  String get onboardingAcademyBody =>
+      'Rutas y cursos pensados para profesionales de seguros — progreso que sí se nota.';
+
+  @override
   String get loginTitle => 'Iniciar sesión';
 
   @override
@@ -980,6 +1017,31 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatUnpin => 'Quitar de fijados';
 
   @override
+  String get chatDelete => 'Eliminar';
+
+  @override
+  String get chatDeleteConfirmTitle => '¿Eliminar chat?';
+
+  @override
+  String get chatDeleteConfirmBody =>
+      'Se quitará de tu bandeja. Puede volver a aparecer si alguien escribe de nuevo.';
+
+  @override
+  String get chatDeleteConfirmAction => 'Eliminar';
+
+  @override
+  String get chatDeleteCancel => 'Cancelar';
+
+  @override
+  String get chatDeleted => 'Chat eliminado';
+
+  @override
+  String get chatPinned => 'Chat fijado';
+
+  @override
+  String get chatUnpinned => 'Chat desafijado';
+
+  @override
   String get chatTimeYesterday => 'Ayer';
 
   @override
@@ -1026,6 +1088,13 @@ class AppLocalizationsEs extends AppLocalizations {
   String get aiEmptyPrompt => '¿En qué puedo ayudarte?';
 
   @override
+  String get aiEmptySubtitle =>
+      'Pregunta por beneficios, cursos o la comunidad — respuestas demo por ahora.';
+
+  @override
+  String get aiAssistantSubtitle => 'Pulse AI';
+
+  @override
   String get aiSettings => 'Ajustes';
 
   @override
@@ -1033,6 +1102,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get aiModelSection => 'Modelo';
+
+  @override
+  String get aiModelName => 'Gemini';
 
   @override
   String get aiModelSubtitle => 'Próximamente vía Firebase AI Logic';

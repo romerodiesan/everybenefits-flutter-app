@@ -10,8 +10,10 @@ import 'package:every_benefits/features/onboarding/forgot_password_screen.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/phone_auth_screen.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
+import 'package:every_benefits/features/onboarding/welcome_screen.dart';
 import 'package:every_benefits/l10n/app_localizations.dart';
 import 'package:every_benefits/l10n/app_localizations_en.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class MockAuthService extends Mock implements AuthService {}
 
@@ -25,7 +27,13 @@ void main() {
   });
 
   setUp(() {
+    SharedPreferences.setMockInitialValues({});
+    WelcomeScreen.debugAmbientMotion = false;
     auth = MockAuthService();
+  });
+
+  tearDown(() {
+    WelcomeScreen.debugAmbientMotion = true;
   });
 
   Future<void> pumpAuth(WidgetTester tester, Widget home) async {
@@ -40,6 +48,45 @@ void main() {
     );
     await tester.pump();
   }
+
+  testWidgets('welcome story advances to auth with Get started', (tester) async {
+    await pumpAuth(
+      tester,
+      WelcomeScreen(
+        authService: auth,
+        onboardingCompletedOverride: false,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Learn out loud'), findsOneWidget);
+
+    for (var i = 0; i < 3; i++) {
+      await tester.tap(find.text('Next'));
+      await tester.pumpAndSettle();
+    }
+
+    expect(find.text('Level up your craft'), findsOneWidget);
+    await tester.tap(find.text('Get started'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('EVERY'), findsOneWidget);
+    expect(find.text('Sign in'), findsOneWidget);
+  });
+
+  testWidgets('completed override opens auth page directly', (tester) async {
+    await pumpAuth(
+      tester,
+      WelcomeScreen(
+        authService: auth,
+        onboardingCompletedOverride: true,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Learn out loud'), findsNothing);
+  });
 
   testWidgets('login submits email and password', (tester) async {
     when(
