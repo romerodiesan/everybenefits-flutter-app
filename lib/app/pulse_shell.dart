@@ -17,7 +17,7 @@ import 'pulse_haptics.dart';
 import 'widgets/lifebuoy_icon.dart';
 import 'widgets/pulse_chrome.dart';
 
-/// App shell: Facebook home, WhatsApp chats, ChatGPT AI, Platzi academy, X profile.
+/// App shell: forums home, chats, Pulse AI, academy, profile.
 class PulseShell extends StatefulWidget {
   const PulseShell({
     super.key,
@@ -45,7 +45,6 @@ class PulseShellState extends State<PulseShell> {
   int _index = 0;
 
   final _forumsKey = GlobalKey<ForumsScreenState>();
-  final _aiKey = GlobalKey<AiChatScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
 
   static const _tabCount = 5;
@@ -112,10 +111,7 @@ class PulseShellState extends State<PulseShell> {
           tooltip: l10n.fabNewChat,
         );
       case 2:
-        return _ShellFabConfig(
-          icon: Icons.edit_square,
-          tooltip: l10n.fabNewConversation,
-        );
+        return null;
       case 3:
         return _ShellFabConfig(
           icon: Icons.search_rounded,
@@ -145,8 +141,6 @@ class PulseShellState extends State<PulseShell> {
           chatRepository: widget.chatRepository,
           userRepository: widget.userRepository,
         );
-      case 2:
-        _aiKey.currentState?.startNewConversation();
       case 3:
         Navigator.of(context).push(
           MaterialPageRoute<void>(
@@ -208,7 +202,7 @@ class PulseShellState extends State<PulseShell> {
         userRepository: widget.userRepository,
         showFab: false,
       ),
-      AiChatScreen(key: _aiKey),
+      const AiChatScreen(),
       const UniversityScreen(),
       ProfileScreen(
         key: _profileKey,

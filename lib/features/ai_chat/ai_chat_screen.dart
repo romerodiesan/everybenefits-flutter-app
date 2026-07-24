@@ -8,22 +8,23 @@ import '../../app/widgets/pulse_chrome.dart';
 import '../../l10n/l10n.dart';
 import 'ai_settings_screen.dart';
 
-/// Minimal AI assistant chat.
+/// Pulse-styled AI assistant chat (demo replies until Gemini is wired).
 class AiChatScreen extends StatefulWidget {
   const AiChatScreen({super.key});
 
   @override
-  State<AiChatScreen> createState() => AiChatScreenState();
+  State<AiChatScreen> createState() => _AiChatScreenState();
 }
 
-class AiChatScreenState extends State<AiChatScreen> {
+class _AiChatScreenState extends State<AiChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
   final List<_AiBubble> _messages = [];
   String? _title;
   bool _thinking = false;
 
-  void startNewConversation() {
+  void _startNewConversation() {
+    PulseHaptics.light();
     setState(() {
       _messages.clear();
       _title = null;
@@ -70,9 +71,11 @@ class AiChatScreenState extends State<AiChatScreen> {
 
   void _showHistory() {
     final l10n = context.l10n;
+    final colors = AppColors.of(context);
+    final theme = Theme.of(context);
     showModalBottomSheet<void>(
       context: context,
-      backgroundColor: AppColors.of(context).sheet,
+      backgroundColor: colors.sheet,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -81,21 +84,32 @@ class AiChatScreenState extends State<AiChatScreen> {
           child: ListView(
             shrinkWrap: true,
             children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+                child: Text(
+                  l10n.aiHistoryTooltip,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
               ListTile(
-                leading: const Icon(Icons.edit_square),
+                leading: Icon(Icons.edit_square, color: AppColors.brandOf(context)),
                 title: Text(l10n.aiNewConversation),
                 onTap: () {
                   Navigator.pop(context);
-                  setState(() {
-                    _messages.clear();
-                    _title = null;
-                  });
+                  _startNewConversation();
                 },
               ),
               const Divider(height: 1),
               for (final title in demoAiChats)
                 ListTile(
-                  title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  leading: Icon(Icons.chat_bubble_outline_rounded, color: colors.muted),
+                  title: Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   onTap: () {
                     Navigator.pop(context);
                     setState(() {
@@ -106,8 +120,9 @@ class AiChatScreenState extends State<AiChatScreen> {
                     });
                   },
                 ),
+              const Divider(height: 1),
               ListTile(
-                leading: const Icon(Icons.settings_outlined),
+                leading: Icon(Icons.settings_outlined, color: colors.muted),
                 title: Text(l10n.aiSettings),
                 onTap: () {
                   Navigator.pop(context);
@@ -129,24 +144,56 @@ class AiChatScreenState extends State<AiChatScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final composerBottom =
+        keyboard > 0 ? 10.0 : pulseShellListBottomPad(context);
 
     return PulseScaffold(
       appBar: AppBar(
+        titleSpacing: 0,
         leading: IconButton(
           tooltip: l10n.aiHistoryTooltip,
           onPressed: _showHistory,
           icon: const Icon(Icons.menu_rounded),
         ),
-        title: Text(
-          _title ?? l10n.aiNewConversation,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
+        title: Row(
+          children: [
+            const _AiMark(size: 38),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _title ?? l10n.aiNewConversation,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  Text(
+                    l10n.aiAssistantSubtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: colors.muted,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
         actions: [
           IconButton(
             tooltip: l10n.aiNewTooltip,
-            onPressed: startNewConversation,
+            onPressed: _startNewConversation,
             icon: const Icon(Icons.edit_square),
           ),
         ],
@@ -158,7 +205,7 @@ class AiChatScreenState extends State<AiChatScreen> {
                 ? _EmptyState(onSuggestion: _send)
                 : ListView.builder(
                     controller: _scroll,
-                    padding: const EdgeInsets.fromLTRB(
+                    padding: EdgeInsets.fromLTRB(
                       AppSpacing.lg,
                       AppSpacing.sm,
                       AppSpacing.lg,
@@ -167,50 +214,85 @@ class AiChatScreenState extends State<AiChatScreen> {
                     itemCount: _messages.length + (_thinking ? 1 : 0),
                     itemBuilder: (context, index) {
                       if (_thinking && index == _messages.length) {
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Text(
-                            l10n.aiThinking,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colors.muted,
-                            ),
-                          ),
-                        );
+                        return const _ThinkingRow();
                       }
                       return _Bubble(message: _messages[index]);
                     },
                   ),
           ),
-          SafeArea(
-            top: false,
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.sheet.withValues(alpha: 0.96),
+              border: Border(top: BorderSide(color: colors.border)),
+            ),
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                0,
-                AppSpacing.md,
-                72,
-              ),
-              child: TextField(
-                controller: _controller,
-                minLines: 1,
-                maxLines: 4,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  hintText: l10n.aiInputHint,
-                  filled: true,
-                  fillColor: colors.sheet,
-                  suffixIcon: IconButton(
-                    onPressed: _thinking ? null : () => _send(),
-                    icon: Icon(
-                      Icons.arrow_upward_rounded,
-                      color: _thinking ? colors.muted : AppColors.brandOf(context),
+              padding: EdgeInsets.fromLTRB(10, 10, 10, composerBottom),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      minLines: 1,
+                      maxLines: 4,
+                      textCapitalization: TextCapitalization.sentences,
+                      enabled: !_thinking,
+                      decoration: InputDecoration(
+                        hintText: l10n.aiInputHint,
+                        hintStyle: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.muted,
+                        ),
+                        filled: true,
+                        fillColor: colors.glassFill,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: BorderSide(color: colors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: BorderSide(color: colors.border),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: BorderSide(color: brand, width: 1.4),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                      ),
+                      onSubmitted: (_) => _send(),
                     ),
                   ),
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
+                  const SizedBox(width: 8),
+                  Material(
+                    color: brand,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: InkWell(
+                      onTap: _thinking ? null : () => _send(),
+                      borderRadius: BorderRadius.circular(16),
+                      child: SizedBox(
+                        width: 48,
+                        height: 48,
+                        child: _thinking
+                            ? Padding(
+                                padding: const EdgeInsets.all(14),
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: AppColors.onBrandOf(context),
+                                ),
+                              )
+                            : Icon(
+                                Icons.send_rounded,
+                                size: 20,
+                                color: AppColors.onBrandOf(context),
+                              ),
+                      ),
+                    ),
                   ),
-                ),
-                onSubmitted: (_) => _send(),
+                ],
               ),
             ),
           ),
@@ -226,6 +308,41 @@ class _AiBubble {
   final bool isUser;
 }
 
+class _AiMark extends StatelessWidget {
+  const _AiMark({this.size = 38});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final brand = AppColors.brandOf(context);
+    final colors = AppColors.of(context);
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            brand.withValues(alpha: 0.22),
+            brand.withValues(alpha: 0.08),
+          ],
+        ),
+        border: Border.all(color: colors.border),
+      ),
+      alignment: Alignment.center,
+      child: Icon(
+        Icons.auto_awesome,
+        size: size * 0.42,
+        color: brand,
+      ),
+    );
+  }
+}
+
 class _Bubble extends StatelessWidget {
   const _Bubble({required this.message});
   final _AiBubble message;
@@ -234,37 +351,79 @@ class _Bubble extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+    final mine = message.isUser;
 
-    if (message.isUser) {
+    final bubble = Container(
+      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.sizeOf(context).width * 0.82,
+      ),
+      decoration: BoxDecoration(
+        color: mine ? brand.withValues(alpha: 0.16) : colors.sheet,
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(18),
+          topRight: const Radius.circular(18),
+          bottomLeft: Radius.circular(mine ? 18 : 5),
+          bottomRight: Radius.circular(mine ? 5 : 18),
+        ),
+        border: Border.all(
+          color: mine ? brand.withValues(alpha: 0.22) : colors.border,
+        ),
+      ),
+      child: Text(
+        message.text,
+        style: theme.textTheme.bodyLarge?.copyWith(
+          height: 1.4,
+          fontWeight: FontWeight.w500,
+          color: colors.ink,
+        ),
+      ),
+    );
+
+    if (mine) {
       return Align(
         alignment: Alignment.centerRight,
-        child: Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-          ),
-          decoration: BoxDecoration(
-            color: AppColors.brandOf(context).withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: colors.border),
-          ),
-          child: Text(message.text, style: theme.textTheme.bodyLarge),
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: bubble,
         ),
       );
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Icon(Icons.auto_awesome, size: 18, color: AppColors.brandOf(context)),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              message.text,
-              style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
+          const _AiMark(size: 28),
+          const SizedBox(width: 8),
+          Flexible(child: bubble),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThinkingRow extends StatelessWidget {
+  const _ThinkingRow();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          const _AiMark(size: 28),
+          const SizedBox(width: 8),
+          Text(
+            context.l10n.aiThinking,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.muted,
+              fontWeight: FontWeight.w500,
             ),
           ),
         ],
@@ -280,22 +439,62 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final l10n = context.l10n;
+
     return ListView(
-      padding: const EdgeInsets.all(AppSpacing.lg),
+      padding: EdgeInsets.fromLTRB(
+        AppSpacing.lg,
+        AppSpacing.xl,
+        AppSpacing.lg,
+        AppSpacing.lg,
+      ),
       children: [
-        const SizedBox(height: 48),
+        const Center(child: _AiMark(size: 64)),
+        const SizedBox(height: AppSpacing.lg),
         Text(
-          context.l10n.aiEmptyPrompt,
+          l10n.aiEmptyPrompt,
           textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium,
+          style: theme.textTheme.headlineMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.4,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          l10n.aiEmptySubtitle,
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: colors.muted,
+            height: 1.4,
+          ),
         ),
         const SizedBox(height: AppSpacing.xl),
         for (final s in demoAiChats)
           Padding(
             padding: const EdgeInsets.only(bottom: AppSpacing.sm),
             child: PulseSheet(
-              onTap: () => onSuggestion(s),
-              child: Text(s, style: theme.textTheme.bodyLarge),
+              onTap: () {
+                PulseHaptics.selection();
+                onSuggestion(s);
+              },
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      s,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                  Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    size: 14,
+                    color: colors.muted,
+                  ),
+                ],
+              ),
             ),
           ),
       ],
