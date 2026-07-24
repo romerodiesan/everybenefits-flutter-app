@@ -8,6 +8,19 @@ admin.initializeApp({
 });
 setGlobalOptions({ region: "us-central1", maxInstances: 20 });
 
+/** Gen2 callables need explicit CORS for browser (e.g. localhost webapp). */
+const callableOpts = {
+  cors: [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    /https:\/\/.*\.vercel\.app$/,
+    /https:\/\/.*\.web\.app$/,
+    /https:\/\/.*\.firebaseapp\.com$/,
+  ],
+  // Auth is enforced inside the handler; Cloud Run must allow the OPTIONS preflight.
+  invoker: "public" as const,
+};
+
 const db = admin.firestore();
 const rtdb = admin.database();
 
@@ -101,7 +114,7 @@ async function addAgentToDefaultGroup(uid: string, displayName: string) {
 /**
  * Trusted vote path: updates vote doc + score increment under Admin SDK.
  */
-export const castForumVote = onCall(async (request) => {
+export const castForumVote = onCall(callableOpts, async (request) => {
   if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "Sign in required.");
   }
@@ -170,7 +183,7 @@ export const castForumVote = onCall(async (request) => {
  * Admin-only role assignment.
  * Staff roles (agent / instructor / manager / admin) join the default group.
  */
-export const setUserRole = onCall(async (request) => {
+export const setUserRole = onCall(callableOpts, async (request) => {
   if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "Sign in required.");
   }
@@ -222,7 +235,7 @@ export const setUserRole = onCall(async (request) => {
  * Admin-only directory of students awaiting promotion.
  * Uses Admin SDK so the client does not need a fragile users list rule.
  */
-export const listStudentsForPromotion = onCall(async (request) => {
+export const listStudentsForPromotion = onCall(callableOpts, async (request) => {
   if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "Sign in required.");
   }
@@ -260,7 +273,7 @@ export const listStudentsForPromotion = onCall(async (request) => {
 /**
  * Ensures the caller (staff) is a member of the default community RTDB chat.
  */
-export const ensureDefaultAgentGroup = onCall(async (request) => {
+export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
   if (!request.auth?.uid) {
     throw new HttpsError("unauthenticated", "Sign in required.");
   }
