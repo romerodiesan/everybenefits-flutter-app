@@ -124,3 +124,9 @@ test/rules/package-lock.json
 # Cloud Functions
 functions/node_modules/
 functions/lib/
+
+# Next.js web client
+webapp/node_modules/
+webapp/.next/
+webapp/out/
+webapp/.env*.local
