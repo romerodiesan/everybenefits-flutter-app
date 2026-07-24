@@ -262,6 +262,126 @@ void main() {
       );
       expect(store.messages[chat.id]!.first.reactions['other'], '❤️');
     });
+
+    test('rejects reactions on support chat', () async {
+      final me = _user('me', name: 'María');
+      final chat = await repo.getOrCreateSupportChat(me: me);
+      final msg = await repo.sendMessage(
+        chatId: chat.id,
+        body: 'Need help',
+        author: me,
+      );
+
+      expect(
+        () => repo.toggleReaction(
+          chatId: chat.id,
+          messageId: msg.id,
+          uid: me.uid,
+          emoji: '👍',
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('soporte'),
+          ),
+        ),
+      );
+    });
+  });
+
+  group('hideChatForMe', () {
+    test('hides from inbox and reappears after a new message', () async {
+      final me = _user('me', name: 'María');
+      final other = _user('other', name: 'Carlos');
+      final chat = await repo.getOrCreateDm(me: me, other: other);
+      await repo.sendMessage(chatId: chat.id, body: 'hola', author: me);
+
+      await repo.hideChatForMe(chatId: chat.id, uid: me.uid);
+      final hidden = await repo.watchChats(me.uid).first;
+      expect(hidden.any((c) => c.id == chat.id), isFalse);
+
+      await repo.sendMessage(chatId: chat.id, body: 'back', author: other);
+      final again = await repo.watchChats(me.uid).first;
+      expect(again.any((c) => c.id == chat.id), isTrue);
+    });
+
+    test('rejects support and default community chats', () async {
+      final me = _user('me', name: 'María', role: UserRole.agent);
+      final support = await repo.getOrCreateSupportChat(me: me);
+      expect(
+        () => repo.hideChatForMe(chatId: support.id, uid: me.uid),
+        throwsA(isA<StateError>()),
+      );
+
+      final community = await store.createChat(
+        ChatConversation(
+          id: 'agents-default',
+          memberIds: [me.uid],
+          memberNames: {me.uid: me.headlineName},
+          isGroup: true,
+          title: 'Team',
+          lastMessage: '',
+          lastMessageAt: DateTime.utc(2024, 1, 1),
+          createdAt: DateTime.utc(2024, 1, 1),
+          createdBy: 'system',
+          unreadCounts: {me.uid: 0},
+          pinnedBy: const {},
+          isDefaultAgentGroup: true,
+          isSupportChat: false,
+        ),
+      );
+      expect(
+        () => repo.hideChatForMe(chatId: community.id, uid: me.uid),
+        throwsA(isA<StateError>()),
+      );
+      expect(
+        () => repo.setPinned(chatId: community.id, uid: me.uid, pinned: true),
+        throwsA(isA<StateError>()),
+      );
+    });
+
+    test('clears pin when hiding', () async {
+      final me = _user('me');
+      final other = _user('other');
+      final chat = await repo.getOrCreateDm(me: me, other: other);
+      await repo.setPinned(chatId: chat.id, uid: me.uid, pinned: true);
+      await repo.hideChatForMe(chatId: chat.id, uid: me.uid);
+      final updated = await repo.watchChat(chat.id).first;
+      expect(updated!.isPinnedFor(me.uid), isFalse);
+    });
+
+    test('hide only removes chat for that user', () async {
+      final me = _user('me', name: 'María');
+      final other = _user('other', name: 'Carlos');
+      final chat = await repo.getOrCreateDm(me: me, other: other);
+      await repo.hideChatForMe(chatId: chat.id, uid: me.uid);
+
+      final mine = await repo.watchChats(me.uid).first;
+      final theirs = await repo.watchChats(other.uid).first;
+      expect(mine.any((c) => c.id == chat.id), isFalse);
+      expect(theirs.any((c) => c.id == chat.id), isTrue);
+    });
+  });
+
+  group('setPinned inbox', () {
+    test('pinned chat appears in pinned partition for that user only', () async {
+      final me = _user('me', name: 'María');
+      final other = _user('other', name: 'Carlos');
+      final chat = await repo.getOrCreateDm(me: me, other: other);
+
+      await repo.setPinned(chatId: chat.id, uid: me.uid, pinned: true);
+
+      final mine = await repo.watchChats(me.uid).first;
+      final sections = partitionChatInbox(mine, me.uid);
+      expect(sections.pinned.map((c) => c.id), contains(chat.id));
+      expect(sections.recent.map((c) => c.id), isNot(contains(chat.id)));
+
+      final theirs = await repo.watchChats(other.uid).first;
+      final otherSections = partitionChatInbox(theirs, other.uid);
+      expect(otherSections.pinned.map((c) => c.id), isNot(contains(chat.id)));
+      expect(otherSections.recent.map((c) => c.id), contains(chat.id));
+    });
   });
 
   group('formatChatTime', () {

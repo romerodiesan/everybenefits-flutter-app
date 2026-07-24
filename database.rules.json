@@ -80,6 +80,7 @@
               ".write": "auth != null
                 && auth.uid === $uid
                 && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
+                && root.child('chats').child($chatId).child('isSupportChat').val() !== true
                 && (!newData.exists() || newData.isString())"
             }
           }

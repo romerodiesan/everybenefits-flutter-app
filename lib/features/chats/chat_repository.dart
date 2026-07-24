@@ -35,6 +35,23 @@ abstract class ChatStore {
     required String chatId,
   });
 
+  /// Removes this chat from [uid]'s inbox index (hide for me).
+  Future<void> removeUserChatIndex({
+    required String uid,
+    required String chatId,
+  });
+
+  /// Patches [uid]'s inbox row (own index only). Used to refresh listeners on pin.
+  Future<void> patchUserChatIndex({
+    required String uid,
+    required String chatId,
+    required int lastMessageAt,
+    bool? pinned,
+  });
+
+  /// Ensures inbox rows exist for all indexable members (e.g. after a new message).
+  Future<void> ensureUserChatIndexes(ChatConversation chat);
+
   Future<void> updateChat(ChatConversation chat);
 
   Future<ChatMessage> addMessage(ChatMessage message);
@@ -68,7 +85,10 @@ class RtdbChatStore implements ChatStore {
     return raw.map((key, value) => MapEntry('$key', value));
   }
 
-  Future<List<ChatConversation>> _inboxFromIndex(Object? raw) async {
+  Future<List<ChatConversation>> _inboxFromIndex(
+    Object? raw, {
+    required String viewerUid,
+  }) async {
     if (raw is! Map || raw.isEmpty) return <ChatConversation>[];
 
     final entries = raw.entries.toList();
@@ -81,11 +101,23 @@ class RtdbChatStore implements ChatStore {
     final chats = <ChatConversation>[];
     for (final entry in entries) {
       final chatId = '${entry.key}';
+      final index = _asStringKeyedMap(entry.value);
       final snap = await _root.child('chats/$chatId').get();
       if (!snap.exists || snap.value is! Map) continue;
-      chats.add(
-        ChatConversation.fromMap(chatId, _asStringKeyedMap(snap.value)),
+      var chat = ChatConversation.fromMap(
+        chatId,
+        _asStringKeyedMap(snap.value),
       );
+      // Prefer per-user inbox pin flag when present (drives section + refresh).
+      if (index.containsKey('pinned')) {
+        final pinned = index['pinned'] == true;
+        if (chat.isPinnedFor(viewerUid) != pinned) {
+          final next = Map<String, bool>.from(chat.pinnedBy)
+            ..[viewerUid] = pinned;
+          chat = chat.copyWith(pinnedBy: next);
+        }
+      }
+      chats.add(chat);
     }
     return chats;
   }
@@ -98,7 +130,12 @@ class RtdbChatStore implements ChatStore {
       final sub = _root.child('userChats/$uid').onValue.listen(
         (event) async {
           try {
-            controller.add(await _inboxFromIndex(event.snapshot.value));
+            controller.add(
+              await _inboxFromIndex(
+                event.snapshot.value,
+                viewerUid: uid,
+              ),
+            );
           } catch (e, st) {
             controller.addError(e, st);
           }
@@ -238,7 +275,10 @@ class RtdbChatStore implements ChatStore {
   @override
   Future<void> updateChat(ChatConversation chat) async {
     final at = chat.lastMessageAt.toUtc().millisecondsSinceEpoch;
-    final updates = <String, Object?>{
+    // Do not touch userChats here: reading other members' indexes is denied
+    // (owner-only), and writing them would recreate a chat someone hid.
+    // New messages call [ensureUserChatIndexes] to refresh every inbox row.
+    await _root.update({
       'chats/${chat.id}/memberNames': chat.memberNames,
       'chats/${chat.id}/title': chat.title,
       'chats/${chat.id}/lastMessage': chat.lastMessage,
@@ -249,10 +289,42 @@ class RtdbChatStore implements ChatStore {
         for (final e in chat.pinnedBy.entries)
           if (e.value) e.key: true,
       },
+    });
+  }
+
+  @override
+  Future<void> removeUserChatIndex({
+    required String uid,
+    required String chatId,
+  }) async {
+    await _root.child('userChats/$uid/$chatId').remove();
+  }
+
+  @override
+  Future<void> patchUserChatIndex({
+    required String uid,
+    required String chatId,
+    required int lastMessageAt,
+    bool? pinned,
+  }) async {
+    final updates = <String, Object?>{
+      'userChats/$uid/$chatId/lastMessageAt': lastMessageAt,
     };
+    if (pinned != null) {
+      updates['userChats/$uid/$chatId/pinned'] = pinned;
+    }
+    await _root.update(updates);
+  }
+
+  @override
+  Future<void> ensureUserChatIndexes(ChatConversation chat) async {
+    final at = chat.lastMessageAt.toUtc().millisecondsSinceEpoch;
+    final updates = <String, Object?>{};
+    // Patch lastMessageAt only — do not wipe per-user `pinned` on the index.
     for (final memberId in userChatIndexMemberIds(chat.memberIds)) {
       updates['userChats/$memberId/${chat.id}/lastMessageAt'] = at;
     }
+    if (updates.isEmpty) return;
     await _root.update(updates);
   }
 
@@ -496,18 +568,18 @@ class ChatRepository {
       }
     }
 
-    await _store.updateChat(
-      chat.copyWith(
-        lastMessage: text,
-        lastMessageAt: now,
-        lastMessageSenderId: ChatConversation.supportAiUid,
-        unreadCounts: nextUnread,
-        memberNames: {
-          ...chat.memberNames,
-          ChatConversation.supportAiUid: aiName,
-        },
-      ),
+    final updated = chat.copyWith(
+      lastMessage: text,
+      lastMessageAt: now,
+      lastMessageSenderId: ChatConversation.supportAiUid,
+      unreadCounts: nextUnread,
+      memberNames: {
+        ...chat.memberNames,
+        ChatConversation.supportAiUid: aiName,
+      },
     );
+    await _store.updateChat(updated);
+    await _store.ensureUserChatIndexes(updated);
     return message;
   }
 
@@ -567,11 +639,42 @@ class ChatRepository {
     required bool pinned,
   }) async {
     final chat = await _requireChat(chatId);
+    if (chat.isSupportChat || chat.isDefaultAgentGroup) {
+      throw StateError('Este chat no se puede fijar.');
+    }
     if (!chat.memberIds.contains(uid)) {
       throw StateError('No eres miembro de este chat.');
     }
     final nextPinned = Map<String, bool>.from(chat.pinnedBy)..[uid] = pinned;
-    await _store.updateChat(chat.copyWith(pinnedBy: nextPinned));
+    final updated = chat.copyWith(pinnedBy: nextPinned);
+    await _store.updateChat(updated);
+    // Touch own inbox row so watchChats (listens to userChats) refreshes.
+    await _store.patchUserChatIndex(
+      uid: uid,
+      chatId: chatId,
+      lastMessageAt: updated.lastMessageAt.toUtc().millisecondsSinceEpoch,
+      pinned: pinned,
+    );
+  }
+
+  /// Hides [chatId] from [uid]'s inbox only (other members keep their row).
+  Future<void> hideChatForMe({
+    required String chatId,
+    required String uid,
+  }) async {
+    final chat = await _requireChat(chatId);
+    if (chat.isSupportChat || chat.isDefaultAgentGroup) {
+      throw StateError('Este chat no se puede eliminar.');
+    }
+    if (!chat.memberIds.contains(uid)) {
+      throw StateError('No eres miembro de este chat.');
+    }
+    if (chat.isPinnedFor(uid)) {
+      final nextPinned = Map<String, bool>.from(chat.pinnedBy)..[uid] = false;
+      await _store.updateChat(chat.copyWith(pinnedBy: nextPinned));
+    }
+    // Only this user's index — never other members' userChats.
+    await _store.removeUserChatIndex(uid: uid, chatId: chatId);
   }
 
   /// Toggles [emoji] for [uid] on a message (same emoji again clears).
@@ -582,6 +685,9 @@ class ChatRepository {
     required String emoji,
   }) async {
     final chat = await _requireChat(chatId);
+    if (chat.isSupportChat) {
+      throw StateError('Las reacciones no están permitidas en soporte.');
+    }
     if (!chat.memberIds.contains(uid)) {
       throw StateError('No eres miembro de este chat.');
     }
@@ -649,6 +755,15 @@ class ChatRepository {
       ..[author.uid] = author.headlineName;
 
     await _store.updateChat(
+      chat.copyWith(
+        lastMessage: preview,
+        lastMessageAt: now,
+        lastMessageSenderId: author.uid,
+        unreadCounts: nextUnread,
+        memberNames: names,
+      ),
+    );
+    await _store.ensureUserChatIndexes(
       chat.copyWith(
         lastMessage: preview,
         lastMessageAt: now,

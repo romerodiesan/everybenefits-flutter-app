@@ -6,8 +6,11 @@ import 'package:every_benefits/features/chats/chat_repository.dart';
 class FakeChatStore implements ChatStore {
   final Map<String, ChatConversation> chats = {};
   final Map<String, List<ChatMessage>> messages = {};
+  final Set<String> _hiddenInbox = {};
   final _chatsController = StreamController<void>.broadcast();
   final Map<String, StreamController<void>> _messageControllers = {};
+
+  String _hideKey(String uid, String chatId) => '$uid|$chatId';
 
   void dispose() {
     _chatsController.close();
@@ -29,7 +32,11 @@ class FakeChatStore implements ChatStore {
   Stream<List<ChatConversation>> watchChats(String uid) async* {
     List<ChatConversation> current() {
       final list = chats.values
-          .where((c) => c.memberIds.contains(uid))
+          .where(
+            (c) =>
+                c.memberIds.contains(uid) &&
+                !_hiddenInbox.contains(_hideKey(uid, c.id)),
+          )
           .toList()
         ..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
       return list;
@@ -81,7 +88,42 @@ class FakeChatStore implements ChatStore {
     required String chatId,
   }) async {
     final chat = chats[chatId];
-    return chat != null && chat.memberIds.contains(uid);
+    if (chat == null || !chat.memberIds.contains(uid)) return false;
+    return !_hiddenInbox.contains(_hideKey(uid, chatId));
+  }
+
+  @override
+  Future<void> removeUserChatIndex({
+    required String uid,
+    required String chatId,
+  }) async {
+    _hiddenInbox.add(_hideKey(uid, chatId));
+    _bumpChats();
+  }
+
+  @override
+  Future<void> patchUserChatIndex({
+    required String uid,
+    required String chatId,
+    required int lastMessageAt,
+    bool? pinned,
+  }) async {
+    final chat = chats[chatId];
+    if (chat == null) return;
+    if (pinned != null) {
+      final next = Map<String, bool>.from(chat.pinnedBy)..[uid] = pinned;
+      chats[chatId] = chat.copyWith(pinnedBy: next);
+    }
+    _hiddenInbox.remove(_hideKey(uid, chatId));
+    _bumpChats();
+  }
+
+  @override
+  Future<void> ensureUserChatIndexes(ChatConversation chat) async {
+    for (final memberId in userChatIndexMemberIds(chat.memberIds)) {
+      _hiddenInbox.remove(_hideKey(memberId, chat.id));
+    }
+    _bumpChats();
   }
 
   @override
@@ -106,6 +148,9 @@ class FakeChatStore implements ChatStore {
     );
     chats[id] = saved;
     messages.putIfAbsent(id, () => []);
+    for (final memberId in userChatIndexMemberIds(saved.memberIds)) {
+      _hiddenInbox.remove(_hideKey(memberId, id));
+    }
     _bumpChats();
     return saved;
   }

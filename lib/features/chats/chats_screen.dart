@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
@@ -91,6 +92,71 @@ class _ChatsScreenState extends State<ChatsScreen> {
     _sub?.cancel();
     _gate.close();
     super.dispose();
+  }
+
+  bool _canSwipe(ChatConversation chat) =>
+      !chat.isSupportChat && !chat.isDefaultAgentGroup;
+
+  Future<void> _togglePin(ChatConversation chat) async {
+    final l10n = context.l10n;
+    final pinned = chat.isPinnedFor(widget.profile.uid);
+    PulseHaptics.selection();
+    try {
+      await _repo.setPinned(
+        chatId: chat.id,
+        uid: widget.profile.uid,
+        pinned: !pinned,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(pinned ? l10n.chatUnpinned : l10n.chatPinned)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyChatError(error, l10n))),
+      );
+    }
+  }
+
+  Future<void> _confirmDelete(ChatConversation chat) async {
+    final l10n = context.l10n;
+    PulseHaptics.medium();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: Text(l10n.chatDeleteConfirmTitle),
+          content: Text(l10n.chatDeleteConfirmBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(l10n.chatDeleteCancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(l10n.chatDeleteConfirmAction),
+            ),
+          ],
+        );
+      },
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _repo.hideChatForMe(
+        chatId: chat.id,
+        uid: widget.profile.uid,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.chatDeleted)),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyChatError(error, l10n))),
+      );
+    }
   }
 
   @override
@@ -261,12 +327,15 @@ class _ChatsScreenState extends State<ChatsScreen> {
         child: _ChatRow(
           chat: chat,
           viewerUid: profile.uid,
+          swipeEnabled: _canSwipe(chat),
           onTap: () => openChat(
             context,
             chat: chat,
             profile: profile,
             chatRepository: _repo,
           ),
+          onPin: () => _togglePin(chat),
+          onDelete: () => _confirmDelete(chat),
         ),
       );
     }
@@ -427,11 +496,17 @@ class _ChatRow extends StatelessWidget {
     required this.chat,
     required this.viewerUid,
     required this.onTap,
+    required this.swipeEnabled,
+    required this.onPin,
+    required this.onDelete,
   });
 
   final ChatConversation chat;
   final String viewerUid;
   final VoidCallback onTap;
+  final bool swipeEnabled;
+  final VoidCallback onPin;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -441,6 +516,7 @@ class _ChatRow extends StatelessWidget {
     final l10n = context.l10n;
     final unread = chat.unreadFor(viewerUid);
     final hasUnread = unread > 0;
+    final pinned = chat.isPinnedFor(viewerUid);
     final title = chat.titleFor(viewerUid, l10n: l10n);
     final preview = chat.isSupportChat
         ? (chat.lastMessage.isEmpty
@@ -452,7 +528,7 @@ class _ChatRow extends StatelessWidget {
                 ? l10n.chatsNoMessagesYet
                 : chat.lastMessage);
 
-    return Material(
+    final tile = Material(
       color: colors.sheet,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
@@ -477,7 +553,7 @@ class _ChatRow extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        if (chat.isPinnedFor(viewerUid)) ...[
+                        if (pinned) ...[
                           Icon(
                             Icons.push_pin_rounded,
                             size: 13,
@@ -559,6 +635,73 @@ class _ChatRow extends StatelessWidget {
             ],
           ),
         ),
+      ),
+    );
+
+    if (!swipeEnabled) return tile;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: Slidable(
+        key: ValueKey('slide-${chat.id}'),
+        startActionPane: ActionPane(
+          motion: const DrawerMotion(),
+          extentRatio: 0.28,
+          children: [
+            CustomSlidableAction(
+              onPressed: (_) => onPin(),
+              backgroundColor: brand,
+              foregroundColor: AppColors.onBrandOf(context),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                    size: 22,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    pinned ? l10n.chatUnpin : l10n.chatPin,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      height: 1.15,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        endActionPane: ActionPane(
+          motion: const DrawerMotion(),
+          extentRatio: 0.28,
+          children: [
+            CustomSlidableAction(
+              onPressed: (_) => onDelete(),
+              backgroundColor: const Color(0xFFB42318),
+              foregroundColor: Colors.white,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.delete_outline_rounded, size: 22),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.chatDelete,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        child: tile,
       ),
     );
   }

@@ -379,6 +379,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             !mine &&
                             msg.senderName.trim().isNotEmpty;
 
+                        final reactionsEnabled = !widget.chat.isSupportChat;
+
                         return _MessageRow(
                           key: ValueKey(msg.id),
                           msg: msg,
@@ -387,11 +389,16 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           showName: showName,
                           shared: shared,
                           viewerUid: uid,
+                          reactionsEnabled: reactionsEnabled,
                           onOpenShared: shared == null
                               ? null
                               : () => _openSharedPost(shared),
-                          onLongPress: () => _showReactionPicker(msg),
-                          onTapReaction: (emoji) => _react(msg, emoji),
+                          onLongPress: reactionsEnabled
+                              ? () => _showReactionPicker(msg)
+                              : null,
+                          onTapReaction: reactionsEnabled
+                              ? (emoji) => _react(msg, emoji)
+                              : null,
                         );
                       },
                     );
@@ -545,8 +552,9 @@ class _MessageRow extends StatelessWidget {
     required this.showName,
     required this.shared,
     required this.viewerUid,
-    required this.onLongPress,
-    required this.onTapReaction,
+    required this.reactionsEnabled,
+    this.onLongPress,
+    this.onTapReaction,
     this.onOpenShared,
   });
 
@@ -556,8 +564,9 @@ class _MessageRow extends StatelessWidget {
   final bool showName;
   final SharedPostPreview? shared;
   final String viewerUid;
-  final VoidCallback onLongPress;
-  final ValueChanged<String> onTapReaction;
+  final bool reactionsEnabled;
+  final VoidCallback? onLongPress;
+  final ValueChanged<String>? onTapReaction;
   final VoidCallback? onOpenShared;
 
   @override
@@ -565,8 +574,8 @@ class _MessageRow extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    final counts = msg.reactionCounts();
-    final myEmoji = msg.reactions[viewerUid];
+    final counts = reactionsEnabled ? msg.reactionCounts() : const <String, int>{};
+    final myEmoji = reactionsEnabled ? msg.reactions[viewerUid] : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -611,7 +620,9 @@ class _MessageRow extends StatelessWidget {
                     children: [
                       for (final entry in counts.entries)
                         InkWell(
-                          onTap: () => onTapReaction(entry.key),
+                          onTap: onTapReaction == null
+                              ? null
+                              : () => onTapReaction!(entry.key),
                           borderRadius: BorderRadius.circular(999),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
