@@ -1,0 +1,153 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --brand: #1f6b4a;
+  --ink: #0c0d10;
+  --muted: #5c6570;
+  --mesh-base: #f3f5f7;
+  --mesh-deep: #ffffff;
+  --mesh-blob: #e4e7eb;
+  --glass: #ffffff;
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --surface: #ffffff;
+  --on-brand: #ffffff;
+  --space-xs: 6px;
+  --space-sm: 10px;
+  --space-md: 14px;
+  --space-lg: 20px;
+  --space-xl: 28px;
+  --radius-sheet: 14px;
+  --radius-row: 12px;
+  --radius-pill: 20px;
+  --radius-tag: 6px;
+  --control-h: 40px;
+}
+
+.dark {
+  --ink: #f4f3f0;
+  --muted: #8b9098;
+  --mesh-base: #0c0d10;
+  --mesh-deep: #16171c;
+  --mesh-blob: #1c1d24;
+  --glass: #1c1d24;
+  --glass-border: rgba(255, 255, 255, 0.13);
+  --surface: #16171c;
+  --on-brand: #ffffff;
+}
+
+@theme inline {
+  --color-brand: var(--brand);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-mesh: var(--mesh-base);
+  --color-sheet: var(--mesh-deep);
+  --color-glass: var(--glass);
+  --color-glass-border: var(--glass-border);
+  --color-surface: var(--surface);
+  --color-on-brand: var(--on-brand);
+  --font-display: var(--font-outfit);
+  --font-sans: var(--font-figtree);
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background: var(--mesh-base);
+  color: var(--ink);
+  font-family: var(--font-figtree), system-ui, sans-serif;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+/* Quiet mesh: diagonal wash + soft blobs (mobile-like) */
+.mesh-bg {
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--mesh-blob) 55%, transparent) 0%,
+      transparent 42%,
+      color-mix(in srgb, var(--mesh-blob) 35%, transparent) 100%
+    ),
+    radial-gradient(
+      ellipse 70% 55% at 12% 18%,
+      color-mix(in srgb, var(--brand) 10%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 55% 45% at 88% 12%,
+      color-mix(in srgb, var(--mesh-blob) 80%, transparent),
+      transparent 55%
+    ),
+    var(--mesh-base);
+}
+
+.dark .mesh-bg {
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--mesh-blob) 40%, transparent) 0%,
+      transparent 45%,
+      color-mix(in srgb, var(--mesh-blob) 25%, transparent) 100%
+    ),
+    radial-gradient(
+      ellipse 70% 55% at 12% 18%,
+      color-mix(in srgb, var(--brand) 12%, transparent),
+      transparent 58%
+    ),
+    radial-gradient(
+      ellipse 55% 45% at 88% 12%,
+      color-mix(in srgb, var(--mesh-blob) 70%, transparent),
+      transparent 55%
+    ),
+    var(--mesh-base);
+}
+
+/* Matte Pulse sheet — no frosted blur */
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--glass-border);
+}
+
+.pulse-sheet {
+  background: var(--mesh-deep);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sheet);
+}
+
+.pulse-row {
+  background: var(--mesh-deep);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-row);
+}
+
+.pulse-tab-pill {
+  background: color-mix(in srgb, var(--mesh-deep) 94%, transparent);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.bubble-mine {
+  background: color-mix(in srgb, var(--brand) 16%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, transparent);
+  border-radius: 14px 14px 4px 14px;
+  color: var(--ink);
+}
+
+.bubble-other {
+  background: var(--mesh-deep);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px 14px 14px 4px;
+  color: var(--ink);
+}
