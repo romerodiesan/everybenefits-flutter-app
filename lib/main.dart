@@ -11,6 +11,7 @@ import 'app/widgets/pulse_chrome.dart';
 import 'auth/auth.dart';
 import 'features/chats/chat_repository.dart';
 import 'features/forums/forum_repository.dart';
+import 'features/university/course_repository.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/profile/profile_completion_flow.dart';
 import 'firebase/firebase_app_check.dart';
@@ -76,6 +77,7 @@ Future<void> main() async {
       localeController: localeController,
       forumRepository: forumRepository,
       chatRepository: ChatRepository(),
+      courseRepository: CourseRepository(),
     ),
   );
 }
@@ -108,6 +110,7 @@ class EveryInsuranceApp extends StatefulWidget {
     required this.localeController,
     this.forumRepository,
     this.chatRepository,
+    this.courseRepository,
   });
 
   final AuthService authService;
@@ -116,6 +119,7 @@ class EveryInsuranceApp extends StatefulWidget {
   final LocaleController localeController;
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
+  final CourseRepository? courseRepository;
 
   @override
   State<EveryInsuranceApp> createState() => _EveryInsuranceAppState();
@@ -181,6 +185,7 @@ class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
                     userRepository: widget.userRepository,
                     forumRepository: widget.forumRepository,
                     chatRepository: widget.chatRepository,
+                    courseRepository: widget.courseRepository,
                     connectionState: snapshot.connectionState,
                     user: snapshot.data,
                   ),
@@ -200,6 +205,7 @@ class _AuthHome extends StatelessWidget {
     required this.userRepository,
     required this.forumRepository,
     required this.chatRepository,
+    required this.courseRepository,
     required this.connectionState,
     required this.user,
   });
@@ -208,6 +214,7 @@ class _AuthHome extends StatelessWidget {
   final UserRepository userRepository;
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
+  final CourseRepository? courseRepository;
   final ConnectionState connectionState;
   final User? user;
 
@@ -230,6 +237,7 @@ class _AuthHome extends StatelessWidget {
       userRepository: userRepository,
       forumRepository: forumRepository,
       chatRepository: chatRepository,
+      courseRepository: courseRepository,
     );
   }
 }
@@ -242,6 +250,7 @@ class ProfileBootstrap extends StatefulWidget {
     required this.userRepository,
     this.forumRepository,
     this.chatRepository,
+    this.courseRepository,
   });
 
   final User user;
@@ -249,6 +258,7 @@ class ProfileBootstrap extends StatefulWidget {
   final UserRepository userRepository;
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
+  final CourseRepository? courseRepository;
 
   @override
   State<ProfileBootstrap> createState() => _ProfileBootstrapState();
@@ -318,6 +328,7 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
               profile: profile,
               forumRepository: widget.forumRepository,
               chatRepository: widget.chatRepository,
+              courseRepository: widget.courseRepository,
             );
           },
         );

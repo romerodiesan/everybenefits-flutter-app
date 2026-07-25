@@ -1,5 +1,5 @@
-import { AcademyDemo } from "@/components/forums/academy-demo";
+import { AcademyCatalog } from "@/components/academy/academy-catalog";
 
 export default function AcademyPage() {
-  return <AcademyDemo />;
+  return <AcademyCatalog />;
 }

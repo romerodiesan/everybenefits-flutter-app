@@ -34,6 +34,41 @@ export function canCreateChatGroups(role: UserRole) {
   return role === "admin" || role === "instructor" || role === "manager";
 }
 
+/** Managers and admins can author courses in the Studio. */
+export function canAuthorCourses(role: UserRole) {
+  return role === "manager" || role === "admin";
+}
+
+/** Same authors who write courses can draft learning paths. */
+export function canAuthorPaths(role: UserRole) {
+  return canAuthorCourses(role);
+}
+
+/** Only admins publish and approve courses and paths. */
+export function canManageCourses(role: UserRole) {
+  return role === "admin";
+}
+
+/** Authors keep editing until an admin publishes; admins always may. */
+export function canEditCourse(
+  course: { createdBy: string; status: string },
+  viewer: { uid: string; role: UserRole },
+) {
+  if (viewer.role === "admin") return true;
+  if (!canAuthorCourses(viewer.role)) return false;
+  return course.createdBy === viewer.uid && course.status !== "published";
+}
+
+/** Authors keep editing their path until an admin publishes; admins always may. */
+export function canEditPath(
+  path: { createdBy: string; status: string },
+  viewer: { uid: string; role: UserRole },
+) {
+  if (viewer.role === "admin") return true;
+  if (!canAuthorPaths(viewer.role)) return false;
+  return path.createdBy === viewer.uid && path.status !== "published";
+}
+
 export function belongsInDefaultAgentGroup(role: UserRole) {
   return (
     role === "agent" ||

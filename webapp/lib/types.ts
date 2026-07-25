@@ -60,6 +60,134 @@ export type ForumReply = {
   updatedAt: Date | null;
 };
 
+export type CourseLevel = "basic" | "intermediate" | "advanced";
+
+/** Publication workflow: authors draft, admins publish. */
+export type CourseStatus = "draft" | "pending" | "published";
+
+export const COURSE_LEVELS: CourseLevel[] = [
+  "basic",
+  "intermediate",
+  "advanced",
+];
+
+export type Course = {
+  id: string;
+  title: string;
+  description: string;
+  teacherName: string;
+  level: CourseLevel;
+  status: CourseStatus;
+  /** Storage path of the cover image; resolved to a URL on demand. */
+  coverPath: string | null;
+  /** Direct cover URL (seeds, already-resolved covers). */
+  coverUrl: string | null;
+  lessonCount: number;
+  durationMinutes: number;
+  studentCount: number;
+  createdBy: string;
+  createdAt: Date | null;
+  updatedAt: Date | null;
+  publishedAt: Date | null;
+};
+
+export type CourseModule = {
+  id: string;
+  title: string;
+  order: number;
+};
+
+/** What a learner does in a lesson: watch, read, or answer a quiz. */
+export type LessonType = "video" | "reading" | "quiz";
+
+export const LESSON_TYPES: LessonType[] = ["video", "reading", "quiz"];
+
+/** One or many correct options, decided per question by the author. */
+export type QuizSelectionMode = "single" | "multi";
+
+/** A quiz question as learners see it: no correct answers included. */
+export type QuizQuestion = {
+  id: string;
+  prompt: string;
+  selectionMode: QuizSelectionMode;
+  options: string[];
+};
+
+export type Lesson = {
+  id: string;
+  moduleId: string;
+  title: string;
+  order: number;
+  durationSeconds: number;
+  type: LessonType;
+  videoPath: string | null;
+  videoUrl: string | null;
+  /** Markdown body for reading lessons. */
+  bodyMarkdown: string | null;
+  /** Quiz questions without their answer key (kept in a secure subdoc). */
+  questions: QuizQuestion[];
+  /** Score needed to pass a quiz, 0-100. */
+  passPercent: number;
+};
+
+/** Correct option indexes per question; only authors and admins may read it. */
+export type QuizAnswerKey = Record<string, number[]>;
+
+/** Server response from the `submitQuizAttempt` callable. */
+export type QuizAttemptResult = {
+  score: number;
+  passed: boolean;
+  passPercent: number;
+  correctByQuestion: Record<string, boolean>;
+};
+
+/** Latest graded attempt for a quiz lesson, written by the server. */
+export type QuizAttempt = {
+  score: number;
+  passed: boolean;
+  at: Date | null;
+};
+
+export type CourseContent = {
+  modules: CourseModule[];
+  lessons: Lesson[];
+};
+
+export type LearningPath = {
+  id: string;
+  title: string;
+  description: string;
+  level: CourseLevel;
+  status: CourseStatus;
+  courseIds: string[];
+  order: number;
+  /** Author uid; managers edit their own drafts until an admin publishes. */
+  createdBy: string;
+};
+
+export type Enrollment = {
+  courseId: string;
+  completedLessonIds: string[];
+  lastLessonId: string | null;
+  lastPositionSeconds: number;
+  enrolledAt: Date | null;
+  updatedAt: Date | null;
+  completedAt: Date | null;
+  quizAttempts: Record<string, QuizAttempt>;
+};
+
+/** Enrollment plus the learner it belongs to, for Studio metrics. */
+export type CourseStudent = {
+  uid: string;
+  enrollment: Enrollment;
+};
+
+/** Video lesson completes once the learner reaches this share of the video. */
+export const LESSON_COMPLETE_THRESHOLD = 0.9;
+
+/** Default passing score for new quizzes; authors can change it per quiz. */
+export const QUIZ_DEFAULT_PASS_PERCENT = 70;
+
 export type SharedPostPreview = {
   threadId: string;
   title: string;

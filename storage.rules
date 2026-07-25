@@ -15,11 +15,58 @@ service firebase.storage {
         || request.resource.contentType == 'image/webp';
     }
 
+    function isAllowedVideoType() {
+      return request.resource.contentType == 'video/mp4'
+        || request.resource.contentType == 'video/quicktime'
+        || request.resource.contentType == 'video/webm';
+    }
+
+    // Cross-service lookups: academy writes are gated by the Firestore role
+    // and course ownership, mirroring firestore.rules.
+    function callerRole() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
+        .data.get('role', '');
+    }
+
+    function hasProfile() {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return hasProfile() && callerRole() == 'admin';
+    }
+
+    function ownsCourse(courseId) {
+      return firestore.exists(/databases/(default)/documents/courses/$(courseId))
+        && firestore.get(/databases/(default)/documents/courses/$(courseId))
+          .data.get('createdBy', '') == request.auth.uid;
+    }
+
+    function canWriteCourseFiles(courseId) {
+      return isAdmin()
+        || (hasProfile() && callerRole() == 'manager' && ownsCourse(courseId));
+    }
+
     match /avatars/{fileName} {
       allow read: if isSignedIn();
       allow write: if isOwnerFile(fileName)
         && request.resource.size < 5 * 1024 * 1024
         && isAllowedImageType();
+    }
+
+    // Course covers and lesson videos: /courses/{courseId}/...
+    match /courses/{courseId}/{allPaths=**} {
+      allow read: if isSignedIn();
+
+      allow create, update: if canWriteCourseFiles(courseId)
+        && (
+          (isAllowedImageType() && request.resource.size < 5 * 1024 * 1024)
+          || (isAllowedVideoType()
+              && request.resource.size < 2 * 1024 * 1024 * 1024)
+        );
+
+      allow delete: if canWriteCourseFiles(courseId);
     }
   }
 }

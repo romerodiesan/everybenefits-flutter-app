@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/providers/auth-provider";
 import { useThemeSettings } from "@/lib/providers/theme-provider";
 import { signOutUser } from "@/lib/firebase/auth";
 import { getOrCreateSupportChat } from "@/lib/firebase/chats";
+import { canAuthorCourses } from "@/lib/roles";
 import { Button } from "@/components/ui/primitives";
 
 type IconProps = SVGProps<SVGSVGElement> & { filled?: boolean };
@@ -254,6 +255,26 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
+          {canAuthorCourses(profile.role) && (
+            <Link
+              href="/studio"
+              className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition ${
+                pathname === "/studio" || pathname.startsWith("/studio/")
+                  ? "bg-brand/10 text-ink"
+                  : "text-muted hover:bg-white/[0.04] hover:text-ink"
+              }`}
+            >
+              <IconSchool
+                filled={pathname.startsWith("/studio")}
+                className={
+                  pathname.startsWith("/studio") ? "text-brand" : "text-muted"
+                }
+                width={20}
+                height={20}
+              />
+              {t("studioTitle")}
+            </Link>
+          )}
         </nav>
         <div className="mt-auto">
           <Button
