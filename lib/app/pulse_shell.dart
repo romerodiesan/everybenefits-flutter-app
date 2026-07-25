@@ -43,18 +43,31 @@ typedef HomeShellState = PulseShellState;
 
 class PulseShellState extends State<PulseShell> {
   int _index = 0;
+  bool _tabBarCollapsed = false;
 
   final _forumsKey = GlobalKey<ForumsScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
 
   static const _tabCount = 5;
+  static const _aiTabIndex = 2;
 
   int get currentIndex => _index;
 
   void selectTab(int index) {
     final next = index.clamp(0, _tabCount - 1);
     if (next == _index) return;
-    setState(() => _index = next);
+    setState(() {
+      _index = next;
+      // Leaving AI always restores the tab bar.
+      if (next != _aiTabIndex) _tabBarCollapsed = false;
+    });
+  }
+
+  void _setTabBarCollapsed(bool collapsed) {
+    if (_tabBarCollapsed == collapsed) return;
+    // Only AI may collapse the chrome.
+    if (collapsed && _index != _aiTabIndex) return;
+    setState(() => _tabBarCollapsed = collapsed);
   }
 
   static List<PulseTabItem> _navItems(AppLocalizations l10n) => [
@@ -214,7 +227,7 @@ class PulseShellState extends State<PulseShell> {
     ];
 
     final Widget? fabButton;
-    if (fab == null) {
+    if (fab == null || _tabBarCollapsed) {
       fabButton = null;
     } else if (fab.extended) {
       fabButton = FloatingActionButton.extended(
@@ -252,14 +265,34 @@ class PulseShellState extends State<PulseShell> {
       );
     }
 
-    return PulseScaffold(
-      extendBody: true,
-      body: PulseTabBody(index: _index, children: pages),
-      floatingActionButton: fabButton,
-      bottomNavigationBar: PulseTabBar(
-        items: _navItems(l10n),
-        selectedIndex: _index,
-        onSelect: selectTab,
+    return PulseShellScope(
+      tabBarCollapsed: _tabBarCollapsed,
+      setTabBarCollapsed: _setTabBarCollapsed,
+      child: PulseScaffold(
+        extendBody: true,
+        resizeToAvoidBottomInset: false,
+        body: PulseTabBody(index: _index, children: pages),
+        floatingActionButton: fabButton,
+        // Collapses horizontally (right to left) to hand the row over to the
+        // AI composer, which expands in its place.
+        bottomNavigationBar: AnimatedSlide(
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOutCubic,
+          offset: _tabBarCollapsed ? const Offset(-1.15, 0) : Offset.zero,
+          child: AnimatedOpacity(
+            duration: const Duration(milliseconds: 220),
+            opacity: _tabBarCollapsed ? 0 : 1,
+            child: IgnorePointer(
+              ignoring: _tabBarCollapsed,
+              child: PulseTabBar(
+                items: _navItems(l10n),
+                selectedIndex: _index,
+                onSelect: selectTab,
+                endInset: _index == _aiTabIndex ? 56 : 0,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

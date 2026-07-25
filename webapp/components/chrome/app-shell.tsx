@@ -218,8 +218,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="mesh-bg flex min-h-[100svh] flex-col lg:flex-row">
-      <aside className="sticky top-0 hidden h-svh w-56 shrink-0 flex-col border-r border-glass-border bg-sheet p-3 lg:flex">
+    <div className="mesh-bg flex h-[100svh] flex-col overflow-hidden lg:flex-row">
+      <aside className="hidden h-full w-56 shrink-0 flex-col border-r border-glass-border bg-sheet p-3 lg:flex">
         <div className="flex items-center justify-between gap-2 px-1">
           <Link
             href="/home"
@@ -269,7 +269,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </aside>
 
-      <div className="relative flex min-h-0 flex-1 flex-col lg:min-h-svh">
+      <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-end px-4 pt-[max(0.75rem,env(safe-area-inset-top,0px)+0.35rem)] lg:hidden">
           <div className="pointer-events-auto">
             <ThemeToggle />
@@ -277,7 +277,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         {profile.isAnonymous && (
-          <div className="border-b border-brand/30 bg-brand/10 px-4 py-1.5 text-xs text-ink">
+          <div className="shrink-0 border-b border-brand/30 bg-brand/10 px-4 py-1.5 text-xs text-ink">
             {t("guestBanner")}{" "}
             <Link href="/login" className="font-semibold text-brand underline">
               {t("navLogin")}
@@ -285,7 +285,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        <main className="flex min-h-0 flex-1 flex-col pb-[calc(48px+env(safe-area-inset-bottom,0px)+16px)] lg:pb-0">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-[calc(48px+env(safe-area-inset-bottom,0px)+16px)] lg:pb-0">
           {children}
         </main>
       </div>

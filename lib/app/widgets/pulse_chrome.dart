@@ -12,12 +12,53 @@ const double kPulseTabBarFabGap = 20;
 /// Matches Material [kFloatingActionButtonMargin].
 const double _kFabMargin = 16;
 
+/// Raw home-indicator / system bottom inset in logical pixels.
+///
+/// Uses the window view when available so nested scaffolds under
+/// [Scaffold.extendBody] cannot zero out the value via MediaQuery.
+double systemBottomInset(BuildContext context) {
+  final view = View.maybeOf(context);
+  final fromView = view == null
+      ? 0.0
+      : view.viewPadding.bottom / view.devicePixelRatio;
+  final fromMedia = MediaQuery.viewPaddingOf(context).bottom;
+  final fromPad = MediaQuery.paddingOf(context).bottom;
+  final safe = [fromView, fromMedia, fromPad]
+      .fold<double>(0, (a, b) => a > b ? a : b);
+  return safe > 0 ? safe : 8.0;
+}
+
 /// Distance from the physical bottom to the top of [PulseTabBar].
 double pulseTabBarTopInset(BuildContext context) {
-  final viewBottom = MediaQuery.viewPaddingOf(context).bottom;
-  final safe = viewBottom > 0 ? viewBottom : 8.0;
   // Tab bar outer bottom pad is `(safe) + 6`, then the pill itself.
-  return safe + 6 + kPulseTabBarPillHeight;
+  return systemBottomInset(context) + 6 + kPulseTabBarPillHeight;
+}
+
+/// Shell chrome that AI (and others) can use to collapse the floating tab bar.
+class PulseShellScope extends InheritedWidget {
+  const PulseShellScope({
+    super.key,
+    required this.tabBarCollapsed,
+    required this.setTabBarCollapsed,
+    required super.child,
+  });
+
+  final bool tabBarCollapsed;
+  final ValueChanged<bool> setTabBarCollapsed;
+
+  static PulseShellScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<PulseShellScope>();
+  }
+
+  /// Lookup without registering a dependency (safe outside build).
+  static PulseShellScope? readOf(BuildContext context) {
+    return context.getInheritedWidgetOfExactType<PulseShellScope>();
+  }
+
+  @override
+  bool updateShouldNotify(PulseShellScope oldWidget) {
+    return tabBarCollapsed != oldWidget.tabBarCollapsed;
+  }
 }
 
 /// Extra bottom inset so nested FABs clear [PulseTabBar] under [extendBody].
@@ -175,6 +216,7 @@ class PulseScaffold extends StatelessWidget {
     this.bottomNavigationBar,
     this.extendBody = false,
     this.clearFabForTabBar = false,
+    this.resizeToAvoidBottomInset,
   });
 
   final PreferredSizeWidget? appBar;
@@ -182,6 +224,7 @@ class PulseScaffold extends StatelessWidget {
   final Widget? floatingActionButton;
   final Widget? bottomNavigationBar;
   final bool extendBody;
+  final bool? resizeToAvoidBottomInset;
 
   /// Lift [floatingActionButton] above the shell's floating [PulseTabBar].
   final bool clearFabForTabBar;
@@ -204,6 +247,7 @@ class PulseScaffold extends StatelessWidget {
       floatingActionButton: liftedFab,
       bottomNavigationBar: bottomNavigationBar,
       extendBody: extendBody,
+      resizeToAvoidBottomInset: resizeToAvoidBottomInset,
     );
   }
 }
@@ -285,11 +329,15 @@ class PulseTabBar extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.onSelect,
+    this.endInset = 0,
   });
 
   final List<PulseTabItem> items;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+
+  /// Extra trailing space (e.g. to leave room for the AI composer chip).
+  final double endInset;
 
   void _selectIndex(int index) {
     final next = index.clamp(0, items.length - 1);
@@ -308,13 +356,15 @@ class PulseTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    final bottom = MediaQuery.paddingOf(context).bottom;
+    final bottom = systemBottomInset(context);
     final wide = MediaQuery.sizeOf(context).width >= 390;
 
     return Material(
       type: MaterialType.transparency,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(16, 0, 16, (bottom > 0 ? bottom : 8) + 6),
+      child: AnimatedPadding(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOutCubic,
+        padding: EdgeInsets.fromLTRB(16, 0, 16 + endInset, bottom + 6),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: colors.sheet.withValues(alpha: 0.94),

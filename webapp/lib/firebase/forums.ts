@@ -297,6 +297,26 @@ export function watchReplyVote(
   );
 }
 
+export async function fetchThreadVotes(input: {
+  uid: string;
+  threadIds: string[];
+}) {
+  if (!input.threadIds.length) return {} as Record<string, number>;
+  const snaps = await Promise.all(
+    input.threadIds.map((id) =>
+      getDoc(
+        doc(getFirebaseDb(), "threads", id, "votes", input.uid),
+      ).catch(() => null),
+    ),
+  );
+  const out: Record<string, number> = {};
+  input.threadIds.forEach((id, i) => {
+    const snap = snaps[i];
+    out[id] = snap ? Number(snap.data()?.value ?? 0) : 0;
+  });
+  return out;
+}
+
 export async function fetchReplyVotes(input: {
   threadId: string;
   uid: string;

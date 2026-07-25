@@ -19,6 +19,7 @@ class AiChatScreen extends StatefulWidget {
 class _AiChatScreenState extends State<AiChatScreen> {
   final _controller = TextEditingController();
   final _scroll = ScrollController();
+  final _focus = FocusNode();
   final List<_AiBubble> _messages = [];
   String? _title;
   bool _thinking = false;
@@ -32,7 +33,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _focus.addListener(_onComposerChanged);
+    _controller.addListener(_onComposerChanged);
+  }
+
+  void _onComposerChanged() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void deactivate() {
+    PulseShellScope.readOf(context)?.setTabBarCollapsed(false);
+    super.deactivate();
+  }
+
+  @override
   void dispose() {
+    _focus.dispose();
     _controller.dispose();
     _scroll.dispose();
     super.dispose();
@@ -147,10 +166,25 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+    final shell = PulseShellScope.maybeOf(context);
+    // Expanded: the composer takes over the tab bar row (the pill slides away
+    // right-to-left). Collapsed: it is a round chip docked beside the pill.
+    final expanded = _focus.hasFocus ||
+        keyboard > 0 ||
+        _controller.text.trim().isNotEmpty ||
+        _thinking;
+    if (shell != null && shell.tabBarCollapsed != expanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        shell.setTabBarCollapsed(expanded);
+      });
+    }
+    // Same baseline as the tab pill; above the keyboard when typing.
     final composerBottom =
-        keyboard > 0 ? 10.0 : pulseShellListBottomPad(context);
+        keyboard > 0 ? keyboard + 8 : systemBottomInset(context) + 6;
 
     return PulseScaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         titleSpacing: 0,
         leading: IconButton(
@@ -190,13 +224,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            tooltip: l10n.aiNewTooltip,
-            onPressed: _startNewConversation,
-            icon: const Icon(Icons.edit_square),
-          ),
-        ],
+        actions: const [],
       ),
       body: Column(
         children: [
@@ -220,80 +248,152 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     },
                   ),
           ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.sheet.withValues(alpha: 0.96),
-              border: Border(top: BorderSide(color: colors.border)),
-            ),
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(10, 10, 10, composerBottom),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      minLines: 1,
-                      maxLines: 4,
-                      textCapitalization: TextCapitalization.sentences,
-                      enabled: !_thinking,
-                      decoration: InputDecoration(
-                        hintText: l10n.aiInputHint,
-                        hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                          color: colors.muted,
-                        ),
-                        filled: true,
-                        fillColor: colors.glassFill,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: BorderSide(color: colors.border),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: BorderSide(color: colors.border),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: BorderSide(color: brand, width: 1.4),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
+          // Morphing composer: 48px chip beside the tab pill; expands
+          // right-to-left into a full-width input as the pill leaves.
+          AnimatedPadding(
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.fromLTRB(16, 0, 16, composerBottom),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final onBrand = AppColors.onBrandOf(context);
+                const chipSize = 48.0;
+                return Align(
+                  alignment: Alignment.bottomRight,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    curve: Curves.easeOutCubic,
+                    width: expanded ? constraints.maxWidth : chipSize,
+                    constraints: BoxConstraints(
+                      minHeight: chipSize,
+                      maxHeight: expanded ? 156 : chipSize,
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    decoration: BoxDecoration(
+                      color: expanded ? colors.sheet : brand,
+                      borderRadius: BorderRadius.circular(chipSize / 2),
+                      border: Border.all(
+                        color: expanded ? colors.border : Colors.transparent,
                       ),
-                      onSubmitted: (_) => _send(),
+                      boxShadow: [
+                        BoxShadow(
+                          color: colors.ink.withValues(alpha: 0.06),
+                          blurRadius: 12,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Material(
-                    color: brand,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: InkWell(
-                      onTap: _thinking ? null : () => _send(),
-                      borderRadius: BorderRadius.circular(16),
-                      child: SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: _thinking
-                            ? Padding(
-                                padding: const EdgeInsets.all(14),
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: AppColors.onBrandOf(context),
+                    // Offstage keeps the TextField mounted (so the chip can
+                    // focus it) without letting it size the collapsed chip.
+                    // The inner LayoutBuilder only mounts the send button once
+                    // the morph has revealed enough width for it, so the row
+                    // never overflows mid-animation.
+                    child: Stack(
+                      children: [
+                        Offstage(
+                          offstage: !expanded,
+                          child: Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 2, 6, 2),
+                            child: LayoutBuilder(
+                              builder: (context, box) {
+                                final showSend = box.maxWidth >= 120;
+                                return Row(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
+                                  children: [
+                                    Expanded(
+                                      child: TextField(
+                                        controller: _controller,
+                                        focusNode: _focus,
+                                        minLines: 1,
+                                        maxLines: 5,
+                                        textCapitalization:
+                                            TextCapitalization.sentences,
+                                        textInputAction: TextInputAction.send,
+                                        enabled: !_thinking,
+                                        style: theme.textTheme.bodyLarge,
+                                        decoration: InputDecoration(
+                                          hintText: l10n.aiInputHint,
+                                          hintStyle: theme
+                                              .textTheme.bodyLarge
+                                              ?.copyWith(color: colors.muted),
+                                          isCollapsed: true,
+                                          border: InputBorder.none,
+                                          enabledBorder: InputBorder.none,
+                                          focusedBorder: InputBorder.none,
+                                          contentPadding:
+                                              const EdgeInsets.symmetric(
+                                            vertical: 12,
+                                          ),
+                                        ),
+                                        onSubmitted: (_) => _send(),
+                                      ),
+                                    ),
+                                    if (showSend)
+                                      Padding(
+                                        padding:
+                                            const EdgeInsets.only(bottom: 4),
+                                        child: _thinking
+                                            ? Padding(
+                                                padding:
+                                                    const EdgeInsets.all(10),
+                                                child: SizedBox(
+                                                  width: 18,
+                                                  height: 18,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                    color: brand,
+                                                  ),
+                                                ),
+                                              )
+                                            : IconButton(
+                                                onPressed: () => _send(),
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                style: IconButton.styleFrom(
+                                                  backgroundColor: brand,
+                                                  foregroundColor: onBrand,
+                                                  minimumSize:
+                                                      const Size(36, 36),
+                                                  shape: const CircleBorder(),
+                                                ),
+                                                icon: const Icon(
+                                                  Icons.arrow_upward_rounded,
+                                                  size: 18,
+                                                ),
+                                              ),
+                                      ),
+                                  ],
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        if (!expanded)
+                          Positioned.fill(
+                            child: Material(
+                              type: MaterialType.transparency,
+                              child: InkWell(
+                                onTap: () {
+                                  PulseHaptics.light();
+                                  _focus.requestFocus();
+                                },
+                                customBorder: const CircleBorder(),
+                                child: Center(
+                                  child: Icon(
+                                    Icons.auto_awesome,
+                                    size: 20,
+                                    color: onBrand,
+                                  ),
                                 ),
-                              )
-                            : Icon(
-                                Icons.send_rounded,
-                                size: 20,
-                                color: AppColors.onBrandOf(context),
                               ),
-                      ),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                );
+              },
             ),
           ),
         ],
@@ -443,37 +543,38 @@ class _EmptyState extends StatelessWidget {
     final l10n = context.l10n;
 
     return ListView(
-      padding: EdgeInsets.fromLTRB(
-        AppSpacing.lg,
-        AppSpacing.xl,
-        AppSpacing.lg,
-        AppSpacing.lg,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        0,
       ),
       children: [
-        const Center(child: _AiMark(size: 64)),
-        const SizedBox(height: AppSpacing.lg),
+        const Center(child: _AiMark(size: 44)),
+        const SizedBox(height: AppSpacing.sm),
         Text(
           l10n.aiEmptyPrompt,
           textAlign: TextAlign.center,
-          style: theme.textTheme.headlineMedium?.copyWith(
+          style: theme.textTheme.headlineSmall?.copyWith(
             fontWeight: FontWeight.w800,
             letterSpacing: -0.4,
           ),
         ),
-        const SizedBox(height: AppSpacing.sm),
+        const SizedBox(height: 4),
         Text(
           l10n.aiEmptySubtitle,
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: colors.muted,
-            height: 1.4,
+            height: 1.3,
           ),
         ),
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.sm),
         for (final s in demoAiChats)
           Padding(
-            padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+            padding: const EdgeInsets.only(bottom: 6),
             child: PulseSheet(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
               onTap: () {
                 PulseHaptics.selection();
                 onSuggestion(s);
@@ -483,14 +584,14 @@ class _EmptyState extends StatelessWidget {
                   Expanded(
                     child: Text(
                       s,
-                      style: theme.textTheme.bodyLarge?.copyWith(
+                      style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   Icon(
                     Icons.arrow_forward_ios_rounded,
-                    size: 14,
+                    size: 13,
                     color: colors.muted,
                   ),
                 ],

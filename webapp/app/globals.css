@@ -151,3 +151,213 @@ h3,
   border-radius: 14px 14px 14px 4px;
   color: var(--ink);
 }
+
+/* Landing: cinematic stage — deeper than mesh-bg, brand light from above */
+.cine-bg {
+  background:
+    radial-gradient(
+      ellipse 90% 55% at 50% -12%,
+      color-mix(in srgb, var(--brand) 26%, transparent),
+      transparent 62%
+    ),
+    radial-gradient(
+      ellipse 55% 45% at 92% 8%,
+      color-mix(in srgb, var(--brand) 12%, transparent),
+      transparent 60%
+    ),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--mesh-blob) 70%, transparent) 0%,
+      transparent 40%
+    ),
+    var(--mesh-base);
+}
+
+.cine-vignette::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 85% 65% at 50% 42%,
+    transparent 52%,
+    color-mix(in srgb, var(--ink) 16%, transparent) 100%
+  );
+}
+
+/* Landing: device mock */
+.phone-frame {
+  padding: 9px;
+  border-radius: 2.9rem;
+  background: linear-gradient(
+    155deg,
+    color-mix(in srgb, var(--ink) 96%, transparent),
+    color-mix(in srgb, var(--ink) 72%, transparent)
+  );
+  box-shadow:
+    0 42px 90px -34px color-mix(in srgb, var(--ink) 62%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--ink) 40%, transparent),
+    inset 0 1px 0 color-mix(in srgb, #ffffff 26%, transparent);
+}
+
+.phone-screen {
+  border-radius: 2.3rem;
+  overflow: hidden;
+}
+
+/* Landing: brand-tinted AI answer surface inside the mock */
+.mock-ai-answer {
+  background: color-mix(in srgb, var(--brand) 12%, var(--mesh-deep));
+  border: 1px solid color-mix(in srgb, var(--brand) 26%, transparent);
+}
+
+/* Social feed */
+.feed-card {
+  background: var(--mesh-deep);
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--ink) 3%, transparent);
+  transition:
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    transform 220ms ease;
+}
+
+.feed-card:hover {
+  border-color: color-mix(in srgb, var(--brand) 28%, var(--glass-border));
+  box-shadow:
+    0 18px 40px -28px color-mix(in srgb, var(--ink) 28%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--brand) 8%, transparent);
+}
+
+.feed-card-hot {
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--brand) 8%, var(--mesh-deep)),
+      var(--mesh-deep) 48%
+    );
+}
+
+.feed-spotlight {
+  background:
+    linear-gradient(
+      145deg,
+      color-mix(in srgb, var(--brand) 16%, var(--mesh-deep)),
+      var(--mesh-deep) 55%
+    );
+  border: 1px solid color-mix(in srgb, var(--brand) 28%, var(--glass-border));
+  box-shadow: 0 22px 50px -34px color-mix(in srgb, var(--brand) 55%, transparent);
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.feed-spotlight:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 28px 56px -32px color-mix(in srgb, var(--brand) 65%, transparent);
+}
+
+.feed-topic {
+  display: inline-flex;
+  align-items: center;
+  height: 2.15rem;
+  padding: 0 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--glass-border);
+  background: var(--mesh-deep);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    border-color 160ms ease;
+}
+
+.feed-topic:hover {
+  color: var(--ink);
+  border-color: color-mix(in srgb, var(--brand) 30%, var(--glass-border));
+}
+
+.feed-topic-active {
+  color: var(--on-brand);
+  background: var(--brand);
+  border-color: transparent;
+}
+
+.feed-topic-active:hover {
+  color: var(--on-brand);
+}
+
+/* Floating segmented control — replaces the banded feed header */
+.feed-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  margin-inline-start: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--mesh-deep) 82%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 10px 26px -20px color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+.feed-rail-card {
+  background: var(--mesh-deep);
+  border: 1px solid var(--glass-border);
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.feed-rail-title {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.feed-composer-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 20;
+  margin-top: 1rem;
+  border-top: 1px solid var(--glass-border);
+  background: color-mix(in srgb, var(--mesh-base) 92%, transparent);
+  backdrop-filter: blur(10px);
+  padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (min-width: 1024px) {
+  .feed-composer-dock {
+    padding-bottom: 12px;
+  }
+}
+
+.feed-shimmer {
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--mesh-blob) 70%, transparent) 0%,
+    color-mix(in srgb, var(--brand) 8%, var(--mesh-blob)) 45%,
+    color-mix(in srgb, var(--mesh-blob) 70%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: feed-shimmer 1.2s ease-in-out infinite;
+}
+
+@keyframes feed-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .feed-shimmer {
+    animation: none;
+  }
+  .feed-spotlight:hover {
+    transform: none;
+  }
+}
