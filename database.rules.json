@@ -64,17 +64,14 @@
         ".read": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
         ".indexOn": ["createdAt"],
         "$messageId": {
+          // Members may only post as themselves. Bot replies ('support-ai')
+          // are written by the postSupportAiMessage callable with the Admin
+          // SDK, which bypasses these rules — a client can never impersonate.
           ".write": "auth != null
             && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
             && !data.exists()
-            && (
-              newData.child('senderId').val() === auth.uid
-              || (
-                root.child('chats').child($chatId).child('isSupportChat').val() === true
-                && newData.child('senderId').val() === 'support-ai'
-                && newData.child('isAi').val() === true
-              )
-            )",
+            && newData.child('senderId').val() === auth.uid
+            && newData.child('isAi').val() !== true",
           "reactions": {
             "$uid": {
               ".write": "auth != null

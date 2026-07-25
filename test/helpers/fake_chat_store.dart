@@ -183,6 +183,50 @@ class FakeChatStore implements ChatStore {
     return saved;
   }
 
+  /// Stands in for the `postSupportAiMessage` callable: the real store never
+  /// writes the bot turn itself, so the fake performs the whole server-side
+  /// effect (message plus conversation metadata) in one go.
+  @override
+  Future<ChatMessage> addSupportAiMessage({
+    required String chatId,
+    required String body,
+    required String senderName,
+  }) async {
+    final chat = chats[chatId];
+    if (chat == null) throw StateError('Chat not found.');
+    final now = DateTime.now().toUtc();
+    final saved = await addMessage(
+      ChatMessage(
+        id: '',
+        chatId: chatId,
+        body: body,
+        senderId: ChatConversation.supportAiUid,
+        senderName: senderName,
+        createdAt: now,
+        isAi: true,
+      ),
+    );
+
+    final nextUnread = Map<String, int>.from(chat.unreadCounts);
+    for (final memberId in chat.memberIds) {
+      nextUnread[memberId] = memberId == ChatConversation.supportAiUid
+          ? 0
+          : (nextUnread[memberId] ?? 0) + 1;
+    }
+    chats[chatId] = chat.copyWith(
+      lastMessage: body,
+      lastMessageAt: now,
+      lastMessageSenderId: ChatConversation.supportAiUid,
+      unreadCounts: nextUnread,
+      memberNames: {
+        ...chat.memberNames,
+        ChatConversation.supportAiUid: senderName,
+      },
+    );
+    await ensureUserChatIndexes(chats[chatId]!);
+    return saved;
+  }
+
   @override
   Future<void> setMessageReaction({
     required String chatId,

@@ -16,6 +16,7 @@ import 'chat_contact_info_screen.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
 import 'widgets/chat_avatar.dart';
+import 'widgets/reaction_popup.dart';
 
 class ChatConversationScreen extends StatefulWidget {
   const ChatConversationScreen({
@@ -159,65 +160,18 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  Future<void> _showReactionPicker(ChatMessage msg) async {
-    PulseHaptics.medium();
-    final l10n = context.l10n;
-    final colors = AppColors.of(context);
-    final mine = msg.reactions[widget.profile.uid];
-    await showModalBottomSheet<void>(
+  /// Long-press opens an animated WhatsApp-style bubble anchored to the message.
+  Future<void> _showReactionPicker(ChatMessage msg, Rect anchor) async {
+    final mine = msg.isMine(widget.profile.uid);
+    final picked = await showReactionPopup(
       context: context,
-      backgroundColor: colors.sheet,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  l10n.chatReact,
-                  style: Theme.of(ctx).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    for (final emoji in ChatMessage.reactionEmojis)
-                      InkWell(
-                        onTap: () {
-                          Navigator.pop(ctx);
-                          _react(msg, emoji);
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: mine == emoji
-                                ? AppColors.brandOf(ctx).withValues(alpha: 0.15)
-                                : colors.glassFill,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: mine == emoji
-                                  ? AppColors.brandOf(ctx)
-                                  : colors.border,
-                            ),
-                          ),
-                          child: Text(emoji, style: const TextStyle(fontSize: 26)),
-                        ),
-                      ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        );
-      },
+      anchor: anchor,
+      mine: mine,
+      selected: msg.reactions[widget.profile.uid],
     );
+    if (picked != null) {
+      await _react(msg, picked);
+    }
   }
 
   void _openSharedPost(SharedPostPreview preview) {
@@ -381,7 +335,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               ? null
                               : () => _openSharedPost(shared),
                           onLongPress: reactionsEnabled
-                              ? () => _showReactionPicker(msg)
+                              ? (anchor) => _showReactionPicker(msg, anchor)
                               : null,
                           onTapReaction: reactionsEnabled
                               ? (emoji) => _react(msg, emoji)
@@ -529,7 +483,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   }
 }
 
-class _MessageRow extends StatelessWidget {
+class _MessageRow extends StatefulWidget {
   const _MessageRow({
     super.key,
     required this.msg,
@@ -551,17 +505,44 @@ class _MessageRow extends StatelessWidget {
   final SharedPostPreview? shared;
   final String viewerUid;
   final bool reactionsEnabled;
-  final VoidCallback? onLongPress;
+
+  /// Passes the on-screen rect of the pressed bubble so the picker can anchor.
+  final ValueChanged<Rect>? onLongPress;
   final ValueChanged<String>? onTapReaction;
   final VoidCallback? onOpenShared;
+
+  @override
+  State<_MessageRow> createState() => _MessageRowState();
+}
+
+class _MessageRowState extends State<_MessageRow> {
+  final _bubbleKey = GlobalKey();
+
+  void _handleLongPress() {
+    final onLongPress = widget.onLongPress;
+    if (onLongPress == null) return;
+    final box = _bubbleKey.currentContext?.findRenderObject() as RenderBox?;
+    if (box == null || !box.hasSize) return;
+    final topLeft = box.localToGlobal(Offset.zero);
+    onLongPress(topLeft & box.size);
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    final counts = reactionsEnabled ? msg.reactionCounts() : const <String, int>{};
-    final myEmoji = reactionsEnabled ? msg.reactions[viewerUid] : null;
+    final msg = widget.msg;
+    final mine = widget.mine;
+    final shared = widget.shared;
+    final showName = widget.showName;
+    final time = widget.time;
+    final onTapReaction = widget.onTapReaction;
+    final onOpenShared = widget.onOpenShared;
+    final counts =
+        widget.reactionsEnabled ? msg.reactionCounts() : const <String, int>{};
+    final myEmoji =
+        widget.reactionsEnabled ? msg.reactions[widget.viewerUid] : null;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -572,8 +553,9 @@ class _MessageRow extends StatelessWidget {
             maxWidth: MediaQuery.sizeOf(context).width * 0.82,
           ),
           child: GestureDetector(
-            onLongPress: onLongPress,
+            onLongPress: widget.onLongPress == null ? null : _handleLongPress,
             child: Column(
+              key: _bubbleKey,
               crossAxisAlignment:
                   mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
@@ -591,7 +573,7 @@ class _MessageRow extends StatelessWidget {
                   ),
                 if (shared != null)
                   SharedPostCard(
-                    preview: shared!,
+                    preview: shared,
                     onTap: onOpenShared,
                   ),
                 if (shared != null && msg.body.trim().isNotEmpty)
@@ -608,7 +590,7 @@ class _MessageRow extends StatelessWidget {
                         InkWell(
                           onTap: onTapReaction == null
                               ? null
-                              : () => onTapReaction!(entry.key),
+                              : () => onTapReaction(entry.key),
                           borderRadius: BorderRadius.circular(999),
                           child: Container(
                             padding: const EdgeInsets.symmetric(

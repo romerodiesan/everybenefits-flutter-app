@@ -25,6 +25,7 @@ import {
   supportChatIdFor,
   canCreateChatGroups,
 } from "../roles";
+import { postSupportAiMessage } from "./functions";
 
 function asMap(raw: unknown): Record<string, unknown> {
   if (!raw || typeof raw !== "object") return {};
@@ -347,15 +348,10 @@ export async function getOrCreateSupportChat(
     isSupportChat: true,
   });
   if (welcomeMessage?.trim()) {
-    await sendMessage({
+    await postSupportAiMessage({
       chatId: chat.id,
       body: welcomeMessage.trim(),
-      author: {
-        ...me,
-        uid: SUPPORT_AI_UID,
-        displayName: aiName,
-      },
-      isAi: true,
+      senderName: aiName,
     });
   }
   return chat;

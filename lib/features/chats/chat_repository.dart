@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_database/firebase_database.dart';
 
 import '../../users/user_profile.dart';
@@ -56,6 +57,16 @@ abstract class ChatStore {
 
   Future<ChatMessage> addMessage(ChatMessage message);
 
+  /// Posts an automated reply as `support-ai`.
+  ///
+  /// Database rules only accept messages whose `senderId` is the caller's own
+  /// uid, so this goes through a trusted callable instead of a direct write.
+  Future<ChatMessage> addSupportAiMessage({
+    required String chatId,
+    required String body,
+    required String senderName,
+  });
+
   /// Sets or clears `messages/{chatId}/{messageId}/reactions/{uid}`.
   Future<void> setMessageReaction({
     required String chatId,
@@ -73,10 +84,13 @@ abstract class ChatStore {
 /// - `userChats/{uid}/{chatId}` — inbox index (`lastMessageAt`)
 /// - `dmIndex/{dmKey}` — DM id lookup
 class RtdbChatStore implements ChatStore {
-  RtdbChatStore({FirebaseDatabase? database})
-      : _db = database ?? FirebaseDatabase.instance;
+  RtdbChatStore({FirebaseDatabase? database, FirebaseFunctions? functions})
+      : _db = database ?? FirebaseDatabase.instance,
+        _functions =
+            functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseDatabase _db;
+  final FirebaseFunctions _functions;
 
   DatabaseReference get _root => _db.ref();
 
@@ -344,6 +358,34 @@ class RtdbChatStore implements ChatStore {
   }
 
   @override
+  Future<ChatMessage> addSupportAiMessage({
+    required String chatId,
+    required String body,
+    required String senderName,
+  }) async {
+    final result = await _functions.httpsCallable('postSupportAiMessage').call(
+      <String, dynamic>{
+        'chatId': chatId,
+        'body': body,
+        'senderName': senderName,
+      },
+    );
+    final data = _asStringKeyedMap(result.data);
+    return ChatMessage(
+      id: '${data['id'] ?? ''}',
+      chatId: chatId,
+      body: body,
+      senderId: ChatConversation.supportAiUid,
+      senderName: senderName,
+      createdAt: DateTime.fromMillisecondsSinceEpoch(
+        _readMillis(data['createdAt']),
+        isUtc: true,
+      ),
+      isAi: true,
+    );
+  }
+
+  @override
   Future<void> setMessageReaction({
     required String chatId,
     required String messageId,
@@ -532,6 +574,9 @@ class ChatRepository {
   }
 
   /// Posts an automated support reply as the synthetic AI member.
+  ///
+  /// The write itself happens server-side: clients are not allowed to author
+  /// messages under another sender id.
   Future<ChatMessage> sendSupportAiReply({
     required String chatId,
     required String body,
@@ -546,41 +591,11 @@ class ChatRepository {
       throw StateError('Not a support chat.');
     }
 
-    final now = _clock();
-    final message = await _store.addMessage(
-      ChatMessage(
-        id: '',
-        chatId: chatId,
-        body: text,
-        senderId: ChatConversation.supportAiUid,
-        senderName: aiName,
-        createdAt: now,
-        isAi: true,
-      ),
+    return _store.addSupportAiMessage(
+      chatId: chatId,
+      body: text,
+      senderName: aiName,
     );
-
-    final nextUnread = Map<String, int>.from(chat.unreadCounts);
-    for (final memberId in chat.memberIds) {
-      if (memberId == ChatConversation.supportAiUid) {
-        nextUnread[memberId] = 0;
-      } else {
-        nextUnread[memberId] = (nextUnread[memberId] ?? 0) + 1;
-      }
-    }
-
-    final updated = chat.copyWith(
-      lastMessage: text,
-      lastMessageAt: now,
-      lastMessageSenderId: ChatConversation.supportAiUid,
-      unreadCounts: nextUnread,
-      memberNames: {
-        ...chat.memberNames,
-        ChatConversation.supportAiUid: aiName,
-      },
-    );
-    await _store.updateChat(updated);
-    await _store.ensureUserChatIndexes(updated);
-    return message;
   }
 
   Future<ChatMessage> sendMessage({

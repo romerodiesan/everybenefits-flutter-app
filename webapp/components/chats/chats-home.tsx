@@ -12,7 +12,6 @@ import {
   markChatRead,
   sendMessage,
   setPinned,
-  setReaction,
   watchChat,
   watchInbox,
   watchMessages,
@@ -23,12 +22,15 @@ import {
   canParticipateInChats,
 } from "@/lib/roles";
 import {
-  REACTION_EMOJIS,
   type ChatConversation,
   type ChatMessage,
   type UserProfile,
 } from "@/lib/types";
 import { Button, Input, Panel, Avatar } from "@/components/ui/primitives";
+import {
+  AddReactionButton,
+  ReactionChips,
+} from "@/components/chats/message-reactions";
 
 export function ChatsHome({ selectedId }: { selectedId?: string }) {
   const t = useTranslations();
@@ -368,62 +370,68 @@ export function ConversationPane({ chatId }: { chatId: string }) {
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.map((message) => {
           const mine = message.senderId === profile.uid;
+          const canReact = !chat.isSupportChat;
           return (
             <div
               key={message.id}
               className={`flex ${mine ? "justify-end" : "justify-start"}`}
             >
-              <div
-                className={`max-w-[80%] px-3 py-2 ${
-                  mine ? "bubble-mine" : "bubble-other"
-                }`}
-              >
-                {!mine && (
-                  <p className="mb-1 text-xs text-muted">{message.senderName}</p>
+              <div className="flex max-w-[88%] items-end gap-1.5">
+                {canReact && mine && (
+                  <AddReactionButton
+                    chatId={chatId}
+                    message={message}
+                    uid={profile.uid}
+                    mine={mine}
+                  />
                 )}
-                {message.sharedPost ? (
-                  <Link
-                    href={`/home/${message.sharedPost.threadId}`}
-                    className="block"
+                <div className="min-w-0 max-w-full">
+                  <div
+                    className={`px-3 py-2 ${
+                      mine ? "bubble-mine" : "bubble-other"
+                    }`}
                   >
-                    <Panel className="!p-3 transition hover:bg-white/[0.03]">
-                      <p className="font-semibold">
-                        {message.sharedPost.title}
+                    {!mine && (
+                      <p className="mb-1 text-xs text-muted">
+                        {message.senderName}
                       </p>
-                      <p className="text-sm text-muted">
-                        {message.sharedPost.excerpt}
-                      </p>
-                    </Panel>
-                  </Link>
-                ) : (
-                  <p className="whitespace-pre-wrap text-sm">{message.body}</p>
-                )}
-                {!chat.isSupportChat && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {REACTION_EMOJIS.map((emoji) => (
-                      <button
-                        key={emoji}
-                        type="button"
-                        className="rounded-md px-1 text-sm opacity-80 hover:opacity-100"
-                        onClick={() => {
-                          void setReaction({
-                            chatId,
-                            messageId: message.id,
-                            uid: profile.uid,
-                            emoji:
-                              message.reactions?.[profile.uid] === emoji
-                                ? null
-                                : emoji,
-                          }).catch(() => undefined);
-                        }}
+                    )}
+                    {message.sharedPost ? (
+                      <Link
+                        href={`/home/${message.sharedPost.threadId}`}
+                        className="block"
                       >
-                        {emoji}
-                        {Object.values(message.reactions ?? {}).filter(
-                          (v) => v === emoji,
-                        ).length || ""}
-                      </button>
-                    ))}
+                        <Panel className="!p-3 transition hover:bg-white/[0.03]">
+                          <p className="font-semibold">
+                            {message.sharedPost.title}
+                          </p>
+                          <p className="text-sm text-muted">
+                            {message.sharedPost.excerpt}
+                          </p>
+                        </Panel>
+                      </Link>
+                    ) : (
+                      <p className="whitespace-pre-wrap text-sm">
+                        {message.body}
+                      </p>
+                    )}
                   </div>
+                  {canReact && (
+                    <ReactionChips
+                      chatId={chatId}
+                      message={message}
+                      uid={profile.uid}
+                      mine={mine}
+                    />
+                  )}
+                </div>
+                {canReact && !mine && (
+                  <AddReactionButton
+                    chatId={chatId}
+                    message={message}
+                    uid={profile.uid}
+                    mine={mine}
+                  />
                 )}
               </div>
             </div>

@@ -18,6 +18,28 @@ export async function setUserRole(uid: string, role: UserRole) {
   }
 }
 
+/**
+ * Posts an automated support reply. Clients cannot write as `support-ai`
+ * directly — Realtime Database rules only accept messages sent under the
+ * caller's own uid — so this always goes through the trusted callable.
+ */
+export async function postSupportAiMessage(input: {
+  chatId: string;
+  body: string;
+  senderName: string;
+}): Promise<void> {
+  try {
+    await callCloudFunction("postSupportAiMessage", input);
+  } catch (error) {
+    if (error instanceof FunctionsUnavailableError) {
+      // The welcome line is cosmetic; the thread itself already exists.
+      console.warn("Support bot reply skipped:", error.message);
+      return;
+    }
+    throw error;
+  }
+}
+
 export async function listStudentsForPromotion(): Promise<UserProfile[]> {
   try {
     const data = await callCloudFunction<{
