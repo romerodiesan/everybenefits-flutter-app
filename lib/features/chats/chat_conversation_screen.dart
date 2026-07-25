@@ -97,19 +97,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  void _insertEmoji(String emoji) {
-    final text = _controller.text;
-    final selection = _controller.selection;
-    final start = selection.start >= 0 ? selection.start : text.length;
-    final end = selection.end >= 0 ? selection.end : text.length;
-    final next = text.replaceRange(start, end, emoji);
-    final cursor = start + emoji.length;
-    _controller.value = TextEditingValue(
-      text: next,
-      selection: TextSelection.collapsed(offset: cursor),
-    );
-  }
-
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
@@ -509,7 +496,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       height: 280,
                       child: EmojiPicker(
                         textEditingController: _controller,
-                        onEmojiSelected: (_, emoji) => _insertEmoji(emoji.emoji),
                         config: Config(
                           height: 280,
                           checkPlatformCompatibility: true,

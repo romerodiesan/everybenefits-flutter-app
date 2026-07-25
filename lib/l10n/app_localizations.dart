@@ -1382,6 +1382,12 @@ abstract class AppLocalizations {
   /// **'{count} replies'**
   String replyCountOther(int count);
 
+  /// No description provided for @actionLike.
+  ///
+  /// In en, this message translates to:
+  /// **'Like'**
+  String get actionLike;
+
   /// No description provided for @relevanceLabel.
   ///
   /// In en, this message translates to:
@@ -2125,6 +2131,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pulse AI'**
   String get aiAssistantSubtitle;
+
+  /// No description provided for @aiStatusOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Online · demo'**
+  String get aiStatusOnline;
 
   /// No description provided for @aiSettings.
   ///

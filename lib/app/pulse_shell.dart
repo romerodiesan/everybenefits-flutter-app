@@ -59,7 +59,9 @@ class PulseShellState extends State<PulseShell> {
     setState(() {
       _index = next;
       // Leaving AI always restores the tab bar.
-      if (next != _aiTabIndex) _tabBarCollapsed = false;
+      if (next != _aiTabIndex) {
+        _tabBarCollapsed = false;
+      }
     });
   }
 
@@ -273,12 +275,10 @@ class PulseShellState extends State<PulseShell> {
         resizeToAvoidBottomInset: false,
         body: PulseTabBody(index: _index, children: pages),
         floatingActionButton: fabButton,
-        // Collapses horizontally (right to left) to hand the row over to the
-        // AI composer, which expands in its place.
         bottomNavigationBar: AnimatedSlide(
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOutCubic,
-          offset: _tabBarCollapsed ? const Offset(-1.15, 0) : Offset.zero,
+          offset: _tabBarCollapsed ? const Offset(0, 1.4) : Offset.zero,
           child: AnimatedOpacity(
             duration: const Duration(milliseconds: 220),
             opacity: _tabBarCollapsed ? 0 : 1,
@@ -288,7 +288,6 @@ class PulseShellState extends State<PulseShell> {
                 items: _navItems(l10n),
                 selectedIndex: _index,
                 onSelect: selectTab,
-                endInset: _index == _aiTabIndex ? 56 : 0,
               ),
             ),
           ),

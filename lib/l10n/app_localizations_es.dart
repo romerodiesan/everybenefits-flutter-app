@@ -697,6 +697,9 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
+  String get actionLike => 'Me gusta';
+
+  @override
   String get relevanceLabel => 'Relevancia';
 
   @override
@@ -1093,6 +1096,9 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get aiAssistantSubtitle => 'Pulse AI';
+
+  @override
+  String get aiStatusOnline => 'En línea · demo';
 
   @override
   String get aiSettings => 'Ajustes';

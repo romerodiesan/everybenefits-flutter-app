@@ -34,7 +34,8 @@ double pulseTabBarTopInset(BuildContext context) {
   return systemBottomInset(context) + 6 + kPulseTabBarPillHeight;
 }
 
-/// Shell chrome that AI (and others) can use to collapse the floating tab bar.
+/// Shell chrome that AI (and others) can use to collapse the floating tab bar
+/// while composing, so the input can take its place.
 class PulseShellScope extends InheritedWidget {
   const PulseShellScope({
     super.key,
@@ -329,15 +330,11 @@ class PulseTabBar extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.onSelect,
-    this.endInset = 0,
   });
 
   final List<PulseTabItem> items;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
-
-  /// Extra trailing space (e.g. to leave room for the AI composer chip).
-  final double endInset;
 
   void _selectIndex(int index) {
     final next = index.clamp(0, items.length - 1);
@@ -364,7 +361,7 @@ class PulseTabBar extends StatelessWidget {
       child: AnimatedPadding(
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
-        padding: EdgeInsets.fromLTRB(16, 0, 16 + endInset, bottom + 6),
+        padding: EdgeInsets.fromLTRB(16, 0, 16, bottom + 6),
         child: DecoratedBox(
           decoration: BoxDecoration(
             color: colors.sheet.withValues(alpha: 0.94),
@@ -385,7 +382,10 @@ class PulseTabBar extends StatelessWidget {
                 return GestureDetector(
                   behavior: HitTestBehavior.opaque,
                   onHorizontalDragUpdate: (details) {
-                    _selectAtX(details.localPosition.dx, constraints.maxWidth);
+                    _selectAtX(
+                      details.localPosition.dx,
+                      constraints.maxWidth,
+                    );
                   },
                   onHorizontalDragEnd: (details) {
                     final velocity = details.primaryVelocity ?? 0;

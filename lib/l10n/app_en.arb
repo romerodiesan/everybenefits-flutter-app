@@ -277,6 +277,7 @@
       }
     }
   },
+  "actionLike": "Like",
   "relevanceLabel": "Relevance",
   "relevanceScoreShort": "{score} relev.",
   "@relevanceScoreShort": {
@@ -436,6 +437,7 @@
   "aiEmptyPrompt": "How can I help?",
   "aiEmptySubtitle": "Ask about benefits, courses, or community — demo replies for now.",
   "aiAssistantSubtitle": "Pulse AI",
+  "aiStatusOnline": "Online · demo",
   "aiSettings": "Settings",
   "aiSettingsTitle": "AI settings",
   "aiModelSection": "Model",
