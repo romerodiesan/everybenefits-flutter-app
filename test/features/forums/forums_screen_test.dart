@@ -83,6 +83,13 @@ class _MemoryForumStore implements ForumStore {
       {for (final id in replyIds) id: RelevanceVote.none};
 
   @override
+  Future<Map<String, RelevanceVote>> fetchThreadVotes({
+    required String uid,
+    required List<String> threadIds,
+  }) async =>
+      {for (final id in threadIds) id: RelevanceVote.none};
+
+  @override
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,
@@ -217,7 +224,7 @@ void main() {
 
     expect(find.text('Bienvenidos a la comunidad'), findsOneWidget);
     expect(find.textContaining('Ask the community'), findsOneWidget);
-    expect(find.text('Relevance'), findsWidgets);
+    expect(find.text('Like'), findsWidgets);
     expect(find.text('Chats'), findsWidgets);
     expect(find.byType(FloatingActionButton), findsOneWidget);
     expect(find.byTooltip('Search questions'), findsOneWidget);

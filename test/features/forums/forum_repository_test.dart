@@ -128,6 +128,19 @@ class FakeForumStore implements ForumStore {
   }
 
   @override
+  Future<Map<String, RelevanceVote>> fetchThreadVotes({
+    required String uid,
+    required List<String> threadIds,
+  }) async {
+    final out = <String, RelevanceVote>{};
+    for (final id in threadIds) {
+      final key = _threadVoteKey(id, uid);
+      out[id] = threadVotes[key] ?? RelevanceVote.none;
+    }
+    return out;
+  }
+
+  @override
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,

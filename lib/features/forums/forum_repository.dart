@@ -46,6 +46,12 @@ abstract class ForumStore {
     required List<String> replyIds,
   });
 
+  /// One-shot batch of the viewer's votes for the given thread ids.
+  Future<Map<String, RelevanceVote>> fetchThreadVotes({
+    required String uid,
+    required List<String> threadIds,
+  });
+
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,
@@ -204,6 +210,23 @@ class FirestoreForumStore implements ForumStore {
     for (var i = 0; i < replyIds.length; i++) {
       final value = (snaps[i].data()?['value'] as num?)?.toInt();
       out[replyIds[i]] = RelevanceVote.fromValue(value);
+    }
+    return out;
+  }
+
+  @override
+  Future<Map<String, RelevanceVote>> fetchThreadVotes({
+    required String uid,
+    required List<String> threadIds,
+  }) async {
+    if (threadIds.isEmpty) return {};
+    final snaps = await Future.wait(
+      threadIds.map((id) => _threadVote(id, uid).get()),
+    );
+    final out = <String, RelevanceVote>{};
+    for (var i = 0; i < threadIds.length; i++) {
+      final value = (snaps[i].data()?['value'] as num?)?.toInt();
+      out[threadIds[i]] = RelevanceVote.fromValue(value);
     }
     return out;
   }
@@ -589,6 +612,12 @@ class ForumRepository {
         uid: uid,
         replyIds: replyIds,
       );
+
+  Future<Map<String, RelevanceVote>> fetchThreadVotes({
+    required String uid,
+    required List<String> threadIds,
+  }) =>
+      _store.fetchThreadVotes(uid: uid, threadIds: threadIds);
 
   Future<ForumThread> createThread({
     required List<String> tags,

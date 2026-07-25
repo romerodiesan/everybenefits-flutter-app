@@ -57,6 +57,10 @@ class ForumsScreenState extends State<ForumsScreen> {
   /// Threads used to rank discovery tags (kept when filtering by tag / mine).
   List<ForumThread> _tagCatalog = const [];
 
+  /// Viewer's like state per thread (thread vote up == like).
+  Map<String, RelevanceVote> _threadVotes = {};
+  String? _threadVoteKey;
+
 
   bool get _canPost => canParticipateInForums(
         role: widget.profile.role,
@@ -100,6 +104,7 @@ class ForumsScreenState extends State<ForumsScreen> {
         _loading = false;
         _refreshTagCatalog();
       });
+      _ensureThreadVotes();
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -127,6 +132,7 @@ class ForumsScreenState extends State<ForumsScreen> {
         _loadingMore = false;
         _refreshTagCatalog();
       });
+      _ensureThreadVotes();
     } catch (error) {
       if (!mounted) return;
       setState(() => _loadingMore = false);
@@ -183,8 +189,79 @@ class ForumsScreenState extends State<ForumsScreen> {
         _hasMore = page.hasMore;
         _refreshTagCatalog();
       });
+      _threadVoteKey = null; // Re-fetch: votes may have changed in detail.
+      _ensureThreadVotes();
     } catch (_) {
       // Keep current list on background refresh failure.
+    }
+  }
+
+  Future<void> _ensureThreadVotes() async {
+    if (!_canPost) return;
+    final ids = _threads.map((t) => t.id).toList()..sort();
+    final key = ids.join('|');
+    if (key == _threadVoteKey) return;
+    _threadVoteKey = key;
+    if (ids.isEmpty) {
+      if (mounted) setState(() => _threadVotes = {});
+      return;
+    }
+    try {
+      final votes = await _repository.fetchThreadVotes(
+        uid: widget.profile.uid,
+        threadIds: ids,
+      );
+      if (!mounted || _threadVoteKey != key) return;
+      setState(() => _threadVotes = votes);
+    } catch (_) {
+      // Likes are non-critical; buttons stay at "not liked".
+    }
+  }
+
+  Future<void> _toggleLike(ForumThread thread) async {
+    final l10n = context.l10n;
+    if (!_canPost) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errForumRegisterToVote)),
+      );
+      return;
+    }
+    if (thread.authorId == widget.profile.uid) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.errForumCantVoteOwnQuestion)),
+      );
+      return;
+    }
+    final prev = _threadVotes[thread.id] ?? RelevanceVote.none;
+    final next =
+        prev == RelevanceVote.up ? RelevanceVote.none : RelevanceVote.up;
+    final delta = next.value - prev.value;
+    PulseHaptics.light();
+    setState(() {
+      _threadVotes = {..._threadVotes, thread.id: next};
+      _threads = [
+        for (final t in _threads)
+          t.id == thread.id ? t.copyWith(score: t.score + delta) : t,
+      ];
+    });
+    try {
+      await _repository.setThreadRelevance(
+        thread: thread,
+        actor: widget.profile,
+        vote: next,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _threadVotes = {..._threadVotes, thread.id: prev};
+        _threads = [
+          for (final t in _threads)
+            t.id == thread.id ? t.copyWith(score: t.score - delta) : t,
+        ];
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(friendlyForumError(error, context.l10n))),
+      );
     }
   }
 
@@ -529,8 +606,10 @@ class ForumsScreenState extends State<ForumsScreen> {
           child: FeedPostCard(
             thread: thread,
             onTap: () => _openThread(thread),
+            liked: (_threadVotes[thread.id] ?? RelevanceVote.none) ==
+                RelevanceVote.up,
+            onLike: () => _toggleLike(thread),
             onComment: () => _openThread(thread),
-            onRelevance: () => _openThread(thread),
             onShare: () {
               PulseHaptics.light();
               showShareToChatSheet(

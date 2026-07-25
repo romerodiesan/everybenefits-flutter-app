@@ -359,16 +359,12 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                                           RelevanceVote.none;
                                       return _OriginalPost(
                                         thread: thread,
-                                        vote: vote,
-                                        canVote: canVote,
+                                        liked: vote == RelevanceVote.up,
+                                        canLike: canVote,
                                         canManage: canManageThread,
-                                        onUp: () => _voteThread(
+                                        onLike: () => _voteThread(
                                           thread,
                                           _toggle(vote, RelevanceVote.up),
-                                        ),
-                                        onDown: () => _voteThread(
-                                          thread,
-                                          _toggle(vote, RelevanceVote.down),
                                         ),
                                         onAnswer: _canPost
                                             ? () =>
@@ -478,11 +474,10 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 class _OriginalPost extends StatelessWidget {
   const _OriginalPost({
     required this.thread,
-    required this.vote,
-    required this.canVote,
+    required this.liked,
+    required this.canLike,
     required this.canManage,
-    required this.onUp,
-    required this.onDown,
+    required this.onLike,
     this.onAnswer,
     this.onShare,
     this.onEdit,
@@ -490,11 +485,10 @@ class _OriginalPost extends StatelessWidget {
   });
 
   final ForumThread thread;
-  final RelevanceVote vote;
-  final bool canVote;
+  final bool liked;
+  final bool canLike;
   final bool canManage;
-  final VoidCallback onUp;
-  final VoidCallback onDown;
+  final VoidCallback onLike;
   final VoidCallback? onAnswer;
   final VoidCallback? onShare;
   final VoidCallback? onEdit;
@@ -505,20 +499,13 @@ class _OriginalPost extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final l10n = context.l10n;
+    final likeLabel = thread.score > 0 ? '${thread.score}' : l10n.actionLike;
 
     return PulseSheet(
-      padding: const EdgeInsets.fromLTRB(10, 14, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 14, 14, 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          RelevanceControls(
-            score: thread.score,
-            vote: vote,
-            enabled: canVote,
-            onUp: onUp,
-            onDown: onDown,
-          ),
-          const SizedBox(width: 4),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -595,6 +582,14 @@ class _OriginalPost extends StatelessWidget {
                 Row(
                   children: [
                     _PostAction(
+                      icon: liked
+                          ? Icons.favorite_rounded
+                          : Icons.favorite_border_rounded,
+                      label: likeLabel,
+                      active: liked,
+                      onTap: canLike ? onLike : null,
+                    ),
+                    _PostAction(
                       icon: Icons.chat_bubble_outline_rounded,
                       label: l10n.actionReply,
                       onTap: onAnswer,
@@ -622,15 +617,19 @@ class _PostAction extends StatelessWidget {
     required this.icon,
     required this.label,
     this.onTap,
+    this.active = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+    final color = active ? brand : colors.muted;
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -640,7 +639,7 @@ class _PostAction extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: colors.muted),
+              Icon(icon, size: 16, color: color),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(
@@ -648,9 +647,10 @@ class _PostAction extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: colors.muted,
+                        color: color,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight:
+                            active ? FontWeight.w800 : FontWeight.w600,
                       ),
                 ),
               ),

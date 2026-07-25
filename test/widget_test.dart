@@ -422,6 +422,13 @@ class _EmptyForumStore implements ForumStore {
       {for (final id in replyIds) id: RelevanceVote.none};
 
   @override
+  Future<Map<String, RelevanceVote>> fetchThreadVotes({
+    required String uid,
+    required List<String> threadIds,
+  }) async =>
+      {for (final id in threadIds) id: RelevanceVote.none};
+
+  @override
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,

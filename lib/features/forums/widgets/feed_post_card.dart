@@ -8,26 +8,27 @@ import '../forum_models.dart';
 import 'forum_avatar.dart';
 import 'forum_meta_line.dart';
 import 'forum_tag_wrap.dart';
-import 'relevance_controls.dart';
 
-/// Minimal social-feed card: author, body, tags, relevance / comment / share.
+/// Minimal social-feed card: author, body, tags, like / comment / share.
 class FeedPostCard extends StatelessWidget {
   const FeedPostCard({
     super.key,
     required this.thread,
     required this.onTap,
+    this.liked = false,
+    this.onLike,
     this.onComment,
     this.onTagTap,
     this.onShare,
-    this.onRelevance,
   });
 
   final ForumThread thread;
   final VoidCallback onTap;
+  final bool liked;
+  final VoidCallback? onLike;
   final VoidCallback? onComment;
   final ValueChanged<String>? onTagTap;
   final VoidCallback? onShare;
-  final VoidCallback? onRelevance;
 
   @override
   Widget build(BuildContext context) {
@@ -40,10 +41,15 @@ class FeedPostCard extends StatelessWidget {
         : thread.replyCount == 1
             ? l10n.replyCountOne
             : l10n.replyCountOther(thread.replyCount);
+    final likeLabel =
+        thread.score > 0 ? '${thread.score}' : l10n.actionLike;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: PulseSheet(
+      child: GestureDetector(
+        // Instagram-style double tap to like; single tap still opens.
+        onDoubleTap: onLike,
+        child: PulseSheet(
         onTap: onTap,
         padding: const EdgeInsets.all(14),
         child: Column(
@@ -119,11 +125,13 @@ class FeedPostCard extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                Expanded(
-                  child: RelevanceScoreChip(
-                    score: thread.score,
-                    onTap: onRelevance ?? onTap,
-                  ),
+                _Action(
+                  icon: liked
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  label: likeLabel,
+                  active: liked,
+                  onTap: onLike ?? onTap,
                 ),
                 _Action(
                   icon: Icons.chat_bubble_outline_rounded,
@@ -139,6 +147,7 @@ class FeedPostCard extends StatelessWidget {
             ),
           ],
         ),
+        ),
       ),
     );
   }
@@ -149,15 +158,19 @@ class _Action extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.active = false,
   });
 
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool active;
 
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+    final color = active ? brand : colors.muted;
     return Expanded(
       child: InkWell(
         onTap: onTap,
@@ -167,7 +180,7 @@ class _Action extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(icon, size: 16, color: colors.muted),
+              Icon(icon, size: 16, color: color),
               const SizedBox(width: 4),
               Flexible(
                 child: Text(
@@ -175,9 +188,9 @@ class _Action extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: colors.muted,
+                        color: color,
                         fontSize: 12,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: active ? FontWeight.w800 : FontWeight.w600,
                       ),
                 ),
               ),
