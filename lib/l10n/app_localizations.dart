@@ -2084,12 +2084,6 @@ abstract class AppLocalizations {
   /// **'New conversation'**
   String get aiNewConversation;
 
-  /// No description provided for @aiDemoReply.
-  ///
-  /// In en, this message translates to:
-  /// **'Demo reply. When we connect Gemini, you\'ll see real help here.'**
-  String get aiDemoReply;
-
   /// No description provided for @aiHistoryTooltip.
   ///
   /// In en, this message translates to:
@@ -2105,37 +2099,235 @@ abstract class AppLocalizations {
   /// No description provided for @aiThinking.
   ///
   /// In en, this message translates to:
-  /// **'Thinking…'**
+  /// **'Working on it…'**
   String get aiThinking;
 
   /// No description provided for @aiInputHint.
   ///
   /// In en, this message translates to:
-  /// **'Ask anything'**
+  /// **'Ask about products, licensing, compliance or sales…'**
   String get aiInputHint;
 
   /// No description provided for @aiEmptyPrompt.
   ///
   /// In en, this message translates to:
-  /// **'How can I help?'**
+  /// **'What are you working on?'**
   String get aiEmptyPrompt;
 
   /// No description provided for @aiEmptySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Ask about benefits, courses, or community — demo replies for now.'**
+  /// **'Ask anything about the US insurance business. Pulse AI searches accepted forum answers, the academy and official regulator sources, then shows you exactly where each answer came from.'**
   String get aiEmptySubtitle;
+
+  /// No description provided for @aiSuggestion1.
+  ///
+  /// In en, this message translates to:
+  /// **'What changes for a client during Medicare AEP?'**
+  String get aiSuggestion1;
+
+  /// No description provided for @aiSuggestion2.
+  ///
+  /// In en, this message translates to:
+  /// **'How do I handle the “I need to think about it” objection?'**
+  String get aiSuggestion2;
+
+  /// No description provided for @aiSuggestion3.
+  ///
+  /// In en, this message translates to:
+  /// **'What do I need to get licensed in another state?'**
+  String get aiSuggestion3;
+
+  /// No description provided for @aiSuggestion4.
+  ///
+  /// In en, this message translates to:
+  /// **'Explain how an IUL differs from whole life'**
+  String get aiSuggestion4;
+
+  /// No description provided for @aiSources.
+  ///
+  /// In en, this message translates to:
+  /// **'Sources'**
+  String get aiSources;
+
+  /// No description provided for @aiDisclaimer.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse AI can be wrong. Rules vary by state and carrier — verify before you advise a client.'**
+  String get aiDisclaimer;
+
+  /// No description provided for @aiActivityForum.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching accepted answers'**
+  String get aiActivityForum;
+
+  /// No description provided for @aiActivityAcademy.
+  ///
+  /// In en, this message translates to:
+  /// **'Searching the academy'**
+  String get aiActivityAcademy;
+
+  /// No description provided for @aiActivityOfficial.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking official sources'**
+  String get aiActivityOfficial;
+
+  /// No description provided for @aiActivityWeb.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking official sites'**
+  String get aiActivityWeb;
+
+  /// No description provided for @aiActivityProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Reviewing your learning'**
+  String get aiActivityProfile;
+
+  /// No description provided for @aiActivityResults.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} found'**
+  String aiActivityResults(int count);
+
+  /// No description provided for @aiActivityNone.
+  ///
+  /// In en, this message translates to:
+  /// **'nothing found'**
+  String get aiActivityNone;
+
+  /// No description provided for @aiActivityFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'failed'**
+  String get aiActivityFailed;
+
+  /// No description provided for @aiSourceForum.
+  ///
+  /// In en, this message translates to:
+  /// **'Community answer'**
+  String get aiSourceForum;
+
+  /// No description provided for @aiSourceCourse.
+  ///
+  /// In en, this message translates to:
+  /// **'Course'**
+  String get aiSourceCourse;
+
+  /// No description provided for @aiSourcePath.
+  ///
+  /// In en, this message translates to:
+  /// **'Learning path'**
+  String get aiSourcePath;
+
+  /// No description provided for @aiSourceLesson.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson'**
+  String get aiSourceLesson;
+
+  /// No description provided for @aiSourceOfficial.
+  ///
+  /// In en, this message translates to:
+  /// **'Official source'**
+  String get aiSourceOfficial;
+
+  /// No description provided for @aiSourceMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'That source is no longer available.'**
+  String get aiSourceMissing;
+
+  /// No description provided for @aiNoticeCompliance.
+  ///
+  /// In en, this message translates to:
+  /// **'Educational information, not legal advice. Check the policy wording, your state\'s rules or your compliance team before you act.'**
+  String get aiNoticeCompliance;
+
+  /// No description provided for @aiNoticeLegal.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse AI explains how insurance law and regulation generally work, but never advises on your specific case.'**
+  String get aiNoticeLegal;
+
+  /// No description provided for @aiNoticeScope.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse AI only covers the US insurance industry and the business of insurance.'**
+  String get aiNoticeScope;
+
+  /// No description provided for @aiNoticeNoSources.
+  ///
+  /// In en, this message translates to:
+  /// **'No indexed source backed this answer, so treat it as general industry knowledge and verify before acting.'**
+  String get aiNoticeNoSources;
+
+  /// No description provided for @aiFeedbackUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Helpful'**
+  String get aiFeedbackUp;
+
+  /// No description provided for @aiFeedbackDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Not helpful'**
+  String get aiFeedbackDown;
+
+  /// No description provided for @aiHistoryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No conversations yet.'**
+  String get aiHistoryEmpty;
+
+  /// No description provided for @aiUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled conversation'**
+  String get aiUntitled;
+
+  /// No description provided for @aiDeleteChat.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete conversation'**
+  String get aiDeleteChat;
+
+  /// No description provided for @aiError.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse AI hit an error. Try again.'**
+  String get aiError;
+
+  /// No description provided for @aiStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get aiStop;
+
+  /// No description provided for @aiSignInRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with a complete account to use Pulse AI.'**
+  String get aiSignInRequired;
+
+  /// No description provided for @aiLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading conversation…'**
+  String get aiLoading;
 
   /// No description provided for @aiAssistantSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Pulse AI'**
+  /// **'Powered by the Every Benefits agent'**
   String get aiAssistantSubtitle;
 
   /// No description provided for @aiStatusOnline.
   ///
   /// In en, this message translates to:
-  /// **'Online · demo'**
+  /// **'Online'**
   String get aiStatusOnline;
 
   /// No description provided for @aiSettings.
@@ -2159,13 +2351,13 @@ abstract class AppLocalizations {
   /// No description provided for @aiModelName.
   ///
   /// In en, this message translates to:
-  /// **'Gemini'**
+  /// **'Pulse AI'**
   String get aiModelName;
 
   /// No description provided for @aiModelSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Coming soon via Firebase AI Logic'**
+  /// **'The Every Benefits agent searches forums, academy courses, and official regulator sources.'**
   String get aiModelSubtitle;
 
   /// No description provided for @academyTitle.
@@ -2192,17 +2384,53 @@ abstract class AppLocalizations {
   /// **'Paths'**
   String get academyPaths;
 
+  /// No description provided for @academySeeAll.
+  ///
+  /// In en, this message translates to:
+  /// **'See all'**
+  String get academySeeAll;
+
   /// No description provided for @academyCourses.
   ///
   /// In en, this message translates to:
   /// **'Courses'**
   String get academyCourses;
 
-  /// No description provided for @academyCatalogDemo.
+  /// No description provided for @academyStudio.
   ///
   /// In en, this message translates to:
-  /// **'Demo catalog — real courses coming soon.'**
-  String get academyCatalogDemo;
+  /// **'Studio'**
+  String get academyStudio;
+
+  /// No description provided for @academyContinueLearning.
+  ///
+  /// In en, this message translates to:
+  /// **'Keep learning'**
+  String get academyContinueLearning;
+
+  /// No description provided for @academyCatalogEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No published courses yet.'**
+  String get academyCatalogEmpty;
+
+  /// No description provided for @academyFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get academyFilterAll;
+
+  /// No description provided for @academyMyCourses.
+  ///
+  /// In en, this message translates to:
+  /// **'My courses'**
+  String get academyMyCourses;
+
+  /// No description provided for @academyPendingReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending approval'**
+  String get academyPendingReview;
 
   /// No description provided for @searchCoursesHint.
   ///
@@ -2210,11 +2438,23 @@ abstract class AppLocalizations {
   /// **'Search courses…'**
   String get searchCoursesHint;
 
+  /// No description provided for @searchNoResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results for “{query}”'**
+  String searchNoResults(String query);
+
   /// No description provided for @myLearningInProgress.
   ///
   /// In en, this message translates to:
   /// **'In progress'**
   String get myLearningInProgress;
+
+  /// No description provided for @myLearningCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get myLearningCompleted;
 
   /// No description provided for @myLearningEmpty.
   ///
@@ -2234,11 +2474,47 @@ abstract class AppLocalizations {
   /// **'By {name}'**
   String courseByTeacher(String name);
 
-  /// No description provided for @courseStudents.
+  /// No description provided for @courseStudentsPlural.
   ///
   /// In en, this message translates to:
-  /// **'{count} students'**
-  String courseStudents(String count);
+  /// **'{count, plural, =0{No students yet} =1{1 student} other{{count} students}}'**
+  String courseStudentsPlural(int count);
+
+  /// No description provided for @courseLessonsPlural.
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =0{No lessons} =1{1 lesson} other{{count} lessons}}'**
+  String courseLessonsPlural(int count);
+
+  /// No description provided for @courseDurationMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{minutes} min'**
+  String courseDurationMinutes(int minutes);
+
+  /// No description provided for @courseDurationHoursMinutes.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} h {minutes} min'**
+  String courseDurationHoursMinutes(int hours, int minutes);
+
+  /// No description provided for @courseProgressPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% complete'**
+  String courseProgressPercent(int percent);
+
+  /// No description provided for @courseCompletedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get courseCompletedBadge;
+
+  /// No description provided for @courseNoLessons.
+  ///
+  /// In en, this message translates to:
+  /// **'This course has no lessons yet.'**
+  String get courseNoLessons;
 
   /// No description provided for @courseStart.
   ///
@@ -2258,35 +2534,143 @@ abstract class AppLocalizations {
   /// **'About this course'**
   String get courseAbout;
 
-  /// No description provided for @courseAboutDemo.
-  ///
-  /// In en, this message translates to:
-  /// **'Demo content. Real modules will arrive when we connect the LMS.'**
-  String get courseAboutDemo;
-
   /// No description provided for @courseModule.
   ///
   /// In en, this message translates to:
   /// **'Module {index}'**
   String courseModule(int index);
 
-  /// No description provided for @courseLessonsCount.
+  /// No description provided for @moduleLocked.
   ///
   /// In en, this message translates to:
-  /// **'4 lessons'**
-  String get courseLessonsCount;
+  /// **'Pass the quizzes in the previous module to unlock this one.'**
+  String get moduleLocked;
 
-  /// No description provided for @playerVideoSoon.
+  /// No description provided for @moduleLockedShort.
   ///
   /// In en, this message translates to:
-  /// **'Video coming soon'**
-  String get playerVideoSoon;
+  /// **'Locked'**
+  String get moduleLockedShort;
 
-  /// No description provided for @playerVideoSoonBody.
+  /// No description provided for @courseStatusDraft.
   ///
   /// In en, this message translates to:
-  /// **'The player will go here when content is ready.'**
-  String get playerVideoSoonBody;
+  /// **'Draft'**
+  String get courseStatusDraft;
+
+  /// No description provided for @courseStatusPending.
+  ///
+  /// In en, this message translates to:
+  /// **'In review'**
+  String get courseStatusPending;
+
+  /// No description provided for @courseStatusPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get courseStatusPublished;
+
+  /// No description provided for @courseManageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage course'**
+  String get courseManageTitle;
+
+  /// No description provided for @courseEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit course'**
+  String get courseEditTitle;
+
+  /// No description provided for @courseFieldTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get courseFieldTitle;
+
+  /// No description provided for @courseFieldDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get courseFieldDescription;
+
+  /// No description provided for @courseFieldTeacher.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructor'**
+  String get courseFieldTeacher;
+
+  /// No description provided for @courseFieldLevel.
+  ///
+  /// In en, this message translates to:
+  /// **'Level'**
+  String get courseFieldLevel;
+
+  /// No description provided for @courseActionSubmitReview.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit for review'**
+  String get courseActionSubmitReview;
+
+  /// No description provided for @courseActionApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and publish'**
+  String get courseActionApprove;
+
+  /// No description provided for @courseActionUnpublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpublish'**
+  String get courseActionUnpublish;
+
+  /// No description provided for @courseActionRejectToDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Send back to draft'**
+  String get courseActionRejectToDraft;
+
+  /// No description provided for @courseDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete “{title}”? This can\'t be undone.'**
+  String courseDeleteConfirm(String title);
+
+  /// No description provided for @courseSavedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Changes saved'**
+  String get courseSavedToast;
+
+  /// No description provided for @courseSubmittedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Sent for review'**
+  String get courseSubmittedToast;
+
+  /// No description provided for @coursePublishedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Course published'**
+  String get coursePublishedToast;
+
+  /// No description provided for @courseUnpublishedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Course unpublished'**
+  String get courseUnpublishedToast;
+
+  /// No description provided for @courseDeletedToast.
+  ///
+  /// In en, this message translates to:
+  /// **'Course deleted'**
+  String get courseDeletedToast;
+
+  /// No description provided for @studioWebOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload videos and organize modules from the web.'**
+  String get studioWebOnlyHint;
 
   /// No description provided for @playerClasses.
   ///
@@ -2294,11 +2678,155 @@ abstract class AppLocalizations {
   /// **'Lessons'**
   String get playerClasses;
 
-  /// No description provided for @playerClass.
+  /// No description provided for @playerLoading.
   ///
   /// In en, this message translates to:
-  /// **'Lesson {index}'**
-  String playerClass(int index);
+  /// **'Loading video…'**
+  String get playerLoading;
+
+  /// No description provided for @playerNoVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'This lesson has no video yet.'**
+  String get playerNoVideo;
+
+  /// No description provided for @playerError.
+  ///
+  /// In en, this message translates to:
+  /// **'The video couldn\'t be played.'**
+  String get playerError;
+
+  /// No description provided for @playerNextLesson.
+  ///
+  /// In en, this message translates to:
+  /// **'Next lesson'**
+  String get playerNextLesson;
+
+  /// No description provided for @playerCourseCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'You finished the course!'**
+  String get playerCourseCompleted;
+
+  /// No description provided for @playerLessonOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Lesson {index} of {total}'**
+  String playerLessonOf(int index, int total);
+
+  /// No description provided for @lessonTypeVideo.
+  ///
+  /// In en, this message translates to:
+  /// **'Video'**
+  String get lessonTypeVideo;
+
+  /// No description provided for @lessonTypeReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading'**
+  String get lessonTypeReading;
+
+  /// No description provided for @lessonTypeQuiz.
+  ///
+  /// In en, this message translates to:
+  /// **'Quiz'**
+  String get lessonTypeQuiz;
+
+  /// No description provided for @readingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This reading has no content yet.'**
+  String get readingEmpty;
+
+  /// No description provided for @readingMarkComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark as completed'**
+  String get readingMarkComplete;
+
+  /// No description provided for @readingCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Reading completed'**
+  String get readingCompleted;
+
+  /// No description provided for @quizEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'This quiz has no questions yet.'**
+  String get quizEmpty;
+
+  /// No description provided for @quizPassRequirement.
+  ///
+  /// In en, this message translates to:
+  /// **'You need {percent}% to pass.'**
+  String quizPassRequirement(int percent);
+
+  /// No description provided for @quizPickOne.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose one answer'**
+  String get quizPickOne;
+
+  /// No description provided for @quizPickMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose all that apply'**
+  String get quizPickMany;
+
+  /// No description provided for @quizSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit answers'**
+  String get quizSubmit;
+
+  /// No description provided for @quizGrading.
+  ///
+  /// In en, this message translates to:
+  /// **'Grading…'**
+  String get quizGrading;
+
+  /// No description provided for @quizRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get quizRetry;
+
+  /// No description provided for @quizScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Your score: {score}%'**
+  String quizScore(int score);
+
+  /// No description provided for @quizPassed.
+  ///
+  /// In en, this message translates to:
+  /// **'Passed'**
+  String get quizPassed;
+
+  /// No description provided for @quizFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Not passed yet'**
+  String get quizFailed;
+
+  /// No description provided for @quizQuestionOf.
+  ///
+  /// In en, this message translates to:
+  /// **'Question {index} of {total}'**
+  String quizQuestionOf(int index, int total);
+
+  /// No description provided for @quizAnswerCorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'Correct'**
+  String get quizAnswerCorrect;
+
+  /// No description provided for @quizAnswerIncorrect.
+  ///
+  /// In en, this message translates to:
+  /// **'Incorrect'**
+  String get quizAnswerIncorrect;
 
   /// No description provided for @levelBasic.
   ///
@@ -2318,29 +2846,77 @@ abstract class AppLocalizations {
   /// **'Advanced'**
   String get levelAdvanced;
 
-  /// No description provided for @pathNewAgent.
+  /// No description provided for @pathDetailTitle.
   ///
   /// In en, this message translates to:
-  /// **'New agent'**
-  String get pathNewAgent;
+  /// **'Path'**
+  String get pathDetailTitle;
 
-  /// No description provided for @pathClosing.
+  /// No description provided for @pathsEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Sales closing'**
-  String get pathClosing;
+  /// **'No published paths yet.'**
+  String get pathsEmpty;
 
-  /// No description provided for @pathLeadership.
+  /// No description provided for @pathIncludedCourses.
   ///
   /// In en, this message translates to:
-  /// **'Agency leadership'**
-  String get pathLeadership;
+  /// **'Courses in this path'**
+  String get pathIncludedCourses;
 
   /// No description provided for @pathMetaCoursesHours.
   ///
   /// In en, this message translates to:
   /// **'{courses} courses · {hours}h'**
   String pathMetaCoursesHours(int courses, int hours);
+
+  /// No description provided for @errCourseNoPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'You don\'t have permission to manage courses.'**
+  String get errCourseNoPermission;
+
+  /// No description provided for @errCourseTitleRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'The course title is required.'**
+  String get errCourseTitleRequired;
+
+  /// No description provided for @errCourseAlreadyPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Only an admin can edit a published course.'**
+  String get errCourseAlreadyPublished;
+
+  /// No description provided for @errCourseNotPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'This course isn\'t published yet.'**
+  String get errCourseNotPublished;
+
+  /// No description provided for @errCourseSignInRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to enroll.'**
+  String get errCourseSignInRequired;
+
+  /// No description provided for @errCourseOnlyAdminPublishes.
+  ///
+  /// In en, this message translates to:
+  /// **'Only an admin can publish courses.'**
+  String get errCourseOnlyAdminPublishes;
+
+  /// No description provided for @errQuizIncomplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Answer every question before submitting.'**
+  String get errQuizIncomplete;
+
+  /// No description provided for @errQuizNoAnswerKey.
+  ///
+  /// In en, this message translates to:
+  /// **'This quiz isn\'t ready to be graded yet.'**
+  String get errQuizNoAnswerKey;
 
   /// No description provided for @profileBootstrapFailed.
   ///

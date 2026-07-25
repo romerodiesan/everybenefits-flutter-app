@@ -1072,33 +1072,140 @@ class AppLocalizationsEs extends AppLocalizations {
   String get aiNewConversation => 'Nueva conversación';
 
   @override
-  String get aiDemoReply =>
-      'Respuesta demo. Cuando conectemos Gemini, verás ayuda real aquí.';
-
-  @override
   String get aiHistoryTooltip => 'Historial';
 
   @override
   String get aiNewTooltip => 'Nueva';
 
   @override
-  String get aiThinking => 'Pensando…';
+  String get aiThinking => 'Trabajando…';
 
   @override
-  String get aiInputHint => 'Pregunta lo que sea';
+  String get aiInputHint =>
+      'Pregunta sobre productos, licencias, cumplimiento o ventas…';
 
   @override
-  String get aiEmptyPrompt => '¿En qué puedo ayudarte?';
+  String get aiEmptyPrompt => '¿En qué estás trabajando?';
 
   @override
   String get aiEmptySubtitle =>
-      'Pregunta por beneficios, cursos o la comunidad — respuestas demo por ahora.';
+      'Pregunta lo que necesites sobre el negocio de seguros en EE. UU. Pulse AI busca en respuestas aceptadas del foro, en la academia y en fuentes oficiales, y te muestra de dónde salió cada dato.';
 
   @override
-  String get aiAssistantSubtitle => 'Pulse AI';
+  String get aiSuggestion1 =>
+      '¿Qué cambia para un cliente durante el AEP de Medicare?';
 
   @override
-  String get aiStatusOnline => 'En línea · demo';
+  String get aiSuggestion2 => '¿Cómo manejo la objeción “lo tengo que pensar”?';
+
+  @override
+  String get aiSuggestion3 =>
+      '¿Qué necesito para obtener licencia en otro estado?';
+
+  @override
+  String get aiSuggestion4 =>
+      'Explica en qué se diferencia un IUL de un whole life';
+
+  @override
+  String get aiSources => 'Fuentes';
+
+  @override
+  String get aiDisclaimer =>
+      'Pulse AI puede equivocarse. Las reglas cambian por estado y aseguradora: verifica antes de asesorar a un cliente.';
+
+  @override
+  String get aiActivityForum => 'Buscando respuestas aceptadas';
+
+  @override
+  String get aiActivityAcademy => 'Buscando en la academia';
+
+  @override
+  String get aiActivityOfficial => 'Revisando fuentes oficiales';
+
+  @override
+  String get aiActivityWeb => 'Revisando sitios oficiales';
+
+  @override
+  String get aiActivityProfile => 'Revisando tu aprendizaje';
+
+  @override
+  String aiActivityResults(int count) {
+    return '$count encontrados';
+  }
+
+  @override
+  String get aiActivityNone => 'sin resultados';
+
+  @override
+  String get aiActivityFailed => 'falló';
+
+  @override
+  String get aiSourceForum => 'Respuesta de la comunidad';
+
+  @override
+  String get aiSourceCourse => 'Curso';
+
+  @override
+  String get aiSourcePath => 'Ruta de aprendizaje';
+
+  @override
+  String get aiSourceLesson => 'Lección';
+
+  @override
+  String get aiSourceOfficial => 'Fuente oficial';
+
+  @override
+  String get aiSourceMissing => 'Esa fuente ya no está disponible.';
+
+  @override
+  String get aiNoticeCompliance =>
+      'Información educativa, no asesoría legal. Revisa la póliza, las reglas de tu estado o tu equipo de cumplimiento antes de actuar.';
+
+  @override
+  String get aiNoticeLegal =>
+      'Pulse AI explica cómo funcionan en general la ley y la regulación de seguros, pero nunca asesora sobre tu caso concreto.';
+
+  @override
+  String get aiNoticeScope =>
+      'Pulse AI solo cubre la industria de seguros de EE. UU. y el negocio asegurador.';
+
+  @override
+  String get aiNoticeNoSources =>
+      'Ninguna fuente indexada respalda esta respuesta: tómala como conocimiento general del sector y verifícala antes de actuar.';
+
+  @override
+  String get aiFeedbackUp => 'Útil';
+
+  @override
+  String get aiFeedbackDown => 'No útil';
+
+  @override
+  String get aiHistoryEmpty => 'Aún no hay conversaciones.';
+
+  @override
+  String get aiUntitled => 'Conversación sin título';
+
+  @override
+  String get aiDeleteChat => 'Eliminar conversación';
+
+  @override
+  String get aiError => 'Pulse AI tuvo un error. Inténtalo de nuevo.';
+
+  @override
+  String get aiStop => 'Detener';
+
+  @override
+  String get aiSignInRequired =>
+      'Inicia sesión con una cuenta completa para usar Pulse AI.';
+
+  @override
+  String get aiLoading => 'Cargando conversación…';
+
+  @override
+  String get aiAssistantSubtitle => 'Impulsado por el agente Every Benefits';
+
+  @override
+  String get aiStatusOnline => 'En línea';
 
   @override
   String get aiSettings => 'Ajustes';
@@ -1110,10 +1217,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get aiModelSection => 'Modelo';
 
   @override
-  String get aiModelName => 'Gemini';
+  String get aiModelName => 'Pulse AI';
 
   @override
-  String get aiModelSubtitle => 'Próximamente vía Firebase AI Logic';
+  String get aiModelSubtitle =>
+      'El agente Every Benefits busca en foros, cursos de la academia y fuentes oficiales de reguladores.';
 
   @override
   String get academyTitle => 'Academia';
@@ -1128,17 +1236,42 @@ class AppLocalizationsEs extends AppLocalizations {
   String get academyPaths => 'Rutas';
 
   @override
+  String get academySeeAll => 'Ver todas';
+
+  @override
   String get academyCourses => 'Cursos';
 
   @override
-  String get academyCatalogDemo =>
-      'Catálogo demo — cursos reales próximamente.';
+  String get academyStudio => 'Studio';
+
+  @override
+  String get academyContinueLearning => 'Continuar aprendiendo';
+
+  @override
+  String get academyCatalogEmpty => 'Aún no hay cursos publicados.';
+
+  @override
+  String get academyFilterAll => 'Todos';
+
+  @override
+  String get academyMyCourses => 'Mis cursos';
+
+  @override
+  String get academyPendingReview => 'Pendientes de aprobación';
 
   @override
   String get searchCoursesHint => 'Buscar cursos…';
 
   @override
+  String searchNoResults(String query) {
+    return 'Sin resultados para «$query»';
+  }
+
+  @override
   String get myLearningInProgress => 'En progreso';
+
+  @override
+  String get myLearningCompleted => 'Completados';
 
   @override
   String get myLearningEmpty => 'Aún no tienes cursos en progreso.';
@@ -1152,9 +1285,49 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String courseStudents(String count) {
-    return '$count estudiantes';
+  String courseStudentsPlural(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count estudiantes',
+      one: '1 estudiante',
+      zero: 'Sin estudiantes',
+    );
+    return '$_temp0';
   }
+
+  @override
+  String courseLessonsPlural(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count clases',
+      one: '1 clase',
+      zero: 'Sin clases',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String courseDurationMinutes(int minutes) {
+    return '$minutes min';
+  }
+
+  @override
+  String courseDurationHoursMinutes(int hours, int minutes) {
+    return '$hours h $minutes min';
+  }
+
+  @override
+  String courseProgressPercent(int percent) {
+    return '$percent% completado';
+  }
+
+  @override
+  String get courseCompletedBadge => 'Completado';
+
+  @override
+  String get courseNoLessons => 'Este curso todavía no tiene clases.';
 
   @override
   String get courseStart => 'Empezar curso';
@@ -1166,31 +1339,165 @@ class AppLocalizationsEs extends AppLocalizations {
   String get courseAbout => 'Sobre este curso';
 
   @override
-  String get courseAboutDemo =>
-      'Contenido demo. Los módulos reales llegarán cuando conectemos el LMS.';
-
-  @override
   String courseModule(int index) {
     return 'Módulo $index';
   }
 
   @override
-  String get courseLessonsCount => '4 clases';
+  String get moduleLocked =>
+      'Aprueba los quizzes del módulo anterior para desbloquear este.';
 
   @override
-  String get playerVideoSoon => 'Video próximamente';
+  String get moduleLockedShort => 'Bloqueado';
 
   @override
-  String get playerVideoSoonBody =>
-      'Aquí irá el reproductor cuando haya contenido.';
+  String get courseStatusDraft => 'Borrador';
+
+  @override
+  String get courseStatusPending => 'En revisión';
+
+  @override
+  String get courseStatusPublished => 'Publicado';
+
+  @override
+  String get courseManageTitle => 'Gestionar curso';
+
+  @override
+  String get courseEditTitle => 'Editar curso';
+
+  @override
+  String get courseFieldTitle => 'Título';
+
+  @override
+  String get courseFieldDescription => 'Descripción';
+
+  @override
+  String get courseFieldTeacher => 'Instructor';
+
+  @override
+  String get courseFieldLevel => 'Nivel';
+
+  @override
+  String get courseActionSubmitReview => 'Enviar a revisión';
+
+  @override
+  String get courseActionApprove => 'Aprobar y publicar';
+
+  @override
+  String get courseActionUnpublish => 'Despublicar';
+
+  @override
+  String get courseActionRejectToDraft => 'Devolver a borrador';
+
+  @override
+  String courseDeleteConfirm(String title) {
+    return '¿Eliminar «$title»? Esta acción no se puede deshacer.';
+  }
+
+  @override
+  String get courseSavedToast => 'Cambios guardados';
+
+  @override
+  String get courseSubmittedToast => 'Enviado a revisión';
+
+  @override
+  String get coursePublishedToast => 'Curso publicado';
+
+  @override
+  String get courseUnpublishedToast => 'Curso despublicado';
+
+  @override
+  String get courseDeletedToast => 'Curso eliminado';
+
+  @override
+  String get studioWebOnlyHint =>
+      'Sube videos y organiza módulos desde la web.';
 
   @override
   String get playerClasses => 'Clases';
 
   @override
-  String playerClass(int index) {
-    return 'Clase $index';
+  String get playerLoading => 'Cargando video…';
+
+  @override
+  String get playerNoVideo => 'Esta clase todavía no tiene video.';
+
+  @override
+  String get playerError => 'No se pudo reproducir el video.';
+
+  @override
+  String get playerNextLesson => 'Siguiente clase';
+
+  @override
+  String get playerCourseCompleted => '¡Completaste el curso!';
+
+  @override
+  String playerLessonOf(int index, int total) {
+    return 'Clase $index de $total';
   }
+
+  @override
+  String get lessonTypeVideo => 'Video';
+
+  @override
+  String get lessonTypeReading => 'Lectura';
+
+  @override
+  String get lessonTypeQuiz => 'Quiz';
+
+  @override
+  String get readingEmpty => 'Esta lectura todavía no tiene contenido.';
+
+  @override
+  String get readingMarkComplete => 'Marcar como completada';
+
+  @override
+  String get readingCompleted => 'Lectura completada';
+
+  @override
+  String get quizEmpty => 'Este quiz todavía no tiene preguntas.';
+
+  @override
+  String quizPassRequirement(int percent) {
+    return 'Necesitas $percent% para aprobar.';
+  }
+
+  @override
+  String get quizPickOne => 'Elige una respuesta';
+
+  @override
+  String get quizPickMany => 'Elige todas las que apliquen';
+
+  @override
+  String get quizSubmit => 'Enviar respuestas';
+
+  @override
+  String get quizGrading => 'Calificando…';
+
+  @override
+  String get quizRetry => 'Intentar de nuevo';
+
+  @override
+  String quizScore(int score) {
+    return 'Tu puntaje: $score%';
+  }
+
+  @override
+  String get quizPassed => 'Aprobado';
+
+  @override
+  String get quizFailed => 'Aún no aprobado';
+
+  @override
+  String quizQuestionOf(int index, int total) {
+    return 'Pregunta $index de $total';
+  }
+
+  @override
+  String get quizAnswerCorrect => 'Correcta';
+
+  @override
+  String get quizAnswerIncorrect => 'Incorrecta';
 
   @override
   String get levelBasic => 'Básico';
@@ -1202,18 +1509,47 @@ class AppLocalizationsEs extends AppLocalizations {
   String get levelAdvanced => 'Avanzado';
 
   @override
-  String get pathNewAgent => 'Agente nuevo';
+  String get pathDetailTitle => 'Ruta';
 
   @override
-  String get pathClosing => 'Cierre de ventas';
+  String get pathsEmpty => 'Aún no hay rutas publicadas.';
 
   @override
-  String get pathLeadership => 'Liderazgo de agencia';
+  String get pathIncludedCourses => 'Cursos de la ruta';
 
   @override
   String pathMetaCoursesHours(int courses, int hours) {
     return '$courses cursos · ${hours}h';
   }
+
+  @override
+  String get errCourseNoPermission =>
+      'No tienes permiso para gestionar cursos.';
+
+  @override
+  String get errCourseTitleRequired => 'El título del curso es obligatorio.';
+
+  @override
+  String get errCourseAlreadyPublished =>
+      'Solo un admin puede editar un curso publicado.';
+
+  @override
+  String get errCourseNotPublished => 'Este curso todavía no está publicado.';
+
+  @override
+  String get errCourseSignInRequired => 'Inicia sesión para inscribirte.';
+
+  @override
+  String get errCourseOnlyAdminPublishes =>
+      'Solo un admin puede publicar cursos.';
+
+  @override
+  String get errQuizIncomplete =>
+      'Responde todas las preguntas antes de enviar.';
+
+  @override
+  String get errQuizNoAnswerKey =>
+      'Este quiz todavía no está listo para calificarse.';
 
   @override
   String profileBootstrapFailed(String error) {

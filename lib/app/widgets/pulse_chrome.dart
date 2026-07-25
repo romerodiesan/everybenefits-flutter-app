@@ -34,34 +34,6 @@ double pulseTabBarTopInset(BuildContext context) {
   return systemBottomInset(context) + 6 + kPulseTabBarPillHeight;
 }
 
-/// Shell chrome that AI (and others) can use to collapse the floating tab bar
-/// while composing, so the input can take its place.
-class PulseShellScope extends InheritedWidget {
-  const PulseShellScope({
-    super.key,
-    required this.tabBarCollapsed,
-    required this.setTabBarCollapsed,
-    required super.child,
-  });
-
-  final bool tabBarCollapsed;
-  final ValueChanged<bool> setTabBarCollapsed;
-
-  static PulseShellScope? maybeOf(BuildContext context) {
-    return context.dependOnInheritedWidgetOfExactType<PulseShellScope>();
-  }
-
-  /// Lookup without registering a dependency (safe outside build).
-  static PulseShellScope? readOf(BuildContext context) {
-    return context.getInheritedWidgetOfExactType<PulseShellScope>();
-  }
-
-  @override
-  bool updateShouldNotify(PulseShellScope oldWidget) {
-    return tabBarCollapsed != oldWidget.tabBarCollapsed;
-  }
-}
-
 /// Extra bottom inset so nested FABs clear [PulseTabBar] under [extendBody].
 ///
 /// Scaffold already lifts the FAB by [MediaQuery.padding] + [_kFabMargin];

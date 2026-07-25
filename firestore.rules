@@ -34,6 +34,69 @@ service cloud.firestore {
           ['student', 'agent', 'instructor', 'manager', 'admin'];
     }
 
+    // Managers author courses (published only after admin approval); admins
+    // have full control over the academy catalog.
+    function isCourseAuthor() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && userDoc(request.auth.uid).data.get('role', '') in ['manager', 'admin'];
+    }
+
+    function courseData(courseId) {
+      return get(/databases/$(database)/documents/courses/$(courseId)).data;
+    }
+
+    function courseExists(courseId) {
+      return exists(/databases/$(database)/documents/courses/$(courseId));
+    }
+
+    function ownsCourse(courseId) {
+      return courseData(courseId).get('createdBy', '') == request.auth.uid;
+    }
+
+    function courseReadable(courseId) {
+      return isSignedIn()
+        && courseExists(courseId)
+        && (
+          courseData(courseId).get('status', 'draft') == 'published'
+          || isAdmin()
+          || ownsCourse(courseId)
+        );
+    }
+
+    /// Content edits stay open to the author until an admin publishes.
+    function canEditCourse(courseId) {
+      return isSignedIn()
+        && courseExists(courseId)
+        && (
+          isAdmin()
+          || (
+            isCourseAuthor()
+            && ownsCourse(courseId)
+            && courseData(courseId).get('status', 'draft') != 'published'
+          )
+        );
+    }
+
+    function validCourseLevel(level) {
+      return level in ['basic', 'intermediate', 'advanced'];
+    }
+
+    function validEnrollmentShape(courseId) {
+      return request.resource.data.courseId == courseId
+        && request.resource.data.completedLessonIds is list
+        && request.resource.data.completedLessonIds.size() <= 500
+        && request.resource.data.lastPositionSeconds is int
+        && request.resource.data.lastPositionSeconds >= 0;
+    }
+
+    function studentCountDeltaWithinOne() {
+      return request.resource.data.studentCount is int
+        && resource.data.studentCount is int
+        && request.resource.data.studentCount - resource.data.studentCount <= 1
+        && request.resource.data.studentCount - resource.data.studentCount >= -1;
+    }
+
     function callerProfile() {
       return userDoc(request.auth.uid).data;
     }
@@ -146,6 +209,45 @@ service cloud.firestore {
         );
 
       allow update, delete: if isAdmin();
+
+      // Pulse AI history. Clients read their own transcript; every write goes
+      // through the agent backend with the Admin SDK, so a client can never
+      // forge an assistant turn or edit a citation.
+      match /aiConversations/{conversationId} {
+        allow read: if isOwner(uid);
+        allow delete: if isOwner(uid);
+        allow create, update: if false;
+
+        match /messages/{messageId} {
+          allow read: if isOwner(uid);
+          allow delete: if isOwner(uid);
+          allow create, update: if false;
+        }
+      }
+
+      // Quota counters: the owner may see what is left, only the server writes.
+      match /aiUsage/{dayId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
+      // Academy progress: one doc per enrolled course, owned by the learner.
+      match /enrollments/{courseId} {
+        allow read: if isOwner(uid) || isAdmin();
+
+        allow create: if isOwner(uid)
+          && validEnrollmentShape(courseId)
+          // Quiz scores are server-written; a new enrollment has none.
+          && request.resource.data.get('quizAttempts', {}).keys().size() == 0;
+
+        allow update: if isOwner(uid)
+          && validEnrollmentShape(courseId)
+          // Only the submitQuizAttempt callable (Admin SDK) may grade quizzes.
+          && request.resource.data.get('quizAttempts', {})
+            == resource.data.get('quizAttempts', {});
+
+        allow delete: if isOwner(uid) || isAdmin();
+      }
     }
 
     // Chats live in Realtime Database (see database.rules.json).
@@ -278,6 +380,145 @@ service cloud.firestore {
             && request.auth.uid == uid;
         }
       }
+    }
+
+    // Academy catalog. Learners only ever see published courses; authors and
+    // admins additionally see their own drafts / pending reviews.
+    match /courses/{courseId} {
+      allow read: if isSignedIn()
+        && (
+          resource.data.get('status', 'draft') == 'published'
+          || isAdmin()
+          || resource.data.get('createdBy', '') == request.auth.uid
+        );
+
+      allow create: if isCourseAuthor()
+        && request.resource.data.createdBy == request.auth.uid
+        && boundedString(request.resource.data.title, 200)
+        && validCourseLevel(request.resource.data.level)
+        && request.resource.data.studentCount is int
+        && request.resource.data.studentCount == 0
+        && (
+          isAdmin()
+          || request.resource.data.status == 'draft'
+        );
+
+      allow update: if isSignedIn()
+        && (
+          // Admins may edit and publish anything.
+          isAdmin()
+          // Authors iterate on their own course and can request review.
+          || (
+            isCourseAuthor()
+            && resource.data.get('createdBy', '') == request.auth.uid
+            && resource.data.get('status', 'draft') != 'published'
+            && request.resource.data.createdBy == resource.data.createdBy
+            && request.resource.data.studentCount == resource.data.studentCount
+            && request.resource.data.status in ['draft', 'pending']
+            && boundedString(request.resource.data.title, 200)
+            && validCourseLevel(request.resource.data.level)
+          )
+          // Enroll / unenroll bumps the denormalized counter only.
+          || (
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['studentCount', 'updatedAt'])
+            && studentCountDeltaWithinOne()
+          )
+        );
+
+      allow delete: if isAdmin()
+        || (
+          isCourseAuthor()
+          && resource.data.get('createdBy', '') == request.auth.uid
+          && resource.data.get('status', 'draft') != 'published'
+        );
+
+      match /modules/{moduleId} {
+        allow read: if courseReadable(courseId);
+        allow create, update, delete: if canEditCourse(courseId);
+      }
+
+      match /lessons/{lessonId} {
+        allow read: if courseReadable(courseId);
+        allow create, update, delete: if canEditCourse(courseId);
+
+        // Quiz answer keys: authors and admins only. Learners never read them;
+        // grading happens in the submitQuizAttempt callable (Admin SDK).
+        match /secure/{secureId} {
+          allow read: if isAdmin()
+            || (isCourseAuthor() && courseExists(courseId) && ownsCourse(courseId));
+          allow create, update, delete: if canEditCourse(courseId);
+        }
+      }
+    }
+
+    // Learning paths: managers draft and submit for review; admins publish.
+    match /paths/{pathId} {
+      allow read: if isSignedIn()
+        && (
+          resource.data.get('status', 'draft') == 'published'
+          || isAdmin()
+          || resource.data.get('createdBy', '') == request.auth.uid
+        );
+
+      allow create: if isCourseAuthor()
+        && request.resource.data.createdBy == request.auth.uid
+        && boundedString(request.resource.data.title, 200)
+        && validCourseLevel(request.resource.data.level)
+        && request.resource.data.courseIds is list
+        && request.resource.data.courseIds.size() <= 100
+        && request.resource.data.order is int
+        && (
+          isAdmin()
+          || request.resource.data.status == 'draft'
+        );
+
+      allow update: if isSignedIn()
+        && (
+          isAdmin()
+          || (
+            isCourseAuthor()
+            && resource.data.get('createdBy', '') == request.auth.uid
+            && resource.data.get('status', 'draft') != 'published'
+            && request.resource.data.createdBy == resource.data.createdBy
+            && request.resource.data.status in ['draft', 'pending']
+            && boundedString(request.resource.data.title, 200)
+            && validCourseLevel(request.resource.data.level)
+            && request.resource.data.courseIds is list
+            && request.resource.data.courseIds.size() <= 100
+          )
+        );
+
+      allow delete: if isAdmin()
+        || (
+          isCourseAuthor()
+          && resource.data.get('createdBy', '') == request.auth.uid
+          && resource.data.get('status', 'draft') != 'published'
+        );
+    }
+
+    // Studio metrics read enrollments across users via collectionGroup.
+    match /{path=**}/enrollments/{enrollmentId} {
+      allow read: if isSignedIn()
+        && (
+          isAdmin()
+          || (
+            isCourseAuthor()
+            && courseExists(resource.data.courseId)
+            && ownsCourse(resource.data.courseId)
+          )
+        );
+    }
+
+    // Retrieval index and run metrics are backend-only: the chunks flatten
+    // content across users and the metrics exist for operators, not clients.
+    // Admin SDK writes bypass rules, so denying everything here is enough.
+    match /aiKnowledgeChunks/{chunkId} {
+      allow read, write: if false;
+    }
+
+    match /aiRuns/{runId} {
+      allow read, write: if false;
     }
 
     // Required for collectionGroup('replies') queries (avatar photo sync).

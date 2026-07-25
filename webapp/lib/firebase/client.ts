@@ -33,7 +33,7 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-let appCheckInitialized = false;
+let appCheck: AppCheck | null = null;
 let emulatorsConnected = false;
 
 export function getFirebaseApp(): FirebaseApp {
@@ -65,6 +65,14 @@ export function getFirebaseFunctions(): Functions {
   return getFunctions(getFirebaseApp(), region);
 }
 
+/**
+ * The App Check instance, when configured. SDK calls attach tokens on their
+ * own; this exists for hand-rolled `fetch` calls to our own API routes.
+ */
+export function getFirebaseAppCheck(): AppCheck | null {
+  return appCheck;
+}
+
 export function initFirebaseClient() {
   if (typeof window === "undefined") return;
 
@@ -77,13 +85,12 @@ export function initFirebaseClient() {
   }
 
   const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY;
-  if (siteKey && !appCheckInitialized) {
+  if (siteKey && !appCheck) {
     try {
-      initializeAppCheck(app, {
+      appCheck = initializeAppCheck(app, {
         provider: new ReCaptchaV3Provider(siteKey),
         isTokenAutoRefreshEnabled: true,
-      }) as AppCheck;
-      appCheckInitialized = true;
+      });
     } catch (error) {
       console.warn("App Check init skipped:", error);
     }

@@ -1,5 +1,5 @@
-import { AiDemo } from "@/components/forums/ai-demo";
+import { PulseAgent } from "@/components/ai/pulse-agent";
 
 export default function AiPage() {
-  return <AiDemo />;
+  return <PulseAgent />;
 }

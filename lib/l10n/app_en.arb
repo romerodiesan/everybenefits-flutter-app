@@ -429,28 +429,82 @@
   "weekdaySat": "Sat",
   "weekdaySun": "Sun",
   "aiNewConversation": "New conversation",
-  "aiDemoReply": "Demo reply. When we connect Gemini, you'll see real help here.",
   "aiHistoryTooltip": "History",
   "aiNewTooltip": "New",
-  "aiThinking": "Thinking…",
-  "aiInputHint": "Ask anything",
-  "aiEmptyPrompt": "How can I help?",
-  "aiEmptySubtitle": "Ask about benefits, courses, or community — demo replies for now.",
-  "aiAssistantSubtitle": "Pulse AI",
-  "aiStatusOnline": "Online · demo",
+  "aiThinking": "Working on it…",
+  "aiInputHint": "Ask about products, licensing, compliance or sales…",
+  "aiEmptyPrompt": "What are you working on?",
+  "aiEmptySubtitle": "Ask anything about the US insurance business. Pulse AI searches accepted forum answers, the academy and official regulator sources, then shows you exactly where each answer came from.",
+  "aiSuggestion1": "What changes for a client during Medicare AEP?",
+  "aiSuggestion2": "How do I handle the “I need to think about it” objection?",
+  "aiSuggestion3": "What do I need to get licensed in another state?",
+  "aiSuggestion4": "Explain how an IUL differs from whole life",
+  "aiSources": "Sources",
+  "aiDisclaimer": "Pulse AI can be wrong. Rules vary by state and carrier — verify before you advise a client.",
+  "aiActivityForum": "Searching accepted answers",
+  "aiActivityAcademy": "Searching the academy",
+  "aiActivityOfficial": "Checking official sources",
+  "aiActivityWeb": "Checking official sites",
+  "aiActivityProfile": "Reviewing your learning",
+  "aiActivityResults": "{count} found",
+  "@aiActivityResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "aiActivityNone": "nothing found",
+  "aiActivityFailed": "failed",
+  "aiSourceForum": "Community answer",
+  "aiSourceCourse": "Course",
+  "aiSourcePath": "Learning path",
+  "aiSourceLesson": "Lesson",
+  "aiSourceOfficial": "Official source",
+  "aiSourceMissing": "That source is no longer available.",
+  "aiNoticeCompliance": "Educational information, not legal advice. Check the policy wording, your state's rules or your compliance team before you act.",
+  "aiNoticeLegal": "Pulse AI explains how insurance law and regulation generally work, but never advises on your specific case.",
+  "aiNoticeScope": "Pulse AI only covers the US insurance industry and the business of insurance.",
+  "aiNoticeNoSources": "No indexed source backed this answer, so treat it as general industry knowledge and verify before acting.",
+  "aiFeedbackUp": "Helpful",
+  "aiFeedbackDown": "Not helpful",
+  "aiHistoryEmpty": "No conversations yet.",
+  "aiUntitled": "Untitled conversation",
+  "aiDeleteChat": "Delete conversation",
+  "aiError": "Pulse AI hit an error. Try again.",
+  "aiStop": "Stop",
+  "aiSignInRequired": "Sign in with a complete account to use Pulse AI.",
+  "aiLoading": "Loading conversation…",
+  "aiAssistantSubtitle": "Powered by the Every Benefits agent",
+  "aiStatusOnline": "Online",
   "aiSettings": "Settings",
   "aiSettingsTitle": "AI settings",
   "aiModelSection": "Model",
-  "aiModelName": "Gemini",
-  "aiModelSubtitle": "Coming soon via Firebase AI Logic",
+  "aiModelName": "Pulse AI",
+  "aiModelSubtitle": "The Every Benefits agent searches forums, academy courses, and official regulator sources.",
   "academyTitle": "Academy",
   "actionSearch": "Search",
   "academyMyLearning": "My learning",
   "academyPaths": "Paths",
+  "academySeeAll": "See all",
   "academyCourses": "Courses",
-  "academyCatalogDemo": "Demo catalog — real courses coming soon.",
+  "academyStudio": "Studio",
+  "academyContinueLearning": "Keep learning",
+  "academyCatalogEmpty": "No published courses yet.",
+  "academyFilterAll": "All",
+  "academyMyCourses": "My courses",
+  "academyPendingReview": "Pending approval",
   "searchCoursesHint": "Search courses…",
+  "searchNoResults": "No results for “{query}”",
+  "@searchNoResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
   "myLearningInProgress": "In progress",
+  "myLearningCompleted": "Completed",
   "myLearningEmpty": "You don't have courses in progress yet.",
   "courseDetailTitle": "Course",
   "courseByTeacher": "By {name}",
@@ -461,18 +515,54 @@
       }
     }
   },
-  "courseStudents": "{count} students",
-  "@courseStudents": {
+  "courseStudentsPlural": "{count, plural, =0{No students yet} =1{1 student} other{{count} students}}",
+  "@courseStudentsPlural": {
     "placeholders": {
       "count": {
-        "type": "String"
+        "type": "int"
       }
     }
   },
+  "courseLessonsPlural": "{count, plural, =0{No lessons} =1{1 lesson} other{{count} lessons}}",
+  "@courseLessonsPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "courseDurationMinutes": "{minutes} min",
+  "@courseDurationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "courseDurationHoursMinutes": "{hours} h {minutes} min",
+  "@courseDurationHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "courseProgressPercent": "{percent}% complete",
+  "@courseProgressPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "courseCompletedBadge": "Completed",
+  "courseNoLessons": "This course has no lessons yet.",
   "courseStart": "Start course",
   "courseContinue": "Continue",
   "courseAbout": "About this course",
-  "courseAboutDemo": "Demo content. Real modules will arrive when we connect the LMS.",
   "courseModule": "Module {index}",
   "@courseModule": {
     "placeholders": {
@@ -481,24 +571,101 @@
       }
     }
   },
-  "courseLessonsCount": "4 lessons",
-  "playerVideoSoon": "Video coming soon",
-  "playerVideoSoonBody": "The player will go here when content is ready.",
+  "moduleLocked": "Pass the quizzes in the previous module to unlock this one.",
+  "moduleLockedShort": "Locked",
+  "courseStatusDraft": "Draft",
+  "courseStatusPending": "In review",
+  "courseStatusPublished": "Published",
+  "courseManageTitle": "Manage course",
+  "courseEditTitle": "Edit course",
+  "courseFieldTitle": "Title",
+  "courseFieldDescription": "Description",
+  "courseFieldTeacher": "Instructor",
+  "courseFieldLevel": "Level",
+  "courseActionSubmitReview": "Submit for review",
+  "courseActionApprove": "Approve and publish",
+  "courseActionUnpublish": "Unpublish",
+  "courseActionRejectToDraft": "Send back to draft",
+  "courseDeleteConfirm": "Delete “{title}”? This can't be undone.",
+  "@courseDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "courseSavedToast": "Changes saved",
+  "courseSubmittedToast": "Sent for review",
+  "coursePublishedToast": "Course published",
+  "courseUnpublishedToast": "Course unpublished",
+  "courseDeletedToast": "Course deleted",
+  "studioWebOnlyHint": "Upload videos and organize modules from the web.",
   "playerClasses": "Lessons",
-  "playerClass": "Lesson {index}",
-  "@playerClass": {
+  "playerLoading": "Loading video…",
+  "playerNoVideo": "This lesson has no video yet.",
+  "playerError": "The video couldn't be played.",
+  "playerNextLesson": "Next lesson",
+  "playerCourseCompleted": "You finished the course!",
+  "playerLessonOf": "Lesson {index} of {total}",
+  "@playerLessonOf": {
     "placeholders": {
       "index": {
+        "type": "int"
+      },
+      "total": {
         "type": "int"
       }
     }
   },
+  "lessonTypeVideo": "Video",
+  "lessonTypeReading": "Reading",
+  "lessonTypeQuiz": "Quiz",
+  "readingEmpty": "This reading has no content yet.",
+  "readingMarkComplete": "Mark as completed",
+  "readingCompleted": "Reading completed",
+  "quizEmpty": "This quiz has no questions yet.",
+  "quizPassRequirement": "You need {percent}% to pass.",
+  "@quizPassRequirement": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "quizPickOne": "Choose one answer",
+  "quizPickMany": "Choose all that apply",
+  "quizSubmit": "Submit answers",
+  "quizGrading": "Grading…",
+  "quizRetry": "Try again",
+  "quizScore": "Your score: {score}%",
+  "@quizScore": {
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "quizPassed": "Passed",
+  "quizFailed": "Not passed yet",
+  "quizQuestionOf": "Question {index} of {total}",
+  "@quizQuestionOf": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "quizAnswerCorrect": "Correct",
+  "quizAnswerIncorrect": "Incorrect",
   "levelBasic": "Basic",
   "levelIntermediate": "Intermediate",
   "levelAdvanced": "Advanced",
-  "pathNewAgent": "New agent",
-  "pathClosing": "Sales closing",
-  "pathLeadership": "Agency leadership",
+  "pathDetailTitle": "Path",
+  "pathsEmpty": "No published paths yet.",
+  "pathIncludedCourses": "Courses in this path",
   "pathMetaCoursesHours": "{courses} courses · {hours}h",
   "@pathMetaCoursesHours": {
     "placeholders": {
@@ -510,6 +677,14 @@
       }
     }
   },
+  "errCourseNoPermission": "You don't have permission to manage courses.",
+  "errCourseTitleRequired": "The course title is required.",
+  "errCourseAlreadyPublished": "Only an admin can edit a published course.",
+  "errCourseNotPublished": "This course isn't published yet.",
+  "errCourseSignInRequired": "Sign in to enroll.",
+  "errCourseOnlyAdminPublishes": "Only an admin can publish courses.",
+  "errQuizIncomplete": "Answer every question before submitting.",
+  "errQuizNoAnswerKey": "This quiz isn't ready to be graded yet.",
   "profileBootstrapFailed": "Couldn't load the profile:\n{error}",
   "@profileBootstrapFailed": {
     "placeholders": {

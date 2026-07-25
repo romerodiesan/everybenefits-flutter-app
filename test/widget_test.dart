@@ -14,6 +14,7 @@ import 'package:every_benefits/auth/auth_service.dart';
 import 'package:every_benefits/features/chats/chat_repository.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
+import 'package:every_benefits/features/university/course_repository.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/onboarding_prefs.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
@@ -27,6 +28,7 @@ import 'package:every_benefits/users/user_repository.dart';
 import 'package:every_benefits/users/user_role.dart';
 
 import 'helpers/fake_chat_store.dart';
+import 'helpers/fake_course_store.dart';
 
 class MockAuthService extends Mock implements AuthService {}
 
@@ -40,6 +42,8 @@ void main() {
   late ForumRepository emptyForums;
   late FakeChatStore chatStore;
   late ChatRepository emptyChats;
+  late FakeCourseStore courseStore;
+  late CourseRepository emptyCourses;
 
   setUpAll(() {
     registerFallbackValue(MockUser());
@@ -56,11 +60,14 @@ void main() {
     emptyForums = ForumRepository(store: _EmptyForumStore());
     chatStore = FakeChatStore();
     emptyChats = ChatRepository(store: chatStore);
+    courseStore = FakeCourseStore();
+    emptyCourses = CourseRepository(store: courseStore);
   });
 
   tearDown(() {
     WelcomeScreen.debugAmbientMotion = true;
     chatStore.dispose();
+    courseStore.dispose();
   });
 
   Widget app() {
@@ -71,6 +78,7 @@ void main() {
       localeController: LocaleController(initialLocale: const Locale('en')),
       forumRepository: emptyForums,
       chatRepository: emptyChats,
+      courseRepository: emptyCourses,
     );
   }
 
@@ -300,6 +308,7 @@ void main() {
           profile: profile,
           forumRepository: ForumRepository(store: _EmptyForumStore()),
           chatRepository: emptyChats,
+          courseRepository: emptyCourses,
         ),
       ),
     );
@@ -346,6 +355,7 @@ void main() {
         localeController: LocaleController(initialLocale: const Locale('en')),
         forumRepository: emptyForums,
         chatRepository: emptyChats,
+        courseRepository: emptyCourses,
       ),
     );
     await tester.pump();
@@ -359,8 +369,11 @@ void main() {
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(find.text('BRAND SIGNAL'), findsOneWidget);
 
-    await tester.ensureVisible(find.text('Dark'));
-    await tester.tap(find.text('Dark'));
+    // Theme mode lives in a dropdown; open it before picking a value.
+    await tester.ensureVisible(find.text('Auto'));
+    await tester.tap(find.text('Auto'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Dark').last);
     await tester.pumpAndSettle();
     expect(find.byType(SettingsScreen), findsOneWidget);
     expect(themeController.mode, ThemeMode.dark);

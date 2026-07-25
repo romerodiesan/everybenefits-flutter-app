@@ -429,28 +429,82 @@
   "weekdaySat": "Sáb",
   "weekdaySun": "Dom",
   "aiNewConversation": "Nueva conversación",
-  "aiDemoReply": "Respuesta demo. Cuando conectemos Gemini, verás ayuda real aquí.",
   "aiHistoryTooltip": "Historial",
   "aiNewTooltip": "Nueva",
-  "aiThinking": "Pensando…",
-  "aiInputHint": "Pregunta lo que sea",
-  "aiEmptyPrompt": "¿En qué puedo ayudarte?",
-  "aiEmptySubtitle": "Pregunta por beneficios, cursos o la comunidad — respuestas demo por ahora.",
-  "aiAssistantSubtitle": "Pulse AI",
-  "aiStatusOnline": "En línea · demo",
+  "aiThinking": "Trabajando…",
+  "aiInputHint": "Pregunta sobre productos, licencias, cumplimiento o ventas…",
+  "aiEmptyPrompt": "¿En qué estás trabajando?",
+  "aiEmptySubtitle": "Pregunta lo que necesites sobre el negocio de seguros en EE. UU. Pulse AI busca en respuestas aceptadas del foro, en la academia y en fuentes oficiales, y te muestra de dónde salió cada dato.",
+  "aiSuggestion1": "¿Qué cambia para un cliente durante el AEP de Medicare?",
+  "aiSuggestion2": "¿Cómo manejo la objeción “lo tengo que pensar”?",
+  "aiSuggestion3": "¿Qué necesito para obtener licencia en otro estado?",
+  "aiSuggestion4": "Explica en qué se diferencia un IUL de un whole life",
+  "aiSources": "Fuentes",
+  "aiDisclaimer": "Pulse AI puede equivocarse. Las reglas cambian por estado y aseguradora: verifica antes de asesorar a un cliente.",
+  "aiActivityForum": "Buscando respuestas aceptadas",
+  "aiActivityAcademy": "Buscando en la academia",
+  "aiActivityOfficial": "Revisando fuentes oficiales",
+  "aiActivityWeb": "Revisando sitios oficiales",
+  "aiActivityProfile": "Revisando tu aprendizaje",
+  "aiActivityResults": "{count} encontrados",
+  "@aiActivityResults": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "aiActivityNone": "sin resultados",
+  "aiActivityFailed": "falló",
+  "aiSourceForum": "Respuesta de la comunidad",
+  "aiSourceCourse": "Curso",
+  "aiSourcePath": "Ruta de aprendizaje",
+  "aiSourceLesson": "Lección",
+  "aiSourceOfficial": "Fuente oficial",
+  "aiSourceMissing": "Esa fuente ya no está disponible.",
+  "aiNoticeCompliance": "Información educativa, no asesoría legal. Revisa la póliza, las reglas de tu estado o tu equipo de cumplimiento antes de actuar.",
+  "aiNoticeLegal": "Pulse AI explica cómo funcionan en general la ley y la regulación de seguros, pero nunca asesora sobre tu caso concreto.",
+  "aiNoticeScope": "Pulse AI solo cubre la industria de seguros de EE. UU. y el negocio asegurador.",
+  "aiNoticeNoSources": "Ninguna fuente indexada respalda esta respuesta: tómala como conocimiento general del sector y verifícala antes de actuar.",
+  "aiFeedbackUp": "Útil",
+  "aiFeedbackDown": "No útil",
+  "aiHistoryEmpty": "Aún no hay conversaciones.",
+  "aiUntitled": "Conversación sin título",
+  "aiDeleteChat": "Eliminar conversación",
+  "aiError": "Pulse AI tuvo un error. Inténtalo de nuevo.",
+  "aiStop": "Detener",
+  "aiSignInRequired": "Inicia sesión con una cuenta completa para usar Pulse AI.",
+  "aiLoading": "Cargando conversación…",
+  "aiAssistantSubtitle": "Impulsado por el agente Every Benefits",
+  "aiStatusOnline": "En línea",
   "aiSettings": "Ajustes",
   "aiSettingsTitle": "Ajustes de IA",
   "aiModelSection": "Modelo",
-  "aiModelName": "Gemini",
-  "aiModelSubtitle": "Próximamente vía Firebase AI Logic",
+  "aiModelName": "Pulse AI",
+  "aiModelSubtitle": "El agente Every Benefits busca en foros, cursos de la academia y fuentes oficiales de reguladores.",
   "academyTitle": "Academia",
   "actionSearch": "Buscar",
   "academyMyLearning": "Mi aprendizaje",
   "academyPaths": "Rutas",
+  "academySeeAll": "Ver todas",
   "academyCourses": "Cursos",
-  "academyCatalogDemo": "Catálogo demo — cursos reales próximamente.",
+  "academyStudio": "Studio",
+  "academyContinueLearning": "Continuar aprendiendo",
+  "academyCatalogEmpty": "Aún no hay cursos publicados.",
+  "academyFilterAll": "Todos",
+  "academyMyCourses": "Mis cursos",
+  "academyPendingReview": "Pendientes de aprobación",
   "searchCoursesHint": "Buscar cursos…",
+  "searchNoResults": "Sin resultados para «{query}»",
+  "@searchNoResults": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
   "myLearningInProgress": "En progreso",
+  "myLearningCompleted": "Completados",
   "myLearningEmpty": "Aún no tienes cursos en progreso.",
   "courseDetailTitle": "Curso",
   "courseByTeacher": "Por {name}",
@@ -461,18 +515,54 @@
       }
     }
   },
-  "courseStudents": "{count} estudiantes",
-  "@courseStudents": {
+  "courseStudentsPlural": "{count, plural, =0{Sin estudiantes} =1{1 estudiante} other{{count} estudiantes}}",
+  "@courseStudentsPlural": {
     "placeholders": {
       "count": {
-        "type": "String"
+        "type": "int"
       }
     }
   },
+  "courseLessonsPlural": "{count, plural, =0{Sin clases} =1{1 clase} other{{count} clases}}",
+  "@courseLessonsPlural": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "courseDurationMinutes": "{minutes} min",
+  "@courseDurationMinutes": {
+    "placeholders": {
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "courseDurationHoursMinutes": "{hours} h {minutes} min",
+  "@courseDurationHoursMinutes": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      },
+      "minutes": {
+        "type": "int"
+      }
+    }
+  },
+  "courseProgressPercent": "{percent}% completado",
+  "@courseProgressPercent": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "courseCompletedBadge": "Completado",
+  "courseNoLessons": "Este curso todavía no tiene clases.",
   "courseStart": "Empezar curso",
   "courseContinue": "Continuar",
   "courseAbout": "Sobre este curso",
-  "courseAboutDemo": "Contenido demo. Los módulos reales llegarán cuando conectemos el LMS.",
   "courseModule": "Módulo {index}",
   "@courseModule": {
     "placeholders": {
@@ -481,24 +571,101 @@
       }
     }
   },
-  "courseLessonsCount": "4 clases",
-  "playerVideoSoon": "Video próximamente",
-  "playerVideoSoonBody": "Aquí irá el reproductor cuando haya contenido.",
+  "moduleLocked": "Aprueba los quizzes del módulo anterior para desbloquear este.",
+  "moduleLockedShort": "Bloqueado",
+  "courseStatusDraft": "Borrador",
+  "courseStatusPending": "En revisión",
+  "courseStatusPublished": "Publicado",
+  "courseManageTitle": "Gestionar curso",
+  "courseEditTitle": "Editar curso",
+  "courseFieldTitle": "Título",
+  "courseFieldDescription": "Descripción",
+  "courseFieldTeacher": "Instructor",
+  "courseFieldLevel": "Nivel",
+  "courseActionSubmitReview": "Enviar a revisión",
+  "courseActionApprove": "Aprobar y publicar",
+  "courseActionUnpublish": "Despublicar",
+  "courseActionRejectToDraft": "Devolver a borrador",
+  "courseDeleteConfirm": "¿Eliminar «{title}»? Esta acción no se puede deshacer.",
+  "@courseDeleteConfirm": {
+    "placeholders": {
+      "title": {
+        "type": "String"
+      }
+    }
+  },
+  "courseSavedToast": "Cambios guardados",
+  "courseSubmittedToast": "Enviado a revisión",
+  "coursePublishedToast": "Curso publicado",
+  "courseUnpublishedToast": "Curso despublicado",
+  "courseDeletedToast": "Curso eliminado",
+  "studioWebOnlyHint": "Sube videos y organiza módulos desde la web.",
   "playerClasses": "Clases",
-  "playerClass": "Clase {index}",
-  "@playerClass": {
+  "playerLoading": "Cargando video…",
+  "playerNoVideo": "Esta clase todavía no tiene video.",
+  "playerError": "No se pudo reproducir el video.",
+  "playerNextLesson": "Siguiente clase",
+  "playerCourseCompleted": "¡Completaste el curso!",
+  "playerLessonOf": "Clase {index} de {total}",
+  "@playerLessonOf": {
     "placeholders": {
       "index": {
+        "type": "int"
+      },
+      "total": {
         "type": "int"
       }
     }
   },
+  "lessonTypeVideo": "Video",
+  "lessonTypeReading": "Lectura",
+  "lessonTypeQuiz": "Quiz",
+  "readingEmpty": "Esta lectura todavía no tiene contenido.",
+  "readingMarkComplete": "Marcar como completada",
+  "readingCompleted": "Lectura completada",
+  "quizEmpty": "Este quiz todavía no tiene preguntas.",
+  "quizPassRequirement": "Necesitas {percent}% para aprobar.",
+  "@quizPassRequirement": {
+    "placeholders": {
+      "percent": {
+        "type": "int"
+      }
+    }
+  },
+  "quizPickOne": "Elige una respuesta",
+  "quizPickMany": "Elige todas las que apliquen",
+  "quizSubmit": "Enviar respuestas",
+  "quizGrading": "Calificando…",
+  "quizRetry": "Intentar de nuevo",
+  "quizScore": "Tu puntaje: {score}%",
+  "@quizScore": {
+    "placeholders": {
+      "score": {
+        "type": "int"
+      }
+    }
+  },
+  "quizPassed": "Aprobado",
+  "quizFailed": "Aún no aprobado",
+  "quizQuestionOf": "Pregunta {index} de {total}",
+  "@quizQuestionOf": {
+    "placeholders": {
+      "index": {
+        "type": "int"
+      },
+      "total": {
+        "type": "int"
+      }
+    }
+  },
+  "quizAnswerCorrect": "Correcta",
+  "quizAnswerIncorrect": "Incorrecta",
   "levelBasic": "Básico",
   "levelIntermediate": "Intermedio",
   "levelAdvanced": "Avanzado",
-  "pathNewAgent": "Agente nuevo",
-  "pathClosing": "Cierre de ventas",
-  "pathLeadership": "Liderazgo de agencia",
+  "pathDetailTitle": "Ruta",
+  "pathsEmpty": "Aún no hay rutas publicadas.",
+  "pathIncludedCourses": "Cursos de la ruta",
   "pathMetaCoursesHours": "{courses} cursos · {hours}h",
   "@pathMetaCoursesHours": {
     "placeholders": {
@@ -510,6 +677,14 @@
       }
     }
   },
+  "errCourseNoPermission": "No tienes permiso para gestionar cursos.",
+  "errCourseTitleRequired": "El título del curso es obligatorio.",
+  "errCourseAlreadyPublished": "Solo un admin puede editar un curso publicado.",
+  "errCourseNotPublished": "Este curso todavía no está publicado.",
+  "errCourseSignInRequired": "Inicia sesión para inscribirte.",
+  "errCourseOnlyAdminPublishes": "Solo un admin puede publicar cursos.",
+  "errQuizIncomplete": "Responde todas las preguntas antes de enviar.",
+  "errQuizNoAnswerKey": "Este quiz todavía no está listo para calificarse.",
   "profileBootstrapFailed": "No se pudo cargar el perfil:\n{error}",
   "@profileBootstrapFailed": {
     "placeholders": {

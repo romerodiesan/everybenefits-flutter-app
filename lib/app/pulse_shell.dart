@@ -9,7 +9,8 @@ import '../features/forums/forum_models.dart';
 import '../features/forums/forum_repository.dart';
 import '../features/forums/forums_screen.dart';
 import '../features/profile/profile_screen.dart';
-import '../features/university/platzi_search_screen.dart';
+import '../features/university/course_repository.dart';
+import '../features/university/course_search_screen.dart';
 import '../features/university/university_screen.dart';
 import '../l10n/l10n.dart';
 import '../users/users.dart';
@@ -26,6 +27,7 @@ class PulseShell extends StatefulWidget {
     required this.profile,
     this.forumRepository,
     this.chatRepository,
+    this.courseRepository,
   });
 
   final AuthService authService;
@@ -33,6 +35,7 @@ class PulseShell extends StatefulWidget {
   final UserProfile profile;
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
+  final CourseRepository? courseRepository;
 
   @override
   State<PulseShell> createState() => PulseShellState();
@@ -43,7 +46,6 @@ typedef HomeShellState = PulseShellState;
 
 class PulseShellState extends State<PulseShell> {
   int _index = 0;
-  bool _tabBarCollapsed = false;
 
   final _forumsKey = GlobalKey<ForumsScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
@@ -55,21 +57,22 @@ class PulseShellState extends State<PulseShell> {
 
   void selectTab(int index) {
     final next = index.clamp(0, _tabCount - 1);
+    // AI opens as a full-screen route (no tab bar); the shell stays on the
+    // current tab so popping returns exactly where the user was.
+    if (next == _aiTabIndex) {
+      _openAi();
+      return;
+    }
     if (next == _index) return;
-    setState(() {
-      _index = next;
-      // Leaving AI always restores the tab bar.
-      if (next != _aiTabIndex) {
-        _tabBarCollapsed = false;
-      }
-    });
+    setState(() => _index = next);
   }
 
-  void _setTabBarCollapsed(bool collapsed) {
-    if (_tabBarCollapsed == collapsed) return;
-    // Only AI may collapse the chrome.
-    if (collapsed && _index != _aiTabIndex) return;
-    setState(() => _tabBarCollapsed = collapsed);
+  void _openAi() {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AiChatScreen(profile: widget.profile),
+      ),
+    );
   }
 
   static List<PulseTabItem> _navItems(AppLocalizations l10n) => [
@@ -159,7 +162,10 @@ class PulseShellState extends State<PulseShell> {
       case 3:
         Navigator.of(context).push(
           MaterialPageRoute<void>(
-            builder: (_) => const PlatziSearchScreen(),
+            builder: (_) => CourseSearchScreen(
+              profile: widget.profile,
+              courseRepository: widget.courseRepository,
+            ),
           ),
         );
       case 4:
@@ -217,8 +223,12 @@ class PulseShellState extends State<PulseShell> {
         userRepository: widget.userRepository,
         showFab: false,
       ),
-      const AiChatScreen(),
-      const UniversityScreen(),
+      // AI is pushed as its own route; keep the slot so indices stay aligned.
+      const SizedBox.shrink(),
+      UniversityScreen(
+        profile: profile,
+        courseRepository: widget.courseRepository,
+      ),
       ProfileScreen(
         key: _profileKey,
         authService: widget.authService,
@@ -229,7 +239,7 @@ class PulseShellState extends State<PulseShell> {
     ];
 
     final Widget? fabButton;
-    if (fab == null || _tabBarCollapsed) {
+    if (fab == null) {
       fabButton = null;
     } else if (fab.extended) {
       fabButton = FloatingActionButton.extended(
@@ -267,31 +277,15 @@ class PulseShellState extends State<PulseShell> {
       );
     }
 
-    return PulseShellScope(
-      tabBarCollapsed: _tabBarCollapsed,
-      setTabBarCollapsed: _setTabBarCollapsed,
-      child: PulseScaffold(
-        extendBody: true,
-        resizeToAvoidBottomInset: false,
-        body: PulseTabBody(index: _index, children: pages),
-        floatingActionButton: fabButton,
-        bottomNavigationBar: AnimatedSlide(
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
-          offset: _tabBarCollapsed ? const Offset(0, 1.4) : Offset.zero,
-          child: AnimatedOpacity(
-            duration: const Duration(milliseconds: 220),
-            opacity: _tabBarCollapsed ? 0 : 1,
-            child: IgnorePointer(
-              ignoring: _tabBarCollapsed,
-              child: PulseTabBar(
-                items: _navItems(l10n),
-                selectedIndex: _index,
-                onSelect: selectTab,
-              ),
-            ),
-          ),
-        ),
+    return PulseScaffold(
+      extendBody: true,
+      resizeToAvoidBottomInset: false,
+      body: PulseTabBody(index: _index, children: pages),
+      floatingActionButton: fabButton,
+      bottomNavigationBar: PulseTabBar(
+        items: _navItems(l10n),
+        selectedIndex: _index,
+        onSelect: selectTab,
       ),
     );
   }
