@@ -82,21 +82,6 @@ service cloud.firestore {
       return level in ['basic', 'intermediate', 'advanced'];
     }
 
-    function validEnrollmentShape(courseId) {
-      return request.resource.data.courseId == courseId
-        && request.resource.data.completedLessonIds is list
-        && request.resource.data.completedLessonIds.size() <= 500
-        && request.resource.data.lastPositionSeconds is int
-        && request.resource.data.lastPositionSeconds >= 0;
-    }
-
-    function studentCountDeltaWithinOne() {
-      return request.resource.data.studentCount is int
-        && resource.data.studentCount is int
-        && request.resource.data.studentCount - resource.data.studentCount <= 1
-        && request.resource.data.studentCount - resource.data.studentCount >= -1;
-    }
-
     function callerProfile() {
       return userDoc(request.auth.uid).data;
     }
@@ -139,16 +124,6 @@ service cloud.firestore {
         && authorRole == callerRole();
     }
 
-    function notVotingOwnThread(threadId) {
-      return get(/databases/$(database)/documents/threads/$(threadId)).data.authorId
-        != request.auth.uid;
-    }
-
-    function notVotingOwnReply(threadId, replyId) {
-      return get(/databases/$(database)/documents/threads/$(threadId)/replies/$(replyId)).data.authorId
-        != request.auth.uid;
-    }
-
     function threadAuthorUnchanged() {
       return request.resource.data.authorId == resource.data.authorId
         && request.resource.data.authorName == resource.data.authorName
@@ -161,17 +136,9 @@ service cloud.firestore {
         && request.resource.data.authorRole == resource.data.authorRole;
     }
 
-    function scoreDeltaWithinVoteRange() {
-      return request.resource.data.score is int
-        && resource.data.score is int
-        && request.resource.data.score - resource.data.score <= 2
-        && request.resource.data.score - resource.data.score >= -2;
-    }
-
     match /users/{uid} {
-      // Directory queries must not depend on {uid} (null during list → Null value error).
-      allow get: if isOwner(uid) || isAdmin() || isForumParticipant();
-      allow list: if isAdmin() || isForumParticipant();
+      // Private profile: peers use /publicProfiles and never receive PII.
+      allow read: if isOwner(uid) || isAdmin();
 
       allow create: if isOwner(uid)
         && request.resource.data.uid == uid
@@ -231,23 +198,23 @@ service cloud.firestore {
         allow write: if false;
       }
 
+      match /forumVotes/{voteId} {
+        allow read: if isOwner(uid);
+        allow write: if false;
+      }
+
       // Academy progress: one doc per enrolled course, owned by the learner.
       match /enrollments/{courseId} {
         allow read: if isOwner(uid) || isAdmin();
-
-        allow create: if isOwner(uid)
-          && validEnrollmentShape(courseId)
-          // Quiz scores are server-written; a new enrollment has none.
-          && request.resource.data.get('quizAttempts', {}).keys().size() == 0;
-
-        allow update: if isOwner(uid)
-          && validEnrollmentShape(courseId)
-          // Only the submitQuizAttempt callable (Admin SDK) may grade quizzes.
-          && request.resource.data.get('quizAttempts', {})
-            == resource.data.get('quizAttempts', {});
-
-        allow delete: if isOwner(uid) || isAdmin();
+        // Enrollment, completion, quiz attempts and counters are atomic
+        // server-side operations. Admin SDK bypasses this denial.
+        allow write: if false;
       }
+    }
+
+    match /publicProfiles/{uid} {
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     // Chats live in Realtime Database (see database.rules.json).
@@ -292,30 +259,6 @@ service cloud.firestore {
             && request.resource.data.diff(resource.data).affectedKeys()
               .hasOnly(['acceptedReplyId', 'updatedAt'])
           )
-          // Vote score bump (max ±2 per write).
-          || (
-            isForumParticipant()
-            && request.resource.data.title == resource.data.title
-            && request.resource.data.body == resource.data.body
-            && request.resource.data.tags == resource.data.tags
-            && request.resource.data.replyCount == resource.data.replyCount
-            && request.resource.data.acceptedReplyId == resource.data.acceptedReplyId
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['score', 'updatedAt'])
-            && scoreDeltaWithinVoteRange()
-          )
-          // Reply create/delete counters (accept may clear only with replyCount).
-          || (
-            isForumParticipant()
-            && request.resource.data.title == resource.data.title
-            && request.resource.data.body == resource.data.body
-            && request.resource.data.tags == resource.data.tags
-            && request.resource.data.score == resource.data.score
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['replyCount', 'lastReplyAt', 'updatedAt', 'acceptedReplyId'])
-            && request.resource.data.diff(resource.data).affectedKeys()
-              .hasAny(['replyCount'])
-          )
         );
 
       allow delete: if isSignedIn()
@@ -323,29 +266,13 @@ service cloud.firestore {
 
       match /votes/{uid} {
         allow read: if isSignedIn();
-        allow create, update: if isForumParticipant()
-          && request.auth.uid == uid
-          && notVotingOwnThread(threadId)
-          && request.resource.data.value is int
-          && (request.resource.data.value == 1
-              || request.resource.data.value == -1);
-        allow delete: if isForumParticipant()
-          && request.auth.uid == uid;
+        allow write: if false;
       }
 
       match /replies/{replyId} {
         allow read: if isSignedIn();
 
-        allow create: if isForumParticipant()
-          && request.resource.data.authorId == request.auth.uid
-          && matchesCallerIdentity(
-            request.resource.data.authorId,
-            request.resource.data.authorName,
-            request.resource.data.authorRole
-          )
-          && boundedString(request.resource.data.body, 20000)
-          && request.resource.data.score is int
-          && request.resource.data.score == 0;
+        allow create: if false;
 
         allow update: if isSignedIn()
           && replyAuthorUnchanged()
@@ -356,28 +283,13 @@ service cloud.firestore {
               && boundedString(request.resource.data.body, 20000)
               && request.resource.data.score == resource.data.score
             )
-            || (
-              isForumParticipant()
-              && request.resource.data.body == resource.data.body
-              && request.resource.data.diff(resource.data).affectedKeys()
-                .hasOnly(['score', 'updatedAt'])
-              && scoreDeltaWithinVoteRange()
-            )
           );
 
-        allow delete: if isSignedIn()
-          && (resource.data.authorId == request.auth.uid || isAdmin());
+        allow delete: if false;
 
         match /votes/{uid} {
           allow read: if isSignedIn();
-          allow create, update: if isForumParticipant()
-            && request.auth.uid == uid
-            && notVotingOwnReply(threadId, replyId)
-            && request.resource.data.value is int
-            && (request.resource.data.value == 1
-                || request.resource.data.value == -1);
-          allow delete: if isForumParticipant()
-            && request.auth.uid == uid;
+          allow write: if false;
         }
       }
     }
@@ -417,12 +329,6 @@ service cloud.firestore {
             && request.resource.data.status in ['draft', 'pending']
             && boundedString(request.resource.data.title, 200)
             && validCourseLevel(request.resource.data.level)
-          )
-          // Enroll / unenroll bumps the denormalized counter only.
-          || (
-            request.resource.data.diff(resource.data).affectedKeys()
-              .hasOnly(['studentCount', 'updatedAt'])
-            && studentCountDeltaWithinOne()
           )
         );
 
@@ -518,6 +424,10 @@ service cloud.firestore {
     }
 
     match /aiRuns/{runId} {
+      allow read, write: if false;
+    }
+
+    match /functionUsage/{counterId} {
       allow read, write: if false;
     }
 

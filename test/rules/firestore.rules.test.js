@@ -180,10 +180,42 @@ describe('thread score forge', () => {
     );
   });
 
-  it('allows vote-sized score delta', async () => {
+  it('blocks direct vote-sized score writes', async () => {
     const db = authedDb('voter');
-    await assertSucceeds(
+    await assertFails(
       db.doc('threads/t1').update({ score: 1, updatedAt: new Date() }),
+    );
+  });
+
+  it('blocks authors from changing their own score', async () => {
+    await assertFails(
+      authedDb('author')
+        .doc('threads/t1')
+        .update({ score: 1, updatedAt: new Date() }),
+    );
+  });
+
+  it('blocks direct reply count writes', async () => {
+    await assertFails(
+      authedDb('voter')
+        .doc('threads/t1')
+        .update({ replyCount: 1, lastReplyAt: new Date(), updatedAt: new Date() }),
+    );
+  });
+
+  it('keeps reply creation and vote documents server-only', async () => {
+    const db = authedDb('voter');
+    await assertFails(
+      db.doc('threads/t1/replies/r1').set({
+        body: 'Direct reply',
+        authorId: 'voter',
+        authorName: 'voter',
+        authorRole: 'agent',
+        score: 0,
+      }),
+    );
+    await assertFails(
+      db.doc('threads/t1/votes/voter').set({ value: 1 }),
     );
   });
 
@@ -304,11 +336,11 @@ describe('academy catalog', () => {
     );
   });
 
-  it('allows a +1 student count bump but not forging it', async () => {
+  it('keeps student count server-only', async () => {
     await seedCourse('pub2', { status: 'published', createdBy: 'manager1' });
     const db = authedDb('student1');
 
-    await assertSucceeds(
+    await assertFails(
       db.doc('courses/pub2').update({ studentCount: 1, updatedAt: new Date() }),
     );
     await assertFails(
@@ -462,7 +494,7 @@ describe('academy catalog', () => {
       }),
     );
 
-    await assertSucceeds(
+    await assertFails(
       db.doc('users/student1/enrollments/pub1').set(enrollment),
     );
     await assertFails(
@@ -470,8 +502,8 @@ describe('academy catalog', () => {
         quizAttempts: { q1: { score: 100, passed: true } },
       }),
     );
-    // Ordinary progress writes still go through.
-    await assertSucceeds(
+    // Completion is server-authoritative.
+    await assertFails(
       db.doc('users/student1/enrollments/pub1').update({
         completedLessonIds: ['l1'],
         lastPositionSeconds: 12,
@@ -579,7 +611,7 @@ describe('academy catalog', () => {
       lastPositionSeconds: 0,
     };
 
-    await assertSucceeds(
+    await assertFails(
       authedDb('student1')
         .doc('users/student1/enrollments/pub1')
         .set(enrollment),
@@ -614,6 +646,47 @@ describe('academy catalog', () => {
     await assertSucceeds(query(authedDb('admin1')).get());
     await assertFails(query(authedDb('manager2')).get());
     await assertFails(query(authedDb('student1')).get());
+  });
+});
+
+describe('private and public profiles', () => {
+  beforeEach(async () => {
+    await seedUser('agent1', {
+      role: 'agent',
+      email: 'private@example.com',
+      npn: '1234567',
+      addressStreet: '123 Private St',
+    });
+    await seedUser('agent2', { role: 'agent' });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('publicProfiles/agent1').set({
+        uid: 'agent1',
+        displayName: 'Agent One',
+        photoUrl: null,
+        role: 'agent',
+        agency: 'Every Benefits',
+        isAnonymous: false,
+      });
+    });
+  });
+
+  it('hides private profile fields from peers', async () => {
+    await assertFails(authedDb('agent2').doc('users/agent1').get());
+    await assertFails(authedDb('agent2').collection('users').get());
+  });
+
+  it('exposes only the server-maintained public directory', async () => {
+    const peer = authedDb('agent2');
+    await assertSucceeds(peer.doc('publicProfiles/agent1').get());
+    await assertSucceeds(peer.collection('publicProfiles').get());
+    await assertFails(
+      peer.doc('publicProfiles/agent2').set({
+        uid: 'agent2',
+        displayName: 'Forged',
+        role: 'admin',
+        isAnonymous: false,
+      }),
+    );
   });
 });
 

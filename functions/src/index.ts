@@ -1,6 +1,8 @@
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onDocumentWritten } from "firebase-functions/v2/firestore";
+import { onValueWritten } from "firebase-functions/v2/database";
 import { setGlobalOptions } from "firebase-functions/v2";
 
 admin.initializeApp({
@@ -13,10 +15,14 @@ const callableOpts = {
   cors: [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
-    /https:\/\/.*\.vercel\.app$/,
-    /https:\/\/.*\.web\.app$/,
-    /https:\/\/.*\.firebaseapp\.com$/,
+    "https://every-insurance.web.app",
+    "https://every-insurance.firebaseapp.com",
+    ...(process.env.FUNCTIONS_ALLOWED_ORIGINS ?? "")
+      .split(",")
+      .map((origin) => origin.trim())
+      .filter(Boolean),
   ],
+  enforceAppCheck: true,
   // Auth is enforced inside the handler; Cloud Run must allow the OPTIONS preflight.
   invoker: "public" as const,
 };
@@ -35,6 +41,9 @@ const DEFAULT_QUIZ_PASS_PERCENT = 70;
 const MAX_QUIZ_OPTIONS = 20;
 /** Roles that belong in the default staff community chat. */
 const DEFAULT_GROUP_ROLES = ["agent", "instructor", "manager", "admin"];
+const GROUP_CREATOR_ROLES = ["instructor", "manager", "admin"];
+const MAX_GROUP_MEMBERS = 20;
+const MAX_FUNCTION_CALLS_PER_MINUTE = 30;
 
 type VoteValue = -1 | 0 | 1;
 
@@ -55,6 +64,70 @@ function headlineName(data: admin.firestore.DocumentData | undefined): string {
 
 function belongsInDefaultGroup(role: string): boolean {
   return DEFAULT_GROUP_ROLES.includes(role);
+}
+
+async function consumeFunctionQuota(uid: string, operation: string) {
+  const minute = Math.floor(Date.now() / 60_000);
+  const ref = db.doc(`functionUsage/${uid}_${minute}`);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const count = Number(snap.data()?.count ?? 0);
+    if (count >= MAX_FUNCTION_CALLS_PER_MINUTE) {
+      throw new HttpsError("resource-exhausted", "Too many requests.");
+    }
+    tx.set(
+      ref,
+      {
+        uid,
+        minute,
+        count: count + 1,
+        operations: FieldValue.arrayUnion(operation),
+        expiresAt: admin.firestore.Timestamp.fromMillis(
+          (minute + 2) * 60_000,
+        ),
+      },
+      { merge: true },
+    );
+  });
+}
+
+async function requireCaller(
+  request: { auth?: { uid: string } },
+  operation: string,
+): Promise<string> {
+  const uid = request.auth?.uid;
+  if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
+  await consumeFunctionQuota(uid, operation);
+  return uid;
+}
+
+function chatInboxRow(
+  chatId: string,
+  chat: Record<string, unknown>,
+  uid: string,
+) {
+  const members = Object.keys((chat.members ?? {}) as Record<string, unknown>)
+    .filter((memberId) => memberId !== SUPPORT_AI_UID);
+  const unreadCounts =
+    (chat.unreadCounts ?? {}) as Record<string, unknown>;
+  const pinnedBy = (chat.pinnedBy ?? {}) as Record<string, unknown>;
+  return {
+    chatId,
+    memberIds: members,
+    memberNames: (chat.memberNames ?? {}) as Record<string, unknown>,
+    isGroup: chat.isGroup === true,
+    title: chat.title ?? null,
+    dmKey: chat.dmKey ?? null,
+    lastMessage: String(chat.lastMessage ?? "").slice(0, 4000),
+    lastMessageAt: Number(chat.lastMessageAt ?? 0),
+    lastMessageSenderId: chat.lastMessageSenderId ?? null,
+    unreadCount: Number(unreadCounts[uid] ?? 0),
+    pinned: pinnedBy[uid] === true,
+    createdAt: Number(chat.createdAt ?? 0),
+    createdBy: String(chat.createdBy ?? ""),
+    isDefaultAgentGroup: chat.isDefaultAgentGroup === true,
+    isSupportChat: chat.isSupportChat === true,
+  };
 }
 
 async function addAgentToDefaultGroup(uid: string, displayName: string) {
@@ -118,14 +191,216 @@ async function addAgentToDefaultGroup(uid: string, displayName: string) {
   });
 }
 
+export const syncPublicProfile = onDocumentWritten(
+  "users/{uid}",
+  async (event) => {
+    const uid = event.params.uid;
+    const after = event.data?.after;
+    const ref = db.doc(`publicProfiles/${uid}`);
+    if (!after?.exists) {
+      await ref.delete();
+      return;
+    }
+    const data = after.data() ?? {};
+    await ref.set({
+      uid,
+      displayName:
+        typeof data.displayName === "string" ? data.displayName.slice(0, 120) : null,
+      photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
+      role: String(data.role ?? "student"),
+      agency: typeof data.agency === "string" ? data.agency.slice(0, 120) : null,
+      isAnonymous: data.isAnonymous === true,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  },
+);
+
+export const syncChatInbox = onValueWritten(
+  { ref: "/chats/{chatId}", region: "us-central1" },
+  async (event) => {
+    const chatId = event.params.chatId;
+    const before = (event.data.before.val() ?? {}) as Record<string, unknown>;
+    const after = (event.data.after.val() ?? {}) as Record<string, unknown>;
+    const beforeMembers = Object.keys(
+      (before.members ?? {}) as Record<string, unknown>,
+    );
+    const members = Object.keys((after.members ?? {}) as Record<string, unknown>)
+      .filter((uid) => uid !== SUPPORT_AI_UID);
+    const removed = beforeMembers.filter(
+      (uid) => uid !== SUPPORT_AI_UID && !members.includes(uid),
+    );
+    const updates: Record<string, unknown> = {};
+
+    for (const uid of removed) updates[`userChats/${uid}/${chatId}`] = null;
+    if (event.data.after.exists()) {
+      for (const uid of members) {
+        updates[`userChats/${uid}/${chatId}`] = chatInboxRow(chatId, after, uid);
+      }
+    }
+    if (Object.keys(updates).length) await rtdb.ref().update(updates);
+  },
+);
+
+export const rebuildChatInbox = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "rebuildChatInbox");
+  const index = await rtdb.ref(`userChats/${uid}`).get();
+  const chatIds = Object.keys((index.val() ?? {}) as Record<string, unknown>);
+  const updates: Record<string, unknown> = {};
+  await Promise.all(
+    chatIds.slice(0, 100).map(async (chatId) => {
+      const chat = await rtdb.ref(`chats/${chatId}`).get();
+      const value = chat.val() as Record<string, unknown> | null;
+      if (value?.members &&
+          (value.members as Record<string, unknown>)[uid] === true) {
+        updates[`userChats/${uid}/${chatId}`] = chatInboxRow(chatId, value, uid);
+      }
+    }),
+  );
+  if (Object.keys(updates).length) await rtdb.ref().update(updates);
+  return { ok: true };
+});
+
+export const createGroupChat = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "createGroupChat");
+  const title = String(request.data?.title ?? "").trim();
+  const requested = Array.isArray(request.data?.memberIds)
+    ? request.data.memberIds.map(String)
+    : [];
+  const memberIds = [...new Set([uid, ...requested])]
+    .filter((id) => id && id !== SUPPORT_AI_UID);
+  if (!title || title.length > 120) {
+    throw new HttpsError("invalid-argument", "Valid group title required.");
+  }
+  if (memberIds.length < 2 || memberIds.length > MAX_GROUP_MEMBERS) {
+    throw new HttpsError("invalid-argument", "Group must have 2–20 members.");
+  }
+  const creator = await db.doc(`users/${uid}`).get();
+  if (!GROUP_CREATOR_ROLES.includes(String(creator.data()?.role ?? ""))) {
+    throw new HttpsError("permission-denied", "Not allowed to create groups.");
+  }
+  const profiles = await db.getAll(
+    ...memberIds.map((memberId) => db.doc(`users/${memberId}`)),
+  );
+  if (profiles.some((profile) => !profile.exists)) {
+    throw new HttpsError("failed-precondition", "Unknown group member.");
+  }
+  const memberNames = Object.fromEntries(
+    profiles.map((profile) => [profile.id, headlineName(profile.data())]),
+  );
+  const now = Date.now();
+  const chatRef = rtdb.ref("chats").push();
+  const chatId = chatRef.key!;
+  await chatRef.set({
+    members: Object.fromEntries(memberIds.map((id) => [id, true])),
+    memberNames,
+    isGroup: true,
+    title,
+    dmKey: null,
+    lastMessage: "",
+    lastMessageAt: now,
+    lastMessageSenderId: null,
+    unreadCounts: Object.fromEntries(memberIds.map((id) => [id, 0])),
+    pinnedBy: {},
+    createdAt: now,
+    createdBy: uid,
+    isDefaultAgentGroup: false,
+    isSupportChat: false,
+  });
+  return { chatId, createdAt: now };
+});
+
+export const enrollInCourse = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "enrollInCourse");
+  const courseId = String(request.data?.courseId ?? "");
+  if (!courseId) throw new HttpsError("invalid-argument", "courseId required");
+  const courseRef = db.doc(`courses/${courseId}`);
+  const enrollmentRef = db.doc(`users/${uid}/enrollments/${courseId}`);
+  await db.runTransaction(async (tx) => {
+    const [course, enrollment] = await Promise.all([
+      tx.get(courseRef),
+      tx.get(enrollmentRef),
+    ]);
+    if (!course.exists || course.data()?.status !== "published") {
+      throw new HttpsError("not-found", "Published course not found.");
+    }
+    if (enrollment.exists) return;
+    tx.set(enrollmentRef, {
+      courseId,
+      completedLessonIds: [],
+      lastLessonId: null,
+      lastPositionSeconds: 0,
+      quizAttempts: {},
+      enrolledAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+      completedAt: null,
+    });
+    tx.update(courseRef, {
+      studentCount: FieldValue.increment(1),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+  return { ok: true };
+});
+
+export const saveCourseProgress = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "saveCourseProgress");
+  const courseId = String(request.data?.courseId ?? "");
+  const lessonId = String(request.data?.lessonId ?? "");
+  const positionSeconds = Math.max(
+    0,
+    Math.min(86_400, Math.round(Number(request.data?.positionSeconds ?? 0))),
+  );
+  const completed = request.data?.completed === true;
+  if (!courseId || !lessonId || !Number.isFinite(positionSeconds)) {
+    throw new HttpsError("invalid-argument", "Invalid course progress.");
+  }
+  const courseRef = db.doc(`courses/${courseId}`);
+  const lessonRef = courseRef.collection("lessons").doc(lessonId);
+  const enrollmentRef = db.doc(`users/${uid}/enrollments/${courseId}`);
+  await db.runTransaction(async (tx) => {
+    const [course, lesson, enrollment] = await Promise.all([
+      tx.get(courseRef),
+      tx.get(lessonRef),
+      tx.get(enrollmentRef),
+    ]);
+    if (!course.exists || !lesson.exists || !enrollment.exists) {
+      throw new HttpsError("failed-precondition", "Enrollment or lesson missing.");
+    }
+    if (completed && lesson.data()?.type === "quiz") {
+      throw new HttpsError("failed-precondition", "Submit quizzes for grading.");
+    }
+    const data = enrollment.data() ?? {};
+    const completedLessonIds = Array.isArray(data.completedLessonIds)
+      ? data.completedLessonIds.map(String)
+      : [];
+    if (completed && !completedLessonIds.includes(lessonId)) {
+      completedLessonIds.push(lessonId);
+    }
+    const lessonCount = Number(course.data()?.lessonCount ?? 0);
+    const allDone =
+      lessonCount > 0 && completedLessonIds.length >= lessonCount;
+    tx.set(
+      enrollmentRef,
+      {
+        completedLessonIds,
+        lastLessonId: lessonId,
+        lastPositionSeconds: positionSeconds,
+        completedAt: allDone
+          ? (data.completedAt ?? FieldValue.serverTimestamp())
+          : null,
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    );
+  });
+  return { ok: true };
+});
+
 /**
  * Trusted vote path: updates vote doc + score increment under Admin SDK.
  */
 export const castForumVote = onCall(callableOpts, async (request) => {
-  if (!request.auth?.uid) {
-    throw new HttpsError("unauthenticated", "Sign in required.");
-  }
-  const uid = request.auth.uid;
+  const uid = await requireCaller(request, "castForumVote");
   const threadId = String(request.data?.threadId ?? "");
   const replyId =
     request.data?.replyId == null ? null : String(request.data.replyId);
@@ -150,6 +425,9 @@ export const castForumVote = onCall(callableOpts, async (request) => {
   const voteRef = replyId
     ? db.doc(`threads/${threadId}/replies/${replyId}/votes/${uid}`)
     : db.doc(`threads/${threadId}/votes/${uid}`);
+  const inboxVoteRef = db.doc(
+    `users/${uid}/forumVotes/${replyId ? `${threadId}_${replyId}` : threadId}`,
+  );
 
   await db.runTransaction(async (tx) => {
     const target = await tx.get(targetRef);
@@ -167,6 +445,7 @@ export const castForumVote = onCall(callableOpts, async (request) => {
 
     if (next === 0) {
       tx.delete(voteRef);
+      tx.delete(inboxVoteRef);
     } else {
       tx.set(
         voteRef,
@@ -176,6 +455,12 @@ export const castForumVote = onCall(callableOpts, async (request) => {
         },
         { merge: true },
       );
+      tx.set(inboxVoteRef, {
+        threadId,
+        replyId,
+        value: next,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
     }
     tx.update(targetRef, {
       score: FieldValue.increment(delta),
@@ -186,15 +471,92 @@ export const castForumVote = onCall(callableOpts, async (request) => {
   return { ok: true };
 });
 
+export const addForumReply = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "addForumReply");
+  const threadId = String(request.data?.threadId ?? "");
+  const body = String(request.data?.body ?? "").trim();
+  if (!threadId || !body || body.length > 20_000) {
+    throw new HttpsError("invalid-argument", "Valid reply required.");
+  }
+  const [user, thread] = await Promise.all([
+    db.doc(`users/${uid}`).get(),
+    db.doc(`threads/${threadId}`).get(),
+  ]);
+  const profile = user.data();
+  if (
+    !thread.exists ||
+    !profile ||
+    profile.isAnonymous === true ||
+    !FORUM_ROLES.includes(String(profile.role))
+  ) {
+    throw new HttpsError("permission-denied", "Forum participants only.");
+  }
+  const replyRef = db.collection(`threads/${threadId}/replies`).doc();
+  const batch = db.batch();
+  batch.set(replyRef, {
+    body,
+    authorId: uid,
+    authorName: headlineName(profile),
+    authorPhotoUrl:
+      typeof profile.photoUrl === "string" ? profile.photoUrl : null,
+    authorRole: String(profile.role),
+    score: 0,
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  batch.update(thread.ref, {
+    replyCount: FieldValue.increment(1),
+    lastReplyAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  await batch.commit();
+  return { replyId: replyRef.id };
+});
+
+export const deleteForumReply = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "deleteForumReply");
+  const threadId = String(request.data?.threadId ?? "");
+  const replyId = String(request.data?.replyId ?? "");
+  const threadRef = db.doc(`threads/${threadId}`);
+  const replyRef = db.doc(`threads/${threadId}/replies/${replyId}`);
+  const [actor, thread, reply] = await Promise.all([
+    db.doc(`users/${uid}`).get(),
+    threadRef.get(),
+    replyRef.get(),
+  ]);
+  if (!thread.exists || !reply.exists) {
+    throw new HttpsError("not-found", "Reply not found.");
+  }
+  if (actor.data()?.role !== "admin" && reply.data()?.authorId !== uid) {
+    throw new HttpsError("permission-denied", "Not allowed to delete this reply.");
+  }
+  const remaining = await db
+    .collection(`threads/${threadId}/replies`)
+    .orderBy("createdAt", "desc")
+    .limit(2)
+    .get();
+  const latest = remaining.docs.find((doc) => doc.id !== replyId);
+  const batch = db.batch();
+  batch.delete(replyRef);
+  batch.update(threadRef, {
+    replyCount: FieldValue.increment(-1),
+    lastReplyAt:
+      latest?.get("createdAt") ?? thread.get("createdAt") ?? FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+    ...(thread.get("acceptedReplyId") === replyId
+      ? { acceptedReplyId: null }
+      : {}),
+  });
+  await batch.commit();
+  return { ok: true };
+});
+
 /**
  * Admin-only role assignment.
  * Staff roles (agent / instructor / manager / admin) join the default group.
  */
 export const setUserRole = onCall(callableOpts, async (request) => {
-  if (!request.auth?.uid) {
-    throw new HttpsError("unauthenticated", "Sign in required.");
-  }
-  const actorUid = request.auth.uid;
+  const actorUid = await requireCaller(request, "setUserRole");
   const targetUid = String(request.data?.uid ?? "");
   const role = String(request.data?.role ?? "");
   const allowed = [
@@ -243,11 +605,9 @@ export const setUserRole = onCall(callableOpts, async (request) => {
  * Uses Admin SDK so the client does not need a fragile users list rule.
  */
 export const listStudentsForPromotion = onCall(callableOpts, async (request) => {
-  if (!request.auth?.uid) {
-    throw new HttpsError("unauthenticated", "Sign in required.");
-  }
+  const actorUid = await requireCaller(request, "listStudentsForPromotion");
 
-  const actor = await db.doc(`users/${request.auth.uid}`).get();
+  const actor = await db.doc(`users/${actorUid}`).get();
   if (actor.data()?.role !== "admin") {
     throw new HttpsError("permission-denied", "Admins only.");
   }
@@ -277,6 +637,34 @@ export const listStudentsForPromotion = onCall(callableOpts, async (request) => 
   return { students };
 });
 
+export const listPublicProfiles = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "listPublicProfiles");
+  const requestedLimit = Math.round(Number(request.data?.limit ?? 80));
+  const max = Math.max(1, Math.min(100, requestedLimit));
+  const snap = await db
+    .collection("users")
+    .where("isAnonymous", "==", false)
+    .limit(max + 1)
+    .get();
+  const profiles = snap.docs
+    .filter((profile) => profile.id !== uid)
+    .slice(0, max)
+    .map((profile) => {
+      const data = profile.data();
+      return {
+        uid: profile.id,
+        displayName:
+          typeof data.displayName === "string" ? data.displayName : null,
+        photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
+        role: String(data.role ?? "student"),
+        agency: typeof data.agency === "string" ? data.agency : null,
+        isAnonymous: false,
+        profileCompleted: data.profileCompleted !== false,
+      };
+    });
+  return { profiles };
+});
+
 /** Normalizes a submitted answer into a sorted, deduped list of option indexes. */
 function parseSelectedOptions(raw: unknown): number[] {
   const list = Array.isArray(raw) ? raw : [raw];
@@ -303,10 +691,7 @@ function sameOptionSet(expected: number[], given: number[]): boolean {
  * `quizAttempts` / quiz completion on an enrollment.
  */
 export const submitQuizAttempt = onCall(callableOpts, async (request) => {
-  if (!request.auth?.uid) {
-    throw new HttpsError("unauthenticated", "Sign in required.");
-  }
-  const uid = request.auth.uid;
+  const uid = await requireCaller(request, "submitQuizAttempt");
   const courseId = String(request.data?.courseId ?? "");
   const lessonId = String(request.data?.lessonId ?? "");
   const rawAnswers = request.data?.answers;
@@ -428,10 +813,7 @@ export const submitQuizAttempt = onCall(callableOpts, async (request) => {
  * Ensures the caller (staff) is a member of the default community RTDB chat.
  */
 export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
-  if (!request.auth?.uid) {
-    throw new HttpsError("unauthenticated", "Sign in required.");
-  }
-  const callerUid = request.auth.uid;
+  const callerUid = await requireCaller(request, "ensureDefaultAgentGroup");
   const targetUid = String(request.data?.uid ?? callerUid);
 
   const caller = await db.doc(`users/${callerUid}`).get();
@@ -464,13 +846,10 @@ export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
  * only trigger it inside their own support thread.
  */
 export const postSupportAiMessage = onCall(callableOpts, async (request) => {
-  if (!request.auth?.uid) {
-    throw new HttpsError("unauthenticated", "Sign in required.");
-  }
-  const uid = request.auth.uid;
+  const uid = await requireCaller(request, "postSupportAiMessage");
   const chatId = String(request.data?.chatId ?? "");
   const body = String(request.data?.body ?? "").trim();
-  const senderName = String(request.data?.senderName ?? "Support").trim();
+  const senderName = "Pulse Support";
 
   if (chatId !== `support_${uid}`) {
     throw new HttpsError("permission-denied", "Not your support chat.");

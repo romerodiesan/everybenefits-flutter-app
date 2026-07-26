@@ -48,6 +48,17 @@ service firebase.storage {
         || (hasProfile() && callerRole() == 'manager' && ownsCourse(courseId));
     }
 
+    function canReadCourseFiles(courseId) {
+      return isSignedIn()
+        && firestore.exists(/databases/(default)/documents/courses/$(courseId))
+        && (
+          firestore.get(/databases/(default)/documents/courses/$(courseId))
+            .data.get('status', 'draft') == 'published'
+          || isAdmin()
+          || ownsCourse(courseId)
+        );
+    }
+
     match /avatars/{fileName} {
       allow read: if isSignedIn();
       allow write: if isOwnerFile(fileName)
@@ -57,7 +68,7 @@ service firebase.storage {
 
     // Course covers and lesson videos: /courses/{courseId}/...
     match /courses/{courseId}/{allPaths=**} {
-      allow read: if isSignedIn();
+      allow read: if canReadCourseFiles(courseId);
 
       allow create, update: if canWriteCourseFiles(courseId)
         && (

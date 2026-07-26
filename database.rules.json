@@ -29,8 +29,9 @@
               newData.child('isSupportChat').val() !== true
               && (
                 (newData.child('isGroup').val() === false
-                  && newData.child('dmKey').val() === $chatId)
-                || newData.child('isGroup').val() === true
+                  && newData.child('dmKey').val() === $chatId
+                  && newData.child('members').numChildren() === 2
+                  && !newData.child('members').child('support-ai').exists())
               )
             )
           )",
@@ -71,7 +72,13 @@
             && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
             && !data.exists()
             && newData.child('senderId').val() === auth.uid
-            && newData.child('isAi').val() !== true",
+            && newData.child('isAi').val() !== true
+            && newData.child('body').isString()
+            && newData.child('body').val().length > 0
+            && newData.child('body').val().length <= 4000
+            && newData.child('senderName').isString()
+            && newData.child('senderName').val().length <= 120
+            && newData.child('createdAt').isNumber()",
           "reactions": {
             "$uid": {
               ".write": "auth != null
@@ -90,17 +97,7 @@
         ".read": "auth != null && auth.uid === $uid",
         ".indexOn": ["lastMessageAt"],
         "$chatId": {
-          // Own inbox always; other members' rows when already in the chat;
-          // or same multi-path update that creates the chat (root is pre-write).
-          ".write": "auth != null && (
-            auth.uid === $uid
-            || root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
-            || (
-              !root.child('chats').child($chatId).exists()
-              && newData.parent().parent().parent().child('chats').child($chatId).child('members').child(auth.uid).val() === true
-              && newData.parent().parent().parent().child('chats').child($chatId).child('createdBy').val() === auth.uid
-            )
-          )"
+          ".write": "auth != null && auth.uid === $uid"
         }
       }
     },
@@ -108,7 +105,7 @@
     "dmIndex": {
       "$dmKey": {
         ".read": "auth != null",
-        ".write": "auth != null && !data.exists()"
+        ".write": false
       }
     }
   }
