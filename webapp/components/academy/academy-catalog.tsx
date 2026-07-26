@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { canAuthorCourses } from "@/lib/roles";
+import { getFirebaseAuth } from "@/lib/firebase/client";
+import { handoffUrlWithToken, ssoConsumeUrl } from "@/lib/sso";
 import {
   progressOf,
   watchEnrollments,
@@ -30,6 +32,7 @@ import {
 
 export function AcademyCatalog() {
   const t = useTranslations();
+  const locale = useLocale();
   const { profile } = useAuth();
   const levelLabel = useLevelLabels();
 
@@ -129,12 +132,30 @@ export function AcademyCatalog() {
         subtitle={t("academySubtitle")}
         actions={
           isAuthor ? (
-            <Link
-              href="/studio"
+            <button
+              type="button"
+              onClick={() => {
+                void (async () => {
+                  const user = getFirebaseAuth().currentUser;
+                  if (!user) {
+                    window.location.assign(
+                      `${process.env.NEXT_PUBLIC_STUDIO_URL?.replace(/\/$/, "") || "http://localhost:3001"}/${locale}`,
+                    );
+                    return;
+                  }
+                  const idToken = await user.getIdToken();
+                  window.location.assign(
+                    handoffUrlWithToken(
+                      ssoConsumeUrl("studio", locale, "/"),
+                      idToken,
+                    ),
+                  );
+                })();
+              }}
               className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-brand px-4 text-sm font-semibold text-on-brand transition hover:brightness-110"
             >
               {t("academyStudioLink")}
-            </Link>
+            </button>
           ) : undefined
         }
       />

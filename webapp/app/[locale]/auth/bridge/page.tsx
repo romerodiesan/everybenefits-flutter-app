@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import { LoginForm } from "@/components/auth/login-form";
+import { SsoBridgePage } from "@/components/chrome/sso-bridge-page";
 
-export default function LoginPage() {
+export default function PulseBridgePage() {
   return (
     <Suspense
       fallback={
@@ -10,7 +10,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginForm />
+      <SsoBridgePage loginPath="/login" />
     </Suspense>
   );
 }

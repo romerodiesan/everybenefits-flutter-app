@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import { LoginForm } from "@/components/auth/login-form";
+import { SsoConsumePage } from "@/components/chrome/sso-consume-page";
 
-export default function LoginPage() {
+export default function PulseSsoPage() {
   return (
     <Suspense
       fallback={
@@ -10,7 +10,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginForm />
+      <SsoConsumePage homePath="/home" />
     </Suspense>
   );
 }

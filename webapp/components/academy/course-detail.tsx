@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { canEditCourse } from "@/lib/roles";
+import { getFirebaseAuth } from "@/lib/firebase/client";
+import { handoffUrlWithToken, ssoConsumeUrl } from "@/lib/sso";
 import {
   enrollInCourse,
   progressOf,
@@ -30,6 +32,7 @@ import {
 
 export function CourseDetail({ courseId }: { courseId: string }) {
   const t = useTranslations();
+  const locale = useLocale();
   const router = useRouter();
   const { profile } = useAuth();
   const duration = useDurationLabel();
@@ -194,12 +197,31 @@ export function CourseDetail({ courseId }: { courseId: string }) {
               {enrollment ? t("courseContinue") : t("courseStart")}
             </Button>
             {canEdit && (
-              <Link
-                href={`/studio/${course.id}`}
+              <button
+                type="button"
+                onClick={() => {
+                  void (async () => {
+                    const user = getFirebaseAuth().currentUser;
+                    const path = `/courses/${course.id}`;
+                    if (!user) {
+                      window.location.assign(
+                        `${process.env.NEXT_PUBLIC_STUDIO_URL?.replace(/\/$/, "") || "http://localhost:3001"}/${locale}${path}`,
+                      );
+                      return;
+                    }
+                    const idToken = await user.getIdToken();
+                    window.location.assign(
+                      handoffUrlWithToken(
+                        ssoConsumeUrl("studio", locale, path),
+                        idToken,
+                      ),
+                    );
+                  })();
+                }}
                 className="pulse-sheet inline-flex h-10 items-center rounded-xl px-4 text-sm font-semibold transition hover:border-brand/40"
               >
                 {t("studioOpenEditor")}
-              </Link>
+              </button>
             )}
           </div>
           {error && <p className="mt-2 text-xs text-[#B42318]">{error}</p>}

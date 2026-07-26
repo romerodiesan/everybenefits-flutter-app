@@ -11,6 +11,7 @@ import {
   signInWithEmailAndPassword,
   signInWithEmailLink,
   signInWithPopup,
+  signInWithCustomToken,
   signOut,
   updateProfile,
   type User,
@@ -21,6 +22,10 @@ const googleProvider = new GoogleAuthProvider();
 
 export async function signInWithEmail(email: string, password: string) {
   return signInWithEmailAndPassword(getFirebaseAuth(), email, password);
+}
+
+export async function signInWithCustomAuthToken(customToken: string) {
+  return signInWithCustomToken(getFirebaseAuth(), customToken);
 }
 
 export async function signUpWithEmail(
@@ -76,8 +81,41 @@ export async function completeMagicLink(href: string) {
   return cred;
 }
 
+import {
+  clearSsoAttempt,
+  logoutCascadeUrl,
+  markSsoAttempted,
+  siblingApp,
+  appBaseUrl,
+} from "@/lib/sso";
+import { clearCachedProfile } from "@/lib/profile-cache";
+
 export async function signOutUser() {
   await signOut(getFirebaseAuth());
+}
+
+/**
+ * Sign out on this origin, then cascade to the sibling app so both
+ * Pulse and Studio sessions are cleared (Firebase Auth is per-origin).
+ */
+export async function signOutEverywhere(opts: {
+  current: "pulse" | "studio";
+  locale: string;
+  /** Path on the current app after both sessions are cleared. */
+  returnPath?: string;
+}) {
+  await signOut(getFirebaseAuth());
+  clearCachedProfile();
+  clearSsoAttempt();
+  // Avoid auto-SSO bounce on login right after an intentional logout.
+  markSsoAttempted();
+
+  const returnPath = opts.returnPath ?? "/login";
+  const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
+  const finalUrl = `${appBaseUrl(opts.current)}/${opts.locale}${path}`;
+  window.location.replace(
+    logoutCascadeUrl(siblingApp(opts.current), opts.locale, finalUrl),
+  );
 }
 
 /** True when the current user signed in with email + password. */

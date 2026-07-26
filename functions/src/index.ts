@@ -20,16 +20,22 @@ setGlobalOptions({ region: "us-central1", maxInstances: 20 });
 /** Gen2 callables need explicit CORS for browser (e.g. localhost webapp). */
 const usingFunctionsEmulator = process.env.FUNCTIONS_EMULATOR === "true";
 const callableOpts = {
-  cors: [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000",
-    "https://every-insurance.web.app",
-    "https://every-insurance.firebaseapp.com",
-    ...(process.env.FUNCTIONS_ALLOWED_ORIGINS ?? "")
-      .split(",")
-      .map((origin) => origin.trim())
-      .filter(Boolean),
-  ],
+  // Emulator Gen2 often drops Access-Control headers on preflight when cors is
+  // an allow-list; open it fully locally. Production keeps an explicit list.
+  cors: usingFunctionsEmulator
+    ? true
+    : [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+        "https://every-insurance.web.app",
+        "https://every-insurance.firebaseapp.com",
+        ...(process.env.FUNCTIONS_ALLOWED_ORIGINS ?? "")
+          .split(",")
+          .map((origin) => origin.trim())
+          .filter(Boolean),
+      ],
   // Emulator clients skip App Check; enforcing here turns votes/replies into
   // opaque `internal` failures. Production keeps enforcement on.
   enforceAppCheck: !usingFunctionsEmulator,
@@ -826,7 +832,9 @@ export const submitQuizAttempt = onCall(callableOpts, async (request) => {
     const actor = await db.doc(`users/${uid}`).get();
     const role = String(actor.data()?.role ?? "");
     const owns = String(course.createdBy ?? "") === uid;
-    if (role !== "admin" && !(owns && (role === "manager" || role === "admin"))) {
+    const isAuthorRole =
+      role === "instructor" || role === "manager" || role === "admin";
+    if (role !== "admin" && !(owns && isAuthorRole)) {
       throw new HttpsError("permission-denied", "Course is not published.");
     }
   }
@@ -1269,3 +1277,26 @@ export const onThreadCreated = onDocumentWritten(
     if (authorId) await ensureThreadParticipant(threadId, authorId);
   },
 );
+
+/**
+ * Cross-app SSO for Pulse ↔ Studio (different origins / ports).
+ * Verifies a Firebase ID token from the source app and mints a custom token
+ * the destination can pass to `signInWithCustomToken`.
+ * Does not require an existing Auth session on the caller.
+ */
+export const exchangeSsoToken = onCall(callableOpts, async (request) => {
+  const idToken = String(request.data?.idToken ?? "");
+  if (idToken.length < 100) {
+    throw new HttpsError("invalid-argument", "idToken required");
+  }
+  let decoded: admin.auth.DecodedIdToken;
+  try {
+    decoded = await admin.auth().verifyIdToken(idToken);
+  } catch {
+    throw new HttpsError("unauthenticated", "Invalid or expired ID token.");
+  }
+  const customToken = await admin.auth().createCustomToken(decoded.uid, {
+    sso: true,
+  });
+  return { customToken, uid: decoded.uid };
+});

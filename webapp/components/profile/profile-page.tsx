@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { headlineName } from "@/lib/firebase/users";
 import { getOrCreateSupportChat } from "@/lib/firebase/chats";
-import { signOutUser } from "@/lib/firebase/auth";
+import { signOutEverywhere } from "@/lib/firebase/auth";
 import type { UserProfile } from "@/lib/types";
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
 import {
@@ -96,6 +96,7 @@ const ICONS: Record<SettingsSection, React.ReactNode> = {
 
 export function ProfilePage() {
   const t = useTranslations();
+  const locale = useLocale();
   const router = useRouter();
   const { profile } = useAuth();
   const [section, setSection] = useState<SettingsSection>(
@@ -220,10 +221,13 @@ export function ProfilePage() {
               <Button
                 variant="secondary"
                 className="h-9 w-full text-xs lg:hidden"
-                onClick={async () => {
-                  await signOutUser();
-                  router.replace("/");
-                }}
+                onClick={() =>
+                  void signOutEverywhere({
+                    current: "pulse",
+                    locale,
+                    returnPath: "/login",
+                  })
+                }
               >
                 {t("navLogout")}
               </Button>

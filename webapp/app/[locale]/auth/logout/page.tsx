@@ -1,7 +1,7 @@
 import { Suspense } from "react";
-import { LoginForm } from "@/components/auth/login-form";
+import { LogoutPage } from "@/components/chrome/logout-page";
 
-export default function LoginPage() {
+export default function PulseLogoutRoute() {
   return (
     <Suspense
       fallback={
@@ -10,7 +10,7 @@ export default function LoginPage() {
         </div>
       }
     >
-      <LoginForm />
+      <LogoutPage />
     </Suspense>
   );
 }

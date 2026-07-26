@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
-import { signOutUser } from "@/lib/firebase/auth";
+import { signOutEverywhere } from "@/lib/firebase/auth";
 import {
   cancelAccountDeletion,
   reactivateAccount,
@@ -19,7 +18,6 @@ import { Button } from "@/components/ui/primitives";
 export function AccountGate({ profile }: { profile: UserProfile }) {
   const t = useTranslations();
   const locale = useLocale();
-  const router = useRouter();
   const { refreshProfile } = useAuth();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,10 +67,13 @@ export function AccountGate({ profile }: { profile: UserProfile }) {
             variant="secondary"
             className="w-full"
             disabled={busy}
-            onClick={async () => {
-              await signOutUser();
-              router.replace("/");
-            }}
+            onClick={() =>
+              void signOutEverywhere({
+                current: "pulse",
+                locale,
+                returnPath: "/login",
+              })
+            }
           >
             {t("navLogout")}
           </Button>

@@ -2,10 +2,9 @@
 
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
 import {
   reauthenticate,
-  signOutUser,
+  signOutEverywhere,
   usesPasswordProvider,
 } from "@/lib/firebase/auth";
 import {
@@ -23,7 +22,6 @@ type Mode = null | "deactivate" | "delete";
 export function DangerPanel() {
   const t = useTranslations();
   const locale = useLocale();
-  const router = useRouter();
   const [mode, setMode] = useState<Mode>(null);
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -37,8 +35,11 @@ export function DangerPanel() {
     setError(null);
     try {
       await deactivateAccount();
-      await signOutUser();
-      router.replace("/");
+      await signOutEverywhere({
+        current: "pulse",
+        locale,
+        returnPath: "/login",
+      });
     } catch {
       setError(t("errorGeneric"));
       setBusy(false);
@@ -57,8 +58,11 @@ export function DangerPanel() {
     }
     try {
       await requestAccountDeletion();
-      await signOutUser();
-      router.replace("/");
+      await signOutEverywhere({
+        current: "pulse",
+        locale,
+        returnPath: "/login",
+      });
     } catch {
       setError(t("errorGeneric"));
       setBusy(false);

@@ -20,6 +20,8 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000) (redirects to `/en`).
 
+Academy **Studio** authoring lives in the adjacent app at [`../studio`](../studio) (default [http://localhost:3001](http://localhost:3001)). Pulse redirects `/[locale]/studio/*` there via `NEXT_PUBLIC_STUDIO_URL`.
+
 ### Environment
 
 Copy values from `.env.example`. They match the Firebase web app already registered in the mobile project (`lib/firebase_options.dart`).
@@ -77,7 +79,7 @@ pnpm dlx vercel
 | Forums | Feed + master-detail, votes, accept answer, share to chat |
 | Chats | RTDB inbox + split pane, DM/group/support, reactions, pin/hide |
 | AI | Pulse AI agent (streaming, sources, history) — see [`docs/pulse-ai.md`](../docs/pulse-ai.md) |
-| Academy | Real courses, paths, Studio authoring |
+| Academy | Learner catalog, courses, paths (authoring → [`../studio`](../studio)) |
 | Admin | Promote students (`listStudentsForPromotion` / `setUserRole`) |
 
 ## Local emulators

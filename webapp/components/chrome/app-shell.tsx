@@ -7,11 +7,11 @@ import {
   type ReactNode,
   type SVGProps,
 } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { useThemeSettings } from "@/lib/providers/theme-provider";
-import { signOutUser } from "@/lib/firebase/auth";
+import { signOutEverywhere } from "@/lib/firebase/auth";
 import { getOrCreateSupportChat, watchInbox } from "@/lib/firebase/chats";
 import { watchEnrollments } from "@/lib/firebase/courses";
 import {
@@ -22,9 +22,14 @@ import {
   watchNotificationState,
 } from "@/lib/firebase/notifications";
 import { canAuthorCourses, headlineName } from "@/lib/roles";
+import { AppSwitcher } from "@/components/chrome/app-switcher";
+import { getFirebaseAuth } from "@/lib/firebase/client";
+import { handoffUrlWithToken, ssoConsumeUrl } from "@/lib/sso";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
 import { AccountGate } from "@/components/chrome/account-gate";
+import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
+import { CommandPalette } from "@/components/chrome/command-palette";
 
 type PushToast = { title: string; body: string; id: number };
 
@@ -250,6 +255,19 @@ function IconBell({ filled, ...props }: IconProps) {
   );
 }
 
+function IconCommand(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      <path
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        d="M10 10V7.5a2.5 2.5 0 1 0-2.5 2.5H10Zm0 0v4m0-4h4m-4 4v2.5a2.5 2.5 0 1 1-2.5-2.5H10Zm0 0h4m0 0h2.5a2.5 2.5 0 1 0-2.5-2.5V14Zm0 0v-4m0 0V7.5A2.5 2.5 0 1 1 16.5 10H14Z"
+      />
+    </svg>
+  );
+}
+
 const NAV = [
   {
     href: "/home",
@@ -321,7 +339,17 @@ function useShellStats(profile: UserProfile | null) {
         setForumUnread(0);
       },
     );
-    void registerWebPushToken(profile.uid).catch(() => undefined);
+    let pushTimer: ReturnType<typeof setTimeout> | undefined;
+    let pushIdle: number | undefined;
+    if (typeof window !== "undefined" && "requestIdleCallback" in window) {
+      pushIdle = window.requestIdleCallback(() => {
+        void registerWebPushToken(profile.uid).catch(() => undefined);
+      });
+    } else {
+      pushTimer = setTimeout(() => {
+        void registerWebPushToken(profile.uid).catch(() => undefined);
+      }, 1500);
+    }
 
     let stopForeground: (() => void) | undefined;
     let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -339,6 +367,10 @@ function useShellStats(profile: UserProfile | null) {
       stopNotif();
       stopForeground?.();
       if (toastTimer) clearTimeout(toastTimer);
+      if (pushIdle !== undefined && typeof window !== "undefined") {
+        window.cancelIdleCallback(pushIdle);
+      }
+      if (pushTimer) clearTimeout(pushTimer);
     };
   }, [profile]);
 
@@ -354,10 +386,12 @@ function formatBadge(n: number) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations();
+  const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, loading } = useAuth();
   const [supportBusy, setSupportBusy] = useState(false);
+  const [cmdOpen, setCmdOpen] = useState(false);
   const { unreadTotal, learningCount, notifUnread, forumBadge, pushToast } =
     useShellStats(profile);
 
@@ -388,6 +422,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [pathname, profile]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCmdOpen((v) => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
   const openSupport = async () => {
     if (!profile || supportBusy || profile.isAnonymous) return;
     setSupportBusy(true);
@@ -405,12 +450,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   };
 
-  if (loading || !user || !profile) {
-    return (
-      <div className="mesh-bg flex min-h-[100svh] items-center justify-center text-muted">
-        {t("loading")}
-      </div>
-    );
+  if (loading || !user) {
+    return <AppShellSkeleton />;
+  }
+
+  if (!profile) {
+    return <AppShellSkeleton />;
   }
 
   if (
@@ -421,8 +466,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const isAuthor = canAuthorCourses(profile.role);
-  const studioActive =
-    pathname === "/studio" || pathname.startsWith("/studio/");
   const unreadLabel = formatBadge(unreadTotal);
   const forumLabel = formatBadge(forumBadge);
   const notifLabel = formatBadge(notifUnread);
@@ -449,6 +492,11 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
             <ThemeToggle />
           </div>
+          {isAuthor ? (
+            <div className="mt-2 px-1">
+              <AppSwitcher current="pulse" compact />
+            </div>
+          ) : null}
           <Link
             href="/profile"
             className="mt-3 flex items-center gap-2.5 rounded-xl bg-ink/[0.035] px-2.5 py-2 transition hover:bg-ink/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
@@ -516,21 +564,23 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
           {isAuthor && (
-            <Link
-              href="/studio"
-              aria-current={studioActive ? "page" : undefined}
-              className={`group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition duration-200 ${
-                studioActive
-                  ? "bg-brand/10 text-ink shadow-[inset_3px_0_0_0_var(--brand)]"
-                  : "text-muted hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
-              }`}
+            <button
+              type="button"
+              onClick={() => {
+                void (async () => {
+                  const user = getFirebaseAuth().currentUser;
+                  if (!user) return;
+                  const idToken = await user.getIdToken();
+                  const consume = ssoConsumeUrl("studio", locale, "/");
+                  window.location.assign(
+                    handoffUrlWithToken(consume, idToken),
+                  );
+                })();
+              }}
+              className="group relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium text-muted transition duration-200 hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
             >
               <IconStudio
-                className={`shrink-0 transition-transform duration-200 ${
-                  studioActive
-                    ? "scale-105 text-brand"
-                    : "text-muted group-hover:text-ink"
-                }`}
+                className="shrink-0 text-muted transition-transform duration-200 group-hover:text-ink"
                 width={20}
                 height={20}
               />
@@ -539,7 +589,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand"
                 aria-hidden
               />
-            </Link>
+            </button>
           )}
         </nav>
 
@@ -575,13 +625,30 @@ export function AppShell({ children }: { children: ReactNode }) {
             </button>
           )}
 
+          <button
+            type="button"
+            onClick={() => setCmdOpen(true)}
+            className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-muted transition hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
+          >
+            <IconCommand width={18} height={18} />
+            <span className="min-w-0 flex-1 truncate text-left">
+              {t("navCommand")}
+            </span>
+            <kbd className="rounded-md border border-glass-border px-1.5 py-0.5 text-[10px] font-semibold text-muted">
+              ⌘K
+            </kbd>
+          </button>
+
           <Button
             variant="ghost"
             className="w-full justify-start"
-            onClick={async () => {
-              await signOutUser();
-              router.replace("/");
-            }}
+            onClick={() =>
+              void signOutEverywhere({
+                current: "pulse",
+                locale,
+                returnPath: "/login",
+              })
+            }
           >
             {t("navLogout")}
           </Button>
@@ -683,6 +750,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           <IconChat filled width={22} height={22} />
         </button>
       )}
+
+      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </div>
   );
 }

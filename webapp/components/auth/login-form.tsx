@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/navigation";
 import {
   Button,
@@ -22,6 +23,7 @@ export function LoginForm() {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
+  const params = useSearchParams();
   const { user, profile, loading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -29,9 +31,14 @@ export function LoginForm() {
   const [busy, setBusy] = useState(false);
   const [magicSent, setMagicSent] = useState(false);
 
+  const nextParam = params.get("next");
+
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (window.location.href.includes("apiKey=") || window.location.href.includes("oobCode=")) {
+    if (
+      window.location.href.includes("apiKey=") ||
+      window.location.href.includes("oobCode=")
+    ) {
       completeMagicLink(window.location.href)
         .then(() => router.replace("/home"))
         .catch(() => undefined);
@@ -39,13 +46,20 @@ export function LoginForm() {
   }, [router]);
 
   useEffect(() => {
-    if (loading || !user || !profile) return;
-    if (!profile.profileCompleted && !profile.isAnonymous) {
+    if (loading || !user) return;
+    // Redirect as soon as auth is known; profile may still be hydrating from cache/network.
+    if (nextParam?.startsWith("/")) {
+      window.location.assign(`/${locale}${nextParam}`);
+      return;
+    }
+    if (profile && !profile.profileCompleted && !profile.isAnonymous) {
       router.replace("/complete-profile");
-    } else {
+      return;
+    }
+    if (user) {
       router.replace("/home");
     }
-  }, [loading, user, profile, router]);
+  }, [loading, user, profile, router, nextParam, locale]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -53,9 +67,10 @@ export function LoginForm() {
     setError(null);
     try {
       await signInWithEmail(email.trim(), password);
+      // Optimistic: leave the login form immediately; AppShell paints with skeleton/cache.
+      router.replace("/home");
     } catch {
       setError(t("errorAuth"));
-    } finally {
       setBusy(false);
     }
   }
@@ -69,7 +84,7 @@ export function LoginForm() {
         <h1 className="mt-6 font-display text-3xl font-bold">{t("loginTitle")}</h1>
         <p className="mt-2 text-muted">{t("loginSubtitle")}</p>
 
-        <form className="mt-8 space-y-4" onSubmit={onSubmit}>
+        <form className="mt-6 space-y-4" onSubmit={onSubmit}>
           <div>
             <Label>{t("email")}</Label>
             <Input
@@ -115,9 +130,9 @@ export function LoginForm() {
               setBusy(true);
               try {
                 await signInWithGoogle();
+                router.replace("/home");
               } catch {
                 setError(t("errorAuth"));
-              } finally {
                 setBusy(false);
               }
             }}
@@ -152,9 +167,9 @@ export function LoginForm() {
               setBusy(true);
               try {
                 await signInAsGuest();
+                router.replace("/home");
               } catch {
                 setError(t("errorAuth"));
-              } finally {
                 setBusy(false);
               }
             }}
