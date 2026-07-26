@@ -152,6 +152,35 @@ describe('users create', () => {
       db.doc('users/u5').update({ role: 'agent' }),
     );
   });
+
+  it('blocks owners from touching account lifecycle fields', async () => {
+    await seedUser('u6', { role: 'student' });
+    const db = authedDb('u6');
+    await assertFails(
+      db.doc('users/u6').update({ accountStatus: 'active' }),
+    );
+    await assertFails(
+      db.doc('users/u6').update({ deletionScheduledAt: new Date() }),
+    );
+    await assertFails(
+      db.doc('users/u6').update({ anonymousLabel: 'anonimo9' }),
+    );
+    // Regular profile edits still work.
+    await assertSucceeds(
+      db.doc('users/u6').update({ displayName: 'New Name' }),
+    );
+  });
+
+  it('blocks deactivated users from clearing their own status', async () => {
+    await seedUser('u7', {
+      role: 'student',
+      accountStatus: 'deactivated',
+    });
+    const db = authedDb('u7');
+    await assertFails(
+      db.doc('users/u7').update({ accountStatus: 'active' }),
+    );
+  });
 });
 
 describe('thread score forge', () => {
@@ -778,6 +807,84 @@ describe('chats moved to Realtime Database', () => {
         isGroup: false,
         createdBy: 'a',
         lastMessage: '',
+      }),
+    );
+  });
+});
+
+describe('notifications inbox', () => {
+  beforeEach(async () => {
+    await seedUser('n1');
+    await seedUser('n2');
+  });
+
+  it('lets owners mark a notification as read', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('users/n1/notifications/x').set({
+        type: 'chat_message',
+        title: 'Hi',
+        body: 'Body',
+        read: false,
+      });
+    });
+    await assertSucceeds(
+      authedDb('n1').doc('users/n1/notifications/x').update({ read: true }),
+    );
+    await assertFails(
+      authedDb('n1').doc('users/n1/notifications/x').update({ title: 'Hack' }),
+    );
+  });
+
+  it('lets owners read notifications but not create them', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('users/n1/notifications/x').set({
+        type: 'chat_message',
+        title: 'Hi',
+        body: 'Body',
+        read: false,
+      });
+    });
+    await assertSucceeds(authedDb('n1').doc('users/n1/notifications/x').get());
+    await assertFails(authedDb('n2').doc('users/n1/notifications/x').get());
+    await assertFails(
+      authedDb('n1').doc('users/n1/notifications/y').set({
+        type: 'chat_message',
+        title: 'Nope',
+        body: 'Client write',
+        read: false,
+      }),
+    );
+  });
+
+  it('allows owners to manage their own FCM tokens', async () => {
+    const db = authedDb('n1');
+    await assertSucceeds(
+      db.doc('users/n1/fcmTokens/abc').set({
+        token: 'x'.repeat(40),
+        platform: 'web',
+      }),
+    );
+    await assertFails(
+      authedDb('n2').doc('users/n1/fcmTokens/abc').set({
+        token: 'y'.repeat(40),
+        platform: 'ios',
+      }),
+    );
+  });
+
+  it('lets owners patch prefs and lastFeedSeenAt on notificationState', async () => {
+    const db = authedDb('n1');
+    await assertSucceeds(
+      db.doc('users/n1/notificationState/default').set({
+        prefs: { pushChats: false },
+        lastFeedSeenAt: new Date(),
+        updatedAt: new Date(),
+      }),
+    );
+    await assertFails(
+      db.doc('users/n1/notificationState/default').set({
+        unreadCount: 99,
+        updatedAt: new Date(),
       }),
     );
   });

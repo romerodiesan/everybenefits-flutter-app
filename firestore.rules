@@ -160,9 +160,19 @@ service cloud.firestore {
       // Owners may edit profile fields. Role is frozen except a one-time
       // student → student|agent transition when completing the profile.
       // Later upgrades and privileged roles require Admin SDK / setUserRole.
+      // Account lifecycle fields are server-managed (deactivate/delete
+      // callables), so clients can never touch them.
       allow update: if isOwner(uid)
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.isAnonymous == resource.data.isAnonymous
+        && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+          'accountStatus',
+          'deactivatedAt',
+          'deletionRequestedAt',
+          'deletionScheduledAt',
+          'anonymousLabel',
+          'deletionSnapshot'
+        ])
         && !isProtectedRole(request.resource.data.role)
         && !isProtectedRole(resource.data.role)
         && (
@@ -209,6 +219,59 @@ service cloud.firestore {
         // Enrollment, completion, quiz attempts and counters are atomic
         // server-side operations. Admin SDK bypasses this denial.
         allow write: if false;
+      }
+
+      // In-app notification inbox — Functions create; owners may mark read.
+      match /notifications/{notificationId} {
+        allow read: if isOwner(uid);
+        allow create, delete: if false;
+        allow update: if isOwner(uid)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['read'])
+          && resource.data.read == false
+          && request.resource.data.read == true;
+      }
+
+      // FCM device tokens for push delivery.
+      match /fcmTokens/{tokenId} {
+        allow read: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && request.resource.data.token is string
+          && request.resource.data.token.size() > 20
+          && request.resource.data.token.size() < 4096
+          && request.resource.data.platform in ['web', 'ios', 'android'];
+        allow delete: if isOwner(uid);
+      }
+
+      // Aggregate unread + prefs + feed cursor. Counters are normally
+      // server-written; owners may also decrement them when marking read
+      // locally (Functions unavailable / offline).
+      match /notificationState/{docId} {
+        allow read: if isOwner(uid) && docId == 'default';
+        allow create: if isOwner(uid)
+          && docId == 'default'
+          && request.resource.data.keys().hasOnly([
+            'prefs', 'lastFeedSeenAt', 'updatedAt'
+          ]);
+        allow update: if isOwner(uid)
+          && docId == 'default'
+          && (
+            request.resource.data.diff(resource.data).affectedKeys()
+              .hasOnly(['prefs', 'lastFeedSeenAt', 'updatedAt'])
+            || (
+              request.resource.data.diff(resource.data).affectedKeys()
+                .hasOnly(['unreadCount', 'unreadForumCount', 'updatedAt'])
+              && request.resource.data.unreadCount is int
+              && request.resource.data.unreadForumCount is int
+              && request.resource.data.unreadCount >= 0
+              && request.resource.data.unreadForumCount >= 0
+              && request.resource.data.unreadCount
+                <= resource.data.get('unreadCount', 0)
+              && request.resource.data.unreadForumCount
+                <= resource.data.get('unreadForumCount', 0)
+            )
+          );
+        allow delete: if false;
       }
     }
 
@@ -263,6 +326,11 @@ service cloud.firestore {
 
       allow delete: if isSignedIn()
         && (resource.data.authorId == request.auth.uid || isAdmin());
+
+      match /participants/{participantUid} {
+        allow read: if isSignedIn();
+        allow write: if false;
+      }
 
       match /votes/{uid} {
         allow read: if isSignedIn();

@@ -1,9 +1,16 @@
 import * as admin from "firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onValueWritten } from "firebase-functions/v2/database";
+import { onSchedule } from "firebase-functions/v2/scheduler";
 import { setGlobalOptions } from "firebase-functions/v2";
+import {
+  ensureThreadParticipant,
+  listThreadNotifyTargets,
+  markNotificationsRead,
+  notifyUser,
+} from "./notifications";
 
 admin.initializeApp({
   databaseURL: "https://every-insurance-default-rtdb.firebaseio.com",
@@ -11,6 +18,7 @@ admin.initializeApp({
 setGlobalOptions({ region: "us-central1", maxInstances: 20 });
 
 /** Gen2 callables need explicit CORS for browser (e.g. localhost webapp). */
+const usingFunctionsEmulator = process.env.FUNCTIONS_EMULATOR === "true";
 const callableOpts = {
   cors: [
     "http://localhost:3000",
@@ -22,7 +30,9 @@ const callableOpts = {
       .map((origin) => origin.trim())
       .filter(Boolean),
   ],
-  enforceAppCheck: true,
+  // Emulator clients skip App Check; enforcing here turns votes/replies into
+  // opaque `internal` failures. Production keeps enforcement on.
+  enforceAppCheck: !usingFunctionsEmulator,
   // Auth is enforced inside the handler; Cloud Run must allow the OPTIONS preflight.
   invoker: "public" as const,
 };
@@ -82,9 +92,7 @@ async function consumeFunctionQuota(uid: string, operation: string) {
         minute,
         count: count + 1,
         operations: FieldValue.arrayUnion(operation),
-        expiresAt: admin.firestore.Timestamp.fromMillis(
-          (minute + 2) * 60_000,
-        ),
+        expiresAt: Timestamp.fromMillis((minute + 2) * 60_000),
       },
       { merge: true },
     );
@@ -138,6 +146,7 @@ async function addAgentToDefaultGroup(uid: string, displayName: string) {
     if (current === null) {
       return {
         members: { [uid]: true },
+        memberCount: 1,
         memberNames: { [uid]: displayName },
         isGroup: true,
         isDefaultAgentGroup: true,
@@ -173,6 +182,7 @@ async function addAgentToDefaultGroup(uid: string, displayName: string) {
     return {
       ...current,
       members,
+      memberCount: Object.keys(members).length,
       memberNames,
       unreadCounts,
       isGroup: true,
@@ -238,6 +248,41 @@ export const syncChatInbox = onValueWritten(
       }
     }
     if (Object.keys(updates).length) await rtdb.ref().update(updates);
+
+    // Push + inbox when a new message bumps unread for recipients.
+    const beforeAt = Number(before.lastMessageAt ?? 0);
+    const afterAt = Number(after.lastMessageAt ?? 0);
+    const senderId = String(after.lastMessageSenderId ?? "");
+    if (!event.data.after.exists() || afterAt <= beforeAt || !senderId) {
+      return;
+    }
+    const preview = String(after.lastMessage ?? "").slice(0, 120);
+    const isSupport = after.isSupportChat === true;
+    const beforeUnread =
+      (before.unreadCounts ?? {}) as Record<string, unknown>;
+    const afterUnread =
+      (after.unreadCounts ?? {}) as Record<string, unknown>;
+
+    await Promise.all(
+      members.map(async (uid) => {
+        if (uid === senderId) return;
+        const prev = Number(beforeUnread[uid] ?? 0);
+        const next = Number(afterUnread[uid] ?? 0);
+        if (next <= prev) return;
+        await notifyUser(
+          uid,
+          {
+            type: isSupport ? "support_message" : "chat_message",
+            title: isSupport ? "Support" : "New message",
+            body: preview || "You have a new message",
+            href: `/chats/${chatId}`,
+            deepLink: `pulse://chats/${chatId}`,
+            ref: { chatId },
+          },
+          { chatIdForDebounce: chatId },
+        );
+      }),
+    );
   },
 );
 
@@ -292,6 +337,7 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
   const chatId = chatRef.key!;
   await chatRef.set({
     members: Object.fromEntries(memberIds.map((id) => [id, true])),
+    memberCount: memberIds.length,
     memberNames,
     isGroup: true,
     title,
@@ -313,6 +359,13 @@ export const enrollInCourse = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "enrollInCourse");
   const courseId = String(request.data?.courseId ?? "");
   if (!courseId) throw new HttpsError("invalid-argument", "courseId required");
+
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const user = userSnap.data();
+  if (!user || user.isAnonymous === true || user.role === "guest") {
+    throw new HttpsError("permission-denied", "Sign in required.");
+  }
+
   const courseRef = db.doc(`courses/${courseId}`);
   const enrollmentRef = db.doc(`users/${uid}/enrollments/${courseId}`);
   await db.runTransaction(async (tx) => {
@@ -468,6 +521,32 @@ export const castForumVote = onCall(callableOpts, async (request) => {
     });
   });
 
+  // Notify content author on upvote (not clear / downvote). Never fail the
+  // vote itself if the inbox/push side effect errors.
+  if (next === 1) {
+    try {
+      const target = await (
+        replyId
+          ? db.doc(`threads/${threadId}/replies/${replyId}`)
+          : db.doc(`threads/${threadId}`)
+      ).get();
+      const authorId = String(target.data()?.authorId ?? "");
+      if (authorId && authorId !== uid) {
+        const voterName = headlineName(user);
+        await notifyUser(authorId, {
+          type: "forum_vote",
+          title: "New upvote",
+          body: `${voterName} upvoted your ${replyId ? "reply" : "question"}`,
+          href: `/home/${threadId}`,
+          deepLink: `pulse://forums/${threadId}`,
+          ref: { threadId, ...(replyId ? { replyId } : {}) },
+        });
+      }
+    } catch (error) {
+      console.error("castForumVote notify failed", error);
+    }
+  }
+
   return { ok: true };
 });
 
@@ -510,6 +589,27 @@ export const addForumReply = onCall(callableOpts, async (request) => {
     updatedAt: FieldValue.serverTimestamp(),
   });
   await batch.commit();
+
+  await ensureThreadParticipant(threadId, uid);
+  const authorId = String(thread.data()?.authorId ?? "");
+  if (authorId && authorId !== uid) {
+    await ensureThreadParticipant(threadId, authorId);
+  }
+  const targets = await listThreadNotifyTargets(threadId, uid);
+  const actorName = headlineName(profile);
+  await Promise.all(
+    targets.map((targetUid) =>
+      notifyUser(targetUid, {
+        type: "forum_reply",
+        title: "New reply",
+        body: `${actorName}: ${body.slice(0, 100)}`,
+        href: `/home/${threadId}`,
+        deepLink: `pulse://forums/${threadId}`,
+        ref: { threadId, replyId: replyRef.id },
+      }),
+    ),
+  );
+
   return { replyId: replyRef.id };
 });
 
@@ -901,3 +1001,271 @@ export const postSupportAiMessage = onCall(callableOpts, async (request) => {
 
   return { id: messageRef.key, createdAt: now };
 });
+
+export const markNotificationRead = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "markNotificationRead");
+  const ids = Array.isArray(request.data?.notificationIds)
+    ? request.data.notificationIds.map(String).filter(Boolean)
+    : [];
+  const notificationId = String(request.data?.notificationId ?? "");
+  const all = ids.length
+    ? ids
+    : notificationId
+      ? [notificationId]
+      : [];
+  if (!all.length) {
+    throw new HttpsError("invalid-argument", "notificationId required");
+  }
+  return markNotificationsRead(uid, all);
+});
+
+export const markAllNotificationsRead = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "markAllNotificationsRead");
+  return markNotificationsRead(uid, "all");
+});
+
+/** When a course flips to published, notify enrolled learners. */
+export const onCoursePublished = onDocumentWritten(
+  { document: "courses/{courseId}", region: "us-central1" },
+  async (event) => {
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
+    if (!after || after.status !== "published") return;
+    if (before?.status === "published") return;
+    const courseId = event.params.courseId;
+    const title = String(after.title ?? "Course");
+    const enrollments = await db
+      .collectionGroup("enrollments")
+      .where("courseId", "==", courseId)
+      .limit(200)
+      .get();
+
+    const uids = new Set<string>();
+    for (const doc of enrollments.docs) {
+      const parent = doc.ref.parent.parent;
+      if (parent) uids.add(parent.id);
+    }
+
+    await Promise.all(
+      [...uids].map((uid) =>
+        notifyUser(uid, {
+          type: "course_published",
+          title: "Course published",
+          body: title.slice(0, 120),
+          href: `/academy/${courseId}`,
+          deepLink: `pulse://academy/${courseId}`,
+          ref: { courseId },
+        }),
+      ),
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
+// Account lifecycle
+//
+// Deactivation is user-reversible (sign in again and reactivate). Deletion
+// starts a 90-day grace period: shared content is anonymized immediately,
+// personal data is purged by the daily cron once the grace period ends.
+// ---------------------------------------------------------------------------
+
+const ACCOUNT_DELETION_GRACE_DAYS = 90;
+
+async function clearFcmTokens(uid: string): Promise<void> {
+  const tokens = await db.collection(`users/${uid}/fcmTokens`).limit(50).get();
+  await Promise.all(tokens.docs.map((doc) => doc.ref.delete()));
+}
+
+/** Sequential anonimo1 / anonimo2 / … labels, allocated transactionally. */
+async function nextAnonymousLabel(): Promise<string> {
+  const ref = db.doc("system/anonCounter");
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const count = Number(snap.data()?.count ?? 0) + 1;
+    tx.set(ref, { count }, { merge: true });
+    return `anonimo${count}`;
+  });
+}
+
+/** Rewrites author identity on the user's forum threads and replies. */
+async function renameForumContent(
+  uid: string,
+  authorName: string,
+  authorPhotoUrl: string | null,
+): Promise<void> {
+  const [threads, replies] = await Promise.all([
+    db.collection("threads").where("authorId", "==", uid).limit(500).get(),
+    db.collectionGroup("replies").where("authorId", "==", uid).limit(500).get(),
+  ]);
+  const docs = [...threads.docs, ...replies.docs];
+  for (let i = 0; i < docs.length; i += 400) {
+    const batch = db.batch();
+    for (const doc of docs.slice(i, i + 400)) {
+      batch.update(doc.ref, { authorName, authorPhotoUrl });
+    }
+    await batch.commit();
+  }
+}
+
+/** Rewrites the user's display name inside their RTDB chats. */
+async function renameChatMemberships(
+  uid: string,
+  name: string,
+): Promise<void> {
+  const index = await rtdb.ref(`userChats/${uid}`).get();
+  const chatIds = Object.keys((index.val() ?? {}) as Record<string, unknown>);
+  const updates: Record<string, unknown> = {};
+  for (const chatId of chatIds.slice(0, 200)) {
+    updates[`chats/${chatId}/memberNames/${uid}`] = name;
+  }
+  if (Object.keys(updates).length) await rtdb.ref().update(updates);
+}
+
+export const deactivateAccount = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "deactivateAccount");
+  const userRef = db.doc(`users/${uid}`);
+  const snap = await userRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "User not found.");
+  if (snap.data()?.accountStatus === "pendingDeletion") {
+    throw new HttpsError("failed-precondition", "Deletion already requested.");
+  }
+  await userRef.update({
+    accountStatus: "deactivated",
+    deactivatedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  await clearFcmTokens(uid);
+  return { ok: true };
+});
+
+export const reactivateAccount = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "reactivateAccount");
+  const userRef = db.doc(`users/${uid}`);
+  const snap = await userRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "User not found.");
+  if (snap.data()?.accountStatus !== "deactivated") {
+    throw new HttpsError("failed-precondition", "Account is not deactivated.");
+  }
+  await userRef.update({
+    accountStatus: "active",
+    deactivatedAt: FieldValue.delete(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+});
+
+export const requestAccountDeletion = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "requestAccountDeletion");
+  const userRef = db.doc(`users/${uid}`);
+  const snap = await userRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "User not found.");
+  const data = snap.data() ?? {};
+  if (data.accountStatus === "pendingDeletion") {
+    throw new HttpsError("failed-precondition", "Deletion already requested.");
+  }
+
+  const label = await nextAnonymousLabel();
+  const scheduledMs =
+    Date.now() + ACCOUNT_DELETION_GRACE_DAYS * 24 * 60 * 60 * 1000;
+
+  // Snapshot the identity so a cancel inside the grace period can restore it.
+  await userRef.update({
+    accountStatus: "pendingDeletion",
+    deletionRequestedAt: FieldValue.serverTimestamp(),
+    deletionScheduledAt: Timestamp.fromMillis(scheduledMs),
+    anonymousLabel: label,
+    deletionSnapshot: {
+      displayName: typeof data.displayName === "string" ? data.displayName : null,
+      photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
+    },
+    displayName: label,
+    photoUrl: null,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  // Shared content stays but under the anonymous identity, effective now.
+  await renameForumContent(uid, label, null);
+  await renameChatMemberships(uid, label);
+  await clearFcmTokens(uid);
+
+  return { deletionScheduledAt: scheduledMs };
+});
+
+export const cancelAccountDeletion = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "cancelAccountDeletion");
+  const userRef = db.doc(`users/${uid}`);
+  const snap = await userRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "User not found.");
+  const data = snap.data() ?? {};
+  if (data.accountStatus !== "pendingDeletion") {
+    throw new HttpsError("failed-precondition", "No pending deletion.");
+  }
+
+  const snapshot = (data.deletionSnapshot ?? {}) as Record<string, unknown>;
+  const displayName =
+    typeof snapshot.displayName === "string" ? snapshot.displayName : null;
+  const photoUrl =
+    typeof snapshot.photoUrl === "string" ? snapshot.photoUrl : null;
+
+  await userRef.update({
+    accountStatus: "active",
+    deletionRequestedAt: FieldValue.delete(),
+    deletionScheduledAt: FieldValue.delete(),
+    anonymousLabel: FieldValue.delete(),
+    deletionSnapshot: FieldValue.delete(),
+    displayName,
+    photoUrl,
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+
+  await renameForumContent(uid, displayName ?? "Usuario", photoUrl);
+  await renameChatMemberships(uid, displayName ?? "Usuario");
+
+  return { ok: true };
+});
+
+/**
+ * Daily purge of accounts whose 90-day grace period expired. Removes personal
+ * data (profile + subcollections, avatar, chat index, Auth user); forum and
+ * chat content stays under the anonymous label assigned at request time.
+ */
+export const purgeDeletedAccounts = onSchedule("every 24 hours", async () => {
+  const pending = await db
+    .collection("users")
+    .where("accountStatus", "==", "pendingDeletion")
+    .limit(100)
+    .get();
+  const now = Date.now();
+  const due = pending.docs.filter((doc) => {
+    const scheduled = doc.data().deletionScheduledAt;
+    const ms =
+      scheduled instanceof Timestamp
+        ? scheduled.toMillis()
+        : Number(scheduled ?? Number.POSITIVE_INFINITY);
+    return ms <= now;
+  });
+
+  for (const doc of due.slice(0, 20)) {
+    const uid = doc.id;
+    await db.recursiveDelete(doc.ref);
+    await rtdb.ref(`userChats/${uid}`).remove().catch(() => undefined);
+    await admin
+      .storage()
+      .bucket()
+      .file(`avatars/${uid}.jpg`)
+      .delete()
+      .catch(() => undefined);
+    await admin.auth().deleteUser(uid).catch(() => undefined);
+  }
+});
+
+/** Seed thread author as participant when a question is posted. */
+export const onThreadCreated = onDocumentWritten(
+  { document: "threads/{threadId}", region: "us-central1" },
+  async (event) => {
+    if (!event.data?.after.exists || event.data.before.exists) return;
+    const threadId = event.params.threadId;
+    const authorId = String(event.data.after.data()?.authorId ?? "");
+    if (authorId) await ensureThreadParticipant(threadId, authorId);
+  },
+);

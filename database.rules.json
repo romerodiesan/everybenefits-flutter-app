@@ -30,7 +30,8 @@
               && (
                 (newData.child('isGroup').val() === false
                   && newData.child('dmKey').val() === $chatId
-                  && newData.child('members').numChildren() === 2
+                  && newData.child('memberCount').val() === 2
+                  && newData.child('members').child(auth.uid).val() === true
                   && !newData.child('members').child('support-ai').exists())
               )
             )
