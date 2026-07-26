@@ -28,7 +28,12 @@ export type UserProfile = {
   agency: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
+  /** Account lifecycle; absent/"active" means normal. Server-managed. */
+  accountStatus?: AccountStatus;
+  deletionScheduledAt?: Date | null;
 };
+
+export type AccountStatus = "active" | "deactivated" | "pendingDeletion";
 
 export type ForumThread = {
   id: string;

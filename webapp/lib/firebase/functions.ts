@@ -76,6 +76,25 @@ export async function listStudentsForPromotion(): Promise<UserProfile[]> {
   }
 }
 
+/** Self-service account lifecycle; all enforce `uid == request.auth.uid`. */
+export async function deactivateAccount(): Promise<void> {
+  await callCloudFunction("deactivateAccount", {});
+}
+
+export async function reactivateAccount(): Promise<void> {
+  await callCloudFunction("reactivateAccount", {});
+}
+
+export async function requestAccountDeletion(): Promise<{
+  deletionScheduledAt: number;
+}> {
+  return callCloudFunction("requestAccountDeletion", {});
+}
+
+export async function cancelAccountDeletion(): Promise<void> {
+  await callCloudFunction("cancelAccountDeletion", {});
+}
+
 export async function listPublicProfiles(max = 80): Promise<UserProfile[]> {
   const data = await callCloudFunction<{
     profiles?: Array<Record<string, unknown>>;

@@ -57,6 +57,12 @@ export function profileFromData(
     agency: (data.agency as string) ?? null,
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
+    accountStatus:
+      data.accountStatus === "deactivated" ||
+      data.accountStatus === "pendingDeletion"
+        ? data.accountStatus
+        : "active",
+    deletionScheduledAt: toDate(data.deletionScheduledAt),
   };
 }
 

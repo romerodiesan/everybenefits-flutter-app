@@ -102,6 +102,7 @@ function messageFrom(
 function chatToRtdb(chat: ChatConversation) {
   return {
     members: Object.fromEntries(chat.memberIds.map((id) => [id, true])),
+    memberCount: chat.memberIds.length,
     memberNames: chat.memberNames,
     isGroup: chat.isGroup,
     title: chat.title,

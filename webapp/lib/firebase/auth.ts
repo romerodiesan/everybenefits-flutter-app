@@ -1,7 +1,10 @@
 import {
+  EmailAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   isSignInWithEmailLink,
+  reauthenticateWithCredential,
+  reauthenticateWithPopup,
   sendPasswordResetEmail,
   sendSignInLinkToEmail,
   signInAnonymously,
@@ -75,6 +78,32 @@ export async function completeMagicLink(href: string) {
 
 export async function signOutUser() {
   await signOut(getFirebaseAuth());
+}
+
+/** True when the current user signed in with email + password. */
+export function usesPasswordProvider(): boolean {
+  const user = getFirebaseAuth().currentUser;
+  return (
+    user?.providerData.some((p) => p.providerId === "password") ?? false
+  );
+}
+
+/**
+ * Confirms the caller's identity before destructive actions.
+ * Password accounts need the current password; OAuth accounts re-run the popup.
+ */
+export async function reauthenticate(password?: string): Promise<void> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error("Not signed in");
+  if (usesPasswordProvider()) {
+    if (!user.email || !password) throw new Error("password-required");
+    await reauthenticateWithCredential(
+      user,
+      EmailAuthProvider.credential(user.email, password),
+    );
+    return;
+  }
+  await reauthenticateWithPopup(user, googleProvider);
 }
 
 export function currentUser(): User | null {

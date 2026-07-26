@@ -14,9 +14,19 @@ import { useThemeSettings } from "@/lib/providers/theme-provider";
 import { signOutUser } from "@/lib/firebase/auth";
 import { getOrCreateSupportChat, watchInbox } from "@/lib/firebase/chats";
 import { watchEnrollments } from "@/lib/firebase/courses";
+import {
+  countNewFeedThreads,
+  listenForegroundMessages,
+  markFeedSeen,
+  registerWebPushToken,
+  watchNotificationState,
+} from "@/lib/firebase/notifications";
 import { canAuthorCourses, headlineName } from "@/lib/roles";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
+import { AccountGate } from "@/components/chrome/account-gate";
+
+type PushToast = { title: string; body: string; id: number };
 
 type IconProps = SVGProps<SVGSVGElement> & { filled?: boolean };
 
@@ -220,22 +230,65 @@ const ROLE_KEY: Record<UserRole, string> = {
   admin: "roleAdmin",
 };
 
+function IconBell({ filled, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" {...props}>
+      <path
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth={filled ? 0 : 1.8}
+        strokeLinejoin="round"
+        d="M6 9.5a6 6 0 1 1 12 0c0 3.2 1.2 4.6 1.8 5.2.4.4.2 1.3-.6 1.3H4.8c-.8 0-1-.9-.6-1.3.6-.6 1.8-2 1.8-5.2Z"
+      />
+      <path
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        d="M10 18.5a2 2 0 0 0 4 0"
+      />
+    </svg>
+  );
+}
+
 const NAV = [
-  { href: "/home", key: "navHome" as const, Icon: IconHome },
-  { href: "/chats", key: "navChats" as const, Icon: IconChat, badge: "unread" as const },
+  {
+    href: "/home",
+    key: "navHome" as const,
+    Icon: IconHome,
+    badge: "forum" as const,
+  },
+  {
+    href: "/chats",
+    key: "navChats" as const,
+    Icon: IconChat,
+    badge: "unread" as const,
+  },
   { href: "/ai", key: "navAi" as const, Icon: IconAi },
   { href: "/academy", key: "navAcademy" as const, Icon: IconSchool },
+  {
+    href: "/notifications",
+    key: "navNotifications" as const,
+    Icon: IconBell,
+    badge: "notifs" as const,
+  },
   { href: "/profile", key: "navProfile" as const, Icon: IconPerson },
 ];
 
 function useShellStats(profile: UserProfile | null) {
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [learningCount, setLearningCount] = useState(0);
+  const [notifUnread, setNotifUnread] = useState(0);
+  const [forumUnread, setForumUnread] = useState(0);
+  const [newThreads, setNewThreads] = useState(0);
+  const [pushToast, setPushToast] = useState<PushToast | null>(null);
 
   useEffect(() => {
     if (!profile || profile.isAnonymous) {
       setUnreadTotal(0);
       setLearningCount(0);
+      setNotifUnread(0);
+      setForumUnread(0);
+      setNewThreads(0);
       return;
     }
     const stopInbox = watchInbox(
@@ -256,13 +309,42 @@ function useShellStats(profile: UserProfile | null) {
       },
       () => setLearningCount(0),
     );
+    const stopNotif = watchNotificationState(
+      profile.uid,
+      (state) => {
+        setNotifUnread(state.unreadCount);
+        setForumUnread(state.unreadForumCount);
+        void countNewFeedThreads(state.lastFeedSeenAt).then(setNewThreads);
+      },
+      () => {
+        setNotifUnread(0);
+        setForumUnread(0);
+      },
+    );
+    void registerWebPushToken(profile.uid).catch(() => undefined);
+
+    let stopForeground: (() => void) | undefined;
+    let toastTimer: ReturnType<typeof setTimeout> | undefined;
+    void listenForegroundMessages((title, body) => {
+      setPushToast({ title, body, id: Date.now() });
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => setPushToast(null), 5000);
+    }).then((stop) => {
+      stopForeground = stop ?? undefined;
+    });
+
     return () => {
       stopInbox();
       stopEnroll();
+      stopNotif();
+      stopForeground?.();
+      if (toastTimer) clearTimeout(toastTimer);
     };
   }, [profile]);
 
-  return { unreadTotal, learningCount };
+  const forumBadge = forumUnread + newThreads;
+
+  return { unreadTotal, learningCount, notifUnread, forumBadge, pushToast };
 }
 
 function formatBadge(n: number) {
@@ -276,7 +358,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, profile, loading } = useAuth();
   const [supportBusy, setSupportBusy] = useState(false);
-  const { unreadTotal, learningCount } = useShellStats(profile);
+  const { unreadTotal, learningCount, notifUnread, forumBadge, pushToast } =
+    useShellStats(profile);
 
   const name = useMemo(
     () => (profile ? headlineName(profile) : ""),
@@ -297,6 +380,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       router.replace("/complete-profile");
     }
   }, [loading, user, profile, router]);
+
+  useEffect(() => {
+    if (!profile || profile.isAnonymous) return;
+    if (pathname === "/home" || pathname.startsWith("/home/")) {
+      void markFeedSeen(profile.uid);
+    }
+  }, [pathname, profile]);
 
   const openSupport = async () => {
     if (!profile || supportBusy || profile.isAnonymous) return;
@@ -323,12 +413,28 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  if (
+    profile.accountStatus === "deactivated" ||
+    profile.accountStatus === "pendingDeletion"
+  ) {
+    return <AccountGate profile={profile} />;
+  }
+
   const isAuthor = canAuthorCourses(profile.role);
   const studioActive =
     pathname === "/studio" || pathname.startsWith("/studio/");
   const unreadLabel = formatBadge(unreadTotal);
+  const forumLabel = formatBadge(forumBadge);
+  const notifLabel = formatBadge(notifUnread);
   const onChats =
     pathname === "/chats" || pathname.startsWith("/chats/");
+
+  const badgeFor = (kind: "unread" | "forum" | "notifs" | undefined) => {
+    if (kind === "unread") return unreadLabel;
+    if (kind === "forum") return forumLabel;
+    if (kind === "notifs") return notifLabel;
+    return null;
+  };
 
   return (
     <div className="mesh-bg flex h-[100svh] flex-col overflow-hidden lg:flex-row">
@@ -343,7 +449,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             </Link>
             <ThemeToggle />
           </div>
-          <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-ink/[0.035] px-2.5 py-2 dark:bg-white/[0.04]">
+          <Link
+            href="/profile"
+            className="mt-3 flex items-center gap-2.5 rounded-xl bg-ink/[0.035] px-2.5 py-2 transition hover:bg-ink/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
+          >
             <div
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/15 font-display text-sm font-bold text-brand"
               aria-hidden
@@ -367,7 +476,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {t(ROLE_KEY[profile.role])}
               </span>
             </div>
-          </div>
+          </Link>
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3" aria-label="Primary">
@@ -375,8 +484,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.Icon;
-            const showUnread =
-              item.badge === "unread" && unreadLabel != null;
+            const badge = badgeFor(item.badge);
             return (
               <Link
                 key={item.href}
@@ -399,9 +507,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   height={20}
                 />
                 <span className="min-w-0 flex-1 truncate">{t(item.key)}</span>
-                {showUnread && (
+                {badge && (
                   <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-on-brand">
-                    {unreadLabel}
+                    {badge}
                   </span>
                 )}
               </Link>
@@ -496,6 +604,26 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
+        {pushToast && (
+          <div
+            role="status"
+            className="pointer-events-none absolute inset-x-0 top-14 z-40 flex justify-center px-4 lg:top-4"
+          >
+            <div className="pointer-events-auto pulse-sheet max-w-md px-4 py-3 shadow-lg">
+              <p className="text-sm font-semibold">{pushToast.title}</p>
+              {pushToast.body ? (
+                <p className="mt-0.5 text-xs text-muted">{pushToast.body}</p>
+              ) : null}
+              <Link
+                href="/notifications"
+                className="mt-2 inline-block text-xs font-semibold text-brand"
+              >
+                {t("navNotifications")}
+              </Link>
+            </div>
+          </div>
+        )}
+
         <main className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-[calc(48px+env(safe-area-inset-bottom,0px)+16px)] lg:pb-0">
           {children}
         </main>
@@ -510,8 +638,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.Icon;
-            const showUnread =
-              item.badge === "unread" && unreadLabel != null;
+            const badge = badgeFor(item.badge);
             return (
               <Link
                 key={item.href}
@@ -535,7 +662,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     {t(item.key)}
                   </span>
                 )}
-                {showUnread && (
+                {badge && (
                   <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand" />
                 )}
               </Link>
