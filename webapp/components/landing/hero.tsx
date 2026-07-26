@@ -1,17 +1,23 @@
 "use client";
 
-import { motion, useScroll, useTransform } from "motion/react";
-import { useRef } from "react";
+import { AnimatePresence, motion, useScroll, useTransform } from "motion/react";
+import { useEffect, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/primitives";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { useSafeReducedMotion } from "@/lib/use-safe-reduced-motion";
-import { LottieScene } from "@/components/landing/lottie-scene";
 import { PhoneMock } from "@/components/landing/phone-mock";
-import { ForumsScreen } from "@/components/landing/screens/forums-screen";
+import { AiScreen } from "@/components/landing/screens/ai-screen";
 
 const RISE = [0.22, 1, 0.36, 1] as const;
+
+const ROTATING_KEYS = [
+  "landingHowForumsTitle",
+  "landingHowChatsTitle",
+  "landingHowAcademyTitle",
+  "landingHowAiTitle",
+] as const;
 
 export function LandingHero() {
   const t = useTranslations();
@@ -22,147 +28,170 @@ export function LandingHero() {
   const signedIn = Boolean(user && profile);
   const reduced = useSafeReducedMotion();
   const sectionRef = useRef<HTMLElement>(null);
+  const [word, setWord] = useState(0);
+
   const { scrollYProgress } = useScroll({
     target: sectionRef,
     offset: ["start start", "end start"],
   });
-  const atmosphereY = useTransform(
+  const typeY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 90]);
+  const accentY = useTransform(
     scrollYProgress,
     [0, 1],
-    [0, reduced ? 0 : 120],
+    [0, reduced ? 0 : -70],
   );
-  const phoneY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : -60]);
-  const copyY = useTransform(scrollYProgress, [0, 1], [0, reduced ? 0 : 40]);
+
+  useEffect(() => {
+    if (reduced) return;
+    const id = window.setInterval(() => {
+      setWord((prev) => (prev + 1) % ROTATING_KEYS.length);
+    }, 2400);
+    return () => window.clearInterval(id);
+  }, [reduced]);
+
+  const [brandFirst, brandSecond = ""] = t("brand").split(" ");
 
   return (
     <section
       ref={sectionRef}
-      className="cine-bg cine-vignette relative min-h-[100svh] overflow-hidden"
+      className="cine-bg grain relative min-h-[100svh] overflow-hidden"
     >
       <motion.div
         aria-hidden
-        style={{ y: atmosphereY }}
-        className="pointer-events-none absolute -top-[14vh] left-1/2 h-[88vh] w-[88vh] -translate-x-1/2 opacity-[0.055] blur-[2px] grayscale dark:opacity-[0.1]"
-      >
-        <LottieScene src="/lottie/shield.json" className="h-full w-full" />
-      </motion.div>
-      <motion.div
-        aria-hidden
-        style={{ y: atmosphereY }}
-        className="pointer-events-none absolute -left-24 top-32 h-72 w-72 rounded-full bg-brand/20 blur-3xl"
-        animate={reduced ? undefined : { x: [0, 26, 0], y: [0, 16, 0] }}
-        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        aria-hidden
-        className="pointer-events-none absolute -right-20 bottom-8 h-80 w-80 rounded-full bg-brand/12 blur-3xl"
-        animate={reduced ? undefined : { x: [0, -20, 0], y: [0, -12, 0] }}
+        className="pointer-events-none absolute -left-40 top-1/3 h-[30rem] w-[30rem] rounded-full bg-brand/20 blur-3xl"
+        animate={reduced ? undefined : { x: [0, 40, 0], y: [0, 24, 0] }}
         transition={{ duration: 17, repeat: Infinity, ease: "easeInOut" }}
       />
 
-      <div className="relative mx-auto flex min-h-[100svh] max-w-6xl flex-col px-6 pt-5">
-        <header className="flex items-center justify-end gap-3">
-          <div className="flex items-center gap-1 rounded-full border border-glass-border bg-sheet/70 p-0.5">
-            {(["es", "en"] as const).map((code) => (
-              <button
-                key={code}
-                type="button"
-                className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase transition ${
-                  locale === code
-                    ? "bg-brand text-on-brand"
-                    : "text-muted hover:text-ink"
-                }`}
-                onClick={() => router.replace(pathname, { locale: code })}
-              >
-                {code}
-              </button>
-            ))}
+      <div className="relative z-10 mx-auto flex min-h-[100svh] max-w-7xl flex-col px-6 pt-5">
+        <header className="flex items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="font-display text-sm font-extrabold uppercase tracking-[0.2em] text-ink/80"
+          >
+            {t("brandShort")}
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 rounded-full border border-glass-border bg-sheet/70 p-0.5">
+              {(["es", "en"] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase transition ${
+                    locale === code
+                      ? "bg-brand text-on-brand"
+                      : "text-muted hover:text-ink"
+                  }`}
+                  onClick={() => router.replace(pathname, { locale: code })}
+                >
+                  {code}
+                </button>
+              ))}
+            </div>
+            {!loading && !signedIn && (
+              <Link href="/login">
+                <Button variant="secondary">{t("navLogin")}</Button>
+              </Link>
+            )}
+            {!loading && signedIn && (
+              <Link href="/home">
+                <Button>{t("ctaOpenApp")}</Button>
+              </Link>
+            )}
           </div>
-          {!loading && !signedIn && (
-            <Link href="/login">
-              <Button variant="secondary">{t("navLogin")}</Button>
-            </Link>
-          )}
-          {!loading && signedIn && (
-            <Link href="/home">
-              <Button>{t("ctaOpenApp")}</Button>
-            </Link>
-          )}
         </header>
 
-        <div className="grid flex-1 items-end gap-2 pt-6 lg:grid-cols-[1.08fr_0.92fr] lg:gap-8 lg:pt-2">
-          <motion.div style={{ y: copyY }} className="pb-8 lg:pb-20">
+        <div className="relative flex flex-1 flex-col justify-center py-14">
+          <motion.div style={{ y: typeY }} className="relative z-10">
             <motion.p
-              className="text-xs font-semibold uppercase tracking-[0.2em] text-brand"
-              initial={reduced ? false : { opacity: 0, y: 12 }}
+              className="text-outline select-none font-display text-[clamp(4.5rem,17vw,13rem)] font-extrabold uppercase leading-[0.82] tracking-[-0.03em]"
+              initial={reduced ? false : { opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, ease: RISE }}
+              transition={{ duration: 0.7, ease: RISE }}
             >
-              {t("landingHeroKicker")}
+              {brandFirst}
             </motion.p>
             <motion.p
-              className="mt-3 font-display text-[3.5rem] font-extrabold leading-[0.92] tracking-[-0.04em] text-ink sm:text-7xl lg:text-[6.5rem]"
+              className="select-none font-display text-[clamp(4.5rem,17vw,13rem)] font-extrabold uppercase leading-[0.82] tracking-[-0.03em] text-ink"
+              initial={reduced ? false : { opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.7, delay: 0.08, ease: RISE }}
+            >
+              {brandSecond}
+            </motion.p>
+
+            <motion.div
+              className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-1"
               initial={reduced ? false : { opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.55, delay: 0.05, ease: RISE }}
+              transition={{ duration: 0.6, delay: 0.18, ease: RISE }}
             >
-              {t("brand")}
-            </motion.p>
-            <motion.h1
-              className="mt-4 max-w-md font-display text-xl font-semibold leading-snug text-ink/90 md:text-2xl"
+              <span className="text-xs font-semibold uppercase tracking-[0.24em] text-muted">
+                {t("landingStoryKicker")}
+              </span>
+              <span className="relative inline-flex h-[1.3em] min-w-40 overflow-hidden font-display text-3xl font-extrabold tracking-tight text-brand md:text-5xl">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span
+                    key={ROTATING_KEYS[word]}
+                    initial={reduced ? false : { y: "100%", opacity: 0 }}
+                    animate={{ y: "0%", opacity: 1 }}
+                    exit={reduced ? { opacity: 0 } : { y: "-100%", opacity: 0 }}
+                    transition={{ duration: 0.4, ease: RISE }}
+                    className="whitespace-nowrap"
+                  >
+                    {t(ROTATING_KEYS[word])}
+                  </motion.span>
+                </AnimatePresence>
+              </span>
+            </motion.div>
+
+            <motion.p
+              className="mt-5 max-w-md text-sm leading-relaxed text-muted md:text-base"
               initial={reduced ? false : { opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.12, ease: RISE }}
-            >
-              {t("heroHeadline")}
-            </motion.h1>
-            <motion.p
-              className="mt-3 max-w-md text-sm leading-relaxed text-muted md:text-base"
-              initial={reduced ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.18, ease: RISE }}
+              transition={{ duration: 0.55, delay: 0.26, ease: RISE }}
             >
               {t("heroSub")}
             </motion.p>
-            <motion.div
-              className="mt-6 flex flex-wrap gap-2.5"
-              initial={reduced ? false : { opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.24, ease: RISE }}
-            >
-              {signedIn ? (
-                <Link href="/home">
-                  <Button className="min-w-40">{t("ctaOpenApp")}</Button>
+
+            {!loading && !signedIn && (
+              <motion.div
+                className="mt-7 flex flex-wrap gap-2.5"
+                initial={reduced ? false : { opacity: 0, y: 14 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.55, delay: 0.34, ease: RISE }}
+              >
+                <Link href="/register">
+                  <Button className="min-w-36">{t("ctaJoin")}</Button>
                 </Link>
-              ) : (
-                <>
-                  <Link href="/login">
-                    <Button className="min-w-36">{t("ctaEnter")}</Button>
-                  </Link>
-                  <Link href="/register">
-                    <Button variant="secondary" className="min-w-36">
-                      {t("ctaRegister")}
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </motion.div>
+                <Link href="/login">
+                  <Button variant="secondary" className="min-w-36">
+                    {t("ctaEnter")}
+                  </Button>
+                </Link>
+              </motion.div>
+            )}
           </motion.div>
 
           <motion.div
-            style={{ y: phoneY }}
-            className="mx-auto w-[208px] translate-y-6 sm:w-[248px] lg:w-[300px] lg:translate-y-14"
+            style={{ y: accentY }}
+            className="pointer-events-none absolute -bottom-24 right-[-8%] hidden w-[220px] sm:block lg:right-[2%] lg:w-[240px]"
           >
             <motion.div
-              initial={reduced ? false : { opacity: 0, y: 40, scale: 0.97 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ duration: 0.7, delay: 0.1, ease: RISE }}
+              initial={reduced ? false : { opacity: 0, y: 60, rotate: 12 }}
+              animate={{ opacity: 1, y: 0, rotate: 9 }}
+              transition={{ duration: 0.9, delay: 0.3, ease: RISE }}
             >
-              <PhoneMock activeTab="home">
-                <ForumsScreen />
+              <PhoneMock activeTab="ai" className="landing-phone-glow">
+                <AiScreen />
               </PhoneMock>
             </motion.div>
           </motion.div>
+        </div>
+
+        <div className="flex items-center justify-between pb-5 text-[10px] font-semibold uppercase tracking-[0.24em] text-muted">
+          <span>{t("landingScrollHint")} ↓</span>
+          <span>{t("tagline")}</span>
         </div>
       </div>
     </section>

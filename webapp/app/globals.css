@@ -205,6 +205,101 @@ h3,
   overflow: hidden;
 }
 
+.landing-phone-glow {
+  filter: drop-shadow(
+    0 28px 60px color-mix(in srgb, var(--brand) 28%, transparent)
+  );
+}
+
+/* Editorial landing: hollow display type */
+.text-outline {
+  -webkit-text-stroke: 2px color-mix(in srgb, var(--ink) 55%, transparent);
+  color: transparent;
+}
+
+.text-outline-brand {
+  -webkit-text-stroke: 2px color-mix(in srgb, var(--brand) 80%, transparent);
+  color: transparent;
+}
+
+/* Editorial landing: film grain overlay */
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* Editorial landing: tilted product accent cards */
+.landing-accent-card {
+  box-shadow:
+    0 30px 70px -30px color-mix(in srgb, var(--ink) 55%, transparent),
+    0 0 0 1px var(--glass-border);
+  border-radius: 18px;
+  background: var(--mesh-deep);
+}
+
+.browser-frame {
+  border-radius: 1.1rem;
+  border: 1px solid var(--glass-border);
+  background: var(--mesh-deep);
+  overflow: hidden;
+  box-shadow:
+    0 36px 80px -40px color-mix(in srgb, var(--ink) 55%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--ink) 6%, transparent);
+}
+
+.browser-screen {
+  min-height: 0;
+}
+
+.landing-browser-glow {
+  box-shadow:
+    0 40px 90px -42px color-mix(in srgb, var(--brand) 35%, transparent),
+    0 36px 80px -40px color-mix(in srgb, var(--ink) 45%, transparent);
+}
+
+.legal-prose h2 {
+  margin-top: 2rem;
+  margin-bottom: 0.65rem;
+  font-family: var(--font-outfit), system-ui, sans-serif;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+.legal-prose p,
+.legal-prose li {
+  color: var(--muted);
+  font-size: 0.95rem;
+  line-height: 1.7;
+}
+
+.legal-prose p + p {
+  margin-top: 0.75rem;
+}
+
+.legal-prose ul {
+  margin-top: 0.65rem;
+  margin-bottom: 0.65rem;
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+.legal-prose li + li {
+  margin-top: 0.35rem;
+}
+
+.legal-prose a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 /* Landing: brand-tinted AI answer surface inside the mock */
 .mock-ai-answer {
   background: color-mix(in srgb, var(--brand) 12%, var(--mesh-deep));

@@ -8,70 +8,132 @@ import {
   type ReactNode,
   type SVGProps,
 } from "react";
+import { useTranslations } from "next-intl";
 
-export type PhoneTab = "home" | "chats" | "ai" | "academy";
+export type PhoneTab = "home" | "chats" | "ai" | "academy" | "profile";
 
 /** The mock UI is authored at this size and scaled to whatever width it gets. */
 const DESIGN_WIDTH = 282;
 const DESIGN_HEIGHT = 596;
 
-function IconHome(props: SVGProps<SVGSVGElement>) {
+type IconProps = SVGProps<SVGSVGElement> & { filled?: boolean };
+
+function IconHome({ filled, ...props }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" {...props}>
-      <path
-        d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" {...props}>
+      {filled ? (
+        <path
+          fill="currentColor"
+          d="M12 3.2 3.8 10.2c-.4.3-.3.9.2 1V20c0 .6.4 1 1 1h5v-6h4v6h5c.6 0 1-.4 1-1v-8.8c.5-.1.6-.7.2-1L12 3.2Z"
+        />
+      ) : (
+        <path
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+          d="M4 10.5 12 4l8 6.5V20a1 1 0 0 1-1 1h-5v-6H10v6H5a1 1 0 0 1-1-1v-9.5Z"
+        />
+      )}
     </svg>
   );
 }
 
-function IconChat(props: SVGProps<SVGSVGElement>) {
+function IconChat({ filled, ...props }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" {...props}>
-      <path
-        d="M6.5 4h11A2.5 2.5 0 0 1 20 6.5v8A2.5 2.5 0 0 1 17.5 17H9l-3.8 2.8c-.5.4-1.2 0-1.2-.6V6.5A2.5 2.5 0 0 1 6.5 4Z"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" {...props}>
+      {filled ? (
+        <path
+          fill="currentColor"
+          d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5H9.2L5.4 20.4c-.5.4-1.2 0-1.2-.6V5.5Z"
+        />
+      ) : (
+        <path
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+          d="M6.5 4h11A2.5 2.5 0 0 1 20 6.5v8A2.5 2.5 0 0 1 17.5 17H9l-3.8 2.8c-.5.4-1.2 0-1.2-.6V6.5A2.5 2.5 0 0 1 6.5 4Z"
+        />
+      )}
     </svg>
   );
 }
 
-function IconAi(props: SVGProps<SVGSVGElement>) {
+function IconAi({ filled, ...props }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" {...props}>
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" {...props}>
       <path
+        fill={filled ? "currentColor" : "none"}
+        stroke="currentColor"
+        strokeWidth={filled ? 0 : 1.8}
+        strokeLinejoin="round"
         d="M12 3.5 13.8 9l5.7 1.2-4.5 3.8 1.4 5.7L12 16.8 7.6 19.7l1.4-5.7-4.5-3.8L10.2 9 12 3.5Z"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinejoin="round"
       />
     </svg>
   );
 }
 
-function IconSchool(props: SVGProps<SVGSVGElement>) {
+function IconSchool({ filled, ...props }: IconProps) {
   return (
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" {...props}>
-      <path
-        d="M12 4 3 8.4l9 4.4 9-4.4L12 4Zm-5 6.6v3.9c0 1.6 2.2 2.9 5 2.9s5-1.3 5-2.9v-3.9"
-        stroke="currentColor"
-        strokeWidth="1.9"
-        strokeLinejoin="round"
-      />
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" {...props}>
+      {filled ? (
+        <path
+          fill="currentColor"
+          d="M12 3 2.5 8.2 12 13.4l8-4.4V16h1.5V8.2L12 3Zm-6 9.2v3.3c0 1.7 2.7 3 6 3s6-1.3 6-3v-3.3l-6 3.3-6-3.3Z"
+        />
+      ) : (
+        <path
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+          d="M12 4 3 9l9 5 7.2-4V16H21V9L12 4Zm-5.5 8.6v2.9c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-2.9"
+        />
+      )}
     </svg>
   );
 }
 
-const TABS: { id: PhoneTab; Icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
-  { id: "home", Icon: IconHome },
-  { id: "chats", Icon: IconChat },
-  { id: "ai", Icon: IconAi },
-  { id: "academy", Icon: IconSchool },
+function IconPerson({ filled, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" {...props}>
+      {filled ? (
+        <>
+          <circle cx="12" cy="8" r="3.5" fill="currentColor" />
+          <path
+            fill="currentColor"
+            d="M5.5 19.2c.4-3.2 3-5.2 6.5-5.2s6.1 2 6.5 5.2c.1.5-.4 1-1 1H6.5c-.6 0-1.1-.5-1-1Z"
+          />
+        </>
+      ) : (
+        <>
+          <circle
+            cx="12"
+            cy="8"
+            r="3.2"
+            stroke="currentColor"
+            strokeWidth="1.8"
+          />
+          <path
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            d="M6.2 18.5c.6-2.8 2.9-4.3 5.8-4.3s5.2 1.5 5.8 4.3"
+          />
+        </>
+      )}
+    </svg>
+  );
+}
+
+const TABS: {
+  id: PhoneTab;
+  labelKey: "navHome" | "navChats" | "navAi" | "navAcademy" | "navProfile";
+  Icon: ComponentType<IconProps>;
+}[] = [
+  { id: "home", labelKey: "navHome", Icon: IconHome },
+  { id: "chats", labelKey: "navChats", Icon: IconChat },
+  { id: "ai", labelKey: "navAi", Icon: IconAi },
+  { id: "academy", labelKey: "navAcademy", Icon: IconSchool },
+  { id: "profile", labelKey: "navProfile", Icon: IconPerson },
 ];
 
 function StatusBar() {
@@ -89,19 +151,36 @@ function StatusBar() {
 }
 
 function TabBar({ active }: { active: PhoneTab }) {
+  const t = useTranslations();
+
   return (
-    <div className="shrink-0 px-4 pb-3 pt-2">
-      <div className="pulse-tab-pill flex items-center justify-around px-2 py-1.5">
-        {TABS.map(({ id, Icon }) => (
-          <span
-            key={id}
-            className={`flex h-7 w-9 items-center justify-center rounded-full ${
-              id === active ? "bg-brand/14 text-brand" : "text-muted"
-            }`}
-          >
-            <Icon />
-          </span>
-        ))}
+    <div className="shrink-0 px-2 pb-2.5 pt-1.5">
+      <div className="pulse-tab-pill mx-auto flex items-center px-0.5 py-0.5">
+        {TABS.map(({ id, labelKey, Icon }) => {
+          const isActive = id === active;
+          return (
+            <span
+              key={id}
+              className={`flex h-10 flex-1 items-center justify-center gap-1 rounded-xl transition ${
+                isActive
+                  ? "max-w-[7rem] flex-[1.2] bg-brand/10 text-ink"
+                  : "text-muted"
+              }`}
+            >
+              <Icon
+                filled={isActive}
+                className={isActive ? "text-brand" : "text-muted"}
+                width={18}
+                height={18}
+              />
+              {isActive && (
+                <span className="truncate text-[10px] font-semibold tracking-tight">
+                  {t(labelKey)}
+                </span>
+              )}
+            </span>
+          );
+        })}
       </div>
     </div>
   );
@@ -146,7 +225,7 @@ export function PhoneMock({
           }}
         >
           <StatusBar />
-          <div className="relative min-h-0 flex-1 overflow-hidden">
+          <div className="relative min-h-0 flex-1 overflow-hidden pointer-events-none">
             {children}
           </div>
           <TabBar active={activeTab} />
