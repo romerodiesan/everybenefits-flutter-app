@@ -1,5 +1,4 @@
 import {
-  convertToModelMessages,
   createUIMessageStream,
   createUIMessageStreamResponse,
   toUIMessageStream,
@@ -54,7 +53,6 @@ export async function POST(request: Request) {
       locale: body.locale,
       conversationId: body.conversationId,
       userText: textOf(lastUser),
-      history: await convertToModelMessages(uiMessages),
     });
   } catch (error) {
     if (error instanceof PulseHttpError) return error.toResponse();

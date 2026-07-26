@@ -144,6 +144,15 @@ export function classifyScope(text: string): ScopeVerdict {
   return { decision, legalAdvice, injection, insuranceHits, offTopicHits };
 }
 
+export function refusalReasonForScope(
+  scope: ScopeVerdict,
+): PulseRefusalReason | null {
+  if (scope.injection) return "unsafe";
+  if (scope.legalAdvice) return "legal_advice";
+  if (scope.decision === "out_of_scope") return "out_of_scope";
+  return null;
+}
+
 /** Assertions that would turn education into individualised legal counsel. */
 const UNSAFE_OUTPUT_PATTERNS: RegExp[] = [
   /\byou (?:are|will be) (?:legally )?(?:liable|not liable)\b/i,

@@ -1,6 +1,5 @@
 import type {
   LanguageModelUsage,
-  ModelMessage,
   StepResult,
   ToolSet,
 } from "ai";
@@ -13,31 +12,9 @@ import type { PulseMobileEvent } from "@/lib/ai/types";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-/**
- * Flutter-facing endpoint.
- *
- * Emits a small, explicit SSE vocabulary instead of the AI SDK's UI message
- * protocol so the mobile client does not have to reimplement part
- * reconciliation. See `PulseMobileEvent` for the contract.
- */
-function historyFrom(value: unknown): ModelMessage[] {
-  if (!Array.isArray(value)) return [];
-  const messages: ModelMessage[] = [];
-  for (const entry of value.slice(-aiConfig.maxIncomingMessages)) {
-    if (typeof entry !== "object" || entry === null) continue;
-    const role = (entry as { role?: unknown }).role;
-    const text = (entry as { text?: unknown }).text;
-    if (typeof text !== "string" || !text.trim()) continue;
-    if (role !== "user" && role !== "assistant") continue;
-    messages.push({ role, content: text.slice(0, aiConfig.maxPromptChars) });
-  }
-  return messages;
-}
-
 export async function POST(request: Request) {
   let body: {
     message?: unknown;
-    history?: unknown;
     conversationId?: unknown;
     locale?: unknown;
   };
@@ -51,7 +28,6 @@ export async function POST(request: Request) {
   }
 
   const userText = typeof body.message === "string" ? body.message : "";
-  const history = historyFrom(body.history);
 
   let run;
   try {
@@ -60,7 +36,6 @@ export async function POST(request: Request) {
       locale: body.locale,
       conversationId: body.conversationId,
       userText,
-      history: [...history, { role: "user", content: userText.trim() }],
     });
   } catch (error) {
     if (error instanceof PulseHttpError) return error.toResponse();

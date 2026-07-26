@@ -53,6 +53,11 @@ export const aiConfig = {
   webSearchProvider: (env("PULSE_AI_WEB_SEARCH_PROVIDER") ?? "none").toLowerCase(),
   webSearchApiKey: env("PULSE_AI_WEB_SEARCH_API_KEY"),
   webSearchTimeoutMs: intEnv("PULSE_AI_WEB_SEARCH_TIMEOUT_MS", 8000),
+  maxWebSearchesPerRun: intEnv("PULSE_AI_MAX_WEB_SEARCHES_PER_RUN", 1),
+  maxEmbeddingSearchesPerRun: intEnv(
+    "PULSE_AI_MAX_EMBEDDING_SEARCHES_PER_RUN",
+    4,
+  ),
 
   /** Shared secret for the reindex endpoint when called by a cron job. */
   adminTaskKey: env("PULSE_AI_ADMIN_TASK_KEY"),

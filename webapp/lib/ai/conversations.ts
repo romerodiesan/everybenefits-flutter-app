@@ -1,6 +1,6 @@
 import "server-only";
 
-import { generateText } from "ai";
+import { generateText, type ModelMessage } from "ai";
 import { FieldValue } from "firebase-admin/firestore";
 import type { AppLocale } from "@/i18n/routing";
 import {
@@ -9,6 +9,7 @@ import {
   MESSAGES_SUBCOLLECTION,
 } from "./config";
 import { adminDb } from "./firebase-admin";
+import { toServerModelHistory } from "./history";
 import type { PulseSource } from "./types";
 
 export type ConversationState = {
@@ -68,6 +69,24 @@ export async function openConversation(input: {
     updatedAt: FieldValue.serverTimestamp(),
   });
   return { id: ref.id, title: null, memorySummary: null, messageCount: 0, isNew: true };
+}
+
+export async function loadConversationHistory(input: {
+  uid: string;
+  conversationId: string;
+  limit: number;
+}): Promise<ModelMessage[]> {
+  const snapshot = await conversationsRef(input.uid)
+    .doc(input.conversationId)
+    .collection(MESSAGES_SUBCOLLECTION)
+    .orderBy("createdAt", "desc")
+    .limit(Math.max(1, input.limit))
+    .get();
+
+  return toServerModelHistory(
+    snapshot.docs.reverse().map((doc) => doc.data()),
+    input.limit,
+  );
 }
 
 function preview(text: string): string {

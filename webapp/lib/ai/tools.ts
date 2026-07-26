@@ -57,6 +57,18 @@ const NO_RESULTS = {
 };
 
 export function buildPulseTools(ctx: ToolContext) {
+  let embeddingSearches = 0;
+  let webSearches = 0;
+  const cappedKnowledgeSearch = (
+    input: Parameters<typeof searchKnowledge>[0],
+  ) => {
+    if (embeddingSearches >= aiConfig.maxEmbeddingSearchesPerRun) {
+      return Promise.resolve([] as RetrievedChunk[]);
+    }
+    embeddingSearches += 1;
+    return searchKnowledge(input);
+  };
+
   return {
     searchAcceptedAnswers: tool({
       description:
@@ -76,7 +88,7 @@ export function buildPulseTools(ctx: ToolContext) {
       execute: async ({ query, tags }) => {
         const finish = startActivity(ctx, "forum", query);
         try {
-          const chunks = await searchKnowledge({
+          const chunks = await cappedKnowledgeSearch({
             query,
             sourceTypes: ["accepted_forum_answer"],
             locale: ctx.locale,
@@ -111,7 +123,7 @@ export function buildPulseTools(ctx: ToolContext) {
         const sourceTypes: PulseSourceType[] =
           !kind || kind === "any" ? ["course", "lesson", "path"] : [kind];
         try {
-          const chunks = await searchKnowledge({
+          const chunks = await cappedKnowledgeSearch({
             query,
             sourceTypes,
             locale: ctx.locale,
@@ -139,7 +151,7 @@ export function buildPulseTools(ctx: ToolContext) {
       execute: async ({ query }) => {
         const finish = startActivity(ctx, "official", query);
         try {
-          const chunks = await searchKnowledge({
+          const chunks = await cappedKnowledgeSearch({
             query,
             sourceTypes: ["official"],
             locale: ctx.locale,
@@ -170,6 +182,11 @@ export function buildPulseTools(ctx: ToolContext) {
       }),
       execute: async ({ query }) => {
         const finish = startActivity(ctx, "web", query);
+        if (webSearches >= aiConfig.maxWebSearchesPerRun) {
+          finish("empty", 0);
+          return NO_RESULTS;
+        }
+        webSearches += 1;
         const search = await searchOfficialWeb(query);
 
         if (!search.available) {
@@ -242,14 +259,15 @@ export function buildPulseTools(ctx: ToolContext) {
             };
           }
 
-          const courses = await Promise.all(
-            snapshot.docs.map(async (doc) => {
+          const courseRefs = snapshot.docs.map((doc) =>
+            adminDb()
+              .collection("courses")
+              .doc(String(doc.get("courseId") ?? doc.id)),
+          );
+          const courseSnapshots = await adminDb().getAll(...courseRefs);
+          const courses = snapshot.docs.map((doc, index) => {
               const courseId = String(doc.get("courseId") ?? doc.id);
-              const course = await adminDb()
-                .collection("courses")
-                .doc(courseId)
-                .get()
-                .catch(() => null);
+              const course = courseSnapshots[index];
               const completed = doc.get("completedLessonIds");
               const lessonCount = Number(course?.get("lessonCount") ?? 0);
               const completedCount = Array.isArray(completed) ? completed.length : 0;
@@ -261,8 +279,7 @@ export function buildPulseTools(ctx: ToolContext) {
                 totalLessons: lessonCount,
                 finished: Boolean(doc.get("completedAt")),
               };
-            }),
-          );
+            });
 
           finish("done", courses.length);
           return { role: ctx.viewer.role, enrollments: courses };

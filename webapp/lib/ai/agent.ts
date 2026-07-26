@@ -6,7 +6,11 @@ import { routing } from "@/i18n/routing";
 import { aiConfig } from "./config";
 import { authenticate, PulseHttpError, type PulseViewer } from "./auth";
 import { CitationRegistry } from "./citations";
-import { openConversation, type ConversationState } from "./conversations";
+import {
+  loadConversationHistory,
+  openConversation,
+  type ConversationState,
+} from "./conversations";
 import { buildInstructions, classifyScope, type ScopeVerdict } from "./policy";
 import { consumeQuota } from "./rate-limit";
 import { buildPulseTools } from "./tools";
@@ -73,7 +77,6 @@ export async function preparePulseRun(input: {
   locale: unknown;
   conversationId: unknown;
   userText: string;
-  history: ModelMessage[];
 }): Promise<PulseRun> {
   const startedAt = Date.now();
   const viewer = await authenticate(input.request);
@@ -99,6 +102,11 @@ export async function preparePulseRun(input: {
       typeof input.conversationId === "string" ? input.conversationId : null,
     locale,
   });
+  const history = await loadConversationHistory({
+    uid: viewer.uid,
+    conversationId: conversation.id,
+    limit: Math.max(0, aiConfig.memoryWindow - 1),
+  });
 
   return {
     viewer,
@@ -106,7 +114,10 @@ export async function preparePulseRun(input: {
     conversation,
     registry: new CitationRegistry(locale),
     userText,
-    messages: input.history.slice(-aiConfig.memoryWindow),
+    messages: [
+      ...history,
+      { role: "user", content: userText },
+    ] satisfies ModelMessage[],
     scope: classifyScope(userText),
     startedAt,
   };

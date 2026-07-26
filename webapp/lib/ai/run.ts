@@ -7,17 +7,20 @@ import {
   generateTitle,
   refreshMemorySummary,
 } from "./conversations";
-import { refusalMessage, reviewAnswer } from "./policy";
+import {
+  refusalMessage,
+  refusalReasonForScope,
+  reviewAnswer,
+} from "./policy";
 import { recordRun } from "./runs";
 import type { PulseRun } from "./agent";
 import type { PulseRefusalReason, PulseSource } from "./types";
 
 export { refusalMessage };
 
-/** Refuse before the model runs when a prompt has no insurance reading at all. */
+/** Refuse unsafe, individualized legal, and clearly off-topic prompts. */
 export function refusalFor(run: PulseRun): PulseRefusalReason | null {
-  if (run.scope.decision !== "out_of_scope") return null;
-  return run.scope.legalAdvice ? "legal_advice" : "out_of_scope";
+  return refusalReasonForScope(run.scope);
 }
 
 export type FinalizeInput = {
@@ -73,7 +76,7 @@ export async function finalizePulseRun(
 
   if (trimmed) {
     try {
-      title = run.conversation.isNew
+      title = run.conversation.isNew && !input.refused
         ? await generateTitle(run.userText, run.locale)
         : null;
       const appended = await appendTurn({
