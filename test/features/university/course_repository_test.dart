@@ -439,9 +439,10 @@ void main() {
   });
 
   group('permission helpers', () {
-    test('canAuthorCourses covers managers and admins only', () {
+    test('canAuthorCourses covers instructors, managers, and admins', () {
       expect(canAuthorCourses(UserRole.guest), isFalse);
       expect(canAuthorCourses(UserRole.agent), isFalse);
+      expect(canAuthorCourses(UserRole.instructor), isTrue);
       expect(canAuthorCourses(UserRole.manager), isTrue);
       expect(canAuthorCourses(UserRole.admin), isTrue);
     });

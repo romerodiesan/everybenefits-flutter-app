@@ -34,12 +34,13 @@ service cloud.firestore {
           ['student', 'agent', 'instructor', 'manager', 'admin'];
     }
 
-    // Managers author courses (published only after admin approval); admins
-    // have full control over the academy catalog.
+    // Instructors and managers author courses (published only after admin
+    // approval); admins have full control over the academy catalog.
     function isCourseAuthor() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && userDoc(request.auth.uid).data.get('role', '') in ['manager', 'admin'];
+        && userDoc(request.auth.uid).data.get('role', '')
+          in ['instructor', 'manager', 'admin'];
     }
 
     function courseData(courseId) {
@@ -426,7 +427,7 @@ service cloud.firestore {
       }
     }
 
-    // Learning paths: managers draft and submit for review; admins publish.
+    // Learning paths: instructors/managers draft and submit; admins publish.
     match /paths/{pathId} {
       allow read: if isSignedIn()
         && (

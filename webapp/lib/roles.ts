@@ -34,9 +34,11 @@ export function canCreateChatGroups(role: UserRole) {
   return role === "admin" || role === "instructor" || role === "manager";
 }
 
-/** Managers and admins can author courses in the Studio. */
+/** Instructors, managers, and admins can author courses in Studio. */
 export function canAuthorCourses(role: UserRole) {
-  return role === "manager" || role === "admin";
+  return (
+    role === "instructor" || role === "manager" || role === "admin"
+  );
 }
 
 /** Same authors who write courses can draft learning paths. */

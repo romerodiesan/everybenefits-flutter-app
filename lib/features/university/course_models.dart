@@ -686,7 +686,9 @@ class EnrolledCourse {
 
 /// Managers and admins can author courses.
 bool canAuthorCourses(UserRole role) {
-  return role == UserRole.manager || role == UserRole.admin;
+  return role == UserRole.instructor ||
+      role == UserRole.manager ||
+      role == UserRole.admin;
 }
 
 /// Same authors who write courses can draft learning paths.

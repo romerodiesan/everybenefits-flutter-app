@@ -1406,7 +1406,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get studioWebOnlyHint =>
-      'Upload videos and organize modules from the web.';
+      'Open Pulse Studio on the web to upload videos and organize modules.';
 
   @override
   String get playerClasses => 'Lessons';

@@ -245,7 +245,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
           if (_canAuthor)
             IconButton(
               tooltip: l10n.academyStudio,
-              onPressed: () => showStudioHint(context),
+              onPressed: () => openPulseStudio(),
               icon: const Icon(Icons.auto_awesome_motion_outlined),
             ),
           IconButton(

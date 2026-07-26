@@ -600,7 +600,7 @@
   "coursePublishedToast": "Curso publicado",
   "courseUnpublishedToast": "Curso despublicado",
   "courseDeletedToast": "Curso eliminado",
-  "studioWebOnlyHint": "Sube videos y organiza módulos desde la web.",
+  "studioWebOnlyHint": "Abre Pulse Studio en la web para subir videos y organizar módulos.",
   "playerClasses": "Clases",
   "playerLoading": "Cargando video…",
   "playerNoVideo": "Esta clase todavía no tiene video.",

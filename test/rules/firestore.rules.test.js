@@ -295,6 +295,7 @@ describe('academy catalog', () => {
 
   beforeEach(async () => {
     await seedUser('student1', { role: 'agent' });
+    await seedUser('instructor1', { role: 'instructor' });
     await seedUser('manager1', { role: 'manager' });
     await seedUser('manager2', { role: 'manager' });
     await seedUser('admin1', { role: 'admin' });
@@ -313,9 +314,14 @@ describe('academy catalog', () => {
     await assertSucceeds(authedDb('student1').doc('courses/pub1').get());
   });
 
-  it('only lets managers and admins create courses', async () => {
+  it('only lets instructors, managers, and admins create courses', async () => {
     await assertFails(
       authedDb('student1').doc('courses/new1').set(courseDraft('student1')),
+    );
+    await assertSucceeds(
+      authedDb('instructor1')
+        .doc('courses/newInst')
+        .set(courseDraft('instructor1')),
     );
     await assertSucceeds(
       authedDb('manager1').doc('courses/new2').set(courseDraft('manager1')),
@@ -537,6 +543,26 @@ describe('academy catalog', () => {
         completedLessonIds: ['l1'],
         lastPositionSeconds: 12,
       }),
+    );
+  });
+
+  it('lets instructors draft learning paths and keeps publish for admins', async () => {
+    const draft = {
+      title: 'Path',
+      description: 'Desc',
+      level: 'basic',
+      status: 'draft',
+      courseIds: [],
+      order: 0,
+      createdBy: 'instructor1',
+    };
+    await assertSucceeds(
+      authedDb('instructor1').doc('paths/pInst').set(draft),
+    );
+    await assertFails(
+      authedDb('instructor1')
+        .doc('paths/pInst')
+        .update({ status: 'published' }),
     );
   });
 

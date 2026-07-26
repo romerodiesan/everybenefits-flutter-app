@@ -45,7 +45,11 @@ service firebase.storage {
 
     function canWriteCourseFiles(courseId) {
       return isAdmin()
-        || (hasProfile() && callerRole() == 'manager' && ownsCourse(courseId));
+        || (
+          hasProfile()
+          && callerRole() in ['instructor', 'manager']
+          && ownsCourse(courseId)
+        );
     }
 
     function canReadCourseFiles(courseId) {

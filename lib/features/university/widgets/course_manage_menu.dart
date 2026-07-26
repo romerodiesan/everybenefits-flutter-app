@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../app/pulse_haptics.dart';
@@ -18,15 +19,31 @@ enum _ManageAction {
   delete,
 }
 
-/// Video uploads and module ordering live in the web Studio.
+/// Video uploads and module ordering live in the adjacent Studio web app.
+const kPulseStudioUrl = String.fromEnvironment(
+  'PULSE_STUDIO_URL',
+  defaultValue: 'http://localhost:3001',
+);
+
+Future<void> openPulseStudio() async {
+  final uri = Uri.parse(kPulseStudioUrl);
+  await launchUrl(uri, mode: LaunchMode.externalApplication);
+}
+
 void showStudioHint(BuildContext context) {
   final l10n = context.l10n;
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(l10n.studioWebOnlyHint)),
+    SnackBar(
+      content: Text(l10n.studioWebOnlyHint),
+      action: SnackBarAction(
+        label: l10n.academyStudio,
+        onPressed: () => openPulseStudio(),
+      ),
+    ),
   );
 }
 
-/// Quick management actions for authors (manager) and admins.
+/// Quick management actions for authors (instructor/manager) and admins.
 class CourseManageMenu extends StatelessWidget {
   const CourseManageMenu({
     super.key,
