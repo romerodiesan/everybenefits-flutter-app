@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useState, type ReactNode, type SVGProps } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+  type SVGProps,
+} from "react";
 import { useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { useThemeSettings } from "@/lib/providers/theme-provider";
 import { signOutUser } from "@/lib/firebase/auth";
-import { getOrCreateSupportChat } from "@/lib/firebase/chats";
-import { canAuthorCourses } from "@/lib/roles";
+import { getOrCreateSupportChat, watchInbox } from "@/lib/firebase/chats";
+import { watchEnrollments } from "@/lib/firebase/courses";
+import { canAuthorCourses, headlineName } from "@/lib/roles";
+import type { UserProfile, UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
 
 type IconProps = SVGProps<SVGSVGElement> & { filled?: boolean };
@@ -118,6 +126,25 @@ function IconPerson({ filled, ...props }: IconProps) {
   );
 }
 
+function IconStudio(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" {...props}>
+      <path
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+        d="M4 7.5h16v11H4zM8 7.5V5.2A2.2 2.2 0 0 1 10.2 3h3.6A2.2 2.2 0 0 1 16 5.2V7.5"
+      />
+      <path
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        d="M9 12.5h6M9 16h4"
+      />
+    </svg>
+  );
+}
+
 function IconSun(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
@@ -159,7 +186,7 @@ function ThemeToggle() {
       }
       title={resolvedDark ? t("profileThemeLight") : t("profileThemeDark")}
       onClick={() => setMode(resolvedDark ? "light" : "dark")}
-      className="relative flex h-8 w-[3.75rem] items-center rounded-full bg-ink/[0.06] p-0.5 transition-colors hover:bg-ink/[0.1] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]"
+      className="relative flex h-8 w-[3.75rem] shrink-0 items-center rounded-full bg-ink/[0.06] p-0.5 transition-colors hover:bg-ink/[0.1] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]"
     >
       <span
         className={`absolute top-0.5 h-7 w-7 rounded-full bg-sheet shadow-[0_1px_3px_rgba(0,0,0,0.12)] transition-transform duration-200 ease-out ${
@@ -184,13 +211,64 @@ function ThemeToggle() {
   );
 }
 
+const ROLE_KEY: Record<UserRole, string> = {
+  guest: "roleGuest",
+  student: "roleStudent",
+  agent: "roleAgent",
+  instructor: "roleInstructor",
+  manager: "roleManager",
+  admin: "roleAdmin",
+};
+
 const NAV = [
   { href: "/home", key: "navHome" as const, Icon: IconHome },
-  { href: "/chats", key: "navChats" as const, Icon: IconChat },
+  { href: "/chats", key: "navChats" as const, Icon: IconChat, badge: "unread" as const },
   { href: "/ai", key: "navAi" as const, Icon: IconAi },
   { href: "/academy", key: "navAcademy" as const, Icon: IconSchool },
   { href: "/profile", key: "navProfile" as const, Icon: IconPerson },
 ];
+
+function useShellStats(profile: UserProfile | null) {
+  const [unreadTotal, setUnreadTotal] = useState(0);
+  const [learningCount, setLearningCount] = useState(0);
+
+  useEffect(() => {
+    if (!profile || profile.isAnonymous) {
+      setUnreadTotal(0);
+      setLearningCount(0);
+      return;
+    }
+    const stopInbox = watchInbox(
+      profile.uid,
+      (chats) => {
+        const sum = chats.reduce(
+          (acc, chat) => acc + (chat.unreadCounts[profile.uid] ?? 0),
+          0,
+        );
+        setUnreadTotal(sum);
+      },
+      () => setUnreadTotal(0),
+    );
+    const stopEnroll = watchEnrollments(
+      profile.uid,
+      (list) => {
+        setLearningCount(list.filter((e) => !e.completedAt).length);
+      },
+      () => setLearningCount(0),
+    );
+    return () => {
+      stopInbox();
+      stopEnroll();
+    };
+  }, [profile]);
+
+  return { unreadTotal, learningCount };
+}
+
+function formatBadge(n: number) {
+  if (n <= 0) return null;
+  return n > 99 ? "99+" : String(n);
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const t = useTranslations();
@@ -198,6 +276,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user, profile, loading } = useAuth();
   const [supportBusy, setSupportBusy] = useState(false);
+  const { unreadTotal, learningCount } = useShellStats(profile);
+
+  const name = useMemo(
+    () => (profile ? headlineName(profile) : ""),
+    [profile],
+  );
+  const initial = useMemo(() => {
+    const trimmed = name.trim();
+    return trimmed ? trimmed.charAt(0).toUpperCase() : "?";
+  }, [name]);
 
   useEffect(() => {
     if (loading) return;
@@ -210,6 +298,23 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
   }, [loading, user, profile, router]);
 
+  const openSupport = async () => {
+    if (!profile || supportBusy || profile.isAnonymous) return;
+    setSupportBusy(true);
+    try {
+      const chat = await getOrCreateSupportChat(
+        profile,
+        "Support Assistant",
+        "Hi — how can we help?",
+      );
+      router.push(`/chats/${chat.id}`);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSupportBusy(false);
+    }
+  };
+
   if (loading || !user || !profile) {
     return (
       <div className="mesh-bg flex min-h-[100svh] items-center justify-center text-muted">
@@ -218,65 +323,150 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
   }
 
+  const isAuthor = canAuthorCourses(profile.role);
+  const studioActive =
+    pathname === "/studio" || pathname.startsWith("/studio/");
+  const unreadLabel = formatBadge(unreadTotal);
+  const onChats =
+    pathname === "/chats" || pathname.startsWith("/chats/");
+
   return (
     <div className="mesh-bg flex h-[100svh] flex-col overflow-hidden lg:flex-row">
-      <aside className="hidden h-full w-56 shrink-0 flex-col border-r border-glass-border bg-sheet p-3 lg:flex">
-        <div className="flex items-center justify-between gap-2 px-1">
-          <Link
-            href="/home"
-            className="font-display text-lg font-bold tracking-tight"
-          >
-            {t("brandShort")}
-          </Link>
-          <ThemeToggle />
+      <aside className="hidden h-full w-72 shrink-0 flex-col border-r border-glass-border bg-sheet lg:flex">
+        <div className="border-b border-glass-border px-3 pb-3 pt-3.5">
+          <div className="flex items-center justify-between gap-2 px-1">
+            <Link
+              href="/home"
+              className="font-display text-lg font-bold tracking-tight transition-opacity hover:opacity-80"
+            >
+              {t("brandShort")}
+            </Link>
+            <ThemeToggle />
+          </div>
+          <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-ink/[0.035] px-2.5 py-2 dark:bg-white/[0.04]">
+            <div
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand/15 font-display text-sm font-bold text-brand"
+              aria-hidden
+            >
+              {profile.photoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={profile.photoUrl}
+                  alt=""
+                  className="h-9 w-9 rounded-full object-cover"
+                />
+              ) : (
+                initial
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold leading-tight">
+                {name}
+              </p>
+              <span className="mt-1 inline-flex rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+                {t(ROLE_KEY[profile.role])}
+              </span>
+            </div>
+          </div>
         </div>
-        <nav className="mt-6 space-y-0.5">
+
+        <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3" aria-label="Primary">
           {NAV.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.Icon;
+            const showUnread =
+              item.badge === "unread" && unreadLabel != null;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition ${
+                aria-current={active ? "page" : undefined}
+                className={`group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition duration-200 ${
                   active
-                    ? "bg-brand/10 text-ink"
-                    : "text-muted hover:bg-white/[0.04] hover:text-ink"
+                    ? "bg-brand/10 text-ink shadow-[inset_3px_0_0_0_var(--brand)]"
+                    : "text-muted hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
                 }`}
               >
                 <Icon
                   filled={active}
-                  className={active ? "text-brand" : "text-muted"}
+                  className={`shrink-0 transition-transform duration-200 ${
+                    active
+                      ? "scale-105 text-brand"
+                      : "text-muted group-hover:text-ink"
+                  }`}
                   width={20}
                   height={20}
                 />
-                {t(item.key)}
+                <span className="min-w-0 flex-1 truncate">{t(item.key)}</span>
+                {showUnread && (
+                  <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-on-brand">
+                    {unreadLabel}
+                  </span>
+                )}
               </Link>
             );
           })}
-          {canAuthorCourses(profile.role) && (
+          {isAuthor && (
             <Link
               href="/studio"
-              className={`flex items-center gap-2.5 rounded-xl px-2.5 py-2 text-sm font-medium transition ${
-                pathname === "/studio" || pathname.startsWith("/studio/")
-                  ? "bg-brand/10 text-ink"
-                  : "text-muted hover:bg-white/[0.04] hover:text-ink"
+              aria-current={studioActive ? "page" : undefined}
+              className={`group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition duration-200 ${
+                studioActive
+                  ? "bg-brand/10 text-ink shadow-[inset_3px_0_0_0_var(--brand)]"
+                  : "text-muted hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
               }`}
             >
-              <IconSchool
-                filled={pathname.startsWith("/studio")}
-                className={
-                  pathname.startsWith("/studio") ? "text-brand" : "text-muted"
-                }
+              <IconStudio
+                className={`shrink-0 transition-transform duration-200 ${
+                  studioActive
+                    ? "scale-105 text-brand"
+                    : "text-muted group-hover:text-ink"
+                }`}
                 width={20}
                 height={20}
               />
-              {t("studioTitle")}
+              <span className="min-w-0 flex-1 truncate">{t("studioTitle")}</span>
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand"
+                aria-hidden
+              />
             </Link>
           )}
         </nav>
-        <div className="mt-auto">
+
+        <div className="mt-auto space-y-2.5 border-t border-glass-border px-2.5 py-3">
+          <div className="grid grid-cols-2 gap-1.5">
+            <div className="rounded-xl bg-ink/[0.035] px-2.5 py-2 dark:bg-white/[0.04]">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+                {t("navStatUnreadShort")}
+              </p>
+              <p className="mt-1 font-display text-xl font-bold tabular-nums leading-none">
+                {unreadTotal}
+              </p>
+            </div>
+            <div className="rounded-xl bg-ink/[0.035] px-2.5 py-2 dark:bg-white/[0.04]">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
+                {t("navStatLearningShort")}
+              </p>
+              <p className="mt-1 font-display text-xl font-bold tabular-nums leading-none">
+                {learningCount}
+              </p>
+            </div>
+          </div>
+
+          {!profile.isAnonymous && (
+            <button
+              type="button"
+              disabled={supportBusy}
+              onClick={() => void openSupport()}
+              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-muted transition hover:bg-ink/[0.04] hover:text-ink disabled:opacity-60 dark:hover:bg-white/[0.05]"
+            >
+              <IconChat width={18} height={18} />
+              {t("navSupport")}
+            </button>
+          )}
+
           <Button
             variant="ghost"
             className="w-full justify-start"
@@ -320,11 +510,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.Icon;
+            const showUnread =
+              item.badge === "unread" && unreadLabel != null;
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex h-10 flex-1 items-center justify-center gap-1 rounded-xl transition ${
+                className={`relative flex h-10 flex-1 items-center justify-center gap-1 rounded-xl transition ${
                   active
                     ? "max-w-[7rem] flex-[1.2] bg-brand/10 text-ink"
                     : "text-muted"
@@ -343,37 +535,23 @@ export function AppShell({ children }: { children: ReactNode }) {
                     {t(item.key)}
                   </span>
                 )}
+                {showUnread && (
+                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand" />
+                )}
               </Link>
             );
           })}
         </div>
       </nav>
 
-      {!profile.isAnonymous &&
-        pathname !== "/chats" &&
-        !pathname.startsWith("/chats/") && (
+      {!profile.isAnonymous && !onChats && (
         <button
           type="button"
           disabled={supportBusy}
           aria-label={t("profileSupport")}
           title={t("chatsSupport")}
-          onClick={async () => {
-            if (supportBusy) return;
-            setSupportBusy(true);
-            try {
-              const chat = await getOrCreateSupportChat(
-                profile,
-                "Support Assistant",
-                "Hi — how can we help?",
-              );
-              router.push(`/chats/${chat.id}`);
-            } catch (error) {
-              console.error(error);
-            } finally {
-              setSupportBusy(false);
-            }
-          }}
-          className="fixed z-50 flex h-12 w-12 items-center justify-center rounded-full bg-brand text-on-brand shadow-lg transition hover:brightness-110 disabled:opacity-60 right-4 bottom-[calc(52px+env(safe-area-inset-bottom,0px)+12px)] lg:bottom-6 lg:right-6"
+          onClick={() => void openSupport()}
+          className="fixed z-50 flex h-12 w-12 items-center justify-center rounded-full bg-brand text-on-brand shadow-lg transition hover:brightness-110 disabled:opacity-60 right-4 bottom-[calc(52px+env(safe-area-inset-bottom,0px)+12px)] lg:hidden"
         >
           <IconChat filled width={22} height={22} />
         </button>
