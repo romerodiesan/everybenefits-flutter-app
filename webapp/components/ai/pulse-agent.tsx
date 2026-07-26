@@ -159,7 +159,11 @@ function toUIMessage(stored: {
 export function PulseAgent() {
   const t = useTranslations();
   const locale = useLocale() as AppLocale;
-  const { user, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading } = useAuth();
+  const needsSignIn =
+    !user ||
+    profile?.isAnonymous === true ||
+    profile?.role === "guest";
 
   const [input, setInput] = useState("");
   const [conversations, setConversations] = useState<PulseConversation[]>([]);
@@ -319,7 +323,7 @@ export function PulseAgent() {
     [t],
   );
 
-  if (!authLoading && !user) {
+  if (!authLoading && needsSignIn) {
     return (
       <div className="mx-auto flex h-full max-w-3xl items-center justify-center p-6">
         <p className="pulse-sheet px-4 py-10 text-center text-sm text-muted">

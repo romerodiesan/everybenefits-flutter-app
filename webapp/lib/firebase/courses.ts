@@ -5,7 +5,6 @@ import {
   doc,
   getDoc,
   getDocs,
-  increment,
   limit,
   onSnapshot,
   orderBy,
@@ -410,6 +409,30 @@ export function watchPathsByStatus(
   );
 }
 
+/** Single listener for studio admin path queues. */
+export function watchPathsInStatuses(
+  statuses: CourseStatus[],
+  onChange: (paths: LearningPath[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "paths"),
+    where("status", "in", statuses),
+    orderBy("updatedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          pathFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
 export async function createPath(input: {
   title: string;
   description: string;
@@ -513,23 +536,8 @@ export function watchEnrollment(
 }
 
 export async function enrollInCourse(uid: string, courseId: string) {
-  const db = getFirebaseDb();
-  const batch = writeBatch(db);
-  batch.set(doc(db, "users", uid, "enrollments", courseId), {
-    courseId,
-    completedLessonIds: [],
-    lastLessonId: null,
-    lastPositionSeconds: 0,
-    enrolledAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-    completedAt: null,
-    quizAttempts: {},
-  });
-  batch.update(doc(db, "courses", courseId), {
-    studentCount: increment(1),
-    updatedAt: serverTimestamp(),
-  });
-  await batch.commit();
+  void uid;
+  await callCloudFunction("enrollInCourse", { courseId });
 }
 
 /**
@@ -561,18 +569,12 @@ export async function saveLessonProgress(input: {
     completedAt: allDone ? (input.enrollment.completedAt ?? now) : null,
   };
 
-  await setDoc(
-    doc(getFirebaseDb(), "users", input.uid, "enrollments", input.courseId),
-    {
-      courseId: input.courseId,
-      completedLessonIds: next.completedLessonIds,
-      lastLessonId: next.lastLessonId,
-      lastPositionSeconds: next.lastPositionSeconds,
-      updatedAt: serverTimestamp(),
-      completedAt: next.completedAt,
-    },
-    { merge: true },
-  );
+  await callCloudFunction("saveCourseProgress", {
+    courseId: input.courseId,
+    lessonId: input.lessonId,
+    positionSeconds: next.lastPositionSeconds,
+    completed: input.completed,
+  });
   return next;
 }
 
@@ -615,20 +617,32 @@ export function estimateQuizSeconds(questionCount: number) {
 
 // --- Media ---
 
+const storageUrlCache = new Map<string, Promise<string>>();
+
 export async function getStorageUrl(path: string) {
-  return getDownloadURL(ref(getFirebaseStorage(), path));
+  const normalized = path.trim();
+  const cached = storageUrlCache.get(normalized);
+  if (cached) return cached;
+  const pending = getDownloadURL(ref(getFirebaseStorage(), normalized)).catch(
+    (error) => {
+      storageUrlCache.delete(normalized);
+      throw error;
+    },
+  );
+  storageUrlCache.set(normalized, pending);
+  return pending;
 }
 
 export async function resolveVideoUrl(lesson: Lesson) {
   if (lesson.videoUrl?.trim()) return lesson.videoUrl.trim();
   if (!lesson.videoPath?.trim()) return null;
-  return getDownloadURL(ref(getFirebaseStorage(), lesson.videoPath.trim()));
+  return getStorageUrl(lesson.videoPath);
 }
 
 export async function resolveCoverUrl(course: Course) {
   if (course.coverUrl?.trim()) return course.coverUrl.trim();
   if (!course.coverPath?.trim()) return null;
-  return getDownloadURL(ref(getFirebaseStorage(), course.coverPath.trim()));
+  return getStorageUrl(course.coverPath);
 }
 
 /** Resumable upload so the Studio can render real progress. */
@@ -754,6 +768,30 @@ export function watchCoursesByStatus(
   const q = query(
     collection(getFirebaseDb(), "courses"),
     where("status", "==", status),
+    orderBy("updatedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          courseFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+/** Single listener for studio admin queues (draft + pending + published). */
+export function watchCoursesInStatuses(
+  statuses: CourseStatus[],
+  onChange: (courses: Course[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "courses"),
+    where("status", "in", statuses),
     orderBy("updatedAt", "desc"),
   );
   return onSnapshot(

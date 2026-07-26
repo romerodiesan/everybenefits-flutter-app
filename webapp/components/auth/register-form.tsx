@@ -97,6 +97,20 @@ export function RegisterForm() {
           <Button type="submit" className="w-full" disabled={busy}>
             {t("signUp")}
           </Button>
+          <p className="text-center text-xs leading-relaxed text-muted">
+            {t.rich("registerLegalNotice", {
+              terms: (chunks) => (
+                <Link href="/terms" className="text-brand hover:underline">
+                  {chunks}
+                </Link>
+              ),
+              privacy: (chunks) => (
+                <Link href="/privacy" className="text-brand hover:underline">
+                  {chunks}
+                </Link>
+              ),
+            })}
+          </p>
         </form>
 
         <Button

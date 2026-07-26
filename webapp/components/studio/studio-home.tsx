@@ -12,8 +12,8 @@ import {
   setPathStatus,
   watchAuthoredCourses,
   watchAuthoredPaths,
-  watchCoursesByStatus,
-  watchPathsByStatus,
+  watchCoursesInStatuses,
+  watchPathsInStatuses,
 } from "@/lib/firebase/courses";
 import {
   COURSE_LEVELS,
@@ -39,14 +39,10 @@ export function StudioHome() {
   const levelLabel = useLevelLabels();
 
   const [mine, setMine] = useState<Course[]>([]);
-  const [drafts, setDrafts] = useState<Course[]>([]);
-  const [pending, setPending] = useState<Course[]>([]);
-  const [published, setPublished] = useState<Course[]>([]);
+  const [studioCourses, setStudioCourses] = useState<Course[]>([]);
 
   const [myPaths, setMyPaths] = useState<LearningPath[]>([]);
-  const [pathDrafts, setPathDrafts] = useState<LearningPath[]>([]);
-  const [pathPending, setPathPending] = useState<LearningPath[]>([]);
-  const [pathPublished, setPathPublished] = useState<LearningPath[]>([]);
+  const [studioPaths, setStudioPaths] = useState<LearningPath[]>([]);
 
   const [creating, setCreating] = useState<CreateKind>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -75,27 +71,39 @@ export function StudioHome() {
   useEffect(() => {
     if (!isAdmin) return;
     const stops = [
-      watchCoursesByStatus("draft", setDrafts, () => setDrafts([])),
-      watchCoursesByStatus("pending", setPending, () => setPending([])),
-      watchCoursesByStatus("published", setPublished, () => setPublished([])),
-      watchPathsByStatus("draft", setPathDrafts, () => setPathDrafts([])),
-      watchPathsByStatus("pending", setPathPending, () => setPathPending([])),
-      watchPathsByStatus("published", setPathPublished, () =>
-        setPathPublished([]),
+      watchCoursesInStatuses(
+        ["draft", "pending", "published"],
+        setStudioCourses,
+        () => setStudioCourses([]),
+      ),
+      watchPathsInStatuses(
+        ["draft", "pending", "published"],
+        setStudioPaths,
+        () => setStudioPaths([]),
       ),
     ];
     return () => stops.forEach((stop) => stop());
   }, [isAdmin]);
 
+  const pending = useMemo(
+    () => studioCourses.filter((course) => course.status === "pending"),
+    [studioCourses],
+  );
+
+  const pathPending = useMemo(
+    () => studioPaths.filter((path) => path.status === "pending"),
+    [studioPaths],
+  );
+
   const allCourses = useMemo(() => {
     if (!isAdmin) return mine;
-    return [...pending, ...drafts, ...published];
-  }, [isAdmin, mine, pending, drafts, published]);
+    return studioCourses;
+  }, [isAdmin, mine, studioCourses]);
 
   const allPaths = useMemo(() => {
     if (!isAdmin) return myPaths;
-    return [...pathPending, ...pathDrafts, ...pathPublished];
-  }, [isAdmin, myPaths, pathPending, pathDrafts, pathPublished]);
+    return studioPaths;
+  }, [isAdmin, myPaths, studioPaths]);
 
   const reviewQueue = useMemo(() => {
     if (isAdmin) return pending;

@@ -1,15 +1,12 @@
 import {
-  addDoc,
   collection,
   doc,
   getDoc,
   getDocs,
-  increment,
   limit,
   onSnapshot,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
   startAfter,
@@ -19,7 +16,8 @@ import {
   type QueryConstraint,
   type Unsubscribe,
 } from "firebase/firestore";
-import { getFirebaseAuth, getFirebaseDb } from "./client";
+import { getFirebaseDb } from "./client";
+import { callCloudFunction } from "./call-function";
 import type { ForumReply, ForumThread, UserProfile, UserRole } from "../types";
 import { normalizeForumTags, parseRole } from "../roles";
 import { headlineName } from "./users";
@@ -178,26 +176,10 @@ export async function addReply(input: {
   body: string;
   author: UserProfile;
 }) {
-  const replies = collection(
-    getFirebaseDb(),
-    "threads",
-    input.threadId,
-    "replies",
-  );
-  await addDoc(replies, {
+  void input.author;
+  await callCloudFunction("addForumReply", {
+    threadId: input.threadId,
     body: input.body.trim(),
-    authorId: input.author.uid,
-    authorName: headlineName(input.author),
-    authorPhotoUrl: input.author.photoUrl,
-    authorRole: input.author.role,
-    score: 0,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
-  await updateDoc(doc(getFirebaseDb(), "threads", input.threadId), {
-    replyCount: increment(1),
-    lastReplyAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
   });
 }
 
@@ -206,48 +188,7 @@ export async function castForumVote(input: {
   replyId?: string;
   vote: -1 | 0 | 1;
 }) {
-  // Client path (same as Flutter fallback): no Cloud Functions in this project;
-  // Firestore rules allow vote docs + score deltas of ±2.
-  const uid = getFirebaseAuth().currentUser?.uid;
-  if (!uid) throw new Error("Sign in required.");
-
-  const db = getFirebaseDb();
-  const targetRef = input.replyId
-    ? doc(db, "threads", input.threadId, "replies", input.replyId)
-    : doc(db, "threads", input.threadId);
-  const voteRef = input.replyId
-    ? doc(
-        db,
-        "threads",
-        input.threadId,
-        "replies",
-        input.replyId,
-        "votes",
-        uid,
-      )
-    : doc(db, "threads", input.threadId, "votes", uid);
-
-  const next = input.vote;
-  await runTransaction(db, async (tx) => {
-    const voteSnap = await tx.get(voteRef);
-    const previous = Number(voteSnap.data()?.value ?? 0);
-    const delta = next - previous;
-    if (delta === 0) return;
-
-    if (next === 0) {
-      tx.delete(voteRef);
-    } else {
-      tx.set(
-        voteRef,
-        { value: next, updatedAt: serverTimestamp() },
-        { merge: true },
-      );
-    }
-    tx.update(targetRef, {
-      score: increment(delta),
-      updatedAt: serverTimestamp(),
-    });
-  });
+  await callCloudFunction("castForumVote", input);
 }
 
 export async function setAcceptedReply(
@@ -302,18 +243,17 @@ export async function fetchThreadVotes(input: {
   threadIds: string[];
 }) {
   if (!input.threadIds.length) return {} as Record<string, number>;
-  const snaps = await Promise.all(
-    input.threadIds.map((id) =>
-      getDoc(
-        doc(getFirebaseDb(), "threads", id, "votes", input.uid),
-      ).catch(() => null),
-    ),
+  const snap = await getDocs(
+    collection(getFirebaseDb(), "users", input.uid, "forumVotes"),
   );
-  const out: Record<string, number> = {};
-  input.threadIds.forEach((id, i) => {
-    const snap = snaps[i];
-    out[id] = snap ? Number(snap.data()?.value ?? 0) : 0;
-  });
+  const wanted = new Set(input.threadIds);
+  const out = Object.fromEntries(input.threadIds.map((id) => [id, 0]));
+  for (const vote of snap.docs) {
+    const data = vote.data();
+    if (data.replyId == null && wanted.has(String(data.threadId))) {
+      out[String(data.threadId)] = Number(data.value ?? 0);
+    }
+  }
   return out;
 }
 
@@ -323,25 +263,17 @@ export async function fetchReplyVotes(input: {
   replyIds: string[];
 }) {
   if (!input.replyIds.length) return {} as Record<string, number>;
-  const snaps = await Promise.all(
-    input.replyIds.map((id) =>
-      getDoc(
-        doc(
-          getFirebaseDb(),
-          "threads",
-          input.threadId,
-          "replies",
-          id,
-          "votes",
-          input.uid,
-        ),
-      ).catch(() => null),
-    ),
+  const snap = await getDocs(
+    collection(getFirebaseDb(), "users", input.uid, "forumVotes"),
   );
-  const out: Record<string, number> = {};
-  input.replyIds.forEach((id, i) => {
-    const snap = snaps[i];
-    out[id] = snap ? Number(snap.data()?.value ?? 0) : 0;
-  });
+  const wanted = new Set(input.replyIds);
+  const out = Object.fromEntries(input.replyIds.map((id) => [id, 0]));
+  for (const vote of snap.docs) {
+    const data = vote.data();
+    const replyId = String(data.replyId ?? "");
+    if (String(data.threadId) === input.threadId && wanted.has(replyId)) {
+      out[replyId] = Number(data.value ?? 0);
+    }
+  }
   return out;
 }

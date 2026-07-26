@@ -5,11 +5,6 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
-  collection,
-  query,
-  where,
-  limit,
-  getDocs,
   type Unsubscribe,
 } from "firebase/firestore";
 import {
@@ -19,6 +14,7 @@ import {
 } from "firebase/storage";
 import type { User } from "firebase/auth";
 import { getFirebaseDb, getFirebaseStorage } from "./client";
+import { listPublicProfiles } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
 import { composeUsAddress, headlineName, parseRole } from "../roles";
@@ -179,14 +175,8 @@ export async function uploadAvatar(uid: string, file: File): Promise<string> {
 }
 
 export async function listDirectory(excludeUid?: string, max = 80) {
-  const q = query(
-    collection(getFirebaseDb(), "users"),
-    where("isAnonymous", "==", false),
-    limit(max + (excludeUid ? 1 : 0)),
-  );
-  const snap = await getDocs(q);
-  return snap.docs
-    .map((d) => profileFromData(d.id, d.data() as Record<string, unknown>))
+  const profiles = await listPublicProfiles(max + (excludeUid ? 1 : 0));
+  return profiles
     .filter((p) => p.uid !== excludeUid && p.role !== "guest")
     .slice(0, max)
     .sort((a, b) =>

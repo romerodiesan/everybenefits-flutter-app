@@ -4,11 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
-import { canAuthorCourses, canEditCourse, canManageCourses } from "@/lib/roles";
+import { canAuthorCourses } from "@/lib/roles";
 import {
   progressOf,
-  watchAuthoredCourses,
-  watchCoursesByStatus,
   watchEnrollments,
   watchPaths,
   watchPublishedCourses,
@@ -37,8 +35,6 @@ export function AcademyCatalog() {
 
   const [courses, setCourses] = useState<Course[]>([]);
   const [paths, setPaths] = useState<LearningPath[]>([]);
-  const [authored, setAuthored] = useState<Course[]>([]);
-  const [pending, setPending] = useState<Course[]>([]);
   const [enrollments, setEnrollments] = useState<Record<string, Enrollment>>({});
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
@@ -48,7 +44,6 @@ export function AcademyCatalog() {
   const uid = profile?.uid ?? null;
   const role = profile?.role ?? "guest";
   const isAuthor = canAuthorCourses(role);
-  const isAdmin = canManageCourses(role);
 
   useEffect(() => {
     const stop = watchPublishedCourses(
@@ -83,16 +78,6 @@ export function AcademyCatalog() {
     );
   }, [uid]);
 
-  useEffect(() => {
-    if (!uid || !isAuthor) return;
-    return watchAuthoredCourses(uid, setAuthored, () => setAuthored([]));
-  }, [uid, isAuthor]);
-
-  useEffect(() => {
-    if (!isAdmin) return;
-    return watchCoursesByStatus("pending", setPending, () => setPending([]));
-  }, [isAdmin]);
-
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return courses
@@ -124,11 +109,6 @@ export function AcademyCatalog() {
       )
       .slice(0, 3);
   }, [courses, enrollments]);
-
-  const myUnpublished = useMemo(
-    () => authored.filter((course) => course.status !== "published"),
-    [authored],
-  );
 
   const pathMeta = (path: LearningPath) => {
     const byId = new Map(courses.map((course) => [course.id, course]));
@@ -190,46 +170,6 @@ export function AcademyCatalog() {
                   </p>
                 </div>
               </Link>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {isAdmin && pending.length > 0 && (
-        <section className="mt-8">
-          <h2 className="font-display text-lg font-bold">
-            {t("academyPendingReview")}
-          </h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {pending.map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                href={`/studio/${course.id}`}
-                showStatus
-              />
-            ))}
-          </div>
-        </section>
-      )}
-
-      {myUnpublished.length > 0 && (
-        <section className="mt-8">
-          <h2 className="font-display text-lg font-bold">
-            {t("academyMyCourses")}
-          </h2>
-          <div className="mt-3 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {myUnpublished.map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                href={
-                  profile && canEditCourse(course, profile)
-                    ? `/studio/${course.id}`
-                    : `/academy/${course.id}`
-                }
-                showStatus
-              />
             ))}
           </div>
         </section>

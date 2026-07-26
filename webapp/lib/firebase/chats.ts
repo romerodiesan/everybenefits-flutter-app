@@ -12,6 +12,7 @@ import {
   type Unsubscribe,
 } from "firebase/database";
 import { getFirebaseRtdb } from "./client";
+import { callCloudFunction } from "./call-function";
 import type {
   ChatConversation,
   ChatMessage,
@@ -119,46 +120,80 @@ function chatToRtdb(chat: ChatConversation) {
   };
 }
 
-function indexableMembers(memberIds: string[]) {
-  return memberIds.filter((id) => id !== SUPPORT_AI_UID);
-}
-
 export function watchInbox(
   uid: string,
   onChange: (chats: ChatConversation[]) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
   const db = getFirebaseRtdb();
+  void callCloudFunction("rebuildChatInbox", {}).catch(() => {
+    // Legacy rows still refresh on the next chat update.
+  });
+  // Legacy index rows (only `lastMessageAt`) predate syncChatInbox; their
+  // chat meta is soft-read once and refreshed when a newer message lands.
+  const legacyMeta = new Map<string, Record<string, unknown>>();
+  let epoch = 0;
   return onValue(
     ref(db, `userChats/${uid}`),
     (snap) => {
-      void (async () => {
-        try {
-          const raw = asMap(snap.val());
-          const entries = Object.entries(raw).sort((a, b) => {
-            const aAt = Number(asMap(a[1]).lastMessageAt ?? 0);
-            const bAt = Number(asMap(b[1]).lastMessageAt ?? 0);
-            return bAt - aAt;
-          });
-          const chats: ChatConversation[] = [];
-          for (const [chatId, indexRaw] of entries) {
-            const chatSnap = await get(ref(db, `chats/${chatId}`));
-            if (!chatSnap.exists()) continue;
-            let chat = chatFrom(chatId, asMap(chatSnap.val()));
+      const token = ++epoch;
+      const raw = asMap(snap.val());
+      const isLegacy = (index: Record<string, unknown>) =>
+        !Array.isArray(index.memberIds);
+      const build = () =>
+        Object.entries(raw)
+          .map(([chatId, indexRaw]) => {
             const index = asMap(indexRaw);
-            if ("pinned" in index) {
-              chat = {
-                ...chat,
-                pinnedBy: { ...chat.pinnedBy, [uid]: index.pinned === true },
-              };
+            if (isLegacy(index)) {
+              const meta = legacyMeta.get(chatId);
+              if (!meta) {
+                return chatFrom(chatId, {
+                  lastMessageAt: index.lastMessageAt,
+                  pinnedBy: { [uid]: index.pinned === true },
+                });
+              }
+              const chat = chatFrom(chatId, meta);
+              if (typeof index.pinned === "boolean") {
+                chat.pinnedBy = { ...chat.pinnedBy, [uid]: index.pinned };
+              }
+              return chat;
             }
-            chats.push(chat);
-          }
-          onChange(chats);
-        } catch (error) {
-          onError?.(error instanceof Error ? error : new Error(String(error)));
-        }
-      })();
+            const memberIds = (index.memberIds as unknown[]).map(String);
+            return chatFrom(chatId, {
+              ...index,
+              members: Object.fromEntries(memberIds.map((id) => [id, true])),
+              unreadCounts: { [uid]: Number(index.unreadCount ?? 0) },
+              pinnedBy: { [uid]: index.pinned === true },
+            });
+          })
+          .sort((a, b) => b.lastMessageAt - a.lastMessageAt);
+      onChange(build());
+
+      const stale = Object.entries(raw)
+        .filter(([chatId, indexRaw]) => {
+          const index = asMap(indexRaw);
+          if (!isLegacy(index)) return false;
+          const cached = legacyMeta.get(chatId);
+          return (
+            !cached ||
+            Number(index.lastMessageAt ?? 0) >
+              Number(cached.lastMessageAt ?? 0)
+          );
+        })
+        .map(([chatId]) => chatId);
+      if (!stale.length) return;
+      void Promise.all(
+        stale.map(async (chatId) => {
+          const chatSnap = await get(ref(db, `chats/${chatId}`));
+          if (chatSnap.exists()) legacyMeta.set(chatId, asMap(chatSnap.val()));
+        }),
+      )
+        .then(() => {
+          if (token === epoch) onChange(build());
+        })
+        .catch(() => {
+          // Names stay blank for rows we could not read; nothing to surface.
+        });
     },
     (error) => onError?.(error),
   );
@@ -217,12 +252,9 @@ async function createChat(chat: ChatConversation): Promise<ChatConversation> {
   const updates: Record<string, unknown> = {
     [`chats/${id}`]: chatToRtdb(saved),
   };
-  for (const memberId of indexableMembers(saved.memberIds)) {
-    updates[`userChats/${memberId}/${id}`] = {
-      lastMessageAt: saved.lastMessageAt,
-    };
-  }
-  if (saved.dmKey) updates[`dmIndex/${saved.dmKey}`] = id;
+  updates[`userChats/${saved.createdBy}/${id}`] = {
+    lastMessageAt: saved.lastMessageAt,
+  };
   await update(ref(db), updates);
   return saved;
 }
@@ -277,26 +309,14 @@ export async function createGroupChat(input: {
   if (!others.length) throw new Error("Pick at least one member");
   const all = [input.creator, ...others];
   if (all.length > 20) throw new Error("Max 20 members");
-  const now = Date.now();
-  return createChat({
-    id: "",
-    memberIds: all.map((p) => p.uid).sort(),
-    memberNames: Object.fromEntries(
-      all.map((p) => [p.uid, headlineName(p)]),
-    ),
-    isGroup: true,
-    title,
-    dmKey: null,
-    lastMessage: "",
-    lastMessageAt: now,
-    lastMessageSenderId: null,
-    unreadCounts: Object.fromEntries(all.map((p) => [p.uid, 0])),
-    pinnedBy: {},
-    createdAt: now,
-    createdBy: input.creator.uid,
-    isDefaultAgentGroup: false,
-    isSupportChat: false,
-  });
+  const result = await callCloudFunction<{ chatId?: string }>(
+    "createGroupChat",
+    { title, memberIds: all.map((profile) => profile.uid) },
+  );
+  const chatId = String(result?.chatId ?? "");
+  const snap = await get(ref(getFirebaseRtdb(), `chats/${chatId}`));
+  if (!snap.exists()) throw new Error("Group creation failed");
+  return chatFrom(chatId, asMap(snap.val()));
 }
 
 async function ensureUserChatIndex(
@@ -406,9 +426,6 @@ export async function sendMessage(input: {
     [`chats/${input.chatId}/lastMessageSenderId`]: input.author.uid,
     [`chats/${input.chatId}/unreadCounts`]: nextUnread,
   };
-  for (const memberId of indexableMembers(chat.memberIds)) {
-    updates[`userChats/${memberId}/${input.chatId}/lastMessageAt`] = now;
-  }
   await update(ref(db), updates);
   return message;
 }
