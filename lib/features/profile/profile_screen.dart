@@ -11,6 +11,7 @@ import '../../app/widgets/role_badge.dart';
 import '../../auth/auth.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
+import '../notifications/notification_bell_button.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/profile_avatar.dart';
@@ -23,12 +24,16 @@ class ProfileScreen extends StatefulWidget {
     required this.userRepository,
     required this.profile,
     this.onOpenSupportChat,
+    this.notificationUnread = 0,
+    this.onOpenNotifications,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
   final UserProfile profile;
   final Future<void> Function()? onOpenSupportChat;
+  final int notificationUnread;
+  final VoidCallback? onOpenNotifications;
 
   @override
   State<ProfileScreen> createState() => ProfileScreenState();
@@ -306,6 +311,8 @@ class ProfileScreenState extends State<ProfileScreen> {
               onAvatarTap: _pickAvatar,
               onEdit: openEdit,
               onSettings: _openSettings,
+              notificationUnread: widget.notificationUnread,
+              onOpenNotifications: widget.onOpenNotifications,
             ),
           ),
           SliverPadding(
@@ -377,6 +384,8 @@ class _PulseIdentityHero extends StatelessWidget {
     required this.onAvatarTap,
     required this.onEdit,
     required this.onSettings,
+    this.notificationUnread = 0,
+    this.onOpenNotifications,
   });
 
   final UserProfile profile;
@@ -385,6 +394,8 @@ class _PulseIdentityHero extends StatelessWidget {
   final VoidCallback onAvatarTap;
   final VoidCallback onEdit;
   final VoidCallback onSettings;
+  final int notificationUnread;
+  final VoidCallback? onOpenNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -459,6 +470,16 @@ class _PulseIdentityHero extends StatelessWidget {
                   ),
                 ),
                 const Spacer(),
+                if (onOpenNotifications != null)
+                  NotificationBellButton(
+                    unreadCount: notificationUnread,
+                    onPressed: onOpenNotifications!,
+                    style: IconButton.styleFrom(
+                      backgroundColor:
+                          colors.glassFill.withValues(alpha: 0.7),
+                      foregroundColor: colors.ink,
+                    ),
+                  ),
                 IconButton(
                   tooltip: l10n.profileSettingsTooltip,
                   onPressed: onSettings,

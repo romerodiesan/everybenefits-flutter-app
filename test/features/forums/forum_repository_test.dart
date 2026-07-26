@@ -5,8 +5,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/forums/forum_tags.dart';
+import 'package:every_benefits/features/forums/forum_vote_callable.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_role.dart';
+
+class _StubVoteCallable extends ForumVoteCallable {
+  _StubVoteCallable(this.succeed);
+
+  final bool succeed;
+
+  @override
+  Future<bool> cast({
+    required String threadId,
+    String? replyId,
+    required RelevanceVote vote,
+  }) async =>
+      succeed;
+}
 
 class FakeForumStore implements ForumStore {
   final Map<String, ForumThread> threads = {};
@@ -535,6 +550,39 @@ void main() {
         vote: RelevanceVote.up,
       ),
       throwsStateError,
+    );
+  });
+
+  test('live vote path fails closed when callable is unavailable', () async {
+    final live = ForumRepository(voteCallable: _StubVoteCallable(false));
+    final thread = ForumThread(
+      id: 't-live',
+      tags: const ['general'],
+      title: 'Pregunta ajena',
+      body: 'Cuerpo',
+      authorId: 'author',
+      authorName: 'Author',
+      authorRole: UserRole.agent,
+      replyCount: 0,
+      score: 0,
+      createdAt: DateTime.utc(2024, 1, 1),
+      updatedAt: DateTime.utc(2024, 1, 1),
+      lastReplyAt: DateTime.utc(2024, 1, 1),
+    );
+
+    await expectLater(
+      live.setThreadRelevance(
+        thread: thread,
+        actor: _agent(uid: 'voter'),
+        vote: RelevanceVote.up,
+      ),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('Voting service unavailable'),
+        ),
+      ),
     );
   });
 

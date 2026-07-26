@@ -12,6 +12,7 @@ import 'create_thread_screen.dart';
 import 'forum_models.dart';
 import 'forum_repository.dart';
 import '../chats/chat_repository.dart';
+import '../notifications/notification_bell_button.dart';
 import 'thread_detail_screen.dart';
 import 'widgets/feed_composer_bar.dart';
 import 'widgets/feed_post_card.dart';
@@ -26,12 +27,16 @@ class ForumsScreen extends StatefulWidget {
     this.forumRepository,
     this.chatRepository,
     this.embeddedInShell = false,
+    this.notificationUnread = 0,
+    this.onOpenNotifications,
   });
 
   final UserProfile profile;
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
   final bool embeddedInShell;
+  final int notificationUnread;
+  final VoidCallback? onOpenNotifications;
 
   @override
   State<ForumsScreen> createState() => ForumsScreenState();
@@ -369,6 +374,11 @@ class ForumsScreenState extends State<ForumsScreen> {
             ],
             icon: const Icon(Icons.sort_rounded),
           ),
+          if (widget.onOpenNotifications != null)
+            NotificationBellButton(
+              unreadCount: widget.notificationUnread,
+              onPressed: widget.onOpenNotifications!,
+            ),
         ],
       ),
       floatingActionButton: _canPost && !widget.embeddedInShell

@@ -889,6 +889,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get errForumCantVoteOwnReply => 'No puedes votar tu propia respuesta.';
 
   @override
+  String get errForumVoteUnavailable =>
+      'El voto no está disponible por ahora. Inténtalo de nuevo.';
+
+  @override
   String get errChatCantChatSelf => 'No puedes chatear contigo mismo.';
 
   @override
@@ -1681,4 +1685,35 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get settingsSignOutHint =>
       'Necesitarás iniciar sesión de nuevo para volver.';
+
+  @override
+  String get navNotifications => 'Notificaciones';
+
+  @override
+  String get notificationsTitle => 'Notificaciones';
+
+  @override
+  String get notificationsEmpty => 'Estás al día.';
+
+  @override
+  String get notificationsMarkAll => 'Marcar todo leído';
+
+  @override
+  String get notificationsSignIn =>
+      'Inicia sesión para ver tus notificaciones.';
+
+  @override
+  String get notificationsPrefsTitle => 'Preferencias de notificaciones';
+
+  @override
+  String get notificationsPrefChats => 'Mensajes de chat';
+
+  @override
+  String get notificationsPrefForums => 'Actividad en foros';
+
+  @override
+  String get notificationsPrefAcademy => 'Novedades de academia';
+
+  @override
+  String get notificationsPrefSupport => 'Respuestas de soporte';
 }

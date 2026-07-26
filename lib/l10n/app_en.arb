@@ -370,6 +370,7 @@
   "errForumRegisterToVote": "Sign up to mark relevance.",
   "errForumCantVoteOwnQuestion": "You can't vote on your own question.",
   "errForumCantVoteOwnReply": "You can't vote on your own reply.",
+  "errForumVoteUnavailable": "Voting is temporarily unavailable. Try again.",
   "errChatCantChatSelf": "You can't chat with yourself.",
   "errChatEmptyMessage": "Write a message.",
   "errChatInvalidShare": "The question to share isn't valid.",
@@ -739,5 +740,15 @@
   "settingsLanguageHint": "Interface language for Every Insurance.",
   "settingsAccentStudio": "Brand signal",
   "settingsEditAccount": "Edit account details",
-  "settingsSignOutHint": "You'll need to sign in again to return."
+  "settingsSignOutHint": "You'll need to sign in again to return.",
+  "navNotifications": "Notifications",
+  "notificationsTitle": "Notifications",
+  "notificationsEmpty": "You're all caught up.",
+  "notificationsMarkAll": "Mark all read",
+  "notificationsSignIn": "Sign in to see your notifications.",
+  "notificationsPrefsTitle": "Notification preferences",
+  "notificationsPrefChats": "Chat messages",
+  "notificationsPrefForums": "Forum activity",
+  "notificationsPrefAcademy": "Academy updates",
+  "notificationsPrefSupport": "Support replies"
 }

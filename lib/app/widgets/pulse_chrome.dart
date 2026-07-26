@@ -289,11 +289,13 @@ class PulseTabItem {
     required this.label,
     required this.icon,
     required this.selectedIcon,
+    this.badgeCount = 0,
   });
 
   final String label;
   final IconData icon;
   final IconData selectedIcon;
+  final int badgeCount;
 }
 
 class PulseTabBar extends StatelessWidget {
@@ -430,10 +432,29 @@ class _PulseTab extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                selected ? item.selectedIcon : item.icon,
-                size: 22,
-                color: selected ? brand : colors.muted,
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Icon(
+                    selected ? item.selectedIcon : item.icon,
+                    size: 22,
+                    color: selected ? brand : colors.muted,
+                  ),
+                  if (item.badgeCount > 0)
+                    Positioned(
+                      right: -4,
+                      top: -2,
+                      child: Container(
+                        width: 8,
+                        height: 8,
+                        decoration: BoxDecoration(
+                          color: brand,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: colors.sheet, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
               ),
               if (showLabel) ...[
                 const SizedBox(width: 6),

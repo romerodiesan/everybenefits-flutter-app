@@ -370,6 +370,7 @@
   "errForumRegisterToVote": "Regístrate para marcar relevancia.",
   "errForumCantVoteOwnQuestion": "No puedes votar tu propia pregunta.",
   "errForumCantVoteOwnReply": "No puedes votar tu propia respuesta.",
+  "errForumVoteUnavailable": "El voto no está disponible por ahora. Inténtalo de nuevo.",
   "errChatCantChatSelf": "No puedes chatear contigo mismo.",
   "errChatEmptyMessage": "Escribe un mensaje.",
   "errChatInvalidShare": "La pregunta a compartir no es válida.",
@@ -739,5 +740,15 @@
   "settingsLanguageHint": "Idioma de la interfaz de Every Insurance.",
   "settingsAccentStudio": "Señal de marca",
   "settingsEditAccount": "Editar datos de la cuenta",
-  "settingsSignOutHint": "Necesitarás iniciar sesión de nuevo para volver."
+  "settingsSignOutHint": "Necesitarás iniciar sesión de nuevo para volver.",
+  "navNotifications": "Notificaciones",
+  "notificationsTitle": "Notificaciones",
+  "notificationsEmpty": "Estás al día.",
+  "notificationsMarkAll": "Marcar todo leído",
+  "notificationsSignIn": "Inicia sesión para ver tus notificaciones.",
+  "notificationsPrefsTitle": "Preferencias de notificaciones",
+  "notificationsPrefChats": "Mensajes de chat",
+  "notificationsPrefForums": "Actividad en foros",
+  "notificationsPrefAcademy": "Novedades de academia",
+  "notificationsPrefSupport": "Respuestas de soporte"
 }

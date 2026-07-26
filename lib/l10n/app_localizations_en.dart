@@ -883,6 +883,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get errForumCantVoteOwnReply => 'You can\'t vote on your own reply.';
 
   @override
+  String get errForumVoteUnavailable =>
+      'Voting is temporarily unavailable. Try again.';
+
+  @override
   String get errChatCantChatSelf => 'You can\'t chat with yourself.';
 
   @override
@@ -1668,4 +1672,34 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get settingsSignOutHint => 'You\'ll need to sign in again to return.';
+
+  @override
+  String get navNotifications => 'Notifications';
+
+  @override
+  String get notificationsTitle => 'Notifications';
+
+  @override
+  String get notificationsEmpty => 'You\'re all caught up.';
+
+  @override
+  String get notificationsMarkAll => 'Mark all read';
+
+  @override
+  String get notificationsSignIn => 'Sign in to see your notifications.';
+
+  @override
+  String get notificationsPrefsTitle => 'Notification preferences';
+
+  @override
+  String get notificationsPrefChats => 'Chat messages';
+
+  @override
+  String get notificationsPrefForums => 'Forum activity';
+
+  @override
+  String get notificationsPrefAcademy => 'Academy updates';
+
+  @override
+  String get notificationsPrefSupport => 'Support replies';
 }

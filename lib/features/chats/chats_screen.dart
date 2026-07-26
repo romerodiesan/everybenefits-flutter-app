@@ -18,6 +18,7 @@ import 'chat_models.dart';
 import 'chat_new_chat_screen.dart';
 import 'chat_new_group_screen.dart';
 import 'chat_repository.dart';
+import '../notifications/notification_bell_button.dart';
 import 'widgets/chat_avatar.dart';
 
 /// Chat inbox backed by [ChatRepository].
@@ -28,6 +29,8 @@ class ChatsScreen extends StatefulWidget {
     this.chatRepository,
     this.userRepository,
     this.showFab = true,
+    this.notificationUnread = 0,
+    this.onOpenNotifications,
   });
 
   final UserProfile profile;
@@ -36,6 +39,8 @@ class ChatsScreen extends StatefulWidget {
 
   /// When false, the shell owns the FAB.
   final bool showFab;
+  final int notificationUnread;
+  final VoidCallback? onOpenNotifications;
 
   @override
   State<ChatsScreen> createState() => _ChatsScreenState();
@@ -177,6 +182,13 @@ class _ChatsScreenState extends State<ChatsScreen> {
           l10n.chatsTitle,
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
         ),
+        actions: [
+          if (widget.onOpenNotifications != null)
+            NotificationBellButton(
+              unreadCount: widget.notificationUnread,
+              onPressed: widget.onOpenNotifications!,
+            ),
+        ],
       ),
       floatingActionButton: canChat && widget.showFab
           ? FloatingActionButton(

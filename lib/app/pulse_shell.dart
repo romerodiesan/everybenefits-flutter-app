@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../auth/auth.dart';
@@ -8,6 +10,8 @@ import '../features/chats/chats_screen.dart';
 import '../features/forums/forum_models.dart';
 import '../features/forums/forum_repository.dart';
 import '../features/forums/forums_screen.dart';
+import '../features/notifications/notification_repository.dart';
+import '../features/notifications/notifications_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/university/course_repository.dart';
 import '../features/university/course_search_screen.dart';
@@ -49,11 +53,60 @@ class PulseShellState extends State<PulseShell> {
 
   final _forumsKey = GlobalKey<ForumsScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
+  final _notifications = NotificationRepository();
+  final _chatRepoFallback = ChatRepository();
+  final _subs = <StreamSubscription<dynamic>>[];
+
+  int _chatUnread = 0;
+  int _forumBadge = 0;
+  int _notifUnread = 0;
 
   static const _tabCount = 5;
   static const _aiTabIndex = 2;
 
   int get currentIndex => _index;
+
+  @override
+  void initState() {
+    super.initState();
+    _bindBadgeStreams();
+  }
+
+  void _bindBadgeStreams() {
+    final profile = widget.profile;
+    if (profile.isAnonymous) return;
+    final chatRepo = widget.chatRepository ?? _chatRepoFallback;
+    _subs.add(
+      chatRepo.watchChats(profile.uid).listen((chats) {
+        if (!mounted) return;
+        final sum = chats.fold<int>(
+          0,
+          (acc, chat) => acc + chat.unreadFor(profile.uid),
+        );
+        setState(() => _chatUnread = sum);
+      }),
+    );
+    _subs.add(
+      _notifications.watchState(profile.uid).listen((state) async {
+        final newThreads =
+            await _notifications.countNewFeedThreads(state.lastFeedSeenAt);
+        if (!mounted) return;
+        setState(() {
+          _notifUnread = state.unreadCount;
+          _forumBadge = state.unreadForumCount + newThreads;
+        });
+      }),
+    );
+    unawaited(_notifications.registerPushToken(profile.uid));
+  }
+
+  @override
+  void dispose() {
+    for (final sub in _subs) {
+      sub.cancel();
+    }
+    super.dispose();
+  }
 
   void selectTab(int index) {
     final next = index.clamp(0, _tabCount - 1);
@@ -65,6 +118,29 @@ class PulseShellState extends State<PulseShell> {
     }
     if (next == _index) return;
     setState(() => _index = next);
+    if (next == 0 && !widget.profile.isAnonymous) {
+      _notifications.markFeedSeen(widget.profile.uid);
+    }
+  }
+
+  void _openNotifications() {
+    if (widget.profile.isAnonymous) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.notificationsSignIn)),
+      );
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => NotificationsScreen(
+          uid: widget.profile.uid,
+          profile: widget.profile,
+          forumRepository: widget.forumRepository,
+          chatRepository: widget.chatRepository ?? _chatRepoFallback,
+          courseRepository: widget.courseRepository,
+        ),
+      ),
+    );
   }
 
   void _openAi() {
@@ -81,16 +157,23 @@ class PulseShellState extends State<PulseShell> {
     );
   }
 
-  static List<PulseTabItem> _navItems(AppLocalizations l10n) => [
+  static List<PulseTabItem> _navItems(
+    AppLocalizations l10n, {
+    int chatUnread = 0,
+    int forumBadge = 0,
+  }) =>
+      [
         PulseTabItem(
           label: l10n.navHome,
           icon: Icons.home_outlined,
           selectedIcon: Icons.home_rounded,
+          badgeCount: forumBadge,
         ),
         PulseTabItem(
           label: l10n.navChats,
           icon: Icons.chat_bubble_outline_rounded,
           selectedIcon: Icons.chat_bubble_rounded,
+          badgeCount: chatUnread,
         ),
         PulseTabItem(
           label: l10n.navAi,
@@ -106,6 +189,7 @@ class PulseShellState extends State<PulseShell> {
           label: l10n.navProfile,
           icon: Icons.person_outline_rounded,
           selectedIcon: Icons.person_rounded,
+          badgeCount: 0,
         ),
       ];
 
@@ -222,18 +306,24 @@ class PulseShellState extends State<PulseShell> {
         forumRepository: widget.forumRepository,
         chatRepository: widget.chatRepository,
         embeddedInShell: true,
+        notificationUnread: _notifUnread,
+        onOpenNotifications: _openNotifications,
       ),
       ChatsScreen(
         profile: profile,
         chatRepository: widget.chatRepository,
         userRepository: widget.userRepository,
         showFab: false,
+        notificationUnread: _notifUnread,
+        onOpenNotifications: _openNotifications,
       ),
       // AI is pushed as its own route; keep the slot so indices stay aligned.
       const SizedBox.shrink(),
       UniversityScreen(
         profile: profile,
         courseRepository: widget.courseRepository,
+        notificationUnread: _notifUnread,
+        onOpenNotifications: _openNotifications,
       ),
       ProfileScreen(
         key: _profileKey,
@@ -241,6 +331,8 @@ class PulseShellState extends State<PulseShell> {
         userRepository: widget.userRepository,
         profile: profile,
         onOpenSupportChat: _openSupportChat,
+        notificationUnread: _notifUnread,
+        onOpenNotifications: _openNotifications,
       ),
     ];
 
@@ -289,7 +381,11 @@ class PulseShellState extends State<PulseShell> {
       body: PulseTabBody(index: _index, children: pages),
       floatingActionButton: fabButton,
       bottomNavigationBar: PulseTabBar(
-        items: _navItems(l10n),
+        items: _navItems(
+          l10n,
+          chatUnread: _chatUnread,
+          forumBadge: _forumBadge,
+        ),
         selectedIndex: _index,
         onSelect: selectTab,
       ),

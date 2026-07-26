@@ -4,14 +4,22 @@ import 'package:flutter/foundation.dart';
 import '../../firebase/firebase_emulators.dart';
 import 'forum_models.dart';
 
-/// Calls [castForumVote] when Functions are available; returns false on miss.
+/// Calls [castForumVote]. Votes are server-only (Firestore rules deny client
+/// writes to `votes` / `score`), so this never soft-fails into a client path.
 class ForumVoteCallable {
-  ForumVoteCallable({FirebaseFunctions? functions})
-      : _functions = functions ??
-            FirebaseFunctions.instanceFor(region: 'us-central1');
+  ForumVoteCallable({FirebaseFunctions? functions}) : _functionsOverride = functions;
 
-  final FirebaseFunctions _functions;
+  final FirebaseFunctions? _functionsOverride;
 
+  FirebaseFunctions get _functions =>
+      _functionsOverride ??
+      FirebaseFunctions.instanceFor(region: 'us-central1');
+
+  /// Returns `true` on success.
+  ///
+  /// Returns `false` only when the Functions emulator is missing the deploy
+  /// (`not-found` / `unimplemented` / `unavailable`) so callers can surface a
+  /// clear "service unavailable" error. All other failures rethrow.
   Future<bool> cast({
     required String threadId,
     String? replyId,
@@ -26,21 +34,13 @@ class ForumVoteCallable {
       });
       return true;
     } on FirebaseFunctionsException catch (error) {
-      // Emulator / not-deployed / broken deploy → fall back to client path.
-      if (error.code == 'unavailable' ||
-          error.code == 'not-found' ||
-          error.code == 'unimplemented' ||
-          error.code == 'internal' ||
-          error.code == 'deadline-exceeded') {
+      if (useFirebaseEmulators &&
+          (error.code == 'unavailable' ||
+              error.code == 'not-found' ||
+              error.code == 'unimplemented')) {
         debugPrint(
-          'castForumVote unavailable (${error.code}); using client path',
+          'castForumVote missing in emulator (${error.code})',
         );
-        return false;
-      }
-      rethrow;
-    } catch (error) {
-      if (useFirebaseEmulators) {
-        debugPrint('castForumVote failed in emulator: $error');
         return false;
       }
       rethrow;

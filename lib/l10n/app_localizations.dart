@@ -1730,6 +1730,12 @@ abstract class AppLocalizations {
   /// **'You can\'t vote on your own reply.'**
   String get errForumCantVoteOwnReply;
 
+  /// No description provided for @errForumVoteUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Voting is temporarily unavailable. Try again.'**
+  String get errForumVoteUnavailable;
+
   /// No description provided for @errChatCantChatSelf.
   ///
   /// In en, this message translates to:
@@ -3163,6 +3169,66 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'You\'ll need to sign in again to return.'**
   String get settingsSignOutHint;
+
+  /// No description provided for @navNotifications.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get navNotifications;
+
+  /// No description provided for @notificationsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notifications'**
+  String get notificationsTitle;
+
+  /// No description provided for @notificationsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'You\'re all caught up.'**
+  String get notificationsEmpty;
+
+  /// No description provided for @notificationsMarkAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark all read'**
+  String get notificationsMarkAll;
+
+  /// No description provided for @notificationsSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to see your notifications.'**
+  String get notificationsSignIn;
+
+  /// No description provided for @notificationsPrefsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Notification preferences'**
+  String get notificationsPrefsTitle;
+
+  /// No description provided for @notificationsPrefChats.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat messages'**
+  String get notificationsPrefChats;
+
+  /// No description provided for @notificationsPrefForums.
+  ///
+  /// In en, this message translates to:
+  /// **'Forum activity'**
+  String get notificationsPrefForums;
+
+  /// No description provided for @notificationsPrefAcademy.
+  ///
+  /// In en, this message translates to:
+  /// **'Academy updates'**
+  String get notificationsPrefAcademy;
+
+  /// No description provided for @notificationsPrefSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support replies'**
+  String get notificationsPrefSupport;
 }
 
 class _AppLocalizationsDelegate

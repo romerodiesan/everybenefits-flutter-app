@@ -740,18 +740,22 @@ class ForumRepository {
     if (thread.authorId == actor.uid) {
       throw StateError('No puedes votar tu propia pregunta.');
     }
-    if (_storeOverride == null) {
-      final viaCallable = await _voteCallable.cast(
+    // Unit tests inject a memory store and skip the callable.
+    if (_storeOverride != null) {
+      await _store.setThreadRelevance(
         threadId: thread.id,
+        uid: actor.uid,
         vote: vote,
       );
-      if (viaCallable) return;
+      return;
     }
-    await _store.setThreadRelevance(
+    final viaCallable = await _voteCallable.cast(
       threadId: thread.id,
-      uid: actor.uid,
       vote: vote,
     );
+    if (!viaCallable) {
+      throw StateError('Voting service unavailable. Try again.');
+    }
   }
 
   Future<void> syncAuthorPhotoUrl({
@@ -774,19 +778,22 @@ class ForumRepository {
     if (reply.authorId == actor.uid) {
       throw StateError('No puedes votar tu propia respuesta.');
     }
-    if (_storeOverride == null) {
-      final viaCallable = await _voteCallable.cast(
+    if (_storeOverride != null) {
+      await _store.setReplyRelevance(
         threadId: reply.threadId,
         replyId: reply.id,
+        uid: actor.uid,
         vote: vote,
       );
-      if (viaCallable) return;
+      return;
     }
-    await _store.setReplyRelevance(
+    final viaCallable = await _voteCallable.cast(
       threadId: reply.threadId,
       replyId: reply.id,
-      uid: actor.uid,
       vote: vote,
     );
+    if (!viaCallable) {
+      throw StateError('Voting service unavailable. Try again.');
+    }
   }
 }

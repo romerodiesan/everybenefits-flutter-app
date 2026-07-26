@@ -53,6 +53,9 @@ dependencies:
   flutter_slidable: ^4.0.3
   video_player: ^2.13.0
   app_links: ^7.2.1
+  firebase_messaging: ^16.4.3
+  flutter_local_notifications: ^22.2.0
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:

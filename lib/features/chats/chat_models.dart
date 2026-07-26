@@ -142,6 +142,7 @@ class ChatConversation {
   Map<String, Object?> toRtdbMap() {
     return {
       'members': {for (final id in memberIds) id: true},
+      'memberCount': memberIds.length,
       'memberNames': memberNames,
       'isGroup': isGroup,
       'title': title,

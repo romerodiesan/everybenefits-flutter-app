@@ -14,6 +14,7 @@ import 'course_search_screen.dart';
 import 'learning_path_screen.dart';
 import 'my_learning_screen.dart';
 import 'path_detail_screen.dart';
+import '../notifications/notification_bell_button.dart';
 import 'widgets/course_card.dart';
 import 'widgets/course_cover.dart';
 import 'widgets/course_manage_menu.dart';
@@ -24,10 +25,14 @@ class UniversityScreen extends StatefulWidget {
     super.key,
     required this.profile,
     this.courseRepository,
+    this.notificationUnread = 0,
+    this.onOpenNotifications,
   });
 
   final UserProfile profile;
   final CourseRepository? courseRepository;
+  final int notificationUnread;
+  final VoidCallback? onOpenNotifications;
 
   @override
   State<UniversityScreen> createState() => _UniversityScreenState();
@@ -248,6 +253,11 @@ class _UniversityScreenState extends State<UniversityScreen> {
             onPressed: _openSearch,
             icon: const Icon(Icons.search),
           ),
+          if (widget.onOpenNotifications != null)
+            NotificationBellButton(
+              unreadCount: widget.notificationUnread,
+              onPressed: widget.onOpenNotifications!,
+            ),
         ],
       ),
       body: RefreshIndicator(

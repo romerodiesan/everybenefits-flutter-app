@@ -423,6 +423,7 @@ String friendlyForumError(Object error, AppLocalizations l10n) {
         l.errForumCantVoteOwnQuestion,
     'No puedes votar tu propia respuesta.': (l) => l.errForumCantVoteOwnReply,
     "You can't vote on your own reply.": (l) => l.errForumCantVoteOwnReply,
+    'Voting service unavailable. Try again.': (l) => l.errForumVoteUnavailable,
   };
 
   final mapped = known[cleaned];

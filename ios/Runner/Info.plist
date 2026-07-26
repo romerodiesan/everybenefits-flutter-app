@@ -85,5 +85,10 @@
 	<string>Every Insurance necesita acceso a tus fotos para actualizar tu avatar.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>Every Insurance necesita la cámara para tomar tu foto de perfil.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+		<string>remote-notification</string>
+	</array>
 </dict>
 </plist>
