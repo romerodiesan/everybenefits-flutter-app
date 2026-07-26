@@ -68,6 +68,12 @@ class PulseShellState extends State<PulseShell> {
   }
 
   void _openAi() {
+    if (widget.profile.isAnonymous || widget.profile.role == UserRole.guest) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.aiSignInRequired)),
+      );
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => AiChatScreen(profile: widget.profile),

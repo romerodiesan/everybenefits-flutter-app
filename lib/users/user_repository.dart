@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
@@ -25,10 +26,15 @@ abstract class UserProfileStore {
 }
 
 class FirestoreUserProfileStore implements UserProfileStore {
-  FirestoreUserProfileStore({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  FirestoreUserProfileStore({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _functions = functions ??
+            FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
@@ -102,12 +108,14 @@ class FirestoreUserProfileStore implements UserProfileStore {
     String? excludeUid,
     int limit = 80,
   }) async {
-    final snap = await _users
-        .where('isAnonymous', isEqualTo: false)
-        .limit(limit + (excludeUid == null ? 0 : 1))
-        .get();
-    final list = snap.docs
-        .map((d) => UserProfile.fromMap(d.data()))
+    final result = await _functions.httpsCallable('listPublicProfiles').call(
+      <String, dynamic>{'limit': limit + (excludeUid == null ? 0 : 1)},
+    );
+    final payload = result.data is Map ? result.data as Map : const {};
+    final raw = payload['profiles'];
+    final list = (raw is List ? raw : const [])
+        .whereType<Map>()
+        .map((data) => UserProfile.fromMap(Map<String, dynamic>.from(data)))
         .where((p) => p.uid != excludeUid && p.role != UserRole.guest)
         .take(limit)
         .toList()

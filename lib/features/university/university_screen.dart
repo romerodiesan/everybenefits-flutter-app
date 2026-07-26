@@ -38,6 +38,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
       widget.courseRepository ?? CourseRepository();
 
   final _subscriptions = <StreamSubscription<void>>[];
+  bool _active = false;
 
   List<Course> _published = const [];
   List<Course> _authored = const [];
@@ -53,12 +54,20 @@ class _UniversityScreenState extends State<UniversityScreen> {
   bool get _isAdmin => canManageCourses(widget.profile.role);
 
   @override
-  void initState() {
-    super.initState();
-    _listen();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final active = TickerMode.valuesOf(context).enabled;
+    if (active == _active) return;
+    _active = active;
+    if (active) {
+      _listen();
+    } else {
+      _cancelListeners();
+    }
   }
 
   void _listen() {
+    if (_subscriptions.isNotEmpty) return;
     _subscriptions.add(
       _repository.watchPublishedCourses().listen(
         (courses) {
@@ -127,11 +136,16 @@ class _UniversityScreenState extends State<UniversityScreen> {
     }
   }
 
+  void _cancelListeners() {
+    for (final sub in _subscriptions) {
+      unawaited(sub.cancel());
+    }
+    _subscriptions.clear();
+  }
+
   @override
   void dispose() {
-    for (final sub in _subscriptions) {
-      sub.cancel();
-    }
+    _cancelListeners();
     super.dispose();
   }
 

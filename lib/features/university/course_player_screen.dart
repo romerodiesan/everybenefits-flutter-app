@@ -172,8 +172,6 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
     final value = controller.value;
     if (!value.isInitialized) return;
 
-    setState(() {});
-
     final completed = _reachedCompletion(value);
     final alreadyDone = _enrollment.hasCompleted(_lesson.id);
 
@@ -465,9 +463,12 @@ class _Stage extends StatelessWidget {
               opacity: controlsVisible ? 1 : 0,
               child: IgnorePointer(
                 ignoring: !controlsVisible,
-                child: _Controls(
-                  controller: controller!,
-                  onTogglePlay: onTogglePlay,
+                child: ValueListenableBuilder<VideoPlayerValue>(
+                  valueListenable: controller!,
+                  builder: (context, _, child) => _Controls(
+                    controller: controller!,
+                    onTogglePlay: onTogglePlay,
+                  ),
                 ),
               ),
             ),

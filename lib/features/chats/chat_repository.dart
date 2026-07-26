@@ -99,6 +99,11 @@ class RtdbChatStore implements ChatStore {
     return raw.map((key, value) => MapEntry('$key', value));
   }
 
+  /// Chat meta cache for legacy index rows (only `lastMessageAt`) written
+  /// before syncChatInbox denormalized the inbox. Refreshed per chat when a
+  /// newer message lands.
+  final Map<String, Map<String, dynamic>> _legacyChatMeta = {};
+
   Future<List<ChatConversation>> _inboxFromIndex(
     Object? raw, {
     required String viewerUid,
@@ -112,34 +117,79 @@ class RtdbChatStore implements ChatStore {
       return bAt.compareTo(aAt);
     });
 
-    final chats = <ChatConversation>[];
-    for (final entry in entries) {
-      final chatId = '${entry.key}';
-      final index = _asStringKeyedMap(entry.value);
-      final snap = await _root.child('chats/$chatId').get();
-      if (!snap.exists || snap.value is! Map) continue;
-      var chat = ChatConversation.fromMap(
-        chatId,
-        _asStringKeyedMap(snap.value),
-      );
-      // Prefer per-user inbox pin flag when present (drives section + refresh).
-      if (index.containsKey('pinned')) {
-        final pinned = index['pinned'] == true;
-        if (chat.isPinnedFor(viewerUid) != pinned) {
-          final next = Map<String, bool>.from(chat.pinnedBy)
-            ..[viewerUid] = pinned;
-          chat = chat.copyWith(pinnedBy: next);
+    Future<void> refreshLegacyMeta(String chatId) async {
+      try {
+        final snap = await _root.child('chats/$chatId').get();
+        final value = snap.value;
+        if (value is Map) {
+          _legacyChatMeta[chatId] = _asStringKeyedMap(value);
         }
+      } catch (_) {
+        // Names stay blank for rows we could not read.
       }
-      chats.add(chat);
     }
-    return chats;
+
+    final pending = <Future<void>>[];
+    for (final entry in entries) {
+      final row = _asStringKeyedMap(entry.value);
+      if (row['memberIds'] is List) continue;
+      final chatId = '${entry.key}';
+      final cached = _legacyChatMeta[chatId];
+      if (cached == null ||
+          _readMillis(row['lastMessageAt']) >
+              _readMillis(cached['lastMessageAt'])) {
+        pending.add(refreshLegacyMeta(chatId));
+      }
+    }
+    if (pending.isNotEmpty) await Future.wait(pending);
+
+    return [
+      for (final entry in entries)
+        _conversationFromIndexRow(
+          '${entry.key}',
+          _asStringKeyedMap(entry.value),
+          viewerUid: viewerUid,
+        ),
+    ];
+  }
+
+  ChatConversation _conversationFromIndexRow(
+    String chatId,
+    Map<String, dynamic> row, {
+    required String viewerUid,
+  }) {
+    if (row['memberIds'] is! List) {
+      final meta = _legacyChatMeta[chatId];
+      if (meta != null) {
+        final data = Map<String, dynamic>.from(meta);
+        if (row['pinned'] is bool) {
+          data['pinnedBy'] = {
+            ..._asStringKeyedMap(meta['pinnedBy']),
+            viewerUid: row['pinned'] == true,
+          };
+        }
+        return ChatConversation.fromMap(chatId, data);
+      }
+    }
+    return ChatConversation.fromMap(chatId, {
+      ...row,
+      'members': {
+        for (final id in (row['memberIds'] as List? ?? const [])) '$id': true,
+      },
+      'unreadCounts': {
+        viewerUid: _readMillis(row['unreadCount']),
+      },
+      'pinnedBy': {
+        viewerUid: row['pinned'] == true,
+      },
+    });
   }
 
   /// RTDB `onValue` streams are single-subscription; [Stream.multi] makes each
   /// `.listen` start a fresh native subscription (needed when the inbox pauses).
   @override
   Stream<List<ChatConversation>> watchChats(String uid) {
+    unawaited(_rebuildInbox());
     return Stream.multi((controller) {
       final sub = _root.child('userChats/$uid').onValue.listen(
         (event) async {
@@ -159,6 +209,14 @@ class RtdbChatStore implements ChatStore {
       );
       controller.onCancel = sub.cancel;
     });
+  }
+
+  Future<void> _rebuildInbox() async {
+    try {
+      await _functions.httpsCallable('rebuildChatInbox').call(<String, dynamic>{});
+    } catch (_) {
+      // Legacy rows refresh automatically on the next chat write.
+    }
   }
 
   @override
@@ -250,6 +308,24 @@ class RtdbChatStore implements ChatStore {
 
   @override
   Future<ChatConversation> createChat(ChatConversation chat) async {
+    if (chat.isGroup && !chat.isSupportChat) {
+      final result = await _functions.httpsCallable('createGroupChat').call(
+        <String, dynamic>{
+          'title': chat.title,
+          'memberIds': chat.memberIds,
+        },
+      );
+      final data = _asStringKeyedMap(result.data);
+      final chatId = '${data['chatId'] ?? ''}';
+      final snap = await _root.child('chats/$chatId').get();
+      if (!snap.exists || snap.value is! Map) {
+        throw StateError('No se pudo crear el grupo.');
+      }
+      return ChatConversation.fromMap(
+        chatId,
+        _asStringKeyedMap(snap.value),
+      );
+    }
     final ref = chat.id.isEmpty
         ? _root.child('chats').push()
         : _root.child('chats/${chat.id}');
@@ -276,12 +352,7 @@ class RtdbChatStore implements ChatStore {
       'chats/$id': saved.toRtdbMap(),
     };
     final at = saved.lastMessageAt.toUtc().millisecondsSinceEpoch;
-    for (final memberId in userChatIndexMemberIds(saved.memberIds)) {
-      updates['userChats/$memberId/$id'] = {'lastMessageAt': at};
-    }
-    if (saved.dmKey != null && saved.dmKey!.isNotEmpty) {
-      updates['dmIndex/${saved.dmKey}'] = id;
-    }
+    updates['userChats/${saved.createdBy}/$id'] = {'lastMessageAt': at};
     await _root.update(updates);
     return saved;
   }
@@ -332,14 +403,7 @@ class RtdbChatStore implements ChatStore {
 
   @override
   Future<void> ensureUserChatIndexes(ChatConversation chat) async {
-    final at = chat.lastMessageAt.toUtc().millisecondsSinceEpoch;
-    final updates = <String, Object?>{};
-    // Patch lastMessageAt only — do not wipe per-user `pinned` on the index.
-    for (final memberId in userChatIndexMemberIds(chat.memberIds)) {
-      updates['userChats/$memberId/${chat.id}/lastMessageAt'] = at;
-    }
-    if (updates.isEmpty) return;
-    await _root.update(updates);
+    // syncChatInbox fans out denormalized rows with Admin privileges.
   }
 
   @override

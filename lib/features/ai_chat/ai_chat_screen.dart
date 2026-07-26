@@ -40,13 +40,14 @@ class _AiChatScreenState extends State<AiChatScreen> {
   String? _errorMessage;
   CancelToken? _cancelToken;
   StreamSubscription<PulseStreamEvent>? _streamSub;
+  Timer? _deltaTimer;
+  String _pendingDelta = '';
   int _historyEpoch = 0;
 
   @override
   void initState() {
     super.initState();
     _focus.addListener(_onComposerChanged);
-    _controller.addListener(_onComposerChanged);
   }
 
   void _onComposerChanged() {
@@ -55,17 +56,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   String get _locale => Localizations.localeOf(context).languageCode;
-
-  List<({String role, String text})> _buildHistory() {
-    return [
-      for (final message in _messages)
-        if (message.text.trim().isNotEmpty)
-          (
-            role: message.isUser ? 'user' : 'assistant',
-            text: message.text,
-          ),
-    ];
-  }
 
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -94,9 +84,19 @@ class _AiChatScreenState extends State<AiChatScreen> {
     _cancelToken = null;
     unawaited(_streamSub?.cancel());
     _streamSub = null;
+    _flushPendingDelta();
     if (_streaming) {
       setState(() => _streaming = false);
     }
+  }
+
+  void _flushPendingDelta() {
+    _deltaTimer?.cancel();
+    _deltaTimer = null;
+    if (_pendingDelta.isEmpty || !mounted) return;
+    final delta = _pendingDelta;
+    _pendingDelta = '';
+    setState(() => _lastAssistant?.text += delta);
   }
 
   PulseChatMessage? get _lastAssistant {
@@ -120,7 +120,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
     if (text.isEmpty || _streaming) return;
 
     PulseHaptics.light();
-    final history = _buildHistory();
     final userId = _localId.next('user');
     final assistantId = _localId.next('assistant');
 
@@ -144,7 +143,6 @@ class _AiChatScreenState extends State<AiChatScreen> {
             message: text,
             locale: _locale,
             conversationId: _conversationId,
-            history: history,
             cancelToken: token,
           )
           .listen(
@@ -163,6 +161,15 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   void _onStreamEvent(PulseStreamEvent event) {
     if (!mounted) return;
+    if (event case PulseTextEvent(:final delta)) {
+      _pendingDelta += delta;
+      _deltaTimer ??= Timer(
+        const Duration(milliseconds: 50),
+        _flushPendingDelta,
+      );
+      return;
+    }
+    _flushPendingDelta();
     setState(() {
       switch (event) {
         case PulseConversationEvent(:final conversationId, :final title):
@@ -172,8 +179,8 @@ class _AiChatScreenState extends State<AiChatScreen> {
           }
         case PulseActivityEvent(:final activity):
           _upsertActivity(activity);
-        case PulseTextEvent(:final delta):
-          _lastAssistant?.text += delta;
+        case PulseTextEvent():
+          break;
         case PulseSourcesEvent(:final sources):
           final message = _lastAssistant;
           if (message != null) {
@@ -220,6 +227,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Future<void> _loadConversation(String id) async {
     _stopStream();
+    _deltaTimer?.cancel();
     setState(() {
       _errorMessage = null;
       _messages.clear();
@@ -334,10 +342,12 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   @override
   void dispose() {
-    _stopStream();
+    _cancelToken?.cancel();
+    unawaited(_streamSub?.cancel());
+    _deltaTimer?.cancel();
+    _pendingDelta = '';
     _client.close();
     _focus.removeListener(_onComposerChanged);
-    _controller.removeListener(_onComposerChanged);
     _focus.dispose();
     _controller.dispose();
     _scroll.dispose();
@@ -495,14 +505,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
                 duration: const Duration(milliseconds: 280),
                 curve: Curves.easeOutCubic,
                 padding: EdgeInsets.fromLTRB(14, 0, 14, bottomPad),
-                child: _AiComposer(
-                  controller: _controller,
-                  focusNode: _focus,
-                  streaming: _streaming,
-                  focused: _focus.hasFocus,
-                  onSend: () => unawaited(_send()),
-                  onStop: _stopStream,
-                  stopLabel: l10n.aiStop,
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _controller,
+                  builder: (context, _, child) => _AiComposer(
+                    controller: _controller,
+                    focusNode: _focus,
+                    streaming: _streaming,
+                    focused: _focus.hasFocus,
+                    onSend: () => unawaited(_send()),
+                    onStop: _stopStream,
+                    stopLabel: l10n.aiStop,
+                  ),
                 ),
               ),
             ],

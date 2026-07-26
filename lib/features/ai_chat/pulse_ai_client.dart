@@ -74,7 +74,10 @@ class PulseAiClient {
           headers['X-Firebase-AppCheck'] = token;
         }
       } catch (_) {
-        // Production enforces App Check; the server returns a clear 401.
+        throw PulseAiException(
+          'app-check-failed',
+          'Device verification failed. Restart the app and try again.',
+        );
       }
     }
     return headers;
@@ -182,7 +185,6 @@ class PulseAiClient {
     required String message,
     required String locale,
     String? conversationId,
-    List<({String role, String text})> history = const [],
     CancelToken? cancelToken,
   }) async* {
     final request = await _httpClient.openUrl(
@@ -198,9 +200,6 @@ class PulseAiClient {
         'message': message,
         'locale': locale,
         'conversationId': ?conversationId,
-        'history': [
-          for (final turn in history) {'role': turn.role, 'text': turn.text},
-        ],
       }),
     );
     request.contentLength = body.length;

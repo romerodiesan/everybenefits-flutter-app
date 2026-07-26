@@ -92,6 +92,7 @@ class FirestoreCourseStore implements CourseStore {
 
   /// Injected in tests; quizzes are graded by the `submitQuizAttempt` callable.
   final FirebaseFunctions? functions;
+  final Map<String, Future<String>> _storageUrlCache = {};
 
   FirebaseStorage get _bucket => storage ?? FirebaseStorage.instance;
 
@@ -216,22 +217,9 @@ class FirestoreCourseStore implements CourseStore {
       updatedAt: now,
     );
 
-    final batch = _firestore.batch();
-    batch.set(_enrollments(uid).doc(courseId), {
+    await _functions.httpsCallable('enrollInCourse').call(<String, dynamic>{
       'courseId': courseId,
-      'completedLessonIds': <String>[],
-      'lastLessonId': null,
-      'lastPositionSeconds': 0,
-      'enrolledAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'completedAt': null,
-      'quizAttempts': <String, Object?>{},
     });
-    batch.update(_courses.doc(courseId), {
-      'studentCount': FieldValue.increment(1),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
     return enrollment;
   }
 
@@ -240,18 +228,14 @@ class FirestoreCourseStore implements CourseStore {
     required String uid,
     required Enrollment enrollment,
   }) async {
-    // `quizAttempts` is intentionally absent: only the grading callable writes it.
-    await _enrollments(uid).doc(enrollment.courseId).set({
+    final lessonId = enrollment.lastLessonId;
+    if (lessonId == null || lessonId.isEmpty) return;
+    await _functions.httpsCallable('saveCourseProgress').call(<String, dynamic>{
       'courseId': enrollment.courseId,
-      'completedLessonIds': enrollment.completedLessonIds,
-      'lastLessonId': enrollment.lastLessonId,
-      'lastPositionSeconds': enrollment.lastPositionSeconds,
-      'enrolledAt': Timestamp.fromDate(enrollment.enrolledAt),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'completedAt': enrollment.completedAt == null
-          ? null
-          : Timestamp.fromDate(enrollment.completedAt!),
-    }, SetOptions(merge: true));
+      'lessonId': lessonId,
+      'positionSeconds': enrollment.lastPositionSeconds,
+      'completed': enrollment.completedLessonIds.contains(lessonId),
+    });
   }
 
   @override
@@ -260,7 +244,7 @@ class FirestoreCourseStore implements CourseStore {
     if (direct != null && direct.trim().isNotEmpty) return direct.trim();
     final path = lesson.videoPath;
     if (path == null || path.trim().isEmpty) return null;
-    return _bucket.ref(path.trim()).getDownloadURL();
+    return _cachedStorageUrl(path.trim());
   }
 
   @override
@@ -269,7 +253,18 @@ class FirestoreCourseStore implements CourseStore {
     if (direct != null && direct.trim().isNotEmpty) return direct.trim();
     final path = course.coverPath;
     if (path == null || path.trim().isEmpty) return null;
-    return _bucket.ref(path.trim()).getDownloadURL();
+    return _cachedStorageUrl(path.trim());
+  }
+
+  Future<String> _cachedStorageUrl(String path) {
+    final existing = _storageUrlCache[path];
+    if (existing != null) return existing;
+    final pending = _bucket.ref(path).getDownloadURL().catchError((Object error) {
+      _storageUrlCache.remove(path);
+      throw error;
+    });
+    _storageUrlCache[path] = pending;
+    return pending;
   }
 
   @override

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -128,6 +130,21 @@ class EveryInsuranceApp extends StatefulWidget {
 class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
   /// Cached so theme rebuilds do not resubscribe auth (which resets navigation).
   late final Stream<User?> _authStream = widget.authService.authStateChanges;
+  late final MagicLinkHandler _magicLinks = MagicLinkHandler(
+    authService: widget.authService,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_magicLinks.start());
+  }
+
+  @override
+  void dispose() {
+    unawaited(_magicLinks.dispose());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

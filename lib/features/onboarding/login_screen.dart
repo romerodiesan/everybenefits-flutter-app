@@ -72,6 +72,7 @@ class _LoginScreenState extends State<LoginScreen> {
         email: email,
         actionCodeSettings: everyInsuranceEmailLinkSettings(),
       );
+      await MagicLinkEmailStore.save(email);
       if (!mounted) return;
       setState(() => _magicLinkSent = true);
       showAppSuccess(context, l10n.loginMagicLinkSent(email));

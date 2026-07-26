@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../users/avatar_storage.dart';
 import '../../users/user_profile.dart';
@@ -112,10 +113,15 @@ abstract class ForumStore {
 }
 
 class FirestoreForumStore implements ForumStore {
-  FirestoreForumStore({FirebaseFirestore? firestore})
-      : _firestore = firestore ?? FirebaseFirestore.instance;
+  FirestoreForumStore({
+    FirebaseFirestore? firestore,
+    FirebaseFunctions? functions,
+  })  : _firestore = firestore ?? FirebaseFirestore.instance,
+        _functions = functions ??
+            FirebaseFunctions.instanceFor(region: 'us-central1');
 
   final FirebaseFirestore _firestore;
+  final FirebaseFunctions _functions;
 
   CollectionReference<Map<String, dynamic>> get _threads =>
       _firestore.collection('threads');
@@ -203,13 +209,20 @@ class FirestoreForumStore implements ForumStore {
     required List<String> replyIds,
   }) async {
     if (replyIds.isEmpty) return {};
-    final snaps = await Future.wait(
-      replyIds.map((id) => _replyVote(threadId, id, uid).get()),
-    );
-    final out = <String, RelevanceVote>{};
-    for (var i = 0; i < replyIds.length; i++) {
-      final value = (snaps[i].data()?['value'] as num?)?.toInt();
-      out[replyIds[i]] = RelevanceVote.fromValue(value);
+    final snap = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('forumVotes')
+        .get();
+    final out = {for (final id in replyIds) id: RelevanceVote.none};
+    final wanted = replyIds.toSet();
+    for (final vote in snap.docs) {
+      final data = vote.data();
+      final replyId = '${data['replyId'] ?? ''}';
+      if ('${data['threadId'] ?? ''}' == threadId && wanted.contains(replyId)) {
+        out[replyId] =
+            RelevanceVote.fromValue((data['value'] as num?)?.toInt());
+      }
     }
     return out;
   }
@@ -220,13 +233,20 @@ class FirestoreForumStore implements ForumStore {
     required List<String> threadIds,
   }) async {
     if (threadIds.isEmpty) return {};
-    final snaps = await Future.wait(
-      threadIds.map((id) => _threadVote(id, uid).get()),
-    );
-    final out = <String, RelevanceVote>{};
-    for (var i = 0; i < threadIds.length; i++) {
-      final value = (snaps[i].data()?['value'] as num?)?.toInt();
-      out[threadIds[i]] = RelevanceVote.fromValue(value);
+    final snap = await _firestore
+        .collection('users')
+        .doc(uid)
+        .collection('forumVotes')
+        .get();
+    final out = {for (final id in threadIds) id: RelevanceVote.none};
+    final wanted = threadIds.toSet();
+    for (final vote in snap.docs) {
+      final data = vote.data();
+      final threadId = '${data['threadId'] ?? ''}';
+      if (data['replyId'] == null && wanted.contains(threadId)) {
+        out[threadId] =
+            RelevanceVote.fromValue((data['value'] as num?)?.toInt());
+      }
     }
     return out;
   }
@@ -319,9 +339,13 @@ class FirestoreForumStore implements ForumStore {
     required UserProfile author,
   }) async {
     final now = DateTime.now().toUtc();
-    final doc = _replies(threadId).doc();
+    final result = await _functions.httpsCallable('addForumReply').call(
+      <String, dynamic>{'threadId': threadId, 'body': body.trim()},
+    );
+    final data = result.data is Map ? result.data as Map : const {};
+    final replyId = '${data['replyId'] ?? ''}';
     final reply = ForumReply(
-      id: doc.id,
+      id: replyId,
       threadId: threadId,
       body: body.trim(),
       authorId: author.uid,
@@ -333,23 +357,6 @@ class FirestoreForumStore implements ForumStore {
       updatedAt: now,
     );
 
-    final batch = _firestore.batch();
-    batch.set(doc, {
-      'body': reply.body,
-      'authorId': reply.authorId,
-      'authorName': reply.authorName,
-      'authorPhotoUrl': reply.authorPhotoUrl,
-      'authorRole': reply.authorRole.wireValue,
-      'score': 0,
-      'createdAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    batch.update(_threads.doc(threadId), {
-      'replyCount': FieldValue.increment(1),
-      'lastReplyAt': FieldValue.serverTimestamp(),
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-    await batch.commit();
     return reply;
   }
 
@@ -389,52 +396,10 @@ class FirestoreForumStore implements ForumStore {
     required String threadId,
     required String replyId,
   }) async {
-    final threadRef = _threads.doc(threadId);
-    final replyRef = _replies(threadId).doc(replyId);
-    final voteDocs = await replyRef.collection('votes').get();
-
-    final remaining = await _replies(threadId)
-        .orderBy('createdAt', descending: true)
-        .limit(5)
-        .get();
-    DateTime? lastReplyAt;
-    for (final doc in remaining.docs) {
-      if (doc.id == replyId) continue;
-      lastReplyAt = _readDate(doc.data()['createdAt']);
-      break;
-    }
-
-    final threadSnap = await threadRef.get();
-    final threadCreated = _readDate(threadSnap.data()?['createdAt']);
-    final acceptedId = threadSnap.data()?['acceptedReplyId'] as String?;
-
-    final batch = _firestore.batch();
-    for (final vote in voteDocs.docs) {
-      batch.delete(vote.reference);
-    }
-    batch.delete(replyRef);
-
-    final updates = <String, Object?>{
-      'replyCount': FieldValue.increment(-1),
-      'updatedAt': FieldValue.serverTimestamp(),
-      'lastReplyAt': lastReplyAt != null
-          ? Timestamp.fromDate(lastReplyAt.toLocal())
-          : (threadCreated != null
-              ? Timestamp.fromDate(threadCreated.toLocal())
-              : FieldValue.serverTimestamp()),
-    };
-    if (acceptedId == replyId) {
-      updates['acceptedReplyId'] = null;
-    }
-    batch.update(threadRef, updates);
-    await batch.commit();
-  }
-
-  DateTime? _readDate(Object? value) {
-    if (value is Timestamp) return value.toDate().toUtc();
-    if (value is DateTime) return value.toUtc();
-    if (value is String) return DateTime.tryParse(value)?.toUtc();
-    return null;
+    await _functions.httpsCallable('deleteForumReply').call(<String, dynamic>{
+      'threadId': threadId,
+      'replyId': replyId,
+    });
   }
 
   @override
