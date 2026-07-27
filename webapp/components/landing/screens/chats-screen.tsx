@@ -1,17 +1,25 @@
 "use client";
 
+import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Avatar, Button } from "@/components/ui/primitives";
 import {
   LANDING_CHATS,
   LANDING_VIEWER_UID,
 } from "@/lib/landing/fixtures";
-import { chatTitleFor } from "@/lib/firebase/chats";
+import { chatTitleFor, partitionChatInbox } from "@/lib/firebase/chats";
 
 export function ChatsScreen() {
   const t = useTranslations();
-  const pinned = LANDING_CHATS.filter((c) => c.pinnedBy[LANDING_VIEWER_UID]);
-  const rest = LANDING_CHATS.filter((c) => !c.pinnedBy[LANDING_VIEWER_UID]);
+  const sections = useMemo(
+    () => partitionChatInbox(LANDING_CHATS, LANDING_VIEWER_UID),
+    [],
+  );
+  const showSectionHeaders = Boolean(
+    sections.support.length ||
+      sections.community.length ||
+      sections.pinned.length,
+  );
 
   function renderList(
     items: typeof LANDING_CHATS,
@@ -64,8 +72,16 @@ export function ChatsScreen() {
         <Button className="!h-8 !px-3 !text-xs">{t("chatsNew")}</Button>
       </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-hidden px-2.5 py-2.5">
-        {renderList(pinned, t("chatsPinned"))}
-        {renderList(rest)}
+        {showSectionHeaders ? (
+          <>
+            {renderList(sections.support, t("chatsSectionSupport"))}
+            {renderList(sections.community, t("chatsSectionCommunity"))}
+            {renderList(sections.pinned, t("chatsPinned"))}
+            {renderList(sections.recent, t("chatsSectionRecent"))}
+          </>
+        ) : (
+          renderList(sections.recent)
+        )}
       </div>
     </div>
   );

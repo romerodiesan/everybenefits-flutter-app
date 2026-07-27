@@ -519,6 +519,16 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Platform feature flags (e.g. Pulse AI kill switch).
+    match /platformConfig/{docId} {
+      allow read: if isSignedIn();
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'updatedBy'])
+        && request.resource.data.enabled is bool
+        && request.resource.data.updatedBy == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     // Required for collectionGroup('replies') queries (avatar photo sync).
     // Nested match /threads/.../replies alone does not cover collection groups.
     match /{path=**}/replies/{replyId} {

@@ -835,6 +835,59 @@ describe('pulse ai storage', () => {
   });
 });
 
+describe('platformConfig pulseAi kill switch', () => {
+  beforeEach(async () => {
+    await seedUser('student1', { role: 'student' });
+    await seedUser('admin1', { role: 'admin' });
+  });
+
+  it('lets signed-in users read the config', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('platformConfig/pulseAi').set({
+        enabled: true,
+        updatedBy: 'admin1',
+        updatedAt: new Date(),
+      });
+    });
+    await assertSucceeds(authedDb('student1').doc('platformConfig/pulseAi').get());
+  });
+
+  it('lets admins create and update the kill switch', async () => {
+    const admin = authedDb('admin1');
+    await assertSucceeds(
+      admin.doc('platformConfig/pulseAi').set({
+        enabled: false,
+        updatedBy: 'admin1',
+        updatedAt: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      admin.doc('platformConfig/pulseAi').update({
+        enabled: true,
+        updatedBy: 'admin1',
+        updatedAt: new Date(),
+      }),
+    );
+  });
+
+  it('blocks students from writing and rejects forged updatedBy', async () => {
+    await assertFails(
+      authedDb('student1').doc('platformConfig/pulseAi').set({
+        enabled: false,
+        updatedBy: 'student1',
+        updatedAt: new Date(),
+      }),
+    );
+    await assertFails(
+      authedDb('admin1').doc('platformConfig/pulseAi').set({
+        enabled: false,
+        updatedBy: 'student1',
+        updatedAt: new Date(),
+      }),
+    );
+  });
+});
+
 describe('chats moved to Realtime Database', () => {
   it('denies all Firestore chat writes', async () => {
     await seedUser('a', { displayName: 'a', role: 'manager' });

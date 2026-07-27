@@ -2,6 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import { FORUM_TAGS, type ForumThread } from "@/lib/types";
 import { useSavedThreadIds } from "@/lib/saved-threads";
 
@@ -24,6 +25,7 @@ export function FeedSideRail({
 }) {
   const t = useTranslations();
   const savedIds = useSavedThreadIds();
+  const pulseAiEnabled = usePulseAiEnabled();
 
   const topicList: TopicStat[] =
     topics.length > 0
@@ -120,15 +122,17 @@ export function FeedSideRail({
         <section className="feed-rail-card">
           <h2 className="feed-rail-title">{t("forumsRailShortcuts")}</h2>
           <div className="mt-2.5 space-y-1">
-            <Link
-              href="/ai"
-              className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold transition hover:bg-brand/8 hover:text-brand"
-            >
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/12 text-brand">
-                ✦
-              </span>
-              {t("forumsRailAskAi")}
-            </Link>
+            {pulseAiEnabled && (
+              <Link
+                href="/ai"
+                className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold transition hover:bg-brand/8 hover:text-brand"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/12 text-brand">
+                  ✦
+                </span>
+                {t("forumsRailAskAi")}
+              </Link>
+            )}
             <Link
               href="/academy"
               className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold transition hover:bg-brand/8 hover:text-brand"

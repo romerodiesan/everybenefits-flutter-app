@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
@@ -5,20 +7,25 @@ import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/role_badge.dart';
+import '../../firebase/platform_config.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import 'widgets/profile_avatar.dart';
 
-/// Minimal admin surface: promote students to agents via [UserRoleCallable].
+/// Minimal admin surface: Pulse AI kill switch + promote students to agents.
 class AdminPromoteScreen extends StatefulWidget {
   const AdminPromoteScreen({
     super.key,
     required this.userRepository,
+    required this.adminUid,
     this.roleCallable,
+    this.platformConfig,
   });
 
   final UserRepository userRepository;
+  final String adminUid;
   final UserRoleCallable? roleCallable;
+  final PlatformConfig? platformConfig;
 
   @override
   State<AdminPromoteScreen> createState() => _AdminPromoteScreenState();
@@ -27,9 +34,13 @@ class AdminPromoteScreen extends StatefulWidget {
 class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
   late Future<List<UserProfile>> _future;
   final Set<String> _busyUids = {};
+  bool _aiBusy = false;
 
   UserRoleCallable get _callable =>
       widget.roleCallable ?? UserRoleCallable();
+
+  PlatformConfig get _platform =>
+      widget.platformConfig ?? PlatformConfig();
 
   @override
   void initState() {
@@ -39,6 +50,25 @@ class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
 
   Future<List<UserProfile>> _load() {
     return _callable.listStudentsForPromotion();
+  }
+
+  Future<void> _setAiEnabled(bool enabled) async {
+    if (_aiBusy) return;
+    setState(() => _aiBusy = true);
+    try {
+      await _platform.setPulseAiEnabled(
+        enabled: enabled,
+        adminUid: widget.adminUid,
+      );
+    } catch (error) {
+      if (!mounted) return;
+      final l10n = context.l10n;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.settingsAdminPromoteFailed('$error'))),
+      );
+    } finally {
+      if (mounted) setState(() => _aiBusy = false);
+    }
   }
 
   Future<void> _promote(UserProfile profile) async {
@@ -78,100 +108,174 @@ class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 22),
         ),
       ),
-      body: FutureBuilder<List<UserProfile>>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Text(
-                  l10n.settingsAdminPromoteFailed('${snapshot.error}'),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-          final students = snapshot.data ?? const <UserProfile>[];
-          if (students.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Text(
-                  l10n.settingsAdminEmpty,
-                  style: theme.textTheme.bodyLarge?.copyWith(color: colors.muted),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            );
-          }
-
-          return ListView.separated(
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
               AppSpacing.sm,
               AppSpacing.lg,
-              AppSpacing.xl,
+              AppSpacing.md,
             ),
-            itemCount: students.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 10),
-            itemBuilder: (context, index) {
-              final profile = students[index];
-              final busy = _busyUids.contains(profile.uid);
-              return DecoratedBox(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(color: colors.border),
-                  color: colors.glassFill,
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
-                  child: Row(
-                    children: [
-                      ProfileAvatar(profile: profile, size: 48),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+            child: StreamBuilder<bool>(
+              stream: _platform.watchPulseAiEnabled(),
+              initialData: true,
+              builder: (context, snapshot) {
+                final enabled = snapshot.data ?? true;
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: colors.border),
+                    color: colors.glassFill,
+                  ),
+                  child: SwitchListTile.adaptive(
+                    contentPadding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
+                    title: Text(
+                      l10n.settingsAdminPulseAi,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    subtitle: Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: Text(
+                        l10n.settingsAdminPulseAiHint,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.muted,
+                        ),
+                      ),
+                    ),
+                    value: enabled,
+                    onChanged: _aiBusy
+                        ? null
+                        : (next) {
+                            PulseHaptics.selection();
+                            unawaited(_setAiEnabled(next));
+                          },
+                  ),
+                );
+              },
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              0,
+              AppSpacing.lg,
+              AppSpacing.sm,
+            ),
+            child: Text(
+              l10n.settingsAdminPromote,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: colors.muted,
+                fontWeight: FontWeight.w700,
+                letterSpacing: 0.4,
+              ),
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<UserProfile>>(
+              future: _future,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState != ConnectionState.done) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                if (snapshot.hasError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: Text(
+                        l10n.settingsAdminPromoteFailed('${snapshot.error}'),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+                final students = snapshot.data ?? const <UserProfile>[];
+                if (students.isEmpty) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.lg),
+                      child: Text(
+                        l10n.settingsAdminEmpty,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: colors.muted,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  );
+                }
+
+                return ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.sm,
+                    AppSpacing.lg,
+                    AppSpacing.xl,
+                  ),
+                  itemCount: students.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final profile = students[index];
+                    final busy = _busyUids.contains(profile.uid);
+                    return DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: colors.border),
+                        color: colors.glassFill,
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 8, 12),
+                        child: Row(
                           children: [
-                            Text(
-                              profile.headlineName,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
+                            ProfileAvatar(profile: profile, size: 48),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    profile.headlineName,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  RoleBadge(role: profile.role),
+                                ],
                               ),
                             ),
-                            const SizedBox(height: 4),
-                            RoleBadge(role: profile.role),
+                            TextButton(
+                              onPressed: busy
+                                  ? null
+                                  : () {
+                                      PulseHaptics.selection();
+                                      _promote(profile);
+                                    },
+                              child: busy
+                                  ? const SizedBox(
+                                      width: 18,
+                                      height: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : Text(l10n.settingsAdminPromote),
+                            ),
                           ],
                         ),
                       ),
-                      TextButton(
-                        onPressed: busy
-                            ? null
-                            : () {
-                                PulseHaptics.selection();
-                                _promote(profile);
-                              },
-                        child: busy
-                            ? const SizedBox(
-                                width: 18,
-                                height: 18,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : Text(l10n.settingsAdminPromote),
-                      ),
-                    ],
-                  ),
-                ),
-              );
-            },
-          );
-        },
+                    );
+                  },
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }

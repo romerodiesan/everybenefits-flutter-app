@@ -28,6 +28,7 @@ import type {
   PulseUIMessage,
 } from "@/lib/ai/types";
 import { useAuth } from "@/lib/providers/auth-provider";
+import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import { Button } from "@/components/ui/primitives";
 import {
   AnswerBody,
@@ -160,6 +161,7 @@ export function PulseAgent() {
   const t = useTranslations();
   const locale = useLocale() as AppLocale;
   const { user, profile, loading: authLoading } = useAuth();
+  const pulseAiEnabled = usePulseAiEnabled();
   const needsSignIn =
     !user ||
     profile?.isAnonymous === true ||
@@ -328,6 +330,16 @@ export function PulseAgent() {
       <div className="mx-auto flex h-full max-w-3xl items-center justify-center p-6">
         <p className="pulse-sheet px-4 py-10 text-center text-sm text-muted">
           {t("aiSignInRequired")}
+        </p>
+      </div>
+    );
+  }
+
+  if (!pulseAiEnabled) {
+    return (
+      <div className="mx-auto flex h-full max-w-3xl items-center justify-center p-6">
+        <p className="pulse-sheet px-4 py-10 text-center text-sm text-muted">
+          {t("aiDisabled")}
         </p>
       </div>
     );

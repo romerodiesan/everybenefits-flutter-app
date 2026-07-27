@@ -99,6 +99,21 @@ export async function authenticate(request: Request): Promise<PulseViewer> {
     );
   }
 
+  const aiConfigSnap = await adminDb()
+    .collection("platformConfig")
+    .doc("pulseAi")
+    .get();
+  const aiEnabled = aiConfigSnap.exists
+    ? aiConfigSnap.data()?.enabled !== false
+    : true;
+  if (!aiEnabled) {
+    throw new PulseHttpError(
+      403,
+      "ai-disabled",
+      "Pulse AI is temporarily unavailable.",
+    );
+  }
+
   return {
     uid,
     role,

@@ -11,7 +11,7 @@ import { useTranslations, useLocale } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { useThemeSettings } from "@/lib/providers/theme-provider";
-import { signOutEverywhere } from "@/lib/firebase/auth";
+import { signOutEverywhere, hasPasswordProvider } from "@/lib/firebase/auth";
 import { getOrCreateSupportChat, watchInbox } from "@/lib/firebase/chats";
 import {
   countNewFeedThreads,
@@ -20,11 +20,10 @@ import {
   registerWebPushToken,
   watchNotificationState,
 } from "@/lib/firebase/notifications";
-import { canAuthorCourses, headlineName } from "@/lib/roles";
+import { headlineName } from "@/lib/roles";
 import { AppSwitcher } from "@/components/chrome/app-switcher";
-import { getFirebaseAuth } from "@/lib/firebase/client";
-import { buildSsoHandoffUrl, ssoConsumeUrl } from "@/lib/sso";
 import { useVisibleSubscription } from "@/lib/hooks/use-visible-subscription";
+import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import { useEnrollments } from "@/lib/providers/enrollments-provider";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
@@ -144,25 +143,6 @@ function IconPerson({ filled, ...props }: IconProps) {
           />
         </>
       )}
-    </svg>
-  );
-}
-
-function IconStudio(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" {...props}>
-      <path
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-        d="M4 7.5h16v11H4zM8 7.5V5.2A2.2 2.2 0 0 1 10.2 3h3.6A2.2 2.2 0 0 1 16 5.2V7.5"
-      />
-      <path
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        d="M9 12.5h6M9 16h4"
-      />
     </svg>
   );
 }
@@ -406,10 +386,16 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, loading } = useAuth();
+  const pulseAiEnabled = usePulseAiEnabled();
   const [supportBusy, setSupportBusy] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
   const { unreadTotal, learningCount, notifUnread, forumBadge, pushToast } =
     useShellStats(profile);
+
+  const navItems = useMemo(
+    () => NAV.filter((item) => item.href !== "/ai" || pulseAiEnabled),
+    [pulseAiEnabled],
+  );
 
   const name = useMemo(
     () => (profile ? headlineName(profile) : ""),
@@ -424,6 +410,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (loading) return;
     if (!user) {
       router.replace("/login");
+      return;
+    }
+    if (!user.isAnonymous && !hasPasswordProvider() && user.email) {
+      router.replace("/set-password");
       return;
     }
     if (profile && !profile.profileCompleted && !profile.isAnonymous) {
@@ -481,7 +471,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     return <AccountGate profile={profile} />;
   }
 
-  const isAuthor = canAuthorCourses(profile.role);
   const unreadLabel = formatBadge(unreadTotal);
   const forumLabel = formatBadge(forumBadge);
   const notifLabel = formatBadge(notifUnread);
@@ -500,19 +489,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="hidden h-full w-72 shrink-0 flex-col border-r border-glass-border bg-sheet lg:flex">
         <div className="border-b border-glass-border px-3 pb-3 pt-3.5">
           <div className="flex items-center justify-between gap-2 px-1">
-            <Link
-              href="/home"
-              className="font-display text-lg font-bold tracking-tight transition-opacity hover:opacity-80"
-            >
-              {t("brandShort")}
-            </Link>
+            <AppSwitcher current="pulse" role={profile.role} />
             <ThemeToggle />
           </div>
-          {isAuthor ? (
-            <div className="mt-2 px-1">
-              <AppSwitcher current="pulse" compact />
-            </div>
-          ) : null}
           <Link
             href="/profile"
             className="mt-3 flex items-center gap-2.5 rounded-xl bg-ink/[0.035] px-2.5 py-2 transition hover:bg-ink/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
@@ -547,7 +526,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <nav className="flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3" aria-label="Primary">
-          {NAV.map((item) => {
+          {navItems.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.Icon;
@@ -582,34 +561,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             );
           })}
-          {isAuthor && (
-            <button
-              type="button"
-              onClick={() => {
-                void (async () => {
-                  const user = getFirebaseAuth().currentUser;
-                  if (!user) return;
-                  const idToken = await user.getIdToken();
-                  const consume = ssoConsumeUrl("studio", locale, "/");
-                  window.location.assign(
-                    await buildSsoHandoffUrl(consume, idToken),
-                  );
-                })();
-              }}
-              className="group relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-left text-sm font-medium text-muted transition duration-200 hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
-            >
-              <IconStudio
-                className="shrink-0 text-muted transition-transform duration-200 group-hover:text-ink"
-                width={20}
-                height={20}
-              />
-              <span className="min-w-0 flex-1 truncate">{t("studioTitle")}</span>
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand"
-                aria-hidden
-              />
-            </button>
-          )}
         </nav>
 
         <div className="mt-auto space-y-2.5 border-t border-glass-border px-2.5 py-3">
@@ -675,8 +626,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <div className="relative flex min-h-0 flex-1 flex-col">
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex justify-end px-4 pt-[max(0.75rem,env(safe-area-inset-top,0px)+0.35rem)] lg:hidden">
-          <div className="pointer-events-auto">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top,0px)+0.35rem)] lg:hidden">
+          <div className="pointer-events-auto min-w-0">
+            <AppSwitcher current="pulse" role={profile.role} />
+          </div>
+          <div className="pointer-events-auto shrink-0">
             <ThemeToggle />
           </div>
         </div>
@@ -720,7 +674,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         aria-label="Primary"
       >
         <div className="pointer-events-auto pulse-tab-pill mx-auto flex max-w-lg items-center px-0.5 py-0.5">
-          {NAV.map((item) => {
+          {navItems.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.Icon;

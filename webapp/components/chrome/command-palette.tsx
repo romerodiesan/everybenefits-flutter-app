@@ -3,11 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
-import { getFirebaseAuth } from "@/lib/firebase/client";
-import { canAuthorCourses } from "@/lib/roles";
-import { buildSsoHandoffUrl, ssoConsumeUrl } from "@/lib/sso";
-import { useLocale } from "next-intl";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 
 type Command = {
   id: string;
@@ -23,16 +19,13 @@ export function CommandPalette({
   onOpenChange: (open: boolean) => void;
 }) {
   const t = useTranslations();
-  const locale = useLocale();
   const router = useRouter();
-  const { profile } = useAuth();
+  const pulseAiEnabled = usePulseAiEnabled();
   const [query, setQuery] = useState("");
 
   useEffect(() => {
     if (!open) setQuery("");
   }, [open]);
-
-  const isAuthor = profile ? canAuthorCourses(profile.role) : false;
 
   const commands = useMemo<Command[]>(() => {
     const items: Command[] = [
@@ -46,11 +39,15 @@ export function CommandPalette({
         label: t("navChats"),
         run: () => router.push("/chats"),
       },
-      {
+    ];
+    if (pulseAiEnabled) {
+      items.push({
         id: "ai",
         label: t("navAi"),
         run: () => router.push("/ai"),
-      },
+      });
+    }
+    items.push(
       {
         id: "academy",
         label: t("navAcademy"),
@@ -66,24 +63,9 @@ export function CommandPalette({
         label: t("navProfile"),
         run: () => router.push("/profile"),
       },
-    ];
-    if (isAuthor) {
-      items.push({
-        id: "studio",
-        label: t("studioTitle"),
-        run: () => {
-          void (async () => {
-            const user = getFirebaseAuth().currentUser;
-            if (!user) return;
-            const idToken = await user.getIdToken();
-            const consume = ssoConsumeUrl("studio", locale, "/");
-            window.location.assign(await buildSsoHandoffUrl(consume, idToken));
-          })();
-        },
-      });
-    }
+    );
     return items;
-  }, [isAuthor, locale, router, t]);
+  }, [pulseAiEnabled, router, t]);
 
   const filtered = commands.filter((c) =>
     c.label.toLowerCase().includes(query.trim().toLowerCase()),
@@ -104,8 +86,8 @@ export function CommandPalette({
           autoFocus
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("commandPlaceholder")}
-          className="h-12 w-full border-b border-glass-border bg-transparent px-4 text-sm outline-none placeholder:text-muted"
+          placeholder={t("navCommand")}
+          className="w-full border-b border-glass-border bg-transparent px-4 py-3.5 text-sm outline-none placeholder:text-muted"
           onKeyDown={(e) => {
             if (e.key === "Escape") onOpenChange(false);
             if (e.key === "Enter" && filtered[0]) {
@@ -114,26 +96,25 @@ export function CommandPalette({
             }
           }}
         />
-        <ul className="max-h-72 overflow-auto p-1">
-          {filtered.map((c) => (
-            <li key={c.id}>
-              <button
-                type="button"
-                className="w-full rounded-lg px-3 py-2.5 text-left text-sm text-ink transition hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"
-                onClick={() => {
-                  c.run();
-                  onOpenChange(false);
-                }}
-              >
-                {c.label}
-              </button>
-            </li>
-          ))}
+        <ul className="max-h-72 overflow-y-auto py-1">
           {filtered.length === 0 ? (
-            <li className="px-3 py-6 text-center text-sm text-muted">
-              {t("commandEmpty")}
-            </li>
-          ) : null}
+            <li className="px-4 py-3 text-sm text-muted">{t("emptyGeneric")}</li>
+          ) : (
+            filtered.map((cmd) => (
+              <li key={cmd.id}>
+                <button
+                  type="button"
+                  className="flex w-full px-4 py-2.5 text-left text-sm font-medium transition hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"
+                  onClick={() => {
+                    cmd.run();
+                    onOpenChange(false);
+                  }}
+                >
+                  {cmd.label}
+                </button>
+              </li>
+            ))
+          )}
         </ul>
       </div>
     </div>

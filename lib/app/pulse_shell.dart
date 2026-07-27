@@ -16,12 +16,12 @@ import '../features/profile/profile_screen.dart';
 import '../features/university/course_repository.dart';
 import '../features/university/course_search_screen.dart';
 import '../features/university/university_screen.dart';
+import '../firebase/platform_config.dart';
 import '../l10n/l10n.dart';
 import '../users/users.dart';
 import 'pulse_haptics.dart';
 import 'widgets/lifebuoy_icon.dart';
 import 'widgets/pulse_chrome.dart';
-
 /// App shell: forums home, chats, Pulse AI, academy, profile.
 class PulseShell extends StatefulWidget {
   const PulseShell({
@@ -55,11 +55,13 @@ class PulseShellState extends State<PulseShell> {
   final _profileKey = GlobalKey<ProfileScreenState>();
   final _notifications = NotificationRepository();
   final _chatRepoFallback = ChatRepository();
+  final _platformConfig = PlatformConfig();
   final _subs = <StreamSubscription<dynamic>>[];
 
   int _chatUnread = 0;
   int _forumBadge = 0;
   int _notifUnread = 0;
+  bool _pulseAiEnabled = true;
 
   static const _tabCount = 5;
   static const _aiTabIndex = 2;
@@ -70,6 +72,18 @@ class PulseShellState extends State<PulseShell> {
   void initState() {
     super.initState();
     _bindBadgeStreams();
+    _subs.add(
+      _platformConfig.watchPulseAiEnabled().listen(
+        (enabled) {
+          if (!mounted) return;
+          setState(() => _pulseAiEnabled = enabled);
+        },
+        onError: (_) {
+          if (!mounted) return;
+          setState(() => _pulseAiEnabled = true);
+        },
+      ),
+    );
   }
 
   void _bindBadgeStreams() {
@@ -144,6 +158,12 @@ class PulseShellState extends State<PulseShell> {
   }
 
   void _openAi() {
+    if (!_pulseAiEnabled) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(context.l10n.aiDisabled)),
+      );
+      return;
+    }
     if (widget.profile.isAnonymous || widget.profile.role == UserRole.guest) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(context.l10n.aiSignInRequired)),
@@ -157,7 +177,7 @@ class PulseShellState extends State<PulseShell> {
     );
   }
 
-  static List<PulseTabItem> _navItems(
+  static List<PulseTabItem> _allNavItems(
     AppLocalizations l10n, {
     int chatUnread = 0,
     int forumBadge = 0,
@@ -193,6 +213,16 @@ class PulseShellState extends State<PulseShell> {
         ),
       ];
 
+  List<int> get _visibleTabIndices {
+    if (_pulseAiEnabled) return const [0, 1, 2, 3, 4];
+    return const [0, 1, 3, 4];
+  }
+
+  void _selectVisibleTab(int visibleIndex) {
+    final indices = _visibleTabIndices;
+    if (visibleIndex < 0 || visibleIndex >= indices.length) return;
+    selectTab(indices[visibleIndex]);
+  }
   _ShellFabConfig? _fabConfig(AppLocalizations l10n) {
     final profile = widget.profile;
     switch (_index) {
@@ -375,19 +405,28 @@ class PulseShellState extends State<PulseShell> {
       );
     }
 
+    final allItems = _allNavItems(
+      l10n,
+      chatUnread: _chatUnread,
+      forumBadge: _forumBadge,
+    );
+    final visibleIndices = _visibleTabIndices;
+    final navItems = [
+      for (final i in visibleIndices) allItems[i],
+    ];
+    final selectedVisible = visibleIndices.indexOf(_index);
+    final selectedIndex =
+        selectedVisible >= 0 ? selectedVisible : 0;
+
     return PulseScaffold(
       extendBody: true,
       resizeToAvoidBottomInset: false,
       body: PulseTabBody(index: _index, children: pages),
       floatingActionButton: fabButton,
       bottomNavigationBar: PulseTabBar(
-        items: _navItems(
-          l10n,
-          chatUnread: _chatUnread,
-          forumBadge: _forumBadge,
-        ),
-        selectedIndex: _index,
-        onSelect: selectTab,
+        items: navItems,
+        selectedIndex: selectedIndex,
+        onSelect: _selectVisibleTab,
       ),
     );
   }

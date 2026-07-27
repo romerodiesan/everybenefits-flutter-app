@@ -6,14 +6,26 @@ import {
   listStudentsForPromotion,
   setUserRole,
 } from "@/lib/firebase/functions";
+import {
+  setPulseAiEnabled,
+  watchPulseAiEnabled,
+} from "@/lib/firebase/platform-config";
 import { headlineName } from "@/lib/firebase/users";
+import { useAuth } from "@/lib/providers/auth-provider";
 import type { UserProfile } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
-import { SettingsPanelShell } from "@/components/profile/settings-nav";
+import {
+  SettingsPanelShell,
+  SettingsRow,
+  Toggle,
+} from "@/components/profile/settings-nav";
 
 export function AdminPanel() {
   const t = useTranslations();
+  const { profile } = useAuth();
   const [students, setStudents] = useState<UserProfile[]>([]);
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [aiBusy, setAiBusy] = useState(false);
 
   useEffect(() => {
     listStudentsForPromotion()
@@ -21,11 +33,46 @@ export function AdminPanel() {
       .catch(() => setStudents([]));
   }, []);
 
+  useEffect(() => {
+    return watchPulseAiEnabled(setAiEnabled);
+  }, []);
+
+  const toggleAi = async () => {
+    if (!profile || aiBusy) return;
+    const next = !aiEnabled;
+    setAiEnabled(next);
+    setAiBusy(true);
+    try {
+      await setPulseAiEnabled(next, profile.uid);
+    } catch {
+      setAiEnabled(!next);
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
   return (
     <SettingsPanelShell
       title={t("profileAdmin")}
       subtitle={t("profileAdminHint")}
     >
+      <div className="mb-6 border-b border-glass-border pb-4">
+        <SettingsRow
+          label={t("adminPulseAi")}
+          hint={t("adminPulseAiHint")}
+        >
+          <Toggle
+            checked={aiEnabled}
+            disabled={aiBusy}
+            onChange={() => void toggleAi()}
+            label={t("adminPulseAi")}
+          />
+        </SettingsRow>
+      </div>
+
+      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
+        {t("profilePromote")}
+      </p>
       {students.length > 0 ? (
         <div className="-mx-4 overflow-x-auto md:-mx-5">
           <table className="w-full min-w-[28rem] text-left text-sm">

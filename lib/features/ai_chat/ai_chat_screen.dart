@@ -7,6 +7,7 @@ import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../firebase/platform_config.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../university/widgets/markdown_body.dart';
@@ -14,7 +15,6 @@ import 'ai_settings_screen.dart';
 import 'pulse_ai_client.dart';
 import 'pulse_ai_models.dart';
 import 'pulse_source_navigation.dart';
-
 /// Pulse AI — full-screen conversation (no shell tab bar), ambient aurora,
 /// streaming answers from the web `/api/ai/stream` backend.
 class AiChatScreen extends StatefulWidget {
@@ -38,8 +38,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
   String? _title;
   bool _streaming = false;
   String? _errorMessage;
+  bool _pulseAiEnabled = true;
   CancelToken? _cancelToken;
   StreamSubscription<PulseStreamEvent>? _streamSub;
+  StreamSubscription<bool>? _aiEnabledSub;
   Timer? _deltaTimer;
   String _pendingDelta = '';
   int _historyEpoch = 0;
@@ -48,6 +50,16 @@ class _AiChatScreenState extends State<AiChatScreen> {
   void initState() {
     super.initState();
     _focus.addListener(_onComposerChanged);
+    _aiEnabledSub = PlatformConfig().watchPulseAiEnabled().listen(
+      (enabled) {
+        if (!mounted) return;
+        setState(() => _pulseAiEnabled = enabled);
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => _pulseAiEnabled = true);
+      },
+    );
   }
 
   void _onComposerChanged() {
@@ -213,6 +225,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
     setState(() {
       _streaming = false;
       _errorMessage = switch (error) {
+        PulseAiException(code: 'ai-disabled') => context.l10n.aiDisabled,
         PulseAiException(:final message) => message,
         _ => context.l10n.aiError,
       };
@@ -256,6 +269,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
       if (!mounted) return;
       setState(() {
         _errorMessage = switch (error) {
+          PulseAiException(code: 'ai-disabled') => context.l10n.aiDisabled,
           PulseAiException(:final message) => message,
           _ => context.l10n.aiError,
         };
@@ -344,6 +358,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   void dispose() {
     _cancelToken?.cancel();
     unawaited(_streamSub?.cancel());
+    unawaited(_aiEnabledSub?.cancel());
     _deltaTimer?.cancel();
     _pendingDelta = '';
     _client.close();
@@ -361,6 +376,26 @@ class _AiChatScreenState extends State<AiChatScreen> {
     final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
+
+    if (!_pulseAiEnabled) {
+      return PulseScaffold(
+        appBar: AppBar(
+          titleSpacing: 0,
+          leading: const BackButton(),
+          title: Text(l10n.navAi),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Text(
+              l10n.aiDisabled,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodyLarge?.copyWith(color: colors.muted),
+            ),
+          ),
+        ),
+      );
+    }
 
     final bottomPad = keyboard > 0
         ? keyboard + 8
