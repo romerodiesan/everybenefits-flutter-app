@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     return Response.json({ code: result.code });
   } catch (error) {
     if (error instanceof SsoHttpError) return error.toResponse();
-    console.error("create-sso-handoff failed");
+    console.error("create-sso-handoff failed", error);
     return Response.json({ error: "Handoff creation failed" }, { status: 500 });
   }
 }

@@ -19,7 +19,7 @@ import type {
   SharedPostPreview,
   UserProfile,
 } from "../types";
-import { SUPPORT_AI_UID } from "../types";
+import { AGENTS_DEFAULT_ID, SUPPORT_AI_UID } from "../types";
 import {
   dmKeyFor,
   headlineName,
@@ -59,6 +59,10 @@ function stringMap(raw: unknown): Record<string, string> {
 
 export function chatFrom(id: string, data: Record<string, unknown>): ChatConversation {
   const members = boolMap(data.members);
+  const isSupportChat =
+    Boolean(data.isSupportChat) || id.startsWith("support_");
+  const isDefaultAgentGroup =
+    Boolean(data.isDefaultAgentGroup) || id === AGENTS_DEFAULT_ID;
   return {
     id,
     memberIds: Object.keys(members).sort(),
@@ -73,8 +77,8 @@ export function chatFrom(id: string, data: Record<string, unknown>): ChatConvers
     pinnedBy: boolMap(data.pinnedBy),
     createdAt: Number(data.createdAt ?? 0),
     createdBy: String(data.createdBy ?? ""),
-    isDefaultAgentGroup: Boolean(data.isDefaultAgentGroup),
-    isSupportChat: Boolean(data.isSupportChat),
+    isDefaultAgentGroup,
+    isSupportChat,
   };
 }
 
@@ -490,4 +494,34 @@ export function chatTitleFor(
   const other = chat.memberIds.find((id) => id !== viewerUid);
   if (other) return chat.memberNames[other] || other;
   return chat.title || "Chat";
+}
+
+/** Inbox buckets matching Flutter: support → community → pinned → recent. */
+export type ChatInboxSections = {
+  support: ChatConversation[];
+  community: ChatConversation[];
+  pinned: ChatConversation[];
+  recent: ChatConversation[];
+};
+
+export function partitionChatInbox(
+  chats: ChatConversation[],
+  viewerUid: string,
+): ChatInboxSections {
+  const support: ChatConversation[] = [];
+  const community: ChatConversation[] = [];
+  const pinned: ChatConversation[] = [];
+  const recent: ChatConversation[] = [];
+  for (const chat of chats) {
+    if (chat.isSupportChat) {
+      support.push(chat);
+    } else if (chat.isDefaultAgentGroup) {
+      community.push(chat);
+    } else if (chat.pinnedBy[viewerUid]) {
+      pinned.push(chat);
+    } else {
+      recent.push(chat);
+    }
+  }
+  return { support, community, pinned, recent };
 }

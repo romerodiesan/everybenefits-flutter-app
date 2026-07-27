@@ -1,7 +1,7 @@
 "use client";
 
 import { useLocale, useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
+import { usePathname, useRouter } from "@/i18n/navigation";
 import {
   ACCENTS,
   useThemeSettings,
@@ -16,8 +16,23 @@ import {
 export function AppearancePanel() {
   const t = useTranslations();
   const locale = useLocale();
+  const pathname = usePathname();
   const router = useRouter();
   const { mode, accent, setMode, setAccent } = useThemeSettings();
+
+  const switchLocale = (code: string) => {
+    if (code === locale) return;
+    const hash =
+      typeof window !== "undefined" ? window.location.hash : "#appearance";
+    router.replace(pathname, { locale: code });
+    // next-intl locale swaps can drop the panel hash — restore appearance.
+    queueMicrotask(() => {
+      const target = hash || "#appearance";
+      if (window.location.hash !== target) {
+        window.history.replaceState(null, "", target);
+      }
+    });
+  };
 
   return (
     <SettingsPanelShell
@@ -82,7 +97,7 @@ export function AppearancePanel() {
               <button
                 key={code}
                 type="button"
-                onClick={() => router.replace("/profile", { locale: code })}
+                onClick={() => switchLocale(code)}
                 aria-pressed={locale === code}
                 className={`h-8 rounded-lg px-3 text-xs font-semibold transition ${
                   locale === code

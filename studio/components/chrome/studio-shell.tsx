@@ -243,15 +243,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
       <aside className="flex h-full w-72 shrink-0 flex-col border-r border-glass-border bg-sheet">
         <div className="border-b border-glass-border px-3 pb-3 pt-3.5">
           <div className="flex items-center justify-between gap-2 px-1">
-            <div className="min-w-0">
-              <p className="font-display text-lg font-bold tracking-tight">
-                {t("brandShort")}
-              </p>
-              <p className="truncate text-[11px] text-muted">{t("tagline")}</p>
-            </div>
-          </div>
-          <div className="mt-2 px-1">
-            <AppSwitcher current="studio" compact />
+            <AppSwitcher current="studio" role={profile.role} />
           </div>
           <div className="mt-3 flex items-center gap-2.5 rounded-xl bg-ink/[0.035] px-2.5 py-2 dark:bg-white/[0.04]">
             <div

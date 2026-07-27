@@ -77,9 +77,15 @@ let firestore: Firestore | null = null;
 
 export function adminDb(): Firestore {
   if (firestore) return firestore;
-  firestore = getFirestore(getAdminApp());
-  firestore.settings({ ignoreUndefinedProperties: true });
-  return firestore;
+  const db = getFirestore(getAdminApp());
+  try {
+    db.settings({ ignoreUndefinedProperties: true });
+  } catch {
+    // settings() may only run once per Admin singleton. After Fast Refresh the
+    // module cache resets but getFirestore() returns the same instance.
+  }
+  firestore = db;
+  return db;
 }
 
 export function usingEmulators(): boolean {

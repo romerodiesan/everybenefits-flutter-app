@@ -10,6 +10,7 @@ import {
   getOrCreateDm,
   hideChatForMe,
   markChatRead,
+  partitionChatInbox,
   sendMessage,
   setPinned,
   watchChat,
@@ -73,14 +74,15 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
     listDirectory(profile.uid).then(setDirectory).catch(() => setDirectory([]));
   }, [showNew, profile]);
 
-  const pinned = useMemo(
-    () =>
-      chats.filter((c) => profile && c.pinnedBy[profile.uid]),
+  const sections = useMemo(
+    () => (profile ? partitionChatInbox(chats, profile.uid) : null),
     [chats, profile],
   );
-  const rest = useMemo(
-    () => chats.filter((c) => !(profile && c.pinnedBy[profile.uid])),
-    [chats, profile],
+  const showSectionHeaders = Boolean(
+    sections &&
+      (sections.support.length ||
+        sections.community.length ||
+        sections.pinned.length),
   );
 
   async function startDm(other: UserProfile) {
@@ -257,8 +259,15 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
           {!inboxError && !chats.length && (
             <p className="p-4 text-sm text-muted">{t("chatsEmpty")}</p>
           )}
-          {renderList(pinned, t("chatsPinned"))}
-          {renderList(rest)}
+          {sections && showSectionHeaders && (
+            <>
+              {renderList(sections.support, t("chatsSectionSupport"))}
+              {renderList(sections.community, t("chatsSectionCommunity"))}
+              {renderList(sections.pinned, t("chatsPinned"))}
+              {renderList(sections.recent, t("chatsSectionRecent"))}
+            </>
+          )}
+          {sections && !showSectionHeaders && renderList(sections.recent)}
         </div>
       </section>
 

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     return Response.json({ customToken: result.customToken });
   } catch (error) {
     if (error instanceof SsoHttpError) return error.toResponse();
-    console.error("exchange-sso failed");
+    console.error("exchange-sso failed", error);
     return Response.json(
       { error: "Invalid or expired handoff" },
       { status: 401 },
