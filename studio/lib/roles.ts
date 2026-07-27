@@ -6,6 +6,13 @@ export {
   canEditCourse,
   canEditPath,
   belongsInDefaultAgentGroup,
+  canParticipateInForums,
+  canParticipateInChats,
+  canCreateChatGroups,
+  ALL_ROLES,
+  FORUM_ROLES,
+  DEFAULT_GROUP_ROLES,
+  GROUP_CREATOR_ROLES,
 } from "@pulse/shared";
 
 export function headlineName(profile: {

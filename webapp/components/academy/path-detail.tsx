@@ -3,14 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
-import {
-  getPath,
-  progressOf,
-  watchEnrollments,
-  watchPublishedCourses,
-} from "@/lib/firebase/courses";
-import type { Course, Enrollment, LearningPath } from "@/lib/types";
+import { useEnrollments } from "@/lib/providers/enrollments-provider";
+import { getPath, progressOf } from "@/lib/firebase/courses";
+import { usePublishedCourses } from "@/lib/hooks/use-published-courses";
+import type { Course, LearningPath } from "@/lib/types";
 import {
   CourseCard,
   EmptyState,
@@ -21,15 +17,12 @@ import {
 
 export function PathDetail({ pathId }: { pathId: string }) {
   const t = useTranslations();
-  const { profile } = useAuth();
+  const { byCourseId: enrollments } = useEnrollments();
+  const { courses } = usePublishedCourses();
   const levelLabel = useLevelLabels();
 
   const [path, setPath] = useState<LearningPath | null>(null);
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [enrollments, setEnrollments] = useState<Record<string, Enrollment>>({});
   const [loading, setLoading] = useState(true);
-
-  const uid = profile?.uid ?? null;
 
   useEffect(() => {
     let cancelled = false;
@@ -46,23 +39,6 @@ export function PathDetail({ pathId }: { pathId: string }) {
       cancelled = true;
     };
   }, [pathId]);
-
-  useEffect(() => {
-    return watchPublishedCourses(setCourses, () => setCourses([]));
-  }, []);
-
-  useEffect(() => {
-    if (!uid) return;
-    return watchEnrollments(
-      uid,
-      (list) => {
-        const map: Record<string, Enrollment> = {};
-        for (const entry of list) map[entry.courseId] = entry;
-        setEnrollments(map);
-      },
-      () => setEnrollments({}),
-    );
-  }, [uid]);
 
   const ordered = useMemo(() => {
     if (!path) return [];

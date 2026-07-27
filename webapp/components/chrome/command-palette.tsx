@@ -5,7 +5,7 @@ import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { canAuthorCourses } from "@/lib/roles";
-import { handoffUrlWithToken, ssoConsumeUrl } from "@/lib/sso";
+import { buildSsoHandoffUrl, ssoConsumeUrl } from "@/lib/sso";
 import { useLocale } from "next-intl";
 import { useAuth } from "@/lib/providers/auth-provider";
 
@@ -77,7 +77,7 @@ export function CommandPalette({
             if (!user) return;
             const idToken = await user.getIdToken();
             const consume = ssoConsumeUrl("studio", locale, "/");
-            window.location.assign(handoffUrlWithToken(consume, idToken));
+            window.location.assign(await buildSsoHandoffUrl(consume, idToken));
           })();
         },
       });

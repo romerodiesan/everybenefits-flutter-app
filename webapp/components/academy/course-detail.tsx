@@ -6,7 +6,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { canEditCourse } from "@/lib/roles";
 import { getFirebaseAuth } from "@/lib/firebase/client";
-import { handoffUrlWithToken, ssoConsumeUrl } from "@/lib/sso";
+import { buildSsoHandoffUrl, ssoConsumeUrl } from "@/lib/sso";
 import {
   enrollInCourse,
   progressOf,
@@ -211,7 +211,7 @@ export function CourseDetail({ courseId }: { courseId: string }) {
                     }
                     const idToken = await user.getIdToken();
                     window.location.assign(
-                      handoffUrlWithToken(
+                      await buildSsoHandoffUrl(
                         ssoConsumeUrl("studio", locale, path),
                         idToken,
                       ),

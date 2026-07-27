@@ -29,10 +29,12 @@ Add `localhost` (and your Studio + Pulse deploy domains) under **Authentication 
 
 Pulse (`:3000`) and Studio (`:3001`) are different origins, so Firebase sessions are not shared automatically. Switching apps uses:
 
-1. **App switcher** in each shell — hands off an ID token to the other app
-2. **`exchangeSsoToken`** Cloud Function — mints a custom token
-3. **`/auth/sso`** — signs in with that custom token
-4. **`/auth/bridge`** — if you already have a session here, complete a handoff for the sibling app
+1. Source POSTs its ID token to `/api/auth/create-sso-handoff` (same origin) → opaque code
+2. Redirect to dest `/auth/sso?hc=<code>` — the ID token never appears in the URL
+3. Dest `/api/auth/exchange-sso` consumes the one-time code and mints a custom token
+4. `/auth/bridge` — if you already have a session here, complete a handoff for the sibling app
+
+Callables `createSsoHandoff` / `exchangeSsoToken` mirror the same flow. Rate limits and optional App Check apply on the Next routes.
 
 Studio also tries a silent bridge to Pulse once when you arrive signed out.
 

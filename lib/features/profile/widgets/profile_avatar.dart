@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/theme.dart';
@@ -45,17 +46,14 @@ class ProfileAvatar extends StatelessWidget {
         alignment: Alignment.center,
         child: photoUrl == null
             ? initials
-            : Image.network(
-                photoUrl,
+            : CachedNetworkImage(
+                imageUrl: photoUrl,
                 width: size,
                 height: size,
                 fit: BoxFit.cover,
-                gaplessPlayback: true,
-                errorBuilder: (context, error, stackTrace) => initials,
-                frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
-                  if (wasSynchronouslyLoaded || frame != null) return child;
-                  return initials;
-                },
+                fadeInDuration: const Duration(milliseconds: 120),
+                errorWidget: (context, url, error) => initials,
+                placeholder: (context, url) => initials,
               ),
       ),
     );

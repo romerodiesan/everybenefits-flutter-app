@@ -6,16 +6,41 @@ export type UserRole =
   | "manager"
   | "admin";
 
+export const ALL_ROLES: readonly UserRole[] = [
+  "guest",
+  "student",
+  "agent",
+  "instructor",
+  "manager",
+  "admin",
+] as const;
+
+/** Roles that may read/write forums (non-anonymous). */
+export const FORUM_ROLES: readonly UserRole[] = [
+  "student",
+  "agent",
+  "instructor",
+  "manager",
+  "admin",
+] as const;
+
+/** Default agent group membership. */
+export const DEFAULT_GROUP_ROLES: readonly UserRole[] = [
+  "agent",
+  "instructor",
+  "manager",
+  "admin",
+] as const;
+
+/** Who may create non-support chat groups. */
+export const GROUP_CREATOR_ROLES: readonly UserRole[] = [
+  "instructor",
+  "manager",
+  "admin",
+] as const;
+
 export function parseRole(value: unknown): UserRole {
-  const roles: UserRole[] = [
-    "guest",
-    "student",
-    "agent",
-    "instructor",
-    "manager",
-    "admin",
-  ];
-  if (typeof value === "string" && roles.includes(value as UserRole)) {
+  if (typeof value === "string" && (ALL_ROLES as readonly string[]).includes(value)) {
     return value as UserRole;
   }
   return "guest";
@@ -59,10 +84,18 @@ export function canEditPath(
 }
 
 export function belongsInDefaultAgentGroup(role: UserRole) {
-  return (
-    role === "agent" ||
-    role === "instructor" ||
-    role === "manager" ||
-    role === "admin"
-  );
+  return (DEFAULT_GROUP_ROLES as readonly string[]).includes(role);
+}
+
+export function canCreateChatGroups(role: UserRole) {
+  return (GROUP_CREATOR_ROLES as readonly string[]).includes(role);
+}
+
+export function canParticipateInForums(role: UserRole, isAnonymous: boolean) {
+  if (isAnonymous || role === "guest") return false;
+  return (FORUM_ROLES as readonly string[]).includes(role);
+}
+
+export function canParticipateInChats(role: UserRole, isAnonymous: boolean) {
+  return canParticipateInForums(role, isAnonymous);
 }

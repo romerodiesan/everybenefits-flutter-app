@@ -13,7 +13,6 @@ import { useAuth } from "@/lib/providers/auth-provider";
 import { useThemeSettings } from "@/lib/providers/theme-provider";
 import { signOutEverywhere } from "@/lib/firebase/auth";
 import { getOrCreateSupportChat, watchInbox } from "@/lib/firebase/chats";
-import { watchEnrollments } from "@/lib/firebase/courses";
 import {
   countNewFeedThreads,
   listenForegroundMessages,
@@ -24,12 +23,20 @@ import {
 import { canAuthorCourses, headlineName } from "@/lib/roles";
 import { AppSwitcher } from "@/components/chrome/app-switcher";
 import { getFirebaseAuth } from "@/lib/firebase/client";
-import { handoffUrlWithToken, ssoConsumeUrl } from "@/lib/sso";
+import { buildSsoHandoffUrl, ssoConsumeUrl } from "@/lib/sso";
+import { useVisibleSubscription } from "@/lib/hooks/use-visible-subscription";
+import { useEnrollments } from "@/lib/providers/enrollments-provider";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
 import { AccountGate } from "@/components/chrome/account-gate";
 import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
-import { CommandPalette } from "@/components/chrome/command-palette";
+import dynamic from "next/dynamic";
+
+const CommandPalette = dynamic(
+  () =>
+    import("@/components/chrome/command-palette").then((m) => m.CommandPalette),
+  { ssr: false },
+);
 
 type PushToast = { title: string; body: string; id: number };
 
@@ -293,61 +300,73 @@ const NAV = [
 ];
 
 function useShellStats(profile: UserProfile | null) {
+  const { learningCount } = useEnrollments();
   const [unreadTotal, setUnreadTotal] = useState(0);
-  const [learningCount, setLearningCount] = useState(0);
   const [notifUnread, setNotifUnread] = useState(0);
   const [forumUnread, setForumUnread] = useState(0);
   const [newThreads, setNewThreads] = useState(0);
   const [pushToast, setPushToast] = useState<PushToast | null>(null);
 
+  const uid =
+    profile && !profile.isAnonymous ? profile.uid : null;
+
+  useVisibleSubscription(
+    Boolean(uid),
+    () => {
+      if (!uid) return () => undefined;
+      return watchInbox(
+        uid,
+        (chats) => {
+          const sum = chats.reduce(
+            (acc, chat) => acc + (chat.unreadCounts[uid] ?? 0),
+            0,
+          );
+          setUnreadTotal(sum);
+        },
+        () => setUnreadTotal(0),
+      );
+    },
+    [uid],
+  );
+
+  useVisibleSubscription(
+    Boolean(uid),
+    () => {
+      if (!uid) return () => undefined;
+      return watchNotificationState(
+        uid,
+        (state) => {
+          setNotifUnread(state.unreadCount);
+          setForumUnread(state.unreadForumCount);
+          void countNewFeedThreads(state.lastFeedSeenAt).then(setNewThreads);
+        },
+        () => {
+          setNotifUnread(0);
+          setForumUnread(0);
+        },
+      );
+    },
+    [uid],
+  );
+
   useEffect(() => {
-    if (!profile || profile.isAnonymous) {
+    if (!uid) {
       setUnreadTotal(0);
-      setLearningCount(0);
       setNotifUnread(0);
       setForumUnread(0);
       setNewThreads(0);
       return;
     }
-    const stopInbox = watchInbox(
-      profile.uid,
-      (chats) => {
-        const sum = chats.reduce(
-          (acc, chat) => acc + (chat.unreadCounts[profile.uid] ?? 0),
-          0,
-        );
-        setUnreadTotal(sum);
-      },
-      () => setUnreadTotal(0),
-    );
-    const stopEnroll = watchEnrollments(
-      profile.uid,
-      (list) => {
-        setLearningCount(list.filter((e) => !e.completedAt).length);
-      },
-      () => setLearningCount(0),
-    );
-    const stopNotif = watchNotificationState(
-      profile.uid,
-      (state) => {
-        setNotifUnread(state.unreadCount);
-        setForumUnread(state.unreadForumCount);
-        void countNewFeedThreads(state.lastFeedSeenAt).then(setNewThreads);
-      },
-      () => {
-        setNotifUnread(0);
-        setForumUnread(0);
-      },
-    );
+
     let pushTimer: ReturnType<typeof setTimeout> | undefined;
     let pushIdle: number | undefined;
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
       pushIdle = window.requestIdleCallback(() => {
-        void registerWebPushToken(profile.uid).catch(() => undefined);
+        void registerWebPushToken(uid).catch(() => undefined);
       });
     } else {
       pushTimer = setTimeout(() => {
-        void registerWebPushToken(profile.uid).catch(() => undefined);
+        void registerWebPushToken(uid).catch(() => undefined);
       }, 1500);
     }
 
@@ -362,9 +381,6 @@ function useShellStats(profile: UserProfile | null) {
     });
 
     return () => {
-      stopInbox();
-      stopEnroll();
-      stopNotif();
       stopForeground?.();
       if (toastTimer) clearTimeout(toastTimer);
       if (pushIdle !== undefined && typeof window !== "undefined") {
@@ -372,7 +388,7 @@ function useShellStats(profile: UserProfile | null) {
       }
       if (pushTimer) clearTimeout(pushTimer);
     };
-  }, [profile]);
+  }, [uid]);
 
   const forumBadge = forumUnread + newThreads;
 
@@ -506,11 +522,14 @@ export function AppShell({ children }: { children: ReactNode }) {
               aria-hidden
             >
               {profile.photoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
+                // eslint-disable-next-line @next/next/no-img-element -- tiny shell chip; next/image adds layout cost
                 <img
                   src={profile.photoUrl}
                   alt=""
                   className="h-9 w-9 rounded-full object-cover"
+                  width={36}
+                  height={36}
+                  decoding="async"
                 />
               ) : (
                 initial
@@ -573,7 +592,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   const idToken = await user.getIdToken();
                   const consume = ssoConsumeUrl("studio", locale, "/");
                   window.location.assign(
-                    handoffUrlWithToken(consume, idToken),
+                    await buildSsoHandoffUrl(consume, idToken),
                   );
                 })();
               }}

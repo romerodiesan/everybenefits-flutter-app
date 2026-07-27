@@ -1,24 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
+import { useEnrollments } from "@/lib/providers/enrollments-provider";
 import { canAuthorCourses } from "@/lib/roles";
 import { getFirebaseAuth } from "@/lib/firebase/client";
-import { handoffUrlWithToken, ssoConsumeUrl } from "@/lib/sso";
-import {
-  progressOf,
-  watchEnrollments,
-  watchPaths,
-  watchPublishedCourses,
-} from "@/lib/firebase/courses";
-import type {
-  Course,
-  CourseLevel,
-  Enrollment,
-  LearningPath,
-} from "@/lib/types";
+import { buildSsoHandoffUrl, ssoConsumeUrl } from "@/lib/sso";
+import { progressOf, watchPaths } from "@/lib/firebase/courses";
+import { usePublishedCourses } from "@/lib/hooks/use-published-courses";
+import { useVisibleSubscription } from "@/lib/hooks/use-visible-subscription";
+import type { CourseLevel, LearningPath } from "@/lib/types";
 import { Input } from "@/components/ui/primitives";
 import {
   CourseCard,
@@ -34,52 +27,20 @@ export function AcademyCatalog() {
   const t = useTranslations();
   const locale = useLocale();
   const { profile } = useAuth();
+  const { byCourseId: enrollments } = useEnrollments();
+  const { courses, loading, failed } = usePublishedCourses();
   const levelLabel = useLevelLabels();
 
-  const [courses, setCourses] = useState<Course[]>([]);
   const [paths, setPaths] = useState<LearningPath[]>([]);
-  const [enrollments, setEnrollments] = useState<Record<string, Enrollment>>({});
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
   const [level, setLevel] = useState<CourseLevel | "all">("all");
   const [query, setQuery] = useState("");
 
-  const uid = profile?.uid ?? null;
   const role = profile?.role ?? "guest";
   const isAuthor = canAuthorCourses(role);
 
-  useEffect(() => {
-    const stop = watchPublishedCourses(
-      (next) => {
-        setCourses(next);
-        setLoading(false);
-        setFailed(false);
-      },
-      () => {
-        setLoading(false);
-        setFailed(true);
-      },
-    );
-    return stop;
-  }, []);
-
-  useEffect(() => {
+  useVisibleSubscription(true, () => {
     return watchPaths(setPaths, () => setPaths([]));
   }, []);
-
-  useEffect(() => {
-    if (!uid) return;
-    return watchEnrollments(
-      uid,
-      (list) => {
-        const map: Record<string, Enrollment> = {};
-        for (const entry of list) map[entry.courseId] = entry;
-        setEnrollments(map);
-      },
-      // Guests can't read enrollments; the catalog still works.
-      () => setEnrollments({}),
-    );
-  }, [uid]);
 
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
@@ -145,7 +106,7 @@ export function AcademyCatalog() {
                   }
                   const idToken = await user.getIdToken();
                   window.location.assign(
-                    handoffUrlWithToken(
+                    await buildSsoHandoffUrl(
                       ssoConsumeUrl("studio", locale, "/"),
                       idToken,
                     ),

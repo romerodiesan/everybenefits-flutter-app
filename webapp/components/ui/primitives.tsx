@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 export function Button({
@@ -97,8 +98,17 @@ export function Avatar({
       style={{ width: size, height: size }}
     >
       {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt="" className="h-full w-full object-cover" />
+        <Image
+          src={photoUrl}
+          alt=""
+          width={size}
+          height={size}
+          className="h-full w-full object-cover"
+          unoptimized={
+            photoUrl.includes("firebasestorage.googleapis.com") ||
+            photoUrl.includes("googleusercontent.com")
+          }
+        />
       ) : (
         <span
           className="flex h-full w-full items-center justify-center font-display font-semibold"

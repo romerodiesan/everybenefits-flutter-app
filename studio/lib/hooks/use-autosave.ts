@@ -9,7 +9,7 @@ export function useAutosave<T>(
   value: T,
   save: () => Promise<void>,
   enabled: boolean,
-  delayMs = 700,
+  delayMs = 1200,
 ) {
   const [status, setStatus] = useState<AutosaveStatus>("idle");
   const first = useRef(true);

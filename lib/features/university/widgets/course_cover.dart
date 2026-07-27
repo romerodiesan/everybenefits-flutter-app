@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../l10n/l10n.dart';
@@ -104,10 +105,11 @@ class _CourseCoverState extends State<CourseCover> {
               ),
             ),
             if (url != null)
-              Image.network(
-                url,
+              CachedNetworkImage(
+                imageUrl: url,
                 fit: BoxFit.cover,
-                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+                fadeInDuration: const Duration(milliseconds: 180),
+                errorWidget: (_, _, _) => const SizedBox.shrink(),
               ),
             if (widget.showLevel)
               Align(

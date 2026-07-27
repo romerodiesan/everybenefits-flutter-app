@@ -669,19 +669,47 @@ function uploadWithProgress(
   });
 }
 
+/** Mirrors storage.rules image cap. */
+export const MAX_COVER_BYTES = 5 * 1024 * 1024;
+/** Mirrors storage.rules video cap. */
+export const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
+
+async function deleteStoragePathIfPresent(path: string | null | undefined) {
+  const trimmed = path?.trim();
+  if (!trimmed) return;
+  try {
+    await deleteObject(ref(getFirebaseStorage(), trimmed));
+  } catch {
+    // Missing object or permission — non-fatal for replace flows.
+  }
+}
+
 export async function uploadCourseCover(
   courseId: string,
   file: File,
   onProgress?: (fraction: number) => void,
 ) {
+  if (file.size > MAX_COVER_BYTES) {
+    throw new Error(
+      `Cover image must be under ${MAX_COVER_BYTES / (1024 * 1024)}MB`,
+    );
+  }
+  const courseRef = doc(getFirebaseDb(), "courses", courseId);
+  const previous = (await getDoc(courseRef)).data()?.coverPath as
+    | string
+    | null
+    | undefined;
   const extension = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
   const path = `courses/${courseId}/cover-${Date.now()}.${extension}`;
   await uploadWithProgress(path, file, onProgress);
-  await updateDoc(doc(getFirebaseDb(), "courses", courseId), {
+  await updateDoc(courseRef, {
     coverPath: path,
     coverUrl: null,
     updatedAt: serverTimestamp(),
   });
+  if (previous && previous !== path) {
+    void deleteStoragePathIfPresent(previous);
+  }
   return path;
 }
 
@@ -692,27 +720,35 @@ export async function uploadLessonVideo(input: {
   durationSeconds?: number;
   onProgress?: (fraction: number) => void;
 }) {
+  if (input.file.size > MAX_VIDEO_BYTES) {
+    throw new Error("Video must be under 2GB");
+  }
+  const lessonRef = doc(
+    getFirebaseDb(),
+    "courses",
+    input.courseId,
+    "lessons",
+    input.lessonId,
+  );
+  const previous = (await getDoc(lessonRef)).data()?.videoPath as
+    | string
+    | null
+    | undefined;
   const extension = input.file.name.split(".").pop()?.toLowerCase() ?? "mp4";
   const path = `courses/${input.courseId}/lessons/${input.lessonId}-${Date.now()}.${extension}`;
   await uploadWithProgress(path, input.file, input.onProgress);
-  await updateDoc(
-    doc(
-      getFirebaseDb(),
-      "courses",
-      input.courseId,
-      "lessons",
-      input.lessonId,
-    ),
-    {
-      videoPath: path,
-      videoUrl: null,
-      ...(input.durationSeconds
-        ? { durationSeconds: Math.round(input.durationSeconds) }
-        : {}),
-      updatedAt: serverTimestamp(),
-    },
-  );
-  await recomputeCourseTotals(input.courseId);
+  await updateDoc(lessonRef, {
+    videoPath: path,
+    videoUrl: null,
+    ...(input.durationSeconds
+      ? { durationSeconds: Math.round(input.durationSeconds) }
+      : {}),
+    updatedAt: serverTimestamp(),
+  });
+  if (previous && previous !== path) {
+    void deleteStoragePathIfPresent(previous);
+  }
+  scheduleRecomputeCourseTotals(input.courseId);
   return path;
 }
 
@@ -933,7 +969,7 @@ export async function deleteModule(courseId: string, moduleId: string) {
   });
   batch.delete(doc(db, "courses", courseId, "modules", moduleId));
   await batch.commit();
-  await recomputeCourseTotals(courseId);
+  scheduleRecomputeCourseTotals(courseId);
 }
 
 export async function reorderModules(
@@ -990,7 +1026,10 @@ export async function upsertLesson(input: {
     },
     { merge: true },
   );
-  await recomputeCourseTotals(input.courseId);
+  // Title-only edits do not change totals; create / duration updates do.
+  if (!input.lessonId || input.durationSeconds !== undefined) {
+    scheduleRecomputeCourseTotals(input.courseId);
+  }
   return lessonRef.id;
 }
 
@@ -1012,7 +1051,7 @@ export async function saveLessonReading(input: {
       updatedAt: serverTimestamp(),
     },
   );
-  await recomputeCourseTotals(input.courseId);
+  scheduleRecomputeCourseTotals(input.courseId);
 }
 
 /**
@@ -1055,7 +1094,7 @@ export async function saveLessonQuiz(input: {
     updatedAt: serverTimestamp(),
   });
   await batch.commit();
-  await recomputeCourseTotals(input.courseId);
+  scheduleRecomputeCourseTotals(input.courseId);
 }
 
 /** Answer key for the Studio editor; learners are denied by security rules. */
@@ -1094,7 +1133,7 @@ export async function deleteLesson(courseId: string, lessonId: string) {
     doc(db, "courses", courseId, "lessons", lessonId, "secure", "answerKey"),
   ).catch(() => undefined);
   await deleteDoc(doc(db, "courses", courseId, "lessons", lessonId));
-  await recomputeCourseTotals(courseId);
+  scheduleRecomputeCourseTotals(courseId);
 }
 
 export async function reorderLessons(
@@ -1110,6 +1149,24 @@ export async function reorderLessons(
     });
   });
   await batch.commit();
+}
+
+/** Debounce totals recompute across bursty editor mutations. */
+const pendingTotals = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function scheduleRecomputeCourseTotals(
+  courseId: string,
+  delayMs = 800,
+) {
+  const existing = pendingTotals.get(courseId);
+  if (existing) clearTimeout(existing);
+  pendingTotals.set(
+    courseId,
+    setTimeout(() => {
+      pendingTotals.delete(courseId);
+      void recomputeCourseTotals(courseId).catch(() => undefined);
+    }, delayMs),
+  );
 }
 
 /** Keeps `lessonCount` / `durationMinutes` in sync with the lesson docs. */
