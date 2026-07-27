@@ -1,35 +1,25 @@
-import { NextResponse } from "next/server";
-import { adminAuth, usingEmulators } from "@/lib/ai/firebase-admin";
+import {
+  exchangeSsoHandoffCode,
+  SsoHttpError,
+} from "@/lib/sso-server";
 
 /**
- * Same-origin SSO exchange (avoids Functions emulator CORS).
- * Body: { idToken: string } → { customToken: string }
+ * Exchanges a one-time opaque handoff code for a Firebase custom token.
+ * Body: { code: string } → { customToken: string }
  */
 export async function POST(request: Request) {
   try {
-    const body = (await request.json()) as { idToken?: string };
-    const idToken = String(body.idToken ?? "");
-    if (idToken.length < 100) {
-      return NextResponse.json({ error: "idToken required" }, { status: 400 });
-    }
-
-    // Against the Auth emulator, verifyIdToken needs the emulator host set.
-    if (
-      usingEmulators() &&
-      !process.env.FIREBASE_AUTH_EMULATOR_HOST
-    ) {
-      process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9099";
-    }
-
-    const decoded = await adminAuth().verifyIdToken(idToken);
-    const customToken = await adminAuth().createCustomToken(decoded.uid, {
-      sso: true,
-    });
-    return NextResponse.json({ customToken, uid: decoded.uid });
+    const body = (await request.json()) as { code?: string };
+    const result = await exchangeSsoHandoffCode(
+      request,
+      String(body.code ?? ""),
+    );
+    return Response.json({ customToken: result.customToken });
   } catch (error) {
-    console.error("exchange-sso failed", error);
-    return NextResponse.json(
-      { error: "Invalid or expired ID token" },
+    if (error instanceof SsoHttpError) return error.toResponse();
+    console.error("exchange-sso failed");
+    return Response.json(
+      { error: "Invalid or expired handoff" },
       { status: 401 },
     );
   }

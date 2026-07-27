@@ -3,15 +3,28 @@
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
+import { getToken } from "firebase/app-check";
 import { signInWithCustomAuthToken } from "@/lib/firebase/auth";
-import { clearSsoAttempt, takeHandoffToken } from "@/lib/sso";
+import { getFirebaseAppCheck } from "@/lib/firebase/client";
+import { clearSsoAttempt, takeHandoffCode } from "@/lib/sso";
 import { StudioShellSkeleton } from "@/components/chrome/studio-shell-skeleton";
 
-async function exchangeIdToken(idToken: string): Promise<string> {
+async function exchangeHandoffCode(code: string): Promise<string> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  const appCheck = getFirebaseAppCheck();
+  if (appCheck) {
+    try {
+      headers["x-firebase-appcheck"] = (await getToken(appCheck, false)).token;
+    } catch {
+      // optional locally
+    }
+  }
   const res = await fetch("/api/auth/exchange-sso", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ idToken }),
+    headers,
+    body: JSON.stringify({ code }),
   });
   if (!res.ok) {
     const payload = (await res.json().catch(() => null)) as {
@@ -26,10 +39,6 @@ async function exchangeIdToken(idToken: string): Promise<string> {
 
 type Step = "token" | "exchange" | "signin" | "open";
 
-/**
- * Module lock — Strict Mode re-runs the effect and cancels the first run.
- * Keep in-flight work + a "done" flag so the second run still navigates away.
- */
 let ssoConsumePromise: Promise<void> | null = null;
 let ssoConsumeDone = false;
 
@@ -37,9 +46,9 @@ function consumeSsoOnce(): Promise<void> {
   if (ssoConsumeDone) return Promise.resolve();
   if (ssoConsumePromise) return ssoConsumePromise;
   ssoConsumePromise = (async () => {
-    const idToken = takeHandoffToken();
-    if (!idToken) throw new Error("missing-token");
-    const customToken = await exchangeIdToken(idToken);
+    const code = takeHandoffCode();
+    if (!code) throw new Error("missing-token");
+    const customToken = await exchangeHandoffCode(code);
     await signInWithCustomAuthToken(customToken);
     clearSsoAttempt();
     ssoConsumeDone = true;
@@ -51,9 +60,7 @@ function consumeSsoOnce(): Promise<void> {
 }
 
 /**
- * Consumes a handoff token, mints a custom token, hard-navigates home.
- * Soft router.replace was cancelled by Strict Mode cleanup after a successful
- * sign-in, leaving the user stuck on this page with a live session.
+ * Consumes an opaque handoff code, mints a custom token, hard-navigates home.
  */
 export function SsoConsumePage({ homePath = "/" }: { homePath?: string }) {
   const t = useTranslations();
@@ -68,8 +75,8 @@ export function SsoConsumePage({ homePath = "/" }: { homePath?: string }) {
       try {
         if (!ssoConsumeDone) {
           setStep("exchange");
-          const idToken = takeHandoffToken();
-          if (!idToken && !ssoConsumePromise) {
+          const code = takeHandoffCode();
+          if (!code && !ssoConsumePromise) {
             if (alive) setError(t("ssoMissingToken"));
             return;
           }
@@ -81,7 +88,6 @@ export function SsoConsumePage({ homePath = "/" }: { homePath?: string }) {
         const nextRaw = params.get("next") || homePath;
         const next = nextRaw.startsWith("/") ? nextRaw : `/${nextRaw}`;
         const dest = next === "/" ? `/${locale}` : `/${locale}${next}`;
-        // Hard nav leaves /auth/sso reliably (soft replace raced Strict Mode).
         window.location.replace(dest);
       } catch (err) {
         if (!alive) return;

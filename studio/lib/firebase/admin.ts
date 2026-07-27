@@ -2,6 +2,8 @@ import "server-only";
 
 import { cert, getApp, getApps, initializeApp, type App } from "firebase-admin/app";
 import { getAuth, type Auth } from "firebase-admin/auth";
+import { getAppCheck, type AppCheck } from "firebase-admin/app-check";
+import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
 const APP_NAME = "pulse-studio";
 
@@ -65,6 +67,19 @@ export function getAdminApp(): App {
 
 export function adminAuth(): Auth {
   return getAuth(getAdminApp());
+}
+
+export function adminAppCheck(): AppCheck {
+  return getAppCheck(getAdminApp());
+}
+
+let firestore: Firestore | null = null;
+
+export function adminDb(): Firestore {
+  if (firestore) return firestore;
+  firestore = getFirestore(getAdminApp());
+  firestore.settings({ ignoreUndefinedProperties: true });
+  return firestore;
 }
 
 export function usingEmulators(): boolean {

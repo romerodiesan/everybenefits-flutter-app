@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/providers/auth-provider";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import {
   appBaseUrl,
-  handoffUrlWithToken,
+  buildSsoHandoffUrl,
 } from "@/lib/sso";
 
 function isAllowedReturnUrl(url: string): boolean {
@@ -57,7 +57,7 @@ export function SsoBridgePage({
       }
       try {
         const idToken = await getFirebaseAuth().currentUser!.getIdToken();
-        window.location.replace(handoffUrlWithToken(returnUrl, idToken));
+        window.location.replace(await buildSsoHandoffUrl(returnUrl, idToken));
       } catch {
         setError(t("ssoFailed"));
       }

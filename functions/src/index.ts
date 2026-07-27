@@ -1,10 +1,19 @@
 import * as admin from "firebase-admin";
+import { randomBytes } from "node:crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onValueWritten } from "firebase-functions/v2/database";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { setGlobalOptions } from "firebase-functions/v2";
+import {
+  ALL_ROLES,
+  FORUM_ROLES,
+  GROUP_CREATOR_ROLES,
+  belongsInDefaultAgentGroup,
+  canAuthorCourses,
+  parseRole,
+} from "@pulse/shared";
 import {
   ensureThreadParticipant,
   listThreadNotifyTargets,
@@ -50,14 +59,10 @@ const DEFAULT_AGENT_GROUP_ID = "agents-default";
 /** Synthetic sender for automated support replies; never a real account. */
 const SUPPORT_AI_UID = "support-ai";
 const MAX_SUPPORT_MESSAGE_CHARS = 2000;
-const FORUM_ROLES = ["student", "agent", "instructor", "manager", "admin"];
 /** Mirrors QUIZ_DEFAULT_PASS_PERCENT / kQuizDefaultPassPercent in the clients. */
 const DEFAULT_QUIZ_PASS_PERCENT = 70;
 /** Upper bound on option indexes, so a hostile payload can't balloon a set. */
 const MAX_QUIZ_OPTIONS = 20;
-/** Roles that belong in the default staff community chat. */
-const DEFAULT_GROUP_ROLES = ["agent", "instructor", "manager", "admin"];
-const GROUP_CREATOR_ROLES = ["instructor", "manager", "admin"];
 const MAX_GROUP_MEMBERS = 20;
 const MAX_FUNCTION_CALLS_PER_MINUTE = 30;
 
@@ -76,10 +81,6 @@ function headlineName(data: admin.firestore.DocumentData | undefined): string {
   const email = typeof data?.email === "string" ? data.email.trim() : "";
   if (email) return email;
   return "Usuario";
-}
-
-function belongsInDefaultGroup(role: string): boolean {
-  return DEFAULT_GROUP_ROLES.includes(role);
 }
 
 async function consumeFunctionQuota(uid: string, operation: string) {
@@ -105,13 +106,28 @@ async function consumeFunctionQuota(uid: string, operation: string) {
   });
 }
 
+async function requireActiveAccount(uid: string): Promise<void> {
+  const snap = await db.doc(`users/${uid}`).get();
+  const status = String(snap.data()?.accountStatus ?? "active");
+  if (status === "deactivated" || status === "pendingDeletion") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Account is deactivated or pending deletion.",
+    );
+  }
+}
+
 async function requireCaller(
   request: { auth?: { uid: string } },
   operation: string,
+  options?: { allowInactive?: boolean },
 ): Promise<string> {
   const uid = request.auth?.uid;
   if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
   await consumeFunctionQuota(uid, operation);
+  if (!options?.allowInactive) {
+    await requireActiveAccount(uid);
+  }
   return uid;
 }
 
@@ -326,7 +342,7 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     throw new HttpsError("invalid-argument", "Group must have 2–20 members.");
   }
   const creator = await db.doc(`users/${uid}`).get();
-  if (!GROUP_CREATOR_ROLES.includes(String(creator.data()?.role ?? ""))) {
+  if (!(GROUP_CREATOR_ROLES as readonly string[]).includes(String(creator.data()?.role ?? ""))) {
     throw new HttpsError("permission-denied", "Not allowed to create groups.");
   }
   const profiles = await db.getAll(
@@ -474,7 +490,7 @@ export const castForumVote = onCall(callableOpts, async (request) => {
   if (!user || user.isAnonymous === true) {
     throw new HttpsError("permission-denied", "Forum participants only.");
   }
-  if (!FORUM_ROLES.includes(String(user.role))) {
+  if (!(FORUM_ROLES as readonly string[]).includes(String(user.role))) {
     throw new HttpsError("permission-denied", "Forum participants only.");
   }
 
@@ -572,7 +588,7 @@ export const addForumReply = onCall(callableOpts, async (request) => {
     !thread.exists ||
     !profile ||
     profile.isAnonymous === true ||
-    !FORUM_ROLES.includes(String(profile.role))
+    !(FORUM_ROLES as readonly string[]).includes(String(profile.role))
   ) {
     throw new HttpsError("permission-denied", "Forum participants only.");
   }
@@ -665,15 +681,7 @@ export const setUserRole = onCall(callableOpts, async (request) => {
   const actorUid = await requireCaller(request, "setUserRole");
   const targetUid = String(request.data?.uid ?? "");
   const role = String(request.data?.role ?? "");
-  const allowed = [
-    "guest",
-    "student",
-    "agent",
-    "instructor",
-    "manager",
-    "admin",
-  ];
-  if (!targetUid || !allowed.includes(role)) {
+  if (!targetUid || !(ALL_ROLES as readonly string[]).includes(role)) {
     throw new HttpsError("invalid-argument", "uid and valid role required");
   }
 
@@ -699,7 +707,7 @@ export const setUserRole = onCall(callableOpts, async (request) => {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  if (belongsInDefaultGroup(role)) {
+  if (belongsInDefaultAgentGroup(parseRole(role))) {
     await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
   }
 
@@ -830,11 +838,9 @@ export const submitQuizAttempt = onCall(callableOpts, async (request) => {
   // Drafts are only answerable by their author or an admin (Studio preview).
   if (course.status !== "published") {
     const actor = await db.doc(`users/${uid}`).get();
-    const role = String(actor.data()?.role ?? "");
+    const role = parseRole(actor.data()?.role);
     const owns = String(course.createdBy ?? "") === uid;
-    const isAuthorRole =
-      role === "instructor" || role === "manager" || role === "admin";
-    if (role !== "admin" && !(owns && isAuthorRole)) {
+    if (role !== "admin" && !(owns && canAuthorCourses(role))) {
       throw new HttpsError("permission-denied", "Course is not published.");
     }
   }
@@ -935,7 +941,7 @@ export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
     throw new HttpsError("not-found", "User not found.");
   }
   const targetRole = String(target.data()?.role ?? "");
-  if (!belongsInDefaultGroup(targetRole)) {
+  if (!belongsInDefaultAgentGroup(parseRole(targetRole))) {
     throw new HttpsError(
       "failed-precondition",
       "Agents, instructors, managers, and admins only.",
@@ -1130,7 +1136,9 @@ async function renameChatMemberships(
 }
 
 export const deactivateAccount = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "deactivateAccount");
+  const uid = await requireCaller(request, "deactivateAccount", {
+    allowInactive: true,
+  });
   const userRef = db.doc(`users/${uid}`);
   const snap = await userRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "User not found.");
@@ -1147,7 +1155,9 @@ export const deactivateAccount = onCall(callableOpts, async (request) => {
 });
 
 export const reactivateAccount = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "reactivateAccount");
+  const uid = await requireCaller(request, "reactivateAccount", {
+    allowInactive: true,
+  });
   const userRef = db.doc(`users/${uid}`);
   const snap = await userRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "User not found.");
@@ -1163,7 +1173,9 @@ export const reactivateAccount = onCall(callableOpts, async (request) => {
 });
 
 export const requestAccountDeletion = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "requestAccountDeletion");
+  const uid = await requireCaller(request, "requestAccountDeletion", {
+    allowInactive: true,
+  });
   const userRef = db.doc(`users/${uid}`);
   const snap = await userRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "User not found.");
@@ -1200,7 +1212,9 @@ export const requestAccountDeletion = onCall(callableOpts, async (request) => {
 });
 
 export const cancelAccountDeletion = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "cancelAccountDeletion");
+  const uid = await requireCaller(request, "cancelAccountDeletion", {
+    allowInactive: true,
+  });
   const userRef = db.doc(`users/${uid}`);
   const snap = await userRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "User not found.");
@@ -1280,23 +1294,61 @@ export const onThreadCreated = onDocumentWritten(
 
 /**
  * Cross-app SSO for Pulse ↔ Studio (different origins / ports).
- * Verifies a Firebase ID token from the source app and mints a custom token
- * the destination can pass to `signInWithCustomToken`.
- * Does not require an existing Auth session on the caller.
+ *
+ * Preferred: createSsoHandoff (authenticated) → opaque code → exchangeSsoToken({ code }).
+ * Direct idToken exchange is rejected to avoid JWT-in-URL style misuse of this API.
  */
-export const exchangeSsoToken = onCall(callableOpts, async (request) => {
-  const idToken = String(request.data?.idToken ?? "");
-  if (idToken.length < 100) {
-    throw new HttpsError("invalid-argument", "idToken required");
-  }
-  let decoded: admin.auth.DecodedIdToken;
-  try {
-    decoded = await admin.auth().verifyIdToken(idToken);
-  } catch {
-    throw new HttpsError("unauthenticated", "Invalid or expired ID token.");
-  }
-  const customToken = await admin.auth().createCustomToken(decoded.uid, {
-    sso: true,
+export const createSsoHandoff = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "createSsoHandoff");
+  const code = randomBytes(32).toString("base64url");
+  const now = Date.now();
+  await db.collection("ssoHandoffs").doc(code).set({
+    uid,
+    used: false,
+    createdAt: FieldValue.serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(now + 60_000),
   });
-  return { customToken, uid: decoded.uid };
+  return { code };
+});
+
+export const exchangeSsoToken = onCall(callableOpts, async (request) => {
+  const code = String(request.data?.code ?? "").trim();
+  if (code.length < 32) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Opaque handoff code required. Use createSsoHandoff first.",
+    );
+  }
+
+  const ref = db.collection("ssoHandoffs").doc(code);
+  const uid = await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) {
+      throw new HttpsError("unauthenticated", "Invalid or expired handoff.");
+    }
+    const data = snap.data() ?? {};
+    if (data.used === true) {
+      throw new HttpsError("unauthenticated", "Invalid or expired handoff.");
+    }
+    const expiresAt = data.expiresAt as Timestamp | undefined;
+    if (!expiresAt || expiresAt.toMillis() < Date.now()) {
+      tx.delete(ref);
+      throw new HttpsError("unauthenticated", "Invalid or expired handoff.");
+    }
+    const handoffUid = String(data.uid ?? "");
+    if (!handoffUid) {
+      tx.delete(ref);
+      throw new HttpsError("unauthenticated", "Invalid or expired handoff.");
+    }
+    tx.update(ref, {
+      used: true,
+      usedAt: FieldValue.serverTimestamp(),
+    });
+    return handoffUid;
+  });
+
+  await consumeFunctionQuota(uid, "exchangeSsoToken");
+  const customToken = await admin.auth().createCustomToken(uid, { sso: true });
+  void ref.delete().catch(() => undefined);
+  return { customToken, uid };
 });

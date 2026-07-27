@@ -30,9 +30,22 @@ messaging.onBackgroundMessage((payload) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
   const raw = event.notification?.data?.href || "/notifications";
-  const target = raw.startsWith("http")
-    ? raw
-    : new URL(raw, self.location.origin).href;
+  let target;
+  try {
+    if (typeof raw === "string" && raw.startsWith("/")) {
+      target = new URL(raw, self.location.origin).href;
+    } else {
+      const parsed = new URL(String(raw), self.location.origin);
+      // Only same-origin destinations — blocks open-redirect phishing via FCM.
+      if (parsed.origin !== self.location.origin) {
+        target = new URL("/notifications", self.location.origin).href;
+      } else {
+        target = parsed.href;
+      }
+    }
+  } catch {
+    target = new URL("/notifications", self.location.origin).href;
+  }
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(
       (clientList) => {

@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import {
   appBaseUrl,
-  handoffUrlWithToken,
+  buildSsoHandoffUrl,
   ssoConsumeUrl,
   type PulseAppId,
 } from "@/lib/sso";
@@ -63,7 +63,7 @@ export function AppSwitcher({
       if (user) {
         const idToken = await user.getIdToken();
         const consume = ssoConsumeUrl(target, locale, nextHome);
-        window.location.assign(handoffUrlWithToken(consume, idToken));
+        window.location.assign(await buildSsoHandoffUrl(consume, idToken));
         return;
       }
       window.location.assign(`${appBaseUrl(target)}/${locale}`);

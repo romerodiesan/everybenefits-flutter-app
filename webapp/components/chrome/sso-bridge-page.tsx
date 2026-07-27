@@ -5,7 +5,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { getFirebaseAuth } from "@/lib/firebase/client";
-import { appBaseUrl, handoffUrlWithToken } from "@/lib/sso";
+import { appBaseUrl, buildSsoHandoffUrl } from "@/lib/sso";
 
 function isAllowedReturnUrl(url: string): boolean {
   try {
@@ -49,7 +49,7 @@ export function SsoBridgePage({
       }
       try {
         const idToken = await getFirebaseAuth().currentUser!.getIdToken();
-        window.location.replace(handoffUrlWithToken(returnUrl, idToken));
+        window.location.replace(await buildSsoHandoffUrl(returnUrl, idToken));
       } catch {
         setError(t("ssoFailed"));
       }
