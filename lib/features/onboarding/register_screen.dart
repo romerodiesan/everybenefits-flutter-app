@@ -4,6 +4,7 @@ import '../../../app/app_spacing.dart';
 import '../../../auth/auth.dart';
 import '../../../l10n/l10n.dart';
 import 'login_screen.dart';
+import 'mfa_challenge_screen.dart';
 import 'phone_auth_screen.dart';
 import 'widgets/auth_form_widgets.dart';
 
@@ -38,7 +39,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await action();
     } catch (error, stackTrace) {
       if (!mounted) return;
-      showAuthError(context, error, stackTrace: stackTrace);
+      final handled = await presentMfaIfNeeded(
+        context,
+        authService: widget.authService,
+        error: error,
+      );
+      if (!handled && mounted) {
+        showAuthError(context, error, stackTrace: stackTrace);
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }

@@ -46,6 +46,7 @@ dependencies:
   liquid_glass_widgets: ^0.22.1
   firebase_app_check: ^0.4.5+2
   cloud_functions: ^6.3.5
+  http: ^1.2.2
   flutter_localizations:
     sdk: flutter
   intl: any

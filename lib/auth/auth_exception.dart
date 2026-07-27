@@ -74,6 +74,14 @@ class AuthException implements Exception {
         return l10n.authErrPermission;
       case 'invalid-phone-number':
         return l10n.authErrInvalidPhone;
+      case 'requires-recent-login':
+        return l10n.authErrRequiresRecentLogin;
+      case 'email-required':
+        return l10n.authErrEmailRequired;
+      case 'unauthenticated':
+        return l10n.authErrUnauthenticated;
+      case 'credential-already-in-use':
+        return l10n.authErrCredentialInUse;
       case 'invalid-verification-code':
         return l10n.authErrInvalidSms;
       case 'session-expired':

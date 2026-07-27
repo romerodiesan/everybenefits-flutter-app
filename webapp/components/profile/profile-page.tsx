@@ -18,6 +18,7 @@ import { AccountPanel } from "@/components/profile/account-panel";
 import { AppearancePanel } from "@/components/profile/appearance-panel";
 import { NotificationsPanel } from "@/components/profile/notifications-panel";
 import { PrivacyPanel } from "@/components/profile/privacy-panel";
+import { SecurityPanel } from "@/components/profile/security-panel";
 import { AdminPanel } from "@/components/profile/admin-panel";
 import { DangerPanel } from "@/components/profile/danger-panel";
 
@@ -42,6 +43,7 @@ function sectionFromHash(): SettingsSection | null {
     "account",
     "appearance",
     "notifications",
+    "security",
     "privacy",
     "admin",
     "danger",
@@ -79,6 +81,15 @@ const ICONS: Record<SettingsSection, React.ReactNode> = {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
       <rect x="5" y="11" width="14" height="10" rx="2" />
       <path d="M8 11V8a4 4 0 0 1 8 0v3" strokeLinecap="round" />
+    </svg>
+  ),
+  security: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path
+        d="M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6l7-3Z"
+        strokeLinejoin="round"
+      />
+      <path d="M9.5 12.5h5M12 10v5" strokeLinecap="round" />
     </svg>
   ),
   admin: (
@@ -144,6 +155,12 @@ export function ProfilePage() {
         label: t("notificationsPrefsTitle"),
         description: t("profileNotificationsNav"),
         icon: ICONS.notifications,
+      });
+      items.push({
+        id: "security",
+        label: t("profileSecurity"),
+        description: t("profileSecurityNav"),
+        icon: ICONS.security,
       });
     }
     items.push({
@@ -257,6 +274,7 @@ export function ProfilePage() {
           {available === "notifications" && !profile.isAnonymous && (
             <NotificationsPanel uid={profile.uid} />
           )}
+          {available === "security" && !profile.isAnonymous && <SecurityPanel />}
           {available === "privacy" && <PrivacyPanel />}
           {available === "admin" && isAdmin && <AdminPanel />}
           {available === "danger" && !profile.isAnonymous && <DangerPanel />}

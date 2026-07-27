@@ -15,6 +15,7 @@ import 'auth/auth.dart';
 import 'features/chats/chat_repository.dart';
 import 'features/forums/forum_repository.dart';
 import 'features/university/course_repository.dart';
+import 'features/onboarding/set_password_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/profile/profile_completion_flow.dart';
 import 'firebase/firebase_app_check.dart';
@@ -179,7 +180,7 @@ class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
                   View.of(context).platformDispatcher.locale,
                 );
                 return MaterialApp(
-                  key: ValueKey<String>('$authKey-${locale.languageCode}'),
+                  key: ValueKey<String>(authKey),
                   onGenerateTitle: (context) => context.l10n.appTitle,
                   locale: locale,
                   localizationsDelegates: const [
@@ -293,6 +294,11 @@ class ProfileBootstrap extends StatefulWidget {
 class _ProfileBootstrapState extends State<ProfileBootstrap> {
   late final Future<UserProfile> _profileFuture =
       widget.userRepository.ensureProfile(widget.user);
+  int _authEpoch = 0;
+
+  void _onPasswordLinked() {
+    setState(() => _authEpoch++);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -333,6 +339,19 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
         }
 
         final initial = profileSnapshot.data!;
+
+        // Force rebuild after linking a backup password (_authEpoch).
+        final current = widget.authService.currentUser ?? widget.user;
+        final hasPassword = widget.authService.hasPasswordProvider(current);
+        final canLinkPassword =
+            current.email != null && current.email!.trim().isNotEmpty;
+        if (!initial.isAnonymous && !hasPassword && canLinkPassword) {
+          return SetPasswordScreen(
+            key: ValueKey('set-password-$_authEpoch'),
+            authService: widget.authService,
+            onLinked: _onPasswordLinked,
+          );
+        }
 
         return StreamBuilder<UserProfile?>(
           stream: widget.userRepository.watchProfile(widget.user.uid),

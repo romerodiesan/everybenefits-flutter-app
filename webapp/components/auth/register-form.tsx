@@ -4,8 +4,15 @@ import { FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Button, Input, Label, Panel } from "@/components/ui/primitives";
-import { signUpWithEmail, signInWithGoogle } from "@/lib/firebase/auth";
+import {
+  hasPasswordProvider,
+  signUpWithEmail,
+  signInWithGoogle,
+} from "@/lib/firebase/auth";
+import { isMultiFactorError, resolverFromError } from "@/lib/firebase/mfa";
+import { MfaChallengeForm } from "@/components/auth/mfa-challenge-form";
 import { useAuth } from "@/lib/providers/auth-provider";
+import type { MultiFactorResolver } from "firebase/auth";
 
 export function RegisterForm() {
   const t = useTranslations();
@@ -17,20 +24,27 @@ export function RegisterForm() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [mfaResolver, setMfaResolver] = useState<MultiFactorResolver | null>(
+    null,
+  );
 
   useEffect(() => {
-    if (loading || !user || !profile) return;
-    if (!profile.profileCompleted && !profile.isAnonymous) {
+    if (loading || !user || mfaResolver) return;
+    if (!user.isAnonymous && !hasPasswordProvider() && user.email) {
+      router.replace("/set-password");
+      return;
+    }
+    if (profile && !profile.profileCompleted && !profile.isAnonymous) {
       router.replace("/complete-profile");
-    } else {
+    } else if (user) {
       router.replace("/home");
     }
-  }, [loading, user, profile, router]);
+  }, [loading, user, profile, router, mfaResolver]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (password !== confirm) {
-      setError(t("errorGeneric"));
+      setError(t("setPasswordMismatch"));
       return;
     }
     setBusy(true);
@@ -44,12 +58,44 @@ export function RegisterForm() {
     }
   }
 
+  async function onGoogle() {
+    setBusy(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+    } catch (err) {
+      if (String(err).includes("cancelled")) {
+        setBusy(false);
+        return;
+      }
+      if (isMultiFactorError(err)) {
+        setMfaResolver(resolverFromError(err));
+      } else {
+        setError(t("errorAuth"));
+      }
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="mesh-bg flex min-h-[100svh] items-center justify-center px-4 py-10">
       <Panel className="w-full max-w-md">
         <Link href="/" className="font-display text-2xl font-extrabold">
           {t("brand")}
         </Link>
+        {mfaResolver ? (
+          <div className="mt-6">
+            <MfaChallengeForm
+              resolver={mfaResolver}
+              onResolved={() => {
+                setMfaResolver(null);
+                router.replace("/home");
+              }}
+              onCancel={() => setMfaResolver(null)}
+            />
+          </div>
+        ) : (
+          <>
         <h1 className="mt-6 font-display text-3xl font-bold">
           {t("registerTitle")}
         </h1>
@@ -118,18 +164,7 @@ export function RegisterForm() {
           variant="secondary"
           className="mt-4 w-full"
           disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            try {
-              await signInWithGoogle();
-            } catch (err) {
-              if (!(err instanceof Error && err.message === "cancelled")) {
-                setError(t("errorAuth"));
-              }
-            } finally {
-              setBusy(false);
-            }
-          }}
+          onClick={() => void onGoogle()}
         >
           {t("signInGoogle")}
         </Button>
@@ -139,6 +174,8 @@ export function RegisterForm() {
             {t("backToLogin")}
           </Link>
         </p>
+          </>
+        )}
       </Panel>
     </div>
   );
