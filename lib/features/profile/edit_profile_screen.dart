@@ -4,8 +4,10 @@ import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/role_badge.dart';
+import '../../auth/auth.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
+import 'phone_profile_verify.dart';
 import 'widgets/profile_form_widgets.dart';
 
 class EditProfileScreen extends StatefulWidget {
@@ -13,10 +15,12 @@ class EditProfileScreen extends StatefulWidget {
     super.key,
     required this.profile,
     required this.userRepository,
+    required this.authService,
   });
 
   final UserProfile profile;
   final UserRepository userRepository;
+  final AuthService authService;
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -31,11 +35,38 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final isAgentFields = widget.profile.role == UserRole.agent ||
           widget.profile.role == UserRole.instructor ||
           widget.profile.role == UserRole.admin;
+
+      final changed = phoneChangedFromProfile(
+        previousCode: widget.profile.phoneCountryCode,
+        previousNumber: widget.profile.phoneNumber,
+        nextCode: data.phoneCountryCode,
+        nextNumber: data.phoneNumber,
+      );
+
+      var phoneVerified = widget.profile.phoneVerified;
+      if (changed) {
+        final nextDigits = data.phoneNumber.trim();
+        if (nextDigits.isEmpty) {
+          phoneVerified = false;
+        } else {
+          final ok = await verifyProfilePhone(
+            context: context,
+            authService: widget.authService,
+            e164: e164Phone(data.phoneCountryCode, data.phoneNumber),
+          );
+          if (!ok) {
+            if (mounted) setState(() => _busy = false);
+            return;
+          }
+          phoneVerified = true;
+        }
+      }
+
       final next = widget.profile.copyWith(
-        // Name and NPN are locked after setup — keep existing values.
-        displayName: widget.profile.displayName,
+        displayName: data.displayName,
         phoneCountryCode: data.phoneCountryCode,
         phoneNumber: data.phoneNumber,
+        phoneVerified: phoneVerified,
         // Role is frozen after completion — never written from edit.
         role: widget.profile.role,
         profileCompleted: true,
@@ -118,14 +149,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        l10n.editProfileRoleFrozen,
+                        profile.phoneVerified
+                            ? l10n.phoneProfileVerifiedBadge
+                            : l10n.editProfileRoleFrozen,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colors.muted,
                           height: 1.35,
                         ),
                       ),
                     ),
-                    Icon(Icons.lock_outline_rounded, color: colors.muted, size: 20),
+                    Icon(
+                      Icons.lock_outline_rounded,
+                      color: colors.muted,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),
@@ -134,7 +171,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             ProfileDetailsForm(
               accountType: profile.role,
               busy: _busy,
-              lockName: true,
+              lockName: false,
               lockNpn: true,
               submitLabel: l10n.editProfileSave,
               initialName: profile.displayName,

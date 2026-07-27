@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/providers/auth-provider";
 import {
@@ -8,6 +8,12 @@ import {
   updateUserProfile,
   uploadAvatar,
 } from "@/lib/firebase/users";
+import {
+  clearProfilePhoneRecaptcha,
+  confirmProfilePhone,
+  startProfilePhoneVerification,
+  toE164,
+} from "@/lib/firebase/profile-phone";
 import { Avatar, Button, Input, Label } from "@/components/ui/primitives";
 import {
   SettingsPanelShell,
@@ -18,26 +24,86 @@ export function AccountPanel() {
   const t = useTranslations();
   const { profile, refreshProfile } = useAuth();
   const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
+  const [phoneCountryCode, setPhoneCountryCode] = useState(
+    profile?.phoneCountryCode ?? "+1",
+  );
+  const [phoneNumber, setPhoneNumber] = useState(profile?.phoneNumber ?? "");
+  const [smsCode, setSmsCode] = useState("");
+  const [verificationId, setVerificationId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [avatarBusy, setAvatarBusy] = useState(false);
-  const [status, setStatus] = useState<"saved" | "error" | null>(null);
+  const [status, setStatus] = useState<"saved" | "error" | "phone" | null>(
+    null,
+  );
+  const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
+  useEffect(() => {
+    return () => clearProfilePhoneRecaptcha();
+  }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    setDisplayName(profile.displayName ?? "");
+    setPhoneCountryCode(profile.phoneCountryCode ?? "+1");
+    setPhoneNumber(profile.phoneNumber ?? "");
+  }, [profile]);
+
   if (!profile) return null;
+
+  const phoneChanged =
+    `${phoneCountryCode.trim()}${phoneNumber.trim()}` !==
+    `${profile.phoneCountryCode?.trim() ?? ""}${profile.phoneNumber?.trim() ?? ""}`;
 
   async function onSave(e: FormEvent) {
     e.preventDefault();
     if (!profile) return;
     setBusy(true);
     setStatus(null);
+    setError(null);
     try {
-      await updateUserProfile(profile, {
-        displayName: displayName.trim() || profile.displayName,
-      });
+      let phoneVerified = Boolean(profile.phoneVerified);
+
+      if (phoneChanged) {
+        const digits = phoneNumber.trim();
+        if (!digits) {
+          phoneVerified = false;
+          await updateUserProfile(profile, {
+            displayName: displayName.trim() || profile.displayName,
+            phoneCountryCode: phoneCountryCode.trim() || null,
+            phoneNumber: null,
+            phoneVerified: false,
+          });
+        } else if (!verificationId) {
+          const e164 = toE164(phoneCountryCode, phoneNumber);
+          const id = await startProfilePhoneVerification(e164);
+          setVerificationId(id);
+          setStatus("phone");
+          setBusy(false);
+          return;
+        } else {
+          await confirmProfilePhone(verificationId, smsCode);
+          phoneVerified = true;
+          await updateUserProfile(profile, {
+            displayName: displayName.trim() || profile.displayName,
+            phoneCountryCode: phoneCountryCode.trim() || null,
+            phoneNumber: phoneNumber.trim() || null,
+            phoneVerified: true,
+          });
+          setVerificationId(null);
+          setSmsCode("");
+        }
+      } else {
+        await updateUserProfile(profile, {
+          displayName: displayName.trim() || profile.displayName,
+        });
+      }
+
       await refreshProfile();
       setStatus("saved");
     } catch {
       setStatus("error");
+      setError(t("errorGeneric"));
     } finally {
       setBusy(false);
     }
@@ -65,6 +131,7 @@ export function AccountPanel() {
       title={t("profileAccount")}
       subtitle={t("profileAccountHint")}
     >
+      <div id="profile-phone-recaptcha" />
       <div className="flex items-center gap-4">
         <Avatar
           name={headlineName(profile)}
@@ -106,15 +173,64 @@ export function AccountPanel() {
             onChange={(e) => setDisplayName(e.target.value)}
           />
         </div>
+        <div className="grid max-w-md grid-cols-[7rem_1fr] gap-3">
+          <div>
+            <Label>{t("phoneCountryCode")}</Label>
+            <Input
+              value={phoneCountryCode}
+              onChange={(e) => {
+                setPhoneCountryCode(e.target.value);
+                setVerificationId(null);
+                setSmsCode("");
+              }}
+              placeholder="+1"
+            />
+          </div>
+          <div>
+            <Label>{t("fieldPhoneNumber")}</Label>
+            <Input
+              value={phoneNumber}
+              onChange={(e) => {
+                setPhoneNumber(e.target.value);
+                setVerificationId(null);
+                setSmsCode("");
+              }}
+              inputMode="tel"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-muted">
+          {profile.phoneVerified && !phoneChanged
+            ? t("phoneProfileVerifiedBadge")
+            : t("phoneProfileVerifyHint")}
+        </p>
+        {verificationId && (
+          <div className="max-w-sm space-y-2">
+            <StatusBanner kind="info">{t("phoneSmsSent")}</StatusBanner>
+            <Label>{t("fieldVerificationCode")}</Label>
+            <Input
+              value={smsCode}
+              onChange={(e) => setSmsCode(e.target.value)}
+              inputMode="numeric"
+              autoComplete="one-time-code"
+            />
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-3">
-          <Button type="submit" disabled={busy}>
-            {t("profileSave")}
+          <Button
+            type="submit"
+            disabled={busy || (Boolean(verificationId) && smsCode.trim().length < 6)}
+          >
+            {verificationId ? t("phoneProfileVerifyConfirm") : t("profileSave")}
           </Button>
           {status === "saved" && (
             <StatusBanner kind="success">{t("profileSaved")}</StatusBanner>
           )}
-          {status === "error" && (
-            <StatusBanner kind="error">{t("errorGeneric")}</StatusBanner>
+          {status === "phone" && (
+            <StatusBanner kind="info">{t("phoneSmsSent")}</StatusBanner>
+          )}
+          {(status === "error" || error) && (
+            <StatusBanner kind="error">{error ?? t("errorGeneric")}</StatusBanner>
           )}
         </div>
       </form>

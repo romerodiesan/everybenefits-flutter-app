@@ -12,13 +12,12 @@ import {
   ref,
   uploadBytes,
 } from "firebase/storage";
-import type { User } from "firebase/auth";
-import { getFirebaseDb, getFirebaseStorage } from "./client";
+import { updateProfile, type User } from "firebase/auth";
+import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
 import { listPublicProfiles } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
 import { composeUsAddress, headlineName, parseRole } from "../roles";
-
 function toDate(value: unknown): Date | null {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -172,6 +171,19 @@ export async function updateUserProfile(
     agency: next.agency,
     updatedAt: serverTimestamp(),
   });
+
+  // Keep Firebase Auth in sync for fields that also live on the Auth user.
+  if ("displayName" in patch || "photoUrl" in patch) {
+    const authUser = getFirebaseAuth().currentUser;
+    if (authUser && authUser.uid === profile.uid) {
+      await updateProfile(authUser, {
+        ...("displayName" in patch
+          ? { displayName: next.displayName?.trim() || null }
+          : {}),
+        ...("photoUrl" in patch ? { photoURL: next.photoUrl || null } : {}),
+      });
+    }
+  }
 }
 
 export async function uploadAvatar(uid: string, file: File): Promise<string> {

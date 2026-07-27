@@ -124,6 +124,10 @@
   "authErrInvalidSms": "El código SMS no es válido.",
   "authErrSmsExpired": "El código expiró. Solicita uno nuevo.",
   "authErrOpNotAllowed": "Este método de acceso no está habilitado.",
+  "authErrRequiresRecentLogin": "Por seguridad, inicia sesión de nuevo e inténtalo otra vez.",
+  "authErrEmailRequired": "Tu cuenta necesita un correo para establecer una contraseña.",
+  "authErrUnauthenticated": "Inicia sesión para continuar.",
+  "authErrCredentialInUse": "Esa credencial ya está vinculada a otra cuenta.",
   "authErrUnknown": "No se pudo completar la autenticación ({code}).",
   "@authErrUnknown": {
     "placeholders": {
@@ -132,6 +136,38 @@
       }
     }
   },
+  "setPasswordTitle": "Establece una contraseña de respaldo",
+  "setPasswordSubtitle": "Si pierdes acceso a Google, podrás entrar con tu correo y esta contraseña.",
+  "setPasswordSave": "Guardar contraseña",
+  "setPasswordMismatch": "Las contraseñas no coinciden.",
+  "fieldConfirmPassword": "Confirmar contraseña",
+  "mfaTitle": "Verificación en dos pasos",
+  "mfaSubtitle": "Ingresa el código de tu autenticador o SMS.",
+  "mfaChooseFactor": "Elige un método de verificación",
+  "mfaTotpLabel": "App autenticadora",
+  "mfaSmsLabel": "Mensaje de texto",
+  "mfaCodeLabel": "Código de verificación",
+  "mfaVerify": "Verificar",
+  "mfaSendSms": "Enviar código SMS",
+  "settingsSecurity": "Seguridad",
+  "settingsSecurityHint": "Contraseña y verificación en dos pasos.",
+  "securitySetPassword": "Establecer contraseña",
+  "securityChangePassword": "Cambiar contraseña",
+  "securityCurrentPassword": "Contraseña actual",
+  "securityNewPassword": "Nueva contraseña",
+  "securityPasswordSaved": "Contraseña actualizada.",
+  "securityMfaTitle": "Verificación en dos pasos",
+  "securityMfaHint": "Añade SMS o una app autenticadora como segundo factor.",
+  "securityEnrollTotp": "Añadir autenticador",
+  "securityEnrollSms": "Añadir teléfono (SMS)",
+  "securityTotpScan": "Escanea este código QR en tu app autenticadora y luego ingresa el código de 6 dígitos.",
+  "securityTotpSecret": "O ingresa esta clave manualmente",
+  "securityPhoneHint": "Número de teléfono (E.164, p. ej. +15551234567)",
+  "securityFactorRemove": "Quitar",
+  "securityFactorRemoved": "Segundo factor eliminado.",
+  "securityFactorAdded": "Segundo factor añadido.",
+  "securityNoFactors": "Aún no hay segundos factores.",
+  "securityReauthHint": "Confirma tu contraseña para continuar.",
   "profileCompleteRoleTitle": "Tu rol",
   "profileCompleteDataTitle": "Tus datos",
   "profileCompleteSignOut": "Salir",
@@ -721,7 +757,9 @@
   "editProfileCredentialsSection": "Licencia y ubicación",
   "editProfileRoleFrozen": "Elegido al registrarte — solo un admin puede cambiarlo.",
   "settingsAdmin": "Admin",
-  "settingsAdminHint": "Promueve estudiantes a agentes.",
+  "settingsAdminHint": "Promueve estudiantes a agentes y gestiona funciones de la plataforma.",
+  "settingsAdminPulseAi": "Pulse AI",
+  "settingsAdminPulseAiHint": "Si está desactivado, los miembros no pueden abrir ni chatear con Pulse AI.",
   "settingsAdminPromote": "Promover a agente",
   "settingsAdminEmpty": "No hay estudiantes para promover.",
   "settingsAdminPromoteOk": "Promovido a agente.",
@@ -733,6 +771,7 @@
       }
     }
   },
+  "aiDisabled": "Pulse AI no está disponible temporalmente.",
   "settingsAppearance": "Apariencia",
   "settingsPreferences": "Preferencias",
   "settingsPrivacy": "Privacidad",
@@ -754,5 +793,42 @@
   "notificationsPrefChats": "Mensajes de chat",
   "notificationsPrefForums": "Actividad en foros",
   "notificationsPrefAcademy": "Novedades de academia",
-  "notificationsPrefSupport": "Respuestas de soporte"
+  "notificationsPrefSupport": "Respuestas de soporte",
+  "notificationsPrefsHint": "Elige qué alertas llegan como push en este dispositivo.",
+  "notificationsEnablePush": "Activar notificaciones push",
+  "notificationsPushEnabled": "Notificaciones push activadas",
+  "notificationsPushUnavailable": "No se pudieron activar. Permite notificaciones en Ajustes del sistema.",
+  "phoneProfileVerifyTitle": "Verifica tu teléfono",
+  "phoneProfileVerifyHint": "Enviaremos un SMS a {phone} para confirmar que es tuyo.",
+  "@phoneProfileVerifyHint": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "phoneProfileVerifyConfirm": "Confirmar teléfono",
+  "phoneProfileVerifiedBadge": "Teléfono verificado",
+  "phoneProfileUnverifiedBadge": "Teléfono aún sin verificar",
+  "dangerTitle": "Zona de peligro",
+  "dangerNav": "Desactivar o eliminar",
+  "dangerSubtitle": "Acciones sensibles de la cuenta. Léelas con cuidado.",
+  "dangerDeactivate": "Desactivar cuenta",
+  "dangerDeactivateHint": "Tu cuenta se pausa y dejas de recibir notificaciones. Puedes reactivarla iniciando sesión de nuevo.",
+  "dangerDeactivateConfirmHint": "Se cerrará tu sesión ahora. Para volver, inicia sesión y toca Reactivar.",
+  "dangerDeactivateConfirm": "Sí, desactivar",
+  "dangerDelete": "Eliminar cuenta",
+  "dangerDeleteHint": "Tus datos personales se conservan 3 meses y luego se eliminan automáticamente. Puedes cancelar la eliminación en ese periodo iniciando sesión.",
+  "dangerDeleteConfirmHint": "Tus datos se eliminarán definitivamente el {date}. Hasta entonces puedes cancelar iniciando sesión.",
+  "@dangerDeleteConfirmHint": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "dangerDeleteAnonymizeHint": "Tus publicaciones en foros y chats permanecen con un nombre anónimo. Si cancelas, recuperan tu nombre.",
+  "dangerDeleteConfirm": "Eliminar mi cuenta",
+  "dangerCurrentPassword": "Contraseña actual",
+  "dangerReauthFailed": "No pudimos confirmar tu identidad. Revisa tu contraseña e inténtalo de nuevo."
 }

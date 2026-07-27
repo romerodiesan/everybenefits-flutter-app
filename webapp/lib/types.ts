@@ -12,6 +12,8 @@ export type UserProfile = {
   profileCompleted: boolean;
   phoneCountryCode: string | null;
   phoneNumber: string | null;
+  /** True after SMS ownership check; absent means unverified. */
+  phoneVerified?: boolean;
   npn: string | null;
   address: string | null;
   addressStreet: string | null;

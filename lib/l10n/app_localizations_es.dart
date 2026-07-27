@@ -343,9 +343,121 @@ class AppLocalizationsEs extends AppLocalizations {
   String get authErrOpNotAllowed => 'Este método de acceso no está habilitado.';
 
   @override
+  String get authErrRequiresRecentLogin =>
+      'Por seguridad, inicia sesión de nuevo e inténtalo otra vez.';
+
+  @override
+  String get authErrEmailRequired =>
+      'Tu cuenta necesita un correo para establecer una contraseña.';
+
+  @override
+  String get authErrUnauthenticated => 'Inicia sesión para continuar.';
+
+  @override
+  String get authErrCredentialInUse =>
+      'Esa credencial ya está vinculada a otra cuenta.';
+
+  @override
   String authErrUnknown(String code) {
     return 'No se pudo completar la autenticación ($code).';
   }
+
+  @override
+  String get setPasswordTitle => 'Establece una contraseña de respaldo';
+
+  @override
+  String get setPasswordSubtitle =>
+      'Si pierdes acceso a Google, podrás entrar con tu correo y esta contraseña.';
+
+  @override
+  String get setPasswordSave => 'Guardar contraseña';
+
+  @override
+  String get setPasswordMismatch => 'Las contraseñas no coinciden.';
+
+  @override
+  String get mfaTitle => 'Verificación en dos pasos';
+
+  @override
+  String get mfaSubtitle => 'Ingresa el código de tu autenticador o SMS.';
+
+  @override
+  String get mfaChooseFactor => 'Elige un método de verificación';
+
+  @override
+  String get mfaTotpLabel => 'App autenticadora';
+
+  @override
+  String get mfaSmsLabel => 'Mensaje de texto';
+
+  @override
+  String get mfaCodeLabel => 'Código de verificación';
+
+  @override
+  String get mfaVerify => 'Verificar';
+
+  @override
+  String get mfaSendSms => 'Enviar código SMS';
+
+  @override
+  String get settingsSecurity => 'Seguridad';
+
+  @override
+  String get settingsSecurityHint => 'Contraseña y verificación en dos pasos.';
+
+  @override
+  String get securitySetPassword => 'Establecer contraseña';
+
+  @override
+  String get securityChangePassword => 'Cambiar contraseña';
+
+  @override
+  String get securityCurrentPassword => 'Contraseña actual';
+
+  @override
+  String get securityNewPassword => 'Nueva contraseña';
+
+  @override
+  String get securityPasswordSaved => 'Contraseña actualizada.';
+
+  @override
+  String get securityMfaTitle => 'Verificación en dos pasos';
+
+  @override
+  String get securityMfaHint =>
+      'Añade SMS o una app autenticadora como segundo factor.';
+
+  @override
+  String get securityEnrollTotp => 'Añadir autenticador';
+
+  @override
+  String get securityEnrollSms => 'Añadir teléfono (SMS)';
+
+  @override
+  String get securityTotpScan =>
+      'Escanea este código QR en tu app autenticadora y luego ingresa el código de 6 dígitos.';
+
+  @override
+  String get securityTotpSecret => 'O ingresa esta clave manualmente';
+
+  @override
+  String get securityPhoneHint =>
+      'Número de teléfono (E.164, p. ej. +15551234567)';
+
+  @override
+  String get securityFactorRemove => 'Quitar';
+
+  @override
+  String get securityFactorRemoved => 'Segundo factor eliminado.';
+
+  @override
+  String get securityFactorAdded => 'Segundo factor añadido.';
+
+  @override
+  String get securityNoFactors => 'Aún no hay segundos factores.';
+
+  @override
+  String get securityReauthHint => 'Confirma tu contraseña para continuar.';
 
   @override
   String get profileCompleteRoleTitle => 'Tu rol';
@@ -1644,7 +1756,15 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAdmin => 'Admin';
 
   @override
-  String get settingsAdminHint => 'Promueve estudiantes a agentes.';
+  String get settingsAdminHint =>
+      'Promueve estudiantes a agentes y gestiona funciones de la plataforma.';
+
+  @override
+  String get settingsAdminPulseAi => 'Pulse AI';
+
+  @override
+  String get settingsAdminPulseAiHint =>
+      'Si está desactivado, los miembros no pueden abrir ni chatear con Pulse AI.';
 
   @override
   String get settingsAdminPromote => 'Promover a agente';
@@ -1659,6 +1779,9 @@ class AppLocalizationsEs extends AppLocalizations {
   String settingsAdminPromoteFailed(String error) {
     return 'No se pudo promover: $error';
   }
+
+  @override
+  String get aiDisabled => 'Pulse AI no está disponible temporalmente.';
 
   @override
   String get settingsAppearance => 'Apariencia';
@@ -1730,4 +1853,85 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get notificationsPrefSupport => 'Respuestas de soporte';
+
+  @override
+  String get notificationsPrefsHint =>
+      'Elige qué alertas llegan como push en este dispositivo.';
+
+  @override
+  String get notificationsEnablePush => 'Activar notificaciones push';
+
+  @override
+  String get notificationsPushEnabled => 'Notificaciones push activadas';
+
+  @override
+  String get notificationsPushUnavailable =>
+      'No se pudieron activar. Permite notificaciones en Ajustes del sistema.';
+
+  @override
+  String get phoneProfileVerifyTitle => 'Verifica tu teléfono';
+
+  @override
+  String phoneProfileVerifyHint(String phone) {
+    return 'Enviaremos un SMS a $phone para confirmar que es tuyo.';
+  }
+
+  @override
+  String get phoneProfileVerifyConfirm => 'Confirmar teléfono';
+
+  @override
+  String get phoneProfileVerifiedBadge => 'Teléfono verificado';
+
+  @override
+  String get phoneProfileUnverifiedBadge => 'Teléfono aún sin verificar';
+
+  @override
+  String get dangerTitle => 'Zona de peligro';
+
+  @override
+  String get dangerNav => 'Desactivar o eliminar';
+
+  @override
+  String get dangerSubtitle =>
+      'Acciones sensibles de la cuenta. Léelas con cuidado.';
+
+  @override
+  String get dangerDeactivate => 'Desactivar cuenta';
+
+  @override
+  String get dangerDeactivateHint =>
+      'Tu cuenta se pausa y dejas de recibir notificaciones. Puedes reactivarla iniciando sesión de nuevo.';
+
+  @override
+  String get dangerDeactivateConfirmHint =>
+      'Se cerrará tu sesión ahora. Para volver, inicia sesión y toca Reactivar.';
+
+  @override
+  String get dangerDeactivateConfirm => 'Sí, desactivar';
+
+  @override
+  String get dangerDelete => 'Eliminar cuenta';
+
+  @override
+  String get dangerDeleteHint =>
+      'Tus datos personales se conservan 3 meses y luego se eliminan automáticamente. Puedes cancelar la eliminación en ese periodo iniciando sesión.';
+
+  @override
+  String dangerDeleteConfirmHint(String date) {
+    return 'Tus datos se eliminarán definitivamente el $date. Hasta entonces puedes cancelar iniciando sesión.';
+  }
+
+  @override
+  String get dangerDeleteAnonymizeHint =>
+      'Tus publicaciones en foros y chats permanecen con un nombre anónimo. Si cancelas, recuperan tu nombre.';
+
+  @override
+  String get dangerDeleteConfirm => 'Eliminar mi cuenta';
+
+  @override
+  String get dangerCurrentPassword => 'Contraseña actual';
+
+  @override
+  String get dangerReauthFailed =>
+      'No pudimos confirmar tu identidad. Revisa tu contraseña e inténtalo de nuevo.';
 }

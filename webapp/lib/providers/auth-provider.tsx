@@ -33,6 +33,12 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function isPermissionDenied(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const code = "code" in error ? String((error as { code: unknown }).code) : "";
+  return code === "permission-denied" || /permission-denied/i.test(String(error));
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
@@ -45,9 +51,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       void hydrateTelemetry();
     });
     let unsubProfile: (() => void) | undefined;
+    let generation = 0;
+
     const unsubAuth = onAuthStateChanged(getFirebaseAuth(), (next) => {
       unsubProfile?.();
       unsubProfile = undefined;
+      const gen = ++generation;
       setUser(next);
       setLoading(false);
 
@@ -58,13 +67,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const cached = readCachedProfile(next.uid);
+      const uid = next.uid;
+      const cached = readCachedProfile(uid);
       if (cached) setProfile(cached);
       setProfileLoading(!cached);
 
       void (async () => {
         try {
           const ensured = await ensureProfile(next);
+          // Auth switched while ensureProfile was in flight — drop stale work.
+          if (gen !== generation) return;
+          if (getFirebaseAuth().currentUser?.uid !== uid) return;
+
           setProfile(ensured);
           writeCachedProfile(ensured);
           if (
@@ -73,30 +87,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           ) {
             ensureDefaultAgentGroup().catch(() => undefined);
           }
+
+          if (getFirebaseAuth().currentUser?.uid !== uid) return;
           unsubProfile = watchProfile(
-            next.uid,
+            uid,
             (p) => {
+              if (gen !== generation) return;
+              if (getFirebaseAuth().currentUser?.uid !== uid) return;
               if (p) {
                 setProfile(p);
                 writeCachedProfile(p);
               }
             },
-            (error) => console.error(error),
+            (error) => {
+              // Race: listener attached just as session switched away from uid.
+              if (isPermissionDenied(error)) return;
+              console.error(error);
+            },
           );
         } catch (error) {
+          if (gen !== generation) return;
           const message =
             error instanceof Error ? error.message : String(error);
           // Emulator/CSP offline noise — keep cache if we have it.
-          if (!/client is offline/i.test(message)) {
+          if (
+            !/client is offline/i.test(message) &&
+            !isPermissionDenied(error)
+          ) {
             console.error(error);
           }
           if (!cached) setProfile(null);
         } finally {
-          setProfileLoading(false);
+          if (gen === generation) setProfileLoading(false);
         }
       })();
     });
     return () => {
+      generation += 1;
       unsubAuth();
       unsubProfile?.();
     };
@@ -106,6 +133,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const current = getFirebaseAuth().currentUser;
     if (!current) return;
     const ensured = await ensureProfile(current);
+    if (getFirebaseAuth().currentUser?.uid !== current.uid) return;
     setProfile(ensured);
     writeCachedProfile(ensured);
   }, []);

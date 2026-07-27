@@ -74,7 +74,14 @@ void main() {
 
   setUp(() {
     store = FakeUserStore();
-    repository = UserRepository(store: store);
+    repository = UserRepository(
+      store: store,
+      syncAuthProfile: ({
+        required uid,
+        displayName,
+        photoUrl,
+      }) async {},
+    );
     user = MockUser();
   });
 
@@ -168,6 +175,47 @@ void main() {
       expect(updated.npn, isNull);
       expect(store.profiles['user-1']?.displayName, 'Sam');
     });
+
+    test('syncs displayName and photoUrl to Firebase Auth', () async {
+      final base = UserProfile(
+        uid: 'user-1',
+        role: UserRole.student,
+        isAnonymous: false,
+        profileCompleted: true,
+        displayName: 'Old',
+        photoUrl: 'https://old/photo.jpg',
+        createdAt: DateTime.utc(2024, 1, 1),
+        updatedAt: DateTime.utc(2024, 1, 1),
+      );
+      store.profiles['user-1'] = base;
+
+      String? syncedUid;
+      String? syncedName;
+      String? syncedPhoto;
+      final repo = UserRepository(
+        store: store,
+        syncAuthProfile: ({
+          required uid,
+          displayName,
+          photoUrl,
+        }) async {
+          syncedUid = uid;
+          syncedName = displayName;
+          syncedPhoto = photoUrl;
+        },
+      );
+
+      await repo.updateProfile(
+        base.copyWith(
+          displayName: 'New Name',
+          photoUrl: 'https://cdn.example/new.jpg',
+        ),
+      );
+
+      expect(syncedUid, 'user-1');
+      expect(syncedName, 'New Name');
+      expect(syncedPhoto, 'https://cdn.example/new.jpg');
+    });
   });
 
   group('updateAvatar', () {
@@ -187,6 +235,11 @@ void main() {
       String? syncedPhotoUrl;
       final repo = UserRepository(
         store: store,
+        syncAuthProfile: ({
+          required uid,
+          displayName,
+          photoUrl,
+        }) async {},
         avatarStorage: AvatarStorage.test(
           ({required uid, required bytes}) async =>
               'https://cdn.example/avatars/$uid.jpg?alt=media&token=abc&v=99',
@@ -225,6 +278,11 @@ void main() {
 
       final repo = UserRepository(
         store: store,
+        syncAuthProfile: ({
+          required uid,
+          displayName,
+          photoUrl,
+        }) async {},
         avatarStorage: AvatarStorage.test(
           ({required uid, required bytes}) async =>
               'https://cdn.example/avatars/$uid.jpg?alt=media&token=abc',

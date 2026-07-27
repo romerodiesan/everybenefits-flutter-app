@@ -69,6 +69,20 @@ class NotificationPrefs {
         'pushSupport': pushSupport,
       };
 
+  NotificationPrefs copyWith({
+    bool? pushChats,
+    bool? pushForums,
+    bool? pushAcademy,
+    bool? pushSupport,
+  }) {
+    return NotificationPrefs(
+      pushChats: pushChats ?? this.pushChats,
+      pushForums: pushForums ?? this.pushForums,
+      pushAcademy: pushAcademy ?? this.pushAcademy,
+      pushSupport: pushSupport ?? this.pushSupport,
+    );
+  }
+
   factory NotificationPrefs.fromMap(Map<String, dynamic>? data) {
     return NotificationPrefs(
       pushChats: data?['pushChats'] != false,

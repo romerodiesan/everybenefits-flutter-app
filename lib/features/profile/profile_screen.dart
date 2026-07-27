@@ -139,6 +139,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         builder: (_) => EditProfileScreen(
           profile: widget.profile,
           userRepository: widget.userRepository,
+          authService: widget.authService,
         ),
       ),
     );

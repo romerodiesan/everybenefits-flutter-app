@@ -8,6 +8,7 @@ import '../../auth/auth.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import '../chats/chat_default_group_callable.dart';
+import 'phone_profile_verify.dart';
 import 'widgets/profile_form_widgets.dart';
 
 class ProfileCompletionFlow extends StatefulWidget {
@@ -37,10 +38,37 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
 
     setState(() => _busy = true);
     try {
+      final changed = phoneChangedFromProfile(
+        previousCode: widget.profile.phoneCountryCode,
+        previousNumber: widget.profile.phoneNumber,
+        nextCode: data.phoneCountryCode,
+        nextNumber: data.phoneNumber,
+      );
+
+      var phoneVerified = widget.profile.phoneVerified;
+      if (changed) {
+        final nextDigits = data.phoneNumber.trim();
+        if (nextDigits.isEmpty) {
+          phoneVerified = false;
+        } else {
+          final ok = await verifyProfilePhone(
+            context: context,
+            authService: widget.authService,
+            e164: e164Phone(data.phoneCountryCode, data.phoneNumber),
+          );
+          if (!ok) {
+            if (mounted) setState(() => _busy = false);
+            return;
+          }
+          phoneVerified = true;
+        }
+      }
+
       final completed = widget.profile.copyWith(
         displayName: data.displayName,
         phoneCountryCode: data.phoneCountryCode,
         phoneNumber: data.phoneNumber,
+        phoneVerified: phoneVerified,
         role: type,
         profileCompleted: true,
         npn: data.npn,

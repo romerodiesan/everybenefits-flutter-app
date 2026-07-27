@@ -339,9 +339,120 @@ class AppLocalizationsEn extends AppLocalizations {
   String get authErrOpNotAllowed => 'This sign-in method is not enabled.';
 
   @override
+  String get authErrRequiresRecentLogin =>
+      'For security, sign in again and retry.';
+
+  @override
+  String get authErrEmailRequired =>
+      'Your account needs an email to set a password.';
+
+  @override
+  String get authErrUnauthenticated => 'Sign in to continue.';
+
+  @override
+  String get authErrCredentialInUse =>
+      'That credential is already linked to another account.';
+
+  @override
   String authErrUnknown(String code) {
     return 'Authentication failed ($code).';
   }
+
+  @override
+  String get setPasswordTitle => 'Set a backup password';
+
+  @override
+  String get setPasswordSubtitle =>
+      'If you lose access to Google, you can still sign in with email and this password.';
+
+  @override
+  String get setPasswordSave => 'Save password';
+
+  @override
+  String get setPasswordMismatch => 'Passwords don\'t match.';
+
+  @override
+  String get mfaTitle => 'Two-step verification';
+
+  @override
+  String get mfaSubtitle => 'Enter the code from your authenticator or SMS.';
+
+  @override
+  String get mfaChooseFactor => 'Choose a verification method';
+
+  @override
+  String get mfaTotpLabel => 'Authenticator app';
+
+  @override
+  String get mfaSmsLabel => 'Text message';
+
+  @override
+  String get mfaCodeLabel => 'Verification code';
+
+  @override
+  String get mfaVerify => 'Verify';
+
+  @override
+  String get mfaSendSms => 'Send SMS code';
+
+  @override
+  String get settingsSecurity => 'Security';
+
+  @override
+  String get settingsSecurityHint => 'Password and two-step verification.';
+
+  @override
+  String get securitySetPassword => 'Set password';
+
+  @override
+  String get securityChangePassword => 'Change password';
+
+  @override
+  String get securityCurrentPassword => 'Current password';
+
+  @override
+  String get securityNewPassword => 'New password';
+
+  @override
+  String get securityPasswordSaved => 'Password updated.';
+
+  @override
+  String get securityMfaTitle => 'Two-step verification';
+
+  @override
+  String get securityMfaHint =>
+      'Add SMS or an authenticator app as a second factor.';
+
+  @override
+  String get securityEnrollTotp => 'Add authenticator';
+
+  @override
+  String get securityEnrollSms => 'Add phone (SMS)';
+
+  @override
+  String get securityTotpScan =>
+      'Scan this QR code in your authenticator app, then enter the 6-digit code.';
+
+  @override
+  String get securityTotpSecret => 'Or enter this key manually';
+
+  @override
+  String get securityPhoneHint => 'Phone number (E.164, e.g. +15551234567)';
+
+  @override
+  String get securityFactorRemove => 'Remove';
+
+  @override
+  String get securityFactorRemoved => 'Second factor removed.';
+
+  @override
+  String get securityFactorAdded => 'Second factor added.';
+
+  @override
+  String get securityNoFactors => 'No second factors enrolled yet.';
+
+  @override
+  String get securityReauthHint => 'Confirm your password to continue.';
 
   @override
   String get profileCompleteRoleTitle => 'Your role';
@@ -1633,7 +1744,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsAdmin => 'Admin';
 
   @override
-  String get settingsAdminHint => 'Promote students to agents.';
+  String get settingsAdminHint =>
+      'Promote students to agents and manage platform features.';
+
+  @override
+  String get settingsAdminPulseAi => 'Pulse AI';
+
+  @override
+  String get settingsAdminPulseAiHint =>
+      'When off, members cannot open or chat with Pulse AI.';
 
   @override
   String get settingsAdminPromote => 'Promote to agent';
@@ -1648,6 +1767,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String settingsAdminPromoteFailed(String error) {
     return 'Couldn\'t promote: $error';
   }
+
+  @override
+  String get aiDisabled => 'Pulse AI is temporarily unavailable.';
 
   @override
   String get settingsAppearance => 'Appearance';
@@ -1716,4 +1838,85 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get notificationsPrefSupport => 'Support replies';
+
+  @override
+  String get notificationsPrefsHint =>
+      'Choose which alerts arrive as push on this device.';
+
+  @override
+  String get notificationsEnablePush => 'Enable push notifications';
+
+  @override
+  String get notificationsPushEnabled => 'Push notifications on';
+
+  @override
+  String get notificationsPushUnavailable =>
+      'Couldn\'t enable push. Allow notifications in system settings.';
+
+  @override
+  String get phoneProfileVerifyTitle => 'Verify your phone';
+
+  @override
+  String phoneProfileVerifyHint(String phone) {
+    return 'We\'ll send an SMS to $phone to confirm it\'s yours.';
+  }
+
+  @override
+  String get phoneProfileVerifyConfirm => 'Confirm phone';
+
+  @override
+  String get phoneProfileVerifiedBadge => 'Phone verified';
+
+  @override
+  String get phoneProfileUnverifiedBadge => 'Phone not verified yet';
+
+  @override
+  String get dangerTitle => 'Danger zone';
+
+  @override
+  String get dangerNav => 'Deactivate or delete';
+
+  @override
+  String get dangerSubtitle =>
+      'Sensitive account actions. Read them carefully.';
+
+  @override
+  String get dangerDeactivate => 'Deactivate account';
+
+  @override
+  String get dangerDeactivateHint =>
+      'Your account is paused and you stop receiving notifications. You can reactivate it yourself by signing in again.';
+
+  @override
+  String get dangerDeactivateConfirmHint =>
+      'You will be signed out now. To come back, sign in and tap Reactivate.';
+
+  @override
+  String get dangerDeactivateConfirm => 'Yes, deactivate';
+
+  @override
+  String get dangerDelete => 'Delete account';
+
+  @override
+  String get dangerDeleteHint =>
+      'Your personal data is kept for 3 months and then deleted automatically. You can cancel the deletion during that period by signing in.';
+
+  @override
+  String dangerDeleteConfirmHint(String date) {
+    return 'Your data will be permanently deleted on $date. Until then you can cancel by signing in.';
+  }
+
+  @override
+  String get dangerDeleteAnonymizeHint =>
+      'Your forum and chat posts stay up from now on under an anonymous name. If you cancel, they get your name back.';
+
+  @override
+  String get dangerDeleteConfirm => 'Delete my account';
+
+  @override
+  String get dangerCurrentPassword => 'Current password';
+
+  @override
+  String get dangerReauthFailed =>
+      'We couldn\'t confirm your identity. Check your password and try again.';
 }

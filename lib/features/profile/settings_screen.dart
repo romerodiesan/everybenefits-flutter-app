@@ -12,6 +12,9 @@ import '../../l10n/l10n.dart';
 import '../../privacy/telemetry.dart';
 import '../../users/users.dart';
 import 'admin_promote_screen.dart';
+import 'danger_zone_screen.dart';
+import 'notification_prefs_screen.dart';
+import 'security_settings_screen.dart';
 import 'widgets/profile_avatar.dart';
 
 /// Studio-style settings — appearance, language, brand signal, account.
@@ -103,6 +106,48 @@ class SettingsScreen extends StatelessWidget {
             },
           ),
           const SizedBox(height: AppSpacing.xl),
+          _SectionLabel(label: l10n.settingsSecurity),
+          const SizedBox(height: 6),
+          Text(
+            l10n.settingsSecurityHint,
+            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _SettingsNavTile(
+            icon: Icons.shield_outlined,
+            label: l10n.settingsSecurity,
+            onTap: () {
+              PulseHaptics.light();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => SecuritySettingsScreen(
+                    authService: authService,
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          _SectionLabel(label: l10n.notificationsPrefsTitle),
+          const SizedBox(height: 6),
+          Text(
+            l10n.notificationsPrefsHint,
+            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _SettingsNavTile(
+            icon: Icons.notifications_outlined,
+            label: l10n.notificationsPrefsTitle,
+            onTap: () {
+              PulseHaptics.light();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => NotificationPrefsScreen(uid: profile.uid),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: AppSpacing.xl),
           _SectionLabel(label: l10n.settingsPrivacy),
           const SizedBox(height: 6),
           Text(
@@ -111,6 +156,27 @@ class SettingsScreen extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           const _AnalyticsConsentTile(),
+          const SizedBox(height: AppSpacing.xl),
+          _SectionLabel(label: l10n.dangerTitle),
+          const SizedBox(height: 6),
+          Text(
+            l10n.dangerSubtitle,
+            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          _SettingsNavTile(
+            icon: Icons.warning_amber_rounded,
+            label: l10n.dangerNav,
+            danger: true,
+            onTap: () {
+              PulseHaptics.light();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => DangerZoneScreen(authService: authService),
+                ),
+              );
+            },
+          ),
           if (profile.role == UserRole.admin) ...[
             const SizedBox(height: AppSpacing.xl),
             _SectionLabel(label: l10n.settingsAdmin),
@@ -120,49 +186,20 @@ class SettingsScreen extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
             ),
             const SizedBox(height: AppSpacing.md),
-            Material(
-              color: colors.glassFill,
-              borderRadius: BorderRadius.circular(18),
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: () {
-                  PulseHaptics.light();
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => AdminPromoteScreen(
-                        userRepository: userRepository,
-                      ),
-                    ),
-                  );
-                },
-                child: Ink(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: colors.border),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 16,
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.admin_panel_settings_outlined, color: brand),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            l10n.settingsAdminPromote,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                        Icon(Icons.chevron_right_rounded, color: colors.muted),
-                      ],
+            _SettingsNavTile(
+              icon: Icons.admin_panel_settings_outlined,
+              label: l10n.settingsAdminPromote,
+              onTap: () {
+                PulseHaptics.light();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => AdminPromoteScreen(
+                      userRepository: userRepository,
+                      adminUid: profile.uid,
                     ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ],
           const SizedBox(height: AppSpacing.xl + 8),
@@ -203,6 +240,69 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SettingsNavTile extends StatelessWidget {
+  const _SettingsNavTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.danger = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool danger;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+    final accent = danger ? theme.colorScheme.error : brand;
+
+    return Material(
+      color: colors.glassFill,
+      borderRadius: BorderRadius.circular(18),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: danger
+                  ? theme.colorScheme.error.withValues(alpha: 0.35)
+                  : colors.border,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 16,
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: accent),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    label,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: danger ? theme.colorScheme.error : null,
+                    ),
+                  ),
+                ),
+                Icon(Icons.chevron_right_rounded, color: colors.muted),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

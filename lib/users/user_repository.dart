@@ -50,6 +50,7 @@ class FirestoreUserProfileStore implements UserProfileStore {
       'profileCompleted': profile.profileCompleted,
       'phoneCountryCode': profile.phoneCountryCode,
       'phoneNumber': profile.phoneNumber,
+      'phoneVerified': profile.phoneVerified,
       'npn': profile.npn,
       'address': profile.address,
       'addressStreet': profile.addressStreet,
@@ -133,17 +134,42 @@ typedef AuthorPhotoChanged = Future<void> Function({
   required String? photoUrl,
 });
 
+/// Pushes Firestore identity fields onto the signed-in Firebase Auth user.
+typedef AuthProfileSync = Future<void> Function({
+  required String uid,
+  String? displayName,
+  String? photoUrl,
+});
+
+Future<void> syncFirebaseAuthProfile({
+  required String uid,
+  String? displayName,
+  String? photoUrl,
+  FirebaseAuth? auth,
+}) async {
+  final user = (auth ?? FirebaseAuth.instance).currentUser;
+  if (user == null || user.uid != uid) return;
+  final name = displayName?.trim();
+  await Future.wait([
+    user.updateDisplayName(name?.isEmpty == true ? null : name),
+    user.updatePhotoURL(photoUrl),
+  ]);
+}
+
 class UserRepository {
   UserRepository({
     UserProfileStore? store,
     AvatarStorage? avatarStorage,
     this.onAuthorPhotoChanged,
+    AuthProfileSync? syncAuthProfile,
   })  : _store = store ?? FirestoreUserProfileStore(),
-        _avatarStorageOverride = avatarStorage;
+        _avatarStorageOverride = avatarStorage,
+        _syncAuthProfile = syncAuthProfile ?? syncFirebaseAuthProfile;
 
   final UserProfileStore _store;
   final AvatarStorage? _avatarStorageOverride;
   final AuthorPhotoChanged? onAuthorPhotoChanged;
+  final AuthProfileSync _syncAuthProfile;
 
   AvatarStorage get _avatarStorage =>
       _avatarStorageOverride ?? AvatarStorage();
@@ -199,6 +225,11 @@ class UserRepository {
   Future<UserProfile> updateProfile(UserProfile profile) async {
     final next = profile.copyWith(updatedAt: DateTime.now().toUtc());
     await _store.update(next);
+    await _syncAuthProfile(
+      uid: next.uid,
+      displayName: next.displayName,
+      photoUrl: next.photoUrl,
+    );
     return next;
   }
 

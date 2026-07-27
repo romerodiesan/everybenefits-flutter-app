@@ -49,6 +49,7 @@ class UserProfile {
     this.photoUrl,
     this.phoneCountryCode,
     this.phoneNumber,
+    this.phoneVerified = false,
     this.npn,
     this.address,
     this.addressStreet,
@@ -68,6 +69,7 @@ class UserProfile {
   final bool profileCompleted;
   final String? phoneCountryCode;
   final String? phoneNumber;
+  final bool phoneVerified;
   final String? npn;
   /// Legacy / composed display address (kept for compatibility).
   final String? address;
@@ -140,6 +142,7 @@ class UserProfile {
     bool? profileCompleted,
     String? phoneCountryCode,
     String? phoneNumber,
+    bool? phoneVerified,
     String? npn,
     String? address,
     String? addressStreet,
@@ -182,6 +185,7 @@ class UserProfile {
       profileCompleted: profileCompleted ?? this.profileCompleted,
       phoneCountryCode: phoneCountryCode ?? this.phoneCountryCode,
       phoneNumber: phoneNumber ?? this.phoneNumber,
+      phoneVerified: phoneVerified ?? this.phoneVerified,
       npn: clearNpn ? null : (npn ?? this.npn),
       address: composed,
       addressStreet: nextStreet,
@@ -206,6 +210,7 @@ class UserProfile {
       'profileCompleted': profileCompleted,
       'phoneCountryCode': phoneCountryCode,
       'phoneNumber': phoneNumber,
+      'phoneVerified': phoneVerified,
       'npn': npn,
       'address': address,
       'addressStreet': addressStreet,
@@ -245,6 +250,7 @@ class UserProfile {
       profileCompleted: data['profileCompleted'] as bool? ?? true,
       phoneCountryCode: data['phoneCountryCode'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
+      phoneVerified: data['phoneVerified'] as bool? ?? false,
       npn: data['npn'] as String?,
       address: composed,
       addressStreet: street,

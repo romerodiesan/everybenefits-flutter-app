@@ -716,11 +716,221 @@ abstract class AppLocalizations {
   /// **'This sign-in method is not enabled.'**
   String get authErrOpNotAllowed;
 
+  /// No description provided for @authErrRequiresRecentLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'For security, sign in again and retry.'**
+  String get authErrRequiresRecentLogin;
+
+  /// No description provided for @authErrEmailRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account needs an email to set a password.'**
+  String get authErrEmailRequired;
+
+  /// No description provided for @authErrUnauthenticated.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to continue.'**
+  String get authErrUnauthenticated;
+
+  /// No description provided for @authErrCredentialInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'That credential is already linked to another account.'**
+  String get authErrCredentialInUse;
+
   /// No description provided for @authErrUnknown.
   ///
   /// In en, this message translates to:
   /// **'Authentication failed ({code}).'**
   String authErrUnknown(String code);
+
+  /// No description provided for @setPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set a backup password'**
+  String get setPasswordTitle;
+
+  /// No description provided for @setPasswordSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'If you lose access to Google, you can still sign in with email and this password.'**
+  String get setPasswordSubtitle;
+
+  /// No description provided for @setPasswordSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save password'**
+  String get setPasswordSave;
+
+  /// No description provided for @setPasswordMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Passwords don\'t match.'**
+  String get setPasswordMismatch;
+
+  /// No description provided for @mfaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-step verification'**
+  String get mfaTitle;
+
+  /// No description provided for @mfaSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the code from your authenticator or SMS.'**
+  String get mfaSubtitle;
+
+  /// No description provided for @mfaChooseFactor.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a verification method'**
+  String get mfaChooseFactor;
+
+  /// No description provided for @mfaTotpLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticator app'**
+  String get mfaTotpLabel;
+
+  /// No description provided for @mfaSmsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Text message'**
+  String get mfaSmsLabel;
+
+  /// No description provided for @mfaCodeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification code'**
+  String get mfaCodeLabel;
+
+  /// No description provided for @mfaVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get mfaVerify;
+
+  /// No description provided for @mfaSendSms.
+  ///
+  /// In en, this message translates to:
+  /// **'Send SMS code'**
+  String get mfaSendSms;
+
+  /// No description provided for @settingsSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get settingsSecurity;
+
+  /// No description provided for @settingsSecurityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Password and two-step verification.'**
+  String get settingsSecurityHint;
+
+  /// No description provided for @securitySetPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Set password'**
+  String get securitySetPassword;
+
+  /// No description provided for @securityChangePassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Change password'**
+  String get securityChangePassword;
+
+  /// No description provided for @securityCurrentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get securityCurrentPassword;
+
+  /// No description provided for @securityNewPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get securityNewPassword;
+
+  /// No description provided for @securityPasswordSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Password updated.'**
+  String get securityPasswordSaved;
+
+  /// No description provided for @securityMfaTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Two-step verification'**
+  String get securityMfaTitle;
+
+  /// No description provided for @securityMfaHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add SMS or an authenticator app as a second factor.'**
+  String get securityMfaHint;
+
+  /// No description provided for @securityEnrollTotp.
+  ///
+  /// In en, this message translates to:
+  /// **'Add authenticator'**
+  String get securityEnrollTotp;
+
+  /// No description provided for @securityEnrollSms.
+  ///
+  /// In en, this message translates to:
+  /// **'Add phone (SMS)'**
+  String get securityEnrollSms;
+
+  /// No description provided for @securityTotpScan.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan this QR code in your authenticator app, then enter the 6-digit code.'**
+  String get securityTotpScan;
+
+  /// No description provided for @securityTotpSecret.
+  ///
+  /// In en, this message translates to:
+  /// **'Or enter this key manually'**
+  String get securityTotpSecret;
+
+  /// No description provided for @securityPhoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone number (E.164, e.g. +15551234567)'**
+  String get securityPhoneHint;
+
+  /// No description provided for @securityFactorRemove.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get securityFactorRemove;
+
+  /// No description provided for @securityFactorRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Second factor removed.'**
+  String get securityFactorRemoved;
+
+  /// No description provided for @securityFactorAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Second factor added.'**
+  String get securityFactorAdded;
+
+  /// No description provided for @securityNoFactors.
+  ///
+  /// In en, this message translates to:
+  /// **'No second factors enrolled yet.'**
+  String get securityNoFactors;
+
+  /// No description provided for @securityReauthHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your password to continue.'**
+  String get securityReauthHint;
 
   /// No description provided for @profileCompleteRoleTitle.
   ///
@@ -3095,8 +3305,20 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAdminHint.
   ///
   /// In en, this message translates to:
-  /// **'Promote students to agents.'**
+  /// **'Promote students to agents and manage platform features.'**
   String get settingsAdminHint;
+
+  /// No description provided for @settingsAdminPulseAi.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse AI'**
+  String get settingsAdminPulseAi;
+
+  /// No description provided for @settingsAdminPulseAiHint.
+  ///
+  /// In en, this message translates to:
+  /// **'When off, members cannot open or chat with Pulse AI.'**
+  String get settingsAdminPulseAiHint;
 
   /// No description provided for @settingsAdminPromote.
   ///
@@ -3121,6 +3343,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t promote: {error}'**
   String settingsAdminPromoteFailed(String error);
+
+  /// No description provided for @aiDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse AI is temporarily unavailable.'**
+  String get aiDisabled;
 
   /// No description provided for @settingsAppearance.
   ///
@@ -3253,6 +3481,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Support replies'**
   String get notificationsPrefSupport;
+
+  /// No description provided for @notificationsPrefsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose which alerts arrive as push on this device.'**
+  String get notificationsPrefsHint;
+
+  /// No description provided for @notificationsEnablePush.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable push notifications'**
+  String get notificationsEnablePush;
+
+  /// No description provided for @notificationsPushEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Push notifications on'**
+  String get notificationsPushEnabled;
+
+  /// No description provided for @notificationsPushUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Couldn\'t enable push. Allow notifications in system settings.'**
+  String get notificationsPushUnavailable;
+
+  /// No description provided for @phoneProfileVerifyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your phone'**
+  String get phoneProfileVerifyTitle;
+
+  /// No description provided for @phoneProfileVerifyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'We\'ll send an SMS to {phone} to confirm it\'s yours.'**
+  String phoneProfileVerifyHint(String phone);
+
+  /// No description provided for @phoneProfileVerifyConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm phone'**
+  String get phoneProfileVerifyConfirm;
+
+  /// No description provided for @phoneProfileVerifiedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone verified'**
+  String get phoneProfileVerifiedBadge;
+
+  /// No description provided for @phoneProfileUnverifiedBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Phone not verified yet'**
+  String get phoneProfileUnverifiedBadge;
+
+  /// No description provided for @dangerTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger zone'**
+  String get dangerTitle;
+
+  /// No description provided for @dangerNav.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate or delete'**
+  String get dangerNav;
+
+  /// No description provided for @dangerSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sensitive account actions. Read them carefully.'**
+  String get dangerSubtitle;
+
+  /// No description provided for @dangerDeactivate.
+  ///
+  /// In en, this message translates to:
+  /// **'Deactivate account'**
+  String get dangerDeactivate;
+
+  /// No description provided for @dangerDeactivateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your account is paused and you stop receiving notifications. You can reactivate it yourself by signing in again.'**
+  String get dangerDeactivateHint;
+
+  /// No description provided for @dangerDeactivateConfirmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You will be signed out now. To come back, sign in and tap Reactivate.'**
+  String get dangerDeactivateConfirmHint;
+
+  /// No description provided for @dangerDeactivateConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes, deactivate'**
+  String get dangerDeactivateConfirm;
+
+  /// No description provided for @dangerDelete.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete account'**
+  String get dangerDelete;
+
+  /// No description provided for @dangerDeleteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your personal data is kept for 3 months and then deleted automatically. You can cancel the deletion during that period by signing in.'**
+  String get dangerDeleteHint;
+
+  /// No description provided for @dangerDeleteConfirmHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data will be permanently deleted on {date}. Until then you can cancel by signing in.'**
+  String dangerDeleteConfirmHint(String date);
+
+  /// No description provided for @dangerDeleteAnonymizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your forum and chat posts stay up from now on under an anonymous name. If you cancel, they get your name back.'**
+  String get dangerDeleteAnonymizeHint;
+
+  /// No description provided for @dangerDeleteConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete my account'**
+  String get dangerDeleteConfirm;
+
+  /// No description provided for @dangerCurrentPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Current password'**
+  String get dangerCurrentPassword;
+
+  /// No description provided for @dangerReauthFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'We couldn\'t confirm your identity. Check your password and try again.'**
+  String get dangerReauthFailed;
 }
 
 class _AppLocalizationsDelegate

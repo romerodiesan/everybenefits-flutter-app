@@ -124,6 +124,10 @@
   "authErrInvalidSms": "The SMS code is invalid.",
   "authErrSmsExpired": "The code expired. Request a new one.",
   "authErrOpNotAllowed": "This sign-in method is not enabled.",
+  "authErrRequiresRecentLogin": "For security, sign in again and retry.",
+  "authErrEmailRequired": "Your account needs an email to set a password.",
+  "authErrUnauthenticated": "Sign in to continue.",
+  "authErrCredentialInUse": "That credential is already linked to another account.",
   "authErrUnknown": "Authentication failed ({code}).",
   "@authErrUnknown": {
     "placeholders": {
@@ -132,6 +136,38 @@
       }
     }
   },
+  "setPasswordTitle": "Set a backup password",
+  "setPasswordSubtitle": "If you lose access to Google, you can still sign in with email and this password.",
+  "setPasswordSave": "Save password",
+  "setPasswordMismatch": "Passwords don't match.",
+  "fieldConfirmPassword": "Confirm password",
+  "mfaTitle": "Two-step verification",
+  "mfaSubtitle": "Enter the code from your authenticator or SMS.",
+  "mfaChooseFactor": "Choose a verification method",
+  "mfaTotpLabel": "Authenticator app",
+  "mfaSmsLabel": "Text message",
+  "mfaCodeLabel": "Verification code",
+  "mfaVerify": "Verify",
+  "mfaSendSms": "Send SMS code",
+  "settingsSecurity": "Security",
+  "settingsSecurityHint": "Password and two-step verification.",
+  "securitySetPassword": "Set password",
+  "securityChangePassword": "Change password",
+  "securityCurrentPassword": "Current password",
+  "securityNewPassword": "New password",
+  "securityPasswordSaved": "Password updated.",
+  "securityMfaTitle": "Two-step verification",
+  "securityMfaHint": "Add SMS or an authenticator app as a second factor.",
+  "securityEnrollTotp": "Add authenticator",
+  "securityEnrollSms": "Add phone (SMS)",
+  "securityTotpScan": "Scan this QR code in your authenticator app, then enter the 6-digit code.",
+  "securityTotpSecret": "Or enter this key manually",
+  "securityPhoneHint": "Phone number (E.164, e.g. +15551234567)",
+  "securityFactorRemove": "Remove",
+  "securityFactorRemoved": "Second factor removed.",
+  "securityFactorAdded": "Second factor added.",
+  "securityNoFactors": "No second factors enrolled yet.",
+  "securityReauthHint": "Confirm your password to continue.",
   "profileCompleteRoleTitle": "Your role",
   "profileCompleteDataTitle": "Your details",
   "profileCompleteSignOut": "Sign out",
@@ -721,7 +757,9 @@
   "editProfileCredentialsSection": "License & location",
   "editProfileRoleFrozen": "Chosen at signup — only an admin can change this.",
   "settingsAdmin": "Admin",
-  "settingsAdminHint": "Promote students to agents.",
+  "settingsAdminHint": "Promote students to agents and manage platform features.",
+  "settingsAdminPulseAi": "Pulse AI",
+  "settingsAdminPulseAiHint": "When off, members cannot open or chat with Pulse AI.",
   "settingsAdminPromote": "Promote to agent",
   "settingsAdminEmpty": "No students waiting for promotion.",
   "settingsAdminPromoteOk": "Promoted to agent.",
@@ -733,6 +771,7 @@
       }
     }
   },
+  "aiDisabled": "Pulse AI is temporarily unavailable.",
   "settingsAppearance": "Appearance",
   "settingsPreferences": "Preferences",
   "settingsPrivacy": "Privacy",
@@ -754,5 +793,42 @@
   "notificationsPrefChats": "Chat messages",
   "notificationsPrefForums": "Forum activity",
   "notificationsPrefAcademy": "Academy updates",
-  "notificationsPrefSupport": "Support replies"
+  "notificationsPrefSupport": "Support replies",
+  "notificationsPrefsHint": "Choose which alerts arrive as push on this device.",
+  "notificationsEnablePush": "Enable push notifications",
+  "notificationsPushEnabled": "Push notifications on",
+  "notificationsPushUnavailable": "Couldn't enable push. Allow notifications in system settings.",
+  "phoneProfileVerifyTitle": "Verify your phone",
+  "phoneProfileVerifyHint": "We'll send an SMS to {phone} to confirm it's yours.",
+  "@phoneProfileVerifyHint": {
+    "placeholders": {
+      "phone": {
+        "type": "String"
+      }
+    }
+  },
+  "phoneProfileVerifyConfirm": "Confirm phone",
+  "phoneProfileVerifiedBadge": "Phone verified",
+  "phoneProfileUnverifiedBadge": "Phone not verified yet",
+  "dangerTitle": "Danger zone",
+  "dangerNav": "Deactivate or delete",
+  "dangerSubtitle": "Sensitive account actions. Read them carefully.",
+  "dangerDeactivate": "Deactivate account",
+  "dangerDeactivateHint": "Your account is paused and you stop receiving notifications. You can reactivate it yourself by signing in again.",
+  "dangerDeactivateConfirmHint": "You will be signed out now. To come back, sign in and tap Reactivate.",
+  "dangerDeactivateConfirm": "Yes, deactivate",
+  "dangerDelete": "Delete account",
+  "dangerDeleteHint": "Your personal data is kept for 3 months and then deleted automatically. You can cancel the deletion during that period by signing in.",
+  "dangerDeleteConfirmHint": "Your data will be permanently deleted on {date}. Until then you can cancel by signing in.",
+  "@dangerDeleteConfirmHint": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "dangerDeleteAnonymizeHint": "Your forum and chat posts stay up from now on under an anonymous name. If you cancel, they get your name back.",
+  "dangerDeleteConfirm": "Delete my account",
+  "dangerCurrentPassword": "Current password",
+  "dangerReauthFailed": "We couldn't confirm your identity. Check your password and try again."
 }

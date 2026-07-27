@@ -12,8 +12,8 @@ import {
   ref,
   uploadBytes,
 } from "firebase/storage";
-import type { User } from "firebase/auth";
-import { getFirebaseDb, getFirebaseStorage } from "./client";
+import { updateProfile, type User } from "firebase/auth";
+import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
 import { listPublicProfiles } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
@@ -47,6 +47,7 @@ export function profileFromData(
     profileCompleted: (data.profileCompleted as boolean) ?? true,
     phoneCountryCode: (data.phoneCountryCode as string) ?? null,
     phoneNumber: (data.phoneNumber as string) ?? null,
+    phoneVerified: Boolean(data.phoneVerified),
     npn: (data.npn as string) ?? null,
     address: (data.address as string) ?? null,
     addressStreet: (data.addressStreet as string) ?? null,
@@ -84,6 +85,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     profileCompleted: isAnonymous,
     phoneCountryCode: null,
     phoneNumber: null,
+    phoneVerified: false,
     npn: null,
     address: null,
     addressStreet: null,
@@ -106,6 +108,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     profileCompleted: profile.profileCompleted,
     phoneCountryCode: null,
     phoneNumber: null,
+    phoneVerified: false,
     npn: null,
     address: null,
     addressStreet: null,
@@ -162,6 +165,7 @@ export async function updateUserProfile(
     profileCompleted: next.profileCompleted,
     phoneCountryCode: next.phoneCountryCode,
     phoneNumber: next.phoneNumber,
+    phoneVerified: Boolean(next.phoneVerified),
     npn: next.npn,
     address,
     addressStreet: next.addressStreet,
@@ -172,6 +176,19 @@ export async function updateUserProfile(
     agency: next.agency,
     updatedAt: serverTimestamp(),
   });
+
+  // Keep Firebase Auth in sync for fields that also live on the Auth user.
+  if ("displayName" in patch || "photoUrl" in patch) {
+    const authUser = getFirebaseAuth().currentUser;
+    if (authUser && authUser.uid === profile.uid) {
+      await updateProfile(authUser, {
+        ...("displayName" in patch
+          ? { displayName: next.displayName?.trim() || null }
+          : {}),
+        ...("photoUrl" in patch ? { photoURL: next.photoUrl || null } : {}),
+      });
+    }
+  }
 }
 
 export async function uploadAvatar(uid: string, file: File): Promise<string> {
