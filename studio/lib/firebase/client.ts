@@ -99,13 +99,17 @@ export function initFirebaseClient() {
   const useEmulators =
     process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
   if (useEmulators && !emulatorsConnected) {
-    connectAuthEmulator(getFirebaseAuth(), "http://127.0.0.1:9099", {
+    // Match the page hostname (localhost vs 127.0.0.1). Mixing them breaks
+    // Auth emulator popup iframe relay ("No matching frame").
+    const host =
+      window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
+    connectAuthEmulator(getFirebaseAuth(), `http://${host}:9099`, {
       disableWarnings: true,
     });
-    connectFirestoreEmulator(getFirebaseDb(), "127.0.0.1", 8080);
-    connectDatabaseEmulator(getFirebaseRtdb(), "127.0.0.1", 9000);
-    connectStorageEmulator(getFirebaseStorage(), "127.0.0.1", 9199);
-    connectFunctionsEmulator(getFirebaseFunctions(), "127.0.0.1", 5001);
+    connectFirestoreEmulator(getFirebaseDb(), host, 8080);
+    connectDatabaseEmulator(getFirebaseRtdb(), host, 9000);
+    connectStorageEmulator(getFirebaseStorage(), host, 9199);
+    connectFunctionsEmulator(getFirebaseFunctions(), host, 5001);
     emulatorsConnected = true;
   }
 }

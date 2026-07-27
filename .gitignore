@@ -130,3 +130,10 @@ webapp/node_modules/
 webapp/.next/
 webapp/out/
 webapp/.env*.local
+
+# Studio Next.js app
+studio/node_modules/
+studio/.next/
+
+# Shared packages
+packages/*/node_modules/
