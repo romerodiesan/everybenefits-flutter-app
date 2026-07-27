@@ -122,8 +122,10 @@ export function RegisterForm() {
             setBusy(true);
             try {
               await signInWithGoogle();
-            } catch {
-              setError(t("errorAuth"));
+            } catch (err) {
+              if (!(err instanceof Error && err.message === "cancelled")) {
+                setError(t("errorAuth"));
+              }
             } finally {
               setBusy(false);
             }

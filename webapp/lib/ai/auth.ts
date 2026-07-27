@@ -90,6 +90,15 @@ export async function authenticate(request: Request): Promise<PulseViewer> {
     );
   }
 
+  const accountStatus = String(data.accountStatus ?? "active");
+  if (accountStatus === "deactivated" || accountStatus === "pendingDeletion") {
+    throw new PulseHttpError(
+      403,
+      "account-inactive",
+      "This account is deactivated or pending deletion.",
+    );
+  }
+
   return {
     uid,
     role,

@@ -8,6 +8,7 @@ import {
   sendPasswordResetEmail,
   sendSignInLinkToEmail,
   signInAnonymously,
+  signInWithCredential,
   signInWithEmailAndPassword,
   signInWithEmailLink,
   signInWithPopup,
@@ -19,6 +20,22 @@ import {
 import { getFirebaseAuth } from "./client";
 
 const googleProvider = new GoogleAuthProvider();
+
+function usingAuthEmulator() {
+  return process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+}
+
+/** Fake Google ID token the Auth Emulator accepts (no real OAuth popup). */
+function emulatorGoogleCredential(email: string, name?: string) {
+  return GoogleAuthProvider.credential(
+    JSON.stringify({
+      sub: `emulator-google-${email}`,
+      email,
+      email_verified: true,
+      name: name ?? email.split("@")[0],
+    }),
+  );
+}
 
 export async function signInWithEmail(email: string, password: string) {
   return signInWithEmailAndPassword(getFirebaseAuth(), email, password);
@@ -45,7 +62,21 @@ export async function signUpWithEmail(
 }
 
 export async function signInWithGoogle() {
-  return signInWithPopup(getFirebaseAuth(), googleProvider);
+  const auth = getFirebaseAuth();
+  // Auth Emulator popup relay breaks across localhost↔127.0.0.1 ("No matching
+  // frame"). Use a fake Google credential instead — still creates a google.com user.
+  if (usingAuthEmulator()) {
+    const email =
+      window
+        .prompt(
+          "Auth emulator — Google sign-in email",
+          "agent@example.com",
+        )
+        ?.trim() ?? "";
+    if (!email) throw new Error("cancelled");
+    return signInWithCredential(auth, emulatorGoogleCredential(email));
+  }
+  return signInWithPopup(auth, googleProvider);
 }
 
 export async function signInAsGuest() {
@@ -64,19 +95,22 @@ export async function sendMagicLink(email: string, locale?: string) {
     url,
     handleCodeInApp: true,
   });
-  window.localStorage.setItem("emailForSignIn", email);
+  window.sessionStorage.setItem("emailForSignIn", email);
 }
 
 export async function completeMagicLink(href: string) {
   if (!isSignInWithEmailLink(getFirebaseAuth(), href)) {
     throw new Error("Invalid magic link");
   }
-  let email = window.localStorage.getItem("emailForSignIn");
+  let email =
+    window.sessionStorage.getItem("emailForSignIn") ??
+    window.localStorage.getItem("emailForSignIn");
   if (!email) {
     email = window.prompt("Confirm your email for sign-in") ?? "";
   }
   if (!email) throw new Error("Email required");
   const cred = await signInWithEmailLink(getFirebaseAuth(), email, href);
+  window.sessionStorage.removeItem("emailForSignIn");
   window.localStorage.removeItem("emailForSignIn");
   return cred;
 }
@@ -138,6 +172,15 @@ export async function reauthenticate(password?: string): Promise<void> {
     await reauthenticateWithCredential(
       user,
       EmailAuthProvider.credential(user.email, password),
+    );
+    return;
+  }
+  if (usingAuthEmulator()) {
+    const email = user.email?.trim();
+    if (!email) throw new Error("email-required");
+    await reauthenticateWithCredential(
+      user,
+      emulatorGoogleCredential(email, user.displayName ?? undefined),
     );
     return;
   }

@@ -151,7 +151,11 @@ export function LoginPage() {
             try {
               await signInWithGoogle();
               finish();
-            } catch {
+            } catch (err) {
+              if (err instanceof Error && err.message === "cancelled") {
+                setBusy(false);
+                return;
+              }
               setError(t("loginError"));
               setBusy(false);
             }

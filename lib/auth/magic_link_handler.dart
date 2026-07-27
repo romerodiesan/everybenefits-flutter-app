@@ -2,26 +2,52 @@ import 'dart:async';
 
 import 'package:app_links/app_links.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'auth_service.dart';
 
+/// Stores the pending magic-link email in platform secure storage (Keychain /
+/// Keystore). Falls back to clearing any legacy SharedPreferences value.
 class MagicLinkEmailStore {
   static const _key = 'pending_magic_link_email';
+  static const _legacyPrefsKey = 'pending_magic_link_email';
+
+  static const FlutterSecureStorage _secure = FlutterSecureStorage(
+    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+  );
 
   static Future<void> save(String email) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, email.trim());
+    final trimmed = email.trim();
+    await _secure.write(key: _key, value: trimmed);
+    await _clearLegacyPrefs();
   }
 
   static Future<String?> read() async {
+    final fromSecure = await _secure.read(key: _key);
+    if (fromSecure != null && fromSecure.trim().isNotEmpty) {
+      return fromSecure.trim();
+    }
+
+    // One-time migration from plaintext SharedPreferences.
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_key);
+    final legacy = prefs.getString(_legacyPrefsKey);
+    if (legacy != null && legacy.trim().isNotEmpty) {
+      await _secure.write(key: _key, value: legacy.trim());
+      await prefs.remove(_legacyPrefsKey);
+      return legacy.trim();
+    }
+    return null;
   }
 
   static Future<void> clear() async {
+    await _secure.delete(key: _key);
+    await _clearLegacyPrefs();
+  }
+
+  static Future<void> _clearLegacyPrefs() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_key);
+    await prefs.remove(_legacyPrefsKey);
   }
 }
 

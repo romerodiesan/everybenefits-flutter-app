@@ -23,9 +23,8 @@ service firebase.storage {
 
     // Cross-service lookups: academy writes are gated by the Firestore role
     // and course ownership, mirroring firestore.rules.
-    function callerRole() {
-      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
-        .data.get('role', '');
+    function userData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
     }
 
     function hasProfile() {
@@ -33,8 +32,24 @@ service firebase.storage {
         && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid));
     }
 
+    function isAccountActive() {
+      return hasProfile()
+        && !(userData().get('accountStatus', 'active')
+          in ['deactivated', 'pendingDeletion']);
+    }
+
+    function callerRole() {
+      return userData().get('role', '');
+    }
+
     function isAdmin() {
-      return hasProfile() && callerRole() == 'admin';
+      return isAccountActive() && callerRole() == 'admin';
+    }
+
+    function isRegisteredMember() {
+      return isAccountActive()
+        && userData().get('isAnonymous', true) == false
+        && callerRole() != 'guest';
     }
 
     function ownsCourse(courseId) {
@@ -46,26 +61,28 @@ service firebase.storage {
     function canWriteCourseFiles(courseId) {
       return isAdmin()
         || (
-          hasProfile()
+          isAccountActive()
           && callerRole() in ['instructor', 'manager']
           && ownsCourse(courseId)
         );
     }
 
     function canReadCourseFiles(courseId) {
-      return isSignedIn()
-        && firestore.exists(/databases/(default)/documents/courses/$(courseId))
+      return firestore.exists(/databases/(default)/documents/courses/$(courseId))
         && (
-          firestore.get(/databases/(default)/documents/courses/$(courseId))
+          (firestore.get(/databases/(default)/documents/courses/$(courseId))
             .data.get('status', 'draft') == 'published'
+            && isRegisteredMember())
           || isAdmin()
-          || ownsCourse(courseId)
+          || (isAccountActive() && ownsCourse(courseId))
         );
     }
 
     match /avatars/{fileName} {
-      allow read: if isSignedIn();
-      allow write: if isOwnerFile(fileName)
+      // Members only — guests/anonymous cannot scrape the avatar tree.
+      allow read: if isRegisteredMember();
+      allow write: if isAccountActive()
+        && isOwnerFile(fileName)
         && request.resource.size < 5 * 1024 * 1024
         && isAllowedImageType();
     }

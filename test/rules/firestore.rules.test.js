@@ -309,9 +309,21 @@ describe('academy catalog', () => {
     await assertSucceeds(authedDb('admin1').doc('courses/draft1').get());
   });
 
-  it('lets any signed-in user read published courses', async () => {
+  it('lets registered members read published courses (not guests)', async () => {
     await seedCourse('pub1', { status: 'published', createdBy: 'manager1' });
     await assertSucceeds(authedDb('student1').doc('courses/pub1').get());
+    await seedUser('guest1', { role: 'guest', isAnonymous: false });
+    await assertFails(authedDb('guest1').doc('courses/pub1').get());
+    await assertFails(anonDb('anonGuest').doc('courses/pub1').get());
+  });
+
+  it('blocks deactivated members from reading published courses', async () => {
+    await seedCourse('pubD', { status: 'published', createdBy: 'manager1' });
+    await seedUser('ex1', {
+      role: 'student',
+      accountStatus: 'deactivated',
+    });
+    await assertFails(authedDb('ex1').doc('courses/pubD').get());
   });
 
   it('only lets instructors, managers, and admins create courses', async () => {

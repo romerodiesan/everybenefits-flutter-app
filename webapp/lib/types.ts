@@ -1,10 +1,4 @@
-export type UserRole =
-  | "guest"
-  | "student"
-  | "agent"
-  | "instructor"
-  | "manager"
-  | "admin";
+export type UserRole = import("@pulse/shared").UserRole;
 
 export const DEFAULT_AGENCY = "Every Benefits";
 

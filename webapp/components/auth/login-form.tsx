@@ -131,7 +131,11 @@ export function LoginForm() {
               try {
                 await signInWithGoogle();
                 router.replace("/home");
-              } catch {
+              } catch (err) {
+                if (err instanceof Error && err.message === "cancelled") {
+                  setBusy(false);
+                  return;
+                }
                 setError(t("errorAuth"));
                 setBusy(false);
               }
