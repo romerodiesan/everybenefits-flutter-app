@@ -17,6 +17,7 @@ import {
 import { AccountPanel } from "@/components/profile/account-panel";
 import { AppearancePanel } from "@/components/profile/appearance-panel";
 import { NotificationsPanel } from "@/components/profile/notifications-panel";
+import { PrivacyPanel } from "@/components/profile/privacy-panel";
 import { AdminPanel } from "@/components/profile/admin-panel";
 import { DangerPanel } from "@/components/profile/danger-panel";
 
@@ -41,6 +42,7 @@ function sectionFromHash(): SettingsSection | null {
     "account",
     "appearance",
     "notifications",
+    "privacy",
     "admin",
     "danger",
   ];
@@ -71,6 +73,12 @@ const ICONS: Record<SettingsSection, React.ReactNode> = {
         strokeLinejoin="round"
       />
       <path d="M10 18.5a2 2 0 0 0 4 0" strokeLinecap="round" />
+    </svg>
+  ),
+  privacy: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 0 1 8 0v3" strokeLinecap="round" />
     </svg>
   ),
   admin: (
@@ -138,6 +146,12 @@ export function ProfilePage() {
         icon: ICONS.notifications,
       });
     }
+    items.push({
+      id: "privacy",
+      label: t("profilePrivacy"),
+      description: t("profilePrivacyNav"),
+      icon: ICONS.privacy,
+    });
     if (isAdmin) {
       items.push({
         id: "admin",
@@ -243,6 +257,7 @@ export function ProfilePage() {
           {available === "notifications" && !profile.isAnonymous && (
             <NotificationsPanel uid={profile.uid} />
           )}
+          {available === "privacy" && <PrivacyPanel />}
           {available === "admin" && isAdmin && <AdminPanel />}
           {available === "danger" && !profile.isAnonymous && <DangerPanel />}
         </div>

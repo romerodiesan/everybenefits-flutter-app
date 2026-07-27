@@ -21,6 +21,7 @@ import 'firebase/firebase_app_check.dart';
 import 'firebase/firebase_emulators.dart';
 import 'firebase_options.dart';
 import 'l10n/l10n.dart';
+import 'privacy/telemetry.dart';
 import 'users/users.dart';
 
 @pragma('vm:entry-point')
@@ -61,6 +62,7 @@ Future<void> main() async {
   await connectFirebaseEmulators();
   connectFunctionsEmulator();
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  await initTelemetry();
 
   final results = await Future.wait<Object?>([
     activateFirebaseAppCheck(),

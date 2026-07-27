@@ -6,6 +6,7 @@ export type SettingsSection =
   | "account"
   | "appearance"
   | "notifications"
+  | "privacy"
   | "admin"
   | "danger";
 

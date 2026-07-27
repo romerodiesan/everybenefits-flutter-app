@@ -2675,7 +2675,7 @@ abstract class AppLocalizations {
   /// No description provided for @studioWebOnlyHint.
   ///
   /// In en, this message translates to:
-  /// **'Upload videos and organize modules from the web.'**
+  /// **'Open Pulse Studio on the web to upload videos and organize modules.'**
   String get studioWebOnlyHint;
 
   /// No description provided for @playerClasses.
@@ -3133,6 +3133,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Preferences'**
   String get settingsPreferences;
+
+  /// No description provided for @settingsPrivacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Privacy'**
+  String get settingsPrivacy;
+
+  /// No description provided for @settingsPrivacyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Crash reports help us fix bugs. Product analytics stays off until you opt in.'**
+  String get settingsPrivacyHint;
+
+  /// No description provided for @settingsAnalytics.
+  ///
+  /// In en, this message translates to:
+  /// **'Product analytics'**
+  String get settingsAnalytics;
+
+  /// No description provided for @settingsAnalyticsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Anonymous usage events only — no name, email, or message content.'**
+  String get settingsAnalyticsHint;
 
   /// No description provided for @settingsAccount.
   ///

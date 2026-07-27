@@ -1667,6 +1667,20 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsPreferences => 'Preferencias';
 
   @override
+  String get settingsPrivacy => 'Privacidad';
+
+  @override
+  String get settingsPrivacyHint =>
+      'Los reportes de fallos nos ayudan a corregir errores. La analítica de producto permanece desactivada hasta que la actives.';
+
+  @override
+  String get settingsAnalytics => 'Analítica de producto';
+
+  @override
+  String get settingsAnalyticsHint =>
+      'Solo eventos de uso anónimos — sin nombre, correo ni contenido de mensajes.';
+
+  @override
   String get settingsAccount => 'Cuenta';
 
   @override

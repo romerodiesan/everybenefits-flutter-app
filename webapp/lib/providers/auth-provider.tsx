@@ -41,6 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     initFirebaseClient();
+    void import("@/lib/privacy/telemetry").then(({ hydrateTelemetry }) => {
+      void hydrateTelemetry();
+    });
     let unsubProfile: (() => void) | undefined;
     const unsubAuth = onAuthStateChanged(getFirebaseAuth(), (next) => {
       unsubProfile?.();
@@ -81,7 +84,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             (error) => console.error(error),
           );
         } catch (error) {
-          console.error(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          // Emulator/CSP offline noise — keep cache if we have it.
+          if (!/client is offline/i.test(message)) {
+            console.error(error);
+          }
           if (!cached) setProfile(null);
         } finally {
           setProfileLoading(false);

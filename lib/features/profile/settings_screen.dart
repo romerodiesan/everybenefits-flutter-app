@@ -9,6 +9,7 @@ import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/role_badge.dart';
 import '../../auth/auth.dart';
 import '../../l10n/l10n.dart';
+import '../../privacy/telemetry.dart';
 import '../../users/users.dart';
 import 'admin_promote_screen.dart';
 import 'widgets/profile_avatar.dart';
@@ -101,6 +102,15 @@ class SettingsScreen extends StatelessWidget {
               localeController.setLanguageCode(code);
             },
           ),
+          const SizedBox(height: AppSpacing.xl),
+          _SectionLabel(label: l10n.settingsPrivacy),
+          const SizedBox(height: 6),
+          Text(
+            l10n.settingsPrivacyHint,
+            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+          ),
+          const SizedBox(height: AppSpacing.md),
+          const _AnalyticsConsentTile(),
           if (profile.role == UserRole.admin) ...[
             const SizedBox(height: AppSpacing.xl),
             _SectionLabel(label: l10n.settingsAdmin),
@@ -193,6 +203,82 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _AnalyticsConsentTile extends StatefulWidget {
+  const _AnalyticsConsentTile();
+
+  @override
+  State<_AnalyticsConsentTile> createState() => _AnalyticsConsentTileState();
+}
+
+class _AnalyticsConsentTileState extends State<_AnalyticsConsentTile> {
+  bool? _enabled;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    TelemetryPrefs.isAnalyticsEnabled().then((value) {
+      if (mounted) setState(() => _enabled = value);
+    });
+  }
+
+  Future<void> _onChanged(bool next) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _enabled = next;
+    });
+    PulseHaptics.selection();
+    try {
+      await TelemetryPrefs.setAnalyticsEnabled(next);
+    } catch (_) {
+      if (mounted) setState(() => _enabled = !next);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final l10n = context.l10n;
+    final enabled = _enabled ?? false;
+
+    return Material(
+      color: colors.glassFill,
+      borderRadius: BorderRadius.circular(18),
+      child: Ink(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border),
+        ),
+        child: SwitchListTile.adaptive(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 4,
+          ),
+          title: Text(
+            l10n.settingsAnalytics,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              l10n.settingsAnalyticsHint,
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.muted),
+            ),
+          ),
+          value: enabled,
+          onChanged: _enabled == null || _busy ? null : _onChanged,
+        ),
       ),
     );
   }

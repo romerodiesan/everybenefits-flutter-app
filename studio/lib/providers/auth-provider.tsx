@@ -71,7 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             (error) => console.error(error),
           );
         } catch (error) {
-          console.error(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
+          if (!/client is offline/i.test(message)) {
+            console.error(error);
+          }
           if (!cached) setProfile(null);
         } finally {
           setProfileLoading(false);

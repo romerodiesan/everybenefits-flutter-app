@@ -1656,6 +1656,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get settingsPreferences => 'Preferences';
 
   @override
+  String get settingsPrivacy => 'Privacy';
+
+  @override
+  String get settingsPrivacyHint =>
+      'Crash reports help us fix bugs. Product analytics stays off until you opt in.';
+
+  @override
+  String get settingsAnalytics => 'Product analytics';
+
+  @override
+  String get settingsAnalyticsHint =>
+      'Anonymous usage events only — no name, email, or message content.';
+
+  @override
   String get settingsAccount => 'Account';
 
   @override
