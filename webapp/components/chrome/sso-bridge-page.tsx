@@ -30,14 +30,11 @@ export function SsoBridgePage({
   const params = useSearchParams();
   const { user, loading } = useAuth();
   const [error, setError] = useState<string | null>(null);
+  const returnUrl = params.get("return");
+  const invalidReturn = !returnUrl || !isAllowedReturnUrl(returnUrl);
 
   useEffect(() => {
-    if (loading) return;
-    const returnUrl = params.get("return");
-    if (!returnUrl || !isAllowedReturnUrl(returnUrl)) {
-      setError(t("ssoInvalidReturn"));
-      return;
-    }
+    if (loading || invalidReturn || !returnUrl) return;
 
     const go = async () => {
       if (!user) {
@@ -55,11 +52,15 @@ export function SsoBridgePage({
       }
     };
     void go();
-  }, [loading, user, params, locale, loginPath, t]);
+  }, [loading, user, returnUrl, invalidReturn, locale, loginPath, t]);
+
+  const message = invalidReturn
+    ? t("ssoInvalidReturn")
+    : error ?? t("loading");
 
   return (
-    <div className="mesh-bg flex min-h-[100svh] items-center justify-center p-6 text-sm text-muted">
-      {error ?? t("ssoBridging")}
+    <div className="mesh-bg flex min-h-[100svh] items-center justify-center px-4 text-sm text-muted">
+      {message}
     </div>
   );
 }

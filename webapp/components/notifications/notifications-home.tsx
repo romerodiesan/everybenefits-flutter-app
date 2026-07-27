@@ -46,12 +46,12 @@ export function NotificationsHome() {
   const [openingId, setOpeningId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!profile || profile.isAnonymous) {
-      setItems([]);
-      return;
-    }
+    if (!profile || profile.isAnonymous) return;
     return watchNotifications(profile.uid, setItems, () => setItems([]));
   }, [profile]);
+
+  const visibleItems =
+    !profile || profile.isAnonymous ? [] : items;
 
   const openItem = async (item: AppNotification) => {
     if (!profile || openingId) return;
@@ -93,7 +93,7 @@ export function NotificationsHome() {
         <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
-            disabled={busy || items.every((item) => item.read)}
+            disabled={busy || visibleItems.every((item) => item.read)}
             onClick={async () => {
               setBusy(true);
               try {
@@ -130,13 +130,13 @@ export function NotificationsHome() {
         </div>
       </div>
 
-      {items.length === 0 ? (
+      {visibleItems.length === 0 ? (
         <p className="pulse-sheet mt-6 px-4 py-10 text-center text-sm text-muted">
           {t("notificationsEmpty")}
         </p>
       ) : (
         <ul className="mt-6 space-y-2">
-          {items.map((item) => {
+          {visibleItems.map((item) => {
             const dest = destinationFor(item);
             const samePage = dest === "/notifications";
             return (

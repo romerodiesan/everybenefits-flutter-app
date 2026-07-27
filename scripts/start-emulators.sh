@@ -41,6 +41,16 @@ export GOOGLE_CLOUD_PROJECT="$GCLOUD_PROJECT"
 
 npm --prefix functions run build
 
+LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
+if [[ -n "${LAN_IP}" ]]; then
+  echo ""
+  echo "LAN IP for phone / Flutter (IP rotates — refresh if login times out):"
+  echo "  flutter run --dart-define=FIREBASE_EMULATOR_HOST=${LAN_IP}"
+  echo "  Web from phone: set NEXT_PUBLIC_FIREBASE_EMULATOR_HOST=${LAN_IP} then open http://${LAN_IP}:3000"
+  echo "  Browser on this Mac: leave that env unset and use http://localhost:3000"
+  echo ""
+fi
+
 exec npx -y firebase-tools@latest emulators:start \
   --only auth,firestore,database,storage,functions,ui \
   --project every-insurance

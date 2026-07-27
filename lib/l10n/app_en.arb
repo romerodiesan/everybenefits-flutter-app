@@ -830,5 +830,30 @@
   "dangerDeleteAnonymizeHint": "Your forum and chat posts stay up from now on under an anonymous name. If you cancel, they get your name back.",
   "dangerDeleteConfirm": "Delete my account",
   "dangerCurrentPassword": "Current password",
-  "dangerReauthFailed": "We couldn't confirm your identity. Check your password and try again."
+  "dangerReauthFailed": "We couldn't confirm your identity. Check your password and try again.",
+  "tourEyebrow": "Welcome to Pulse",
+  "tourStep": "{current} of {total}",
+  "@tourStep": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "tourSkip": "Skip",
+  "tourBack": "Back",
+  "tourNext": "Next",
+  "tourDone": "Get started",
+  "tourWelcomeTitle": "A fresher Pulse",
+  "tourWelcomeBody": "Forums, chats, academy, and Pulse AI — rebuilt to feel faster and clearer. Here’s a quick tour of what you can do.",
+  "tourCommunityTitle": "Ask the network",
+  "tourCommunityBody": "Home is your community feed. Post questions, follow spotlight threads, and find accepted answers from agents and peers.",
+  "tourChatsTitle": "Talk it through",
+  "tourChatsBody": "Message classmates, start group chats, or open Support when you need a hand. Unread badges keep you current.",
+  "tourAcademyTitle": "Learn at your pace",
+  "tourAcademyBody": "Browse published courses and paths, resume where you left off, and track progress from Academy.",
+  "tourAiTitle": "Ask Pulse AI",
+  "tourAiBody": "Your in-app assistant for insurance craft questions — grounded in community context when available.",
+  "tourYouTitle": "Your space",
+  "tourYouBody": "Profile holds your details, notification preferences, and security options. You can revisit anything from the nav anytime.",
+  "tourYouBodyAgent": "Profile holds your details, notification preferences, and security. Agents can jump to Studio from the app switcher to author courses."
 }

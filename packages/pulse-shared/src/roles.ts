@@ -87,6 +87,11 @@ export function belongsInDefaultAgentGroup(role: UserRole) {
   return (DEFAULT_GROUP_ROLES as readonly string[]).includes(role);
 }
 
+/** Agent tools (quote calculators, etc.) — not for students or guests. */
+export function canAccessTools(role: UserRole) {
+  return belongsInDefaultAgentGroup(role);
+}
+
 export function canCreateChatGroups(role: UserRole) {
   return (GROUP_CREATOR_ROLES as readonly string[]).includes(role);
 }

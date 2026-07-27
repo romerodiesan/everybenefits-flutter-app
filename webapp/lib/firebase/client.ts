@@ -38,6 +38,11 @@ let emulatorsConnected = false;
 
 export function getFirebaseApp(): FirebaseApp {
   if (getApps().length) return getApp();
+  if (!firebaseConfig.apiKey || !firebaseConfig.projectId) {
+    throw new Error(
+      "Firebase web config missing. Set NEXT_PUBLIC_FIREBASE_* in .env.local.",
+    );
+  }
   return initializeApp(firebaseConfig);
 }
 
@@ -77,11 +82,34 @@ export function initFirebaseClient() {
   if (typeof window === "undefined") return;
 
   const app = getFirebaseApp();
-  // Touch RTDB once so config/URL errors surface early with a clear message.
-  try {
-    getFirebaseRtdb();
-  } catch (error) {
-    console.warn("Realtime Database init failed:", error);
+
+  const useEmulators =
+    process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+  if (useEmulators && !emulatorsConnected) {
+    // Loopback when the page is on localhost — LAN IPs (phones/Flutter) often
+    // go stale and cause auth/network-request-failed → Firestore offline.
+    // Only use NEXT_PUBLIC_FIREBASE_EMULATOR_HOST when browsing via that host.
+    const pageHost = window.location.hostname;
+    const fromEnv = process.env.NEXT_PUBLIC_FIREBASE_EMULATOR_HOST?.trim();
+    const host =
+      pageHost === "localhost" || pageHost === "127.0.0.1"
+        ? pageHost
+        : fromEnv || pageHost;
+    // Connect BEFORE any Auth/Firestore/RTDB use — otherwise the SDK may latch
+    // onto production and ignore later connect*Emulator calls.
+    try {
+      connectAuthEmulator(getFirebaseAuth(), `http://${host}:9099`, {
+        disableWarnings: true,
+      });
+      connectFirestoreEmulator(getFirebaseDb(), host, 8080);
+      connectDatabaseEmulator(getFirebaseRtdb(), host, 9000);
+      connectStorageEmulator(getFirebaseStorage(), host, 9199);
+      connectFunctionsEmulator(getFirebaseFunctions(), host, 5001);
+    } catch (error) {
+      // HMR / Strict Mode can re-enter after emulators are already attached.
+      console.warn("Firebase emulator connect skipped:", error);
+    }
+    emulatorsConnected = true;
   }
 
   const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY;
@@ -94,22 +122,5 @@ export function initFirebaseClient() {
     } catch (error) {
       console.warn("App Check init skipped:", error);
     }
-  }
-
-  const useEmulators =
-    process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
-  if (useEmulators && !emulatorsConnected) {
-    // Match the page hostname (localhost vs 127.0.0.1). Mixing them breaks
-    // Auth emulator popup iframe relay ("No matching frame").
-    const host =
-      window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
-    connectAuthEmulator(getFirebaseAuth(), `http://${host}:9099`, {
-      disableWarnings: true,
-    });
-    connectFirestoreEmulator(getFirebaseDb(), host, 8080);
-    connectDatabaseEmulator(getFirebaseRtdb(), host, 9000);
-    connectStorageEmulator(getFirebaseStorage(), host, 9199);
-    connectFunctionsEmulator(getFirebaseFunctions(), host, 5001);
-    emulatorsConnected = true;
   }
 }

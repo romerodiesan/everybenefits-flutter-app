@@ -9,6 +9,11 @@
 export type CspBuildOptions = {
     /** Include Firebase emulator hosts (Auth/Firestore/RTDB/Storage/Functions). */
     includeEmulators?: boolean;
+    /**
+     * Extra emulator hostname(s) besides 127.0.0.1 / localhost — e.g. LAN IP
+     * used by Flutter (`NEXT_PUBLIC_FIREBASE_EMULATOR_HOST=10.0.0.77`).
+     */
+    emulatorHosts?: string | string[];
     /** DotLottie / lottie CDN connect-src (Pulse landing). Default true. */
     includeLottie?: boolean;
     /** GA4 / GTM script+connect+img (consent-gated Analytics). Default true. */

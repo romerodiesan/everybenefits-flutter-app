@@ -23,8 +23,11 @@ double systemBottomInset(BuildContext context) {
       : view.viewPadding.bottom / view.devicePixelRatio;
   final fromMedia = MediaQuery.viewPaddingOf(context).bottom;
   final fromPad = MediaQuery.paddingOf(context).bottom;
-  final safe = [fromView, fromMedia, fromPad]
-      .fold<double>(0, (a, b) => a > b ? a : b);
+  final safe = [
+    fromView,
+    fromMedia,
+    fromPad,
+  ].fold<double>(0, (a, b) => a > b ? a : b);
   return safe > 0 ? safe : 8.0;
 }
 
@@ -41,15 +44,13 @@ double pulseTabBarTopInset(BuildContext context) {
 double pulseFabClearance(BuildContext context) {
   final padBottom = MediaQuery.paddingOf(context).bottom;
   final alreadyCleared = padBottom + _kFabMargin;
-  final needed = pulseTabBarTopInset(context) + kPulseTabBarFabGap - alreadyCleared;
+  final needed =
+      pulseTabBarTopInset(context) + kPulseTabBarFabGap - alreadyCleared;
   return needed < kPulseTabBarFabGap ? kPulseTabBarFabGap : needed;
 }
 
 /// List / scroll bottom padding that clears the floating tab bar.
-double pulseShellListBottomPad(
-  BuildContext context, {
-  bool hasFab = false,
-}) {
+double pulseShellListBottomPad(BuildContext context, {bool hasFab = false}) {
   final clearance = pulseTabBarTopInset(context) + kPulseTabBarFabGap;
   return hasFab ? clearance + 56 : clearance;
 }
@@ -142,10 +143,7 @@ class _PulseTabBodyState extends State<PulseTabBody>
     if (!isCurrent && !isOutgoing) {
       return Offstage(
         offstage: true,
-        child: TickerMode(
-          enabled: false,
-          child: child,
-        ),
+        child: TickerMode(enabled: false, child: child),
       );
     }
 
@@ -170,10 +168,7 @@ class _PulseTabBodyState extends State<PulseTabBody>
         enabled: isCurrent,
         child: Opacity(
           opacity: opacity.clamp(0.0, 1.0),
-          child: Transform.translate(
-            offset: Offset(dx, 0),
-            child: child,
-          ),
+          child: Transform.translate(offset: Offset(dx, 0), child: child),
         ),
       ),
     );
@@ -208,10 +203,7 @@ class PulseScaffold extends StatelessWidget {
     final fab = floatingActionButton;
     final liftedFab = fab == null || !clearFabForTabBar
         ? fab
-        : Padding(
-            padding: pulseFabPadding(context),
-            child: fab,
-          );
+        : Padding(padding: pulseFabPadding(context), child: fab);
 
     return Scaffold(
       backgroundColor: colors.canvas,
@@ -275,10 +267,7 @@ class SignalButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final button = FilledButton(
-      onPressed: onPressed,
-      child: Text(label),
-    );
+    final button = FilledButton(onPressed: onPressed, child: Text(label));
     if (!expand) return button;
     return SizedBox(width: double.infinity, child: button);
   }
@@ -290,12 +279,14 @@ class PulseTabItem {
     required this.icon,
     required this.selectedIcon,
     this.badgeCount = 0,
+    this.tourKey,
   });
 
   final String label;
   final IconData icon;
   final IconData selectedIcon;
   final int badgeCount;
+  final GlobalKey? tourKey;
 }
 
 class PulseTabBar extends StatelessWidget {
@@ -304,11 +295,13 @@ class PulseTabBar extends StatelessWidget {
     required this.items,
     required this.selectedIndex,
     required this.onSelect,
+    this.barTourKey,
   });
 
   final List<PulseTabItem> items;
   final int selectedIndex;
   final ValueChanged<int> onSelect;
+  final GlobalKey? barTourKey;
 
   void _selectIndex(int index) {
     final next = index.clamp(0, items.length - 1);
@@ -336,56 +329,62 @@ class PulseTabBar extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         curve: Curves.easeOutCubic,
         padding: EdgeInsets.fromLTRB(16, 0, 16, bottom + 6),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: colors.sheet.withValues(alpha: 0.94),
-            borderRadius: BorderRadius.circular(26),
-            border: Border.all(color: colors.border),
-            boxShadow: [
-              BoxShadow(
-                color: colors.ink.withValues(alpha: 0.07),
-                blurRadius: 28,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                return GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragUpdate: (details) {
-                    _selectAtX(
-                      details.localPosition.dx,
-                      constraints.maxWidth,
-                    );
-                  },
-                  onHorizontalDragEnd: (details) {
-                    final velocity = details.primaryVelocity ?? 0;
-                    if (velocity <= -450) {
-                      _selectIndex(selectedIndex + 1);
-                    } else if (velocity >= 450) {
-                      _selectIndex(selectedIndex - 1);
-                    }
-                  },
-                  child: Row(
-                    children: [
-                      for (var i = 0; i < items.length; i++)
-                        Expanded(
-                          flex: wide && i == selectedIndex ? 16 : 12,
-                          child: _PulseTab(
-                            item: items[i],
-                            selected: i == selectedIndex,
-                            showLabel: wide && i == selectedIndex,
-                            brand: brand,
-                            onTap: () => _selectIndex(i),
+        child: KeyedSubtree(
+          key: barTourKey,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: colors.sheet.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: colors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: colors.ink.withValues(alpha: 0.07),
+                  blurRadius: 28,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragUpdate: (details) {
+                      _selectAtX(
+                        details.localPosition.dx,
+                        constraints.maxWidth,
+                      );
+                    },
+                    onHorizontalDragEnd: (details) {
+                      final velocity = details.primaryVelocity ?? 0;
+                      if (velocity <= -450) {
+                        _selectIndex(selectedIndex + 1);
+                      } else if (velocity >= 450) {
+                        _selectIndex(selectedIndex - 1);
+                      }
+                    },
+                    child: Row(
+                      children: [
+                        for (var i = 0; i < items.length; i++)
+                          Expanded(
+                            flex: wide && i == selectedIndex ? 16 : 12,
+                            child: KeyedSubtree(
+                              key: items[i].tourKey,
+                              child: _PulseTab(
+                                item: items[i],
+                                selected: i == selectedIndex,
+                                showLabel: wide && i == selectedIndex,
+                                brand: brand,
+                                onTap: () => _selectIndex(i),
+                              ),
+                            ),
                           ),
-                        ),
-                    ],
-                  ),
-                );
-              },
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
         ),
@@ -426,7 +425,9 @@ class _PulseTab extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 2),
           padding: EdgeInsets.symmetric(horizontal: showLabel ? 10 : 0),
           decoration: BoxDecoration(
-            color: selected ? brand.withValues(alpha: 0.14) : Colors.transparent,
+            color: selected
+                ? brand.withValues(alpha: 0.14)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
@@ -479,4 +480,3 @@ class _PulseTab extends StatelessWidget {
     );
   }
 }
-

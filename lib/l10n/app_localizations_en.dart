@@ -1919,4 +1919,70 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get dangerReauthFailed =>
       'We couldn\'t confirm your identity. Check your password and try again.';
+
+  @override
+  String get tourEyebrow => 'Welcome to Pulse';
+
+  @override
+  String tourStep(int current, int total) {
+    return '$current of $total';
+  }
+
+  @override
+  String get tourSkip => 'Skip';
+
+  @override
+  String get tourBack => 'Back';
+
+  @override
+  String get tourNext => 'Next';
+
+  @override
+  String get tourDone => 'Get started';
+
+  @override
+  String get tourWelcomeTitle => 'A fresher Pulse';
+
+  @override
+  String get tourWelcomeBody =>
+      'Forums, chats, academy, and Pulse AI — rebuilt to feel faster and clearer. Here’s a quick tour of what you can do.';
+
+  @override
+  String get tourCommunityTitle => 'Ask the network';
+
+  @override
+  String get tourCommunityBody =>
+      'Home is your community feed. Post questions, follow spotlight threads, and find accepted answers from agents and peers.';
+
+  @override
+  String get tourChatsTitle => 'Talk it through';
+
+  @override
+  String get tourChatsBody =>
+      'Message classmates, start group chats, or open Support when you need a hand. Unread badges keep you current.';
+
+  @override
+  String get tourAcademyTitle => 'Learn at your pace';
+
+  @override
+  String get tourAcademyBody =>
+      'Browse published courses and paths, resume where you left off, and track progress from Academy.';
+
+  @override
+  String get tourAiTitle => 'Ask Pulse AI';
+
+  @override
+  String get tourAiBody =>
+      'Your in-app assistant for insurance craft questions — grounded in community context when available.';
+
+  @override
+  String get tourYouTitle => 'Your space';
+
+  @override
+  String get tourYouBody =>
+      'Profile holds your details, notification preferences, and security options. You can revisit anything from the nav anytime.';
+
+  @override
+  String get tourYouBodyAgent =>
+      'Profile holds your details, notification preferences, and security. Agents can jump to Studio from the app switcher to author courses.';
 }

@@ -122,7 +122,7 @@ class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
               stream: _platform.watchPulseAiEnabled(),
               initialData: true,
               builder: (context, snapshot) {
-                final enabled = snapshot.data ?? true;
+                final enabled = snapshot.data ?? false;
                 return DecoratedBox(
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18),

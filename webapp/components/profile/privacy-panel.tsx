@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useTranslations } from "next-intl";
 import {
   SettingsPanelShell,
@@ -14,14 +14,11 @@ import {
 
 export function PrivacyPanel() {
   const t = useTranslations();
-  const [analytics, setAnalytics] = useState(false);
-  const [ready, setReady] = useState(false);
+  const [analytics, setAnalytics] = useState(() =>
+    typeof window === "undefined" ? false : getAnalyticsConsent(),
+  );
+  const [ready] = useState(() => typeof window !== "undefined");
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    setAnalytics(getAnalyticsConsent());
-    setReady(true);
-  }, []);
 
   const toggle = async () => {
     if (busy || !ready) return;

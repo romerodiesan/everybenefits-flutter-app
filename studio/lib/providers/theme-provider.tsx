@@ -2,6 +2,7 @@
 
 import {
   createContext,
+  startTransition,
   useContext,
   useEffect,
   useMemo,
@@ -48,8 +49,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const [resolvedDark, setResolvedDark] = useState(true);
 
   useEffect(() => {
-    setModeState(readStored("pulse-theme", "dark"));
-    setAccentState(readStored("pulse-accent", "green"));
+    startTransition(() => {
+      setModeState(readStored("pulse-theme", "dark"));
+      setAccentState(readStored("pulse-accent", "green"));
+    });
   }, []);
 
   useEffect(() => {

@@ -16,9 +16,9 @@ export type PulseAiConfig = {
   updatedBy: string | null;
 };
 
-/** Missing doc ⇒ enabled (do not break production by default). */
+/** Missing doc ⇒ disabled until an admin enables Pulse AI. */
 export function parsePulseAiEnabled(data: Record<string, unknown> | undefined): boolean {
-  if (!data || typeof data.enabled !== "boolean") return true;
+  if (!data || typeof data.enabled !== "boolean") return false;
   return data.enabled;
 }
 
@@ -40,8 +40,8 @@ export function watchPulseAiEnabled(
     },
     (error) => {
       onError?.(error);
-      // Fail open for UX if rules/network glitch — server still enforces.
-      onNext(true);
+      // Fail closed in the UI — server also enforces when disabled.
+      onNext(false);
     },
   );
 }

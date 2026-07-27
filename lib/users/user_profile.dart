@@ -44,6 +44,7 @@ class UserProfile {
     required this.createdAt,
     required this.updatedAt,
     required this.profileCompleted,
+    this.productTourVersion = 0,
     this.email,
     this.displayName,
     this.photoUrl,
@@ -67,6 +68,8 @@ class UserProfile {
   final UserRole role;
   final bool isAnonymous;
   final bool profileCompleted;
+  /// Last product-tour version the user finished or skipped (0 = never).
+  final int productTourVersion;
   final String? phoneCountryCode;
   final String? phoneNumber;
   final bool phoneVerified;
@@ -140,6 +143,7 @@ class UserProfile {
     UserRole? role,
     bool? isAnonymous,
     bool? profileCompleted,
+    int? productTourVersion,
     String? phoneCountryCode,
     String? phoneNumber,
     bool? phoneVerified,
@@ -183,6 +187,7 @@ class UserProfile {
       role: role ?? this.role,
       isAnonymous: isAnonymous ?? this.isAnonymous,
       profileCompleted: profileCompleted ?? this.profileCompleted,
+      productTourVersion: productTourVersion ?? this.productTourVersion,
       phoneCountryCode: phoneCountryCode ?? this.phoneCountryCode,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       phoneVerified: phoneVerified ?? this.phoneVerified,
@@ -208,6 +213,7 @@ class UserProfile {
       'role': role.wireValue,
       'isAnonymous': isAnonymous,
       'profileCompleted': profileCompleted,
+      'productTourVersion': productTourVersion,
       'phoneCountryCode': phoneCountryCode,
       'phoneNumber': phoneNumber,
       'phoneVerified': phoneVerified,
@@ -248,6 +254,7 @@ class UserProfile {
       role: UserRole.parse(data['role'] as String?),
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       profileCompleted: data['profileCompleted'] as bool? ?? true,
+      productTourVersion: _readInt(data['productTourVersion']) ?? 0,
       phoneCountryCode: data['phoneCountryCode'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
       phoneVerified: data['phoneVerified'] as bool? ?? false,
@@ -269,6 +276,14 @@ class UserProfile {
     if (value is DateTime) return value.toUtc();
     if (value is String) return DateTime.tryParse(value)?.toUtc();
     if (value is Timestamp) return value.toDate().toUtc();
+    return null;
+  }
+
+  static int? _readInt(Object? value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
     return null;
   }
 }

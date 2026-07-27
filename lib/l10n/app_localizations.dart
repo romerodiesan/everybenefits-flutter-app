@@ -3619,6 +3619,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'We couldn\'t confirm your identity. Check your password and try again.'**
   String get dangerReauthFailed;
+
+  /// No description provided for @tourEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Welcome to Pulse'**
+  String get tourEyebrow;
+
+  /// No description provided for @tourStep.
+  ///
+  /// In en, this message translates to:
+  /// **'{current} of {total}'**
+  String tourStep(int current, int total);
+
+  /// No description provided for @tourSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip'**
+  String get tourSkip;
+
+  /// No description provided for @tourBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get tourBack;
+
+  /// No description provided for @tourNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get tourNext;
+
+  /// No description provided for @tourDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Get started'**
+  String get tourDone;
+
+  /// No description provided for @tourWelcomeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'A fresher Pulse'**
+  String get tourWelcomeTitle;
+
+  /// No description provided for @tourWelcomeBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Forums, chats, academy, and Pulse AI — rebuilt to feel faster and clearer. Here’s a quick tour of what you can do.'**
+  String get tourWelcomeBody;
+
+  /// No description provided for @tourCommunityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask the network'**
+  String get tourCommunityTitle;
+
+  /// No description provided for @tourCommunityBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Home is your community feed. Post questions, follow spotlight threads, and find accepted answers from agents and peers.'**
+  String get tourCommunityBody;
+
+  /// No description provided for @tourChatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Talk it through'**
+  String get tourChatsTitle;
+
+  /// No description provided for @tourChatsBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Message classmates, start group chats, or open Support when you need a hand. Unread badges keep you current.'**
+  String get tourChatsBody;
+
+  /// No description provided for @tourAcademyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Learn at your pace'**
+  String get tourAcademyTitle;
+
+  /// No description provided for @tourAcademyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Browse published courses and paths, resume where you left off, and track progress from Academy.'**
+  String get tourAcademyBody;
+
+  /// No description provided for @tourAiTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask Pulse AI'**
+  String get tourAiTitle;
+
+  /// No description provided for @tourAiBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Your in-app assistant for insurance craft questions — grounded in community context when available.'**
+  String get tourAiBody;
+
+  /// No description provided for @tourYouTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your space'**
+  String get tourYouTitle;
+
+  /// No description provided for @tourYouBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile holds your details, notification preferences, and security options. You can revisit anything from the nav anytime.'**
+  String get tourYouBody;
+
+  /// No description provided for @tourYouBodyAgent.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile holds your details, notification preferences, and security. Agents can jump to Studio from the app switcher to author courses.'**
+  String get tourYouBodyAgent;
 }
 
 class _AppLocalizationsDelegate

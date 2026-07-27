@@ -8,6 +8,7 @@ export {
   canEditCourse,
   canEditPath,
   belongsInDefaultAgentGroup,
+  canAccessTools,
   canParticipateInForums,
   canParticipateInChats,
   canCreateChatGroups,

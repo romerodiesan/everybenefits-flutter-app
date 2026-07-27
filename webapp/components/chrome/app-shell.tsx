@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Fragment,
+  startTransition,
   useEffect,
   useMemo,
   useState,
@@ -20,7 +22,8 @@ import {
   registerWebPushToken,
   watchNotificationState,
 } from "@/lib/firebase/notifications";
-import { headlineName } from "@/lib/roles";
+import { canAccessTools, headlineName } from "@/lib/roles";
+import { AGENT_TOOLS } from "@/lib/tools/catalog";
 import { AppSwitcher } from "@/components/chrome/app-switcher";
 import { useVisibleSubscription } from "@/lib/hooks/use-visible-subscription";
 import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
@@ -29,6 +32,7 @@ import type { UserProfile, UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
 import { AccountGate } from "@/components/chrome/account-gate";
 import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
+import { ProductTour } from "@/components/chrome/product-tour";
 import dynamic from "next/dynamic";
 
 const CommandPalette = dynamic(
@@ -109,6 +113,27 @@ function IconSchool({ filled, ...props }: IconProps) {
           strokeWidth="1.8"
           strokeLinejoin="round"
           d="M12 4 3 9l9 5 7.2-4V16H21V9L12 4Zm-5.5 8.6v2.9c0 1.4 2.5 2.5 5.5 2.5s5.5-1.1 5.5-2.5v-2.9"
+        />
+      )}
+    </svg>
+  );
+}
+
+function IconTools({ filled, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" {...props}>
+      {filled ? (
+        <path
+          fill="currentColor"
+          d="M14.7 6.3a4 4 0 0 0-5.4 5.4l-5.8 5.8a1.5 1.5 0 0 0 2.1 2.1l5.8-5.8a4 4 0 0 0 5.4-5.4l-2.5 2.5-2.1-2.1 2.5-2.5Z"
+        />
+      ) : (
+        <path
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M14.7 6.3a3.2 3.2 0 0 0-4.3 4.3l-5.5 5.5a1.4 1.4 0 0 0 2 2l5.5-5.5a3.2 3.2 0 0 0 4.3-4.3l-2.2 2.2-1.8-1.8 2-2.4Z"
         />
       )}
     </svg>
@@ -331,10 +356,12 @@ function useShellStats(profile: UserProfile | null) {
 
   useEffect(() => {
     if (!uid) {
-      setUnreadTotal(0);
-      setNotifUnread(0);
-      setForumUnread(0);
-      setNewThreads(0);
+      startTransition(() => {
+        setUnreadTotal(0);
+        setNotifUnread(0);
+        setForumUnread(0);
+        setNewThreads(0);
+      });
       return;
     }
 
@@ -385,10 +412,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refreshProfile } = useAuth();
   const pulseAiEnabled = usePulseAiEnabled();
   const [supportBusy, setSupportBusy] = useState(false);
   const [cmdOpen, setCmdOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
+  const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
   const { unreadTotal, learningCount, notifUnread, forumBadge, pushToast } =
     useShellStats(profile);
 
@@ -396,6 +425,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     () => NAV.filter((item) => item.href !== "/ai" || pulseAiEnabled),
     [pulseAiEnabled],
   );
+  const toolsAllowed = Boolean(profile && canAccessTools(profile.role));
+  const toolsActive = pathname === "/tools" || pathname.startsWith("/tools/");
+
+  useEffect(() => {
+    if (toolsActive) setToolsOpen(true);
+  }, [toolsActive]);
 
   const name = useMemo(
     () => (profile ? headlineName(profile) : ""),
@@ -488,12 +523,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     <div className="mesh-bg flex h-[100svh] flex-col overflow-hidden lg:flex-row">
       <aside className="hidden h-full w-72 shrink-0 flex-col border-r border-glass-border bg-sheet lg:flex">
         <div className="border-b border-glass-border px-3 pb-3 pt-3.5">
-          <div className="flex items-center justify-between gap-2 px-1">
+          <div className="flex items-center justify-between gap-2 px-1" data-tour="shell-apps">
             <AppSwitcher current="pulse" role={profile.role} />
             <ThemeToggle />
           </div>
           <Link
             href="/profile"
+            data-tour="nav-profile"
             className="mt-3 flex items-center gap-2.5 rounded-xl bg-ink/[0.035] px-2.5 py-2 transition hover:bg-ink/[0.06] dark:bg-white/[0.04] dark:hover:bg-white/[0.07]"
           >
             <div
@@ -532,33 +568,115 @@ export function AppShell({ children }: { children: ReactNode }) {
             const Icon = item.Icon;
             const badge = badgeFor(item.badge);
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={active ? "page" : undefined}
-                className={`group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition duration-200 ${
-                  active
-                    ? "bg-brand/10 text-ink shadow-[inset_3px_0_0_0_var(--brand)]"
-                    : "text-muted hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
-                }`}
-              >
-                <Icon
-                  filled={active}
-                  className={`shrink-0 transition-transform duration-200 ${
+              <div key={item.href}>
+                <Link
+                  href={item.href}
+                  data-tour={
+                    item.href === "/home"
+                      ? "nav-home"
+                      : item.href === "/chats"
+                        ? "nav-chats"
+                        : item.href === "/academy"
+                          ? "nav-academy"
+                          : item.href === "/ai"
+                            ? "nav-ai"
+                            : item.href === "/profile"
+                              ? "nav-profile"
+                              : undefined
+                  }
+                  aria-current={active ? "page" : undefined}
+                  className={`group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition duration-200 ${
                     active
-                      ? "scale-105 text-brand"
-                      : "text-muted group-hover:text-ink"
+                      ? "bg-brand/10 text-ink shadow-[inset_3px_0_0_0_var(--brand)]"
+                      : "text-muted hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
                   }`}
-                  width={20}
-                  height={20}
-                />
-                <span className="min-w-0 flex-1 truncate">{t(item.key)}</span>
-                {badge && (
-                  <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-on-brand">
-                    {badge}
-                  </span>
-                )}
-              </Link>
+                >
+                  <Icon
+                    filled={active}
+                    className={`shrink-0 transition-transform duration-200 ${
+                      active
+                        ? "scale-105 text-brand"
+                        : "text-muted group-hover:text-ink"
+                    }`}
+                    width={20}
+                    height={20}
+                  />
+                  <span className="min-w-0 flex-1 truncate">{t(item.key)}</span>
+                  {badge && (
+                    <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-md bg-brand px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-on-brand">
+                      {badge}
+                    </span>
+                  )}
+                </Link>
+                {item.href === "/academy" && toolsAllowed ? (
+                  <div className="mt-0.5">
+                    <button
+                      type="button"
+                      aria-expanded={toolsOpen}
+                      onClick={() => setToolsOpen((v) => !v)}
+                      className={`group relative flex w-full items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition duration-200 ${
+                        toolsActive
+                          ? "bg-brand/10 text-ink shadow-[inset_3px_0_0_0_var(--brand)]"
+                          : "text-muted hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
+                      }`}
+                    >
+                      <IconTools
+                        filled={toolsActive}
+                        className={`shrink-0 ${
+                          toolsActive
+                            ? "text-brand"
+                            : "text-muted group-hover:text-ink"
+                        }`}
+                        width={20}
+                        height={20}
+                      />
+                      <span className="min-w-0 flex-1 truncate text-left">
+                        {t("navTools")}
+                      </span>
+                      <svg
+                        viewBox="0 0 20 20"
+                        className={`h-4 w-4 shrink-0 text-muted transition ${
+                          toolsOpen ? "rotate-180" : ""
+                        }`}
+                        fill="none"
+                        aria-hidden
+                      >
+                        <path
+                          d="M5 7.5 10 12.5 15 7.5"
+                          stroke="currentColor"
+                          strokeWidth="1.6"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    </button>
+                    {toolsOpen ? (
+                      <ul className="ml-4 space-y-0.5 border-l border-glass-border py-0.5 pl-2">
+                        {AGENT_TOOLS.map((tool) => {
+                          const toolActive =
+                            pathname === tool.href ||
+                            pathname.startsWith(`${tool.href}/`);
+                          return (
+                            <li key={tool.id}>
+                              <Link
+                                href={tool.href}
+                                aria-current={toolActive ? "page" : undefined}
+                                className={`block rounded-lg px-2.5 py-2 text-[13px] font-medium transition ${
+                                  toolActive
+                                    ? "bg-brand/10 text-brand"
+                                    : "text-muted hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
+                                }`}
+                              >
+                                {t(tool.titleKey)}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
             );
           })}
         </nav>
@@ -627,7 +745,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top,0px)+0.35rem)] lg:hidden">
-          <div className="pointer-events-auto min-w-0">
+          <div className="pointer-events-auto min-w-0" data-tour="shell-apps">
             <AppSwitcher current="pulse" role={profile.role} />
           </div>
           <div className="pointer-events-auto shrink-0">
@@ -673,39 +791,117 @@ export function AppShell({ children }: { children: ReactNode }) {
         className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-3 pb-[calc(env(safe-area-inset-bottom,0px)+4px)] pt-1.5 lg:hidden"
         aria-label="Primary"
       >
-        <div className="pointer-events-auto pulse-tab-pill mx-auto flex max-w-lg items-center px-0.5 py-0.5">
+        <div className="pointer-events-auto pulse-tab-pill relative mx-auto flex max-w-lg items-center px-0.5 py-0.5">
           {navItems.map((item) => {
             const active =
               pathname === item.href || pathname.startsWith(`${item.href}/`);
             const Icon = item.Icon;
             const badge = badgeFor(item.badge);
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`relative flex h-10 flex-1 items-center justify-center gap-1 rounded-xl transition ${
-                  active
-                    ? "max-w-[7rem] flex-[1.2] bg-brand/10 text-ink"
-                    : "text-muted"
-                }`}
-                aria-current={active ? "page" : undefined}
-                aria-label={t(item.key)}
-              >
-                <Icon
-                  filled={active}
-                  className={active ? "text-brand" : "text-muted"}
-                  width={20}
-                  height={20}
-                />
-                {active && (
-                  <span className="truncate text-[11px] font-semibold tracking-tight">
-                    {t(item.key)}
-                  </span>
-                )}
-                {badge && (
-                  <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand" />
-                )}
-              </Link>
+              <Fragment key={item.href}>
+                <Link
+                  href={item.href}
+                  data-tour={
+                    item.href === "/home"
+                      ? "nav-home"
+                      : item.href === "/chats"
+                        ? "nav-chats"
+                        : item.href === "/academy"
+                          ? "nav-academy"
+                          : item.href === "/ai"
+                            ? "nav-ai"
+                            : item.href === "/profile"
+                              ? "nav-profile"
+                              : undefined
+                  }
+                  className={`relative flex h-10 flex-1 items-center justify-center gap-1 rounded-xl transition ${
+                    active
+                      ? "max-w-[7rem] flex-[1.2] bg-brand/10 text-ink"
+                      : "text-muted"
+                  }`}
+                  aria-current={active ? "page" : undefined}
+                  aria-label={t(item.key)}
+                >
+                  <Icon
+                    filled={active}
+                    className={active ? "text-brand" : "text-muted"}
+                    width={20}
+                    height={20}
+                  />
+                  {active && (
+                    <span className="truncate text-[11px] font-semibold tracking-tight">
+                      {t(item.key)}
+                    </span>
+                  )}
+                  {badge && (
+                    <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-brand" />
+                  )}
+                </Link>
+                {item.href === "/academy" && toolsAllowed ? (
+                  <div className="relative flex flex-1 items-stretch">
+                    <button
+                      type="button"
+                      aria-label={t("navTools")}
+                      aria-expanded={mobileToolsOpen}
+                      onClick={() => setMobileToolsOpen((v) => !v)}
+                      className={`relative flex h-10 w-full items-center justify-center gap-1 rounded-xl transition ${
+                        toolsActive || mobileToolsOpen
+                          ? "max-w-[7rem] flex-[1.2] bg-brand/10 text-ink"
+                          : "text-muted"
+                      }`}
+                    >
+                      <IconTools
+                        filled={toolsActive}
+                        className={
+                          toolsActive || mobileToolsOpen
+                            ? "text-brand"
+                            : "text-muted"
+                        }
+                        width={20}
+                        height={20}
+                      />
+                      {(toolsActive || mobileToolsOpen) && (
+                        <span className="truncate text-[11px] font-semibold tracking-tight">
+                          {t("navTools")}
+                        </span>
+                      )}
+                    </button>
+                    {mobileToolsOpen ? (
+                      <>
+                        <button
+                          type="button"
+                          aria-hidden
+                          tabIndex={-1}
+                          className="fixed inset-0 z-40 cursor-default bg-transparent"
+                          onClick={() => setMobileToolsOpen(false)}
+                        />
+                        <ul className="pulse-sheet absolute bottom-[calc(100%+8px)] left-1/2 z-50 min-w-[12.5rem] -translate-x-1/2 overflow-hidden py-1 shadow-lg">
+                          {AGENT_TOOLS.map((tool) => {
+                            const toolActive =
+                              pathname === tool.href ||
+                              pathname.startsWith(`${tool.href}/`);
+                            return (
+                              <li key={tool.id}>
+                                <Link
+                                  href={tool.href}
+                                  onClick={() => setMobileToolsOpen(false)}
+                                  className={`block whitespace-nowrap px-3.5 py-2.5 text-left text-sm font-medium transition ${
+                                    toolActive
+                                      ? "bg-brand/10 text-brand"
+                                      : "text-ink hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"
+                                  }`}
+                                >
+                                  {t(tool.titleKey)}
+                                </Link>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </>
+                    ) : null}
+                  </div>
+                ) : null}
+              </Fragment>
             );
           })}
         </div>
@@ -725,6 +921,13 @@ export function AppShell({ children }: { children: ReactNode }) {
       )}
 
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
+      <ProductTour
+        profile={profile}
+        pulseAiEnabled={pulseAiEnabled}
+        onCompleted={() => {
+          void refreshProfile();
+        }}
+      />
     </div>
   );
 }

@@ -38,7 +38,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
   String? _title;
   bool _streaming = false;
   String? _errorMessage;
-  bool _pulseAiEnabled = true;
+  bool _pulseAiEnabled = false;
   CancelToken? _cancelToken;
   StreamSubscription<PulseStreamEvent>? _streamSub;
   StreamSubscription<bool>? _aiEnabledSub;
@@ -55,10 +55,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
         if (!mounted) return;
         setState(() => _pulseAiEnabled = enabled);
       },
-      onError: (_) {
-        if (!mounted) return;
-        setState(() => _pulseAiEnabled = true);
-      },
+        onError: (_) {
+          if (!mounted) return;
+          setState(() => _pulseAiEnabled = false);
+        },
     );
   }
 

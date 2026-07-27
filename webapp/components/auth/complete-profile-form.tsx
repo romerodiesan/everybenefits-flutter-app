@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, startTransition, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Button, Input, Label, Panel } from "@/components/ui/primitives";
@@ -34,7 +34,9 @@ export function CompleteProfileForm() {
     if (profile?.profileCompleted || profile?.isAnonymous) {
       router.replace("/home");
     }
-    if (profile?.displayName) setDisplayName(profile.displayName);
+    if (profile?.displayName) {
+      startTransition(() => setDisplayName(profile.displayName!));
+    }
   }, [loading, user, profile, router]);
 
   async function onSubmit(e: FormEvent) {

@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Firestore `platformConfig/pulseAi` — global Pulse AI kill switch.
 ///
-/// Missing doc ⇒ enabled (do not break production by default).
+/// Missing doc ⇒ disabled until an admin enables Pulse AI.
 class PlatformConfig {
   PlatformConfig({FirebaseFirestore? firestore})
       : _db = firestore ?? FirebaseFirestore.instance;
@@ -14,7 +14,7 @@ class PlatformConfig {
 
   static bool parsePulseAiEnabled(Map<String, dynamic>? data) {
     final enabled = data?['enabled'];
-    if (enabled is! bool) return true;
+    if (enabled is! bool) return false;
     return enabled;
   }
 
@@ -29,7 +29,7 @@ class PlatformConfig {
       final snap = await _pulseAi.get();
       return parsePulseAiEnabled(snap.data());
     } catch (_) {
-      return true;
+      return false;
     }
   }
 

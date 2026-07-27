@@ -10,6 +10,8 @@ export type UserProfile = {
   role: UserRole;
   isAnonymous: boolean;
   profileCompleted: boolean;
+  /** Last product-tour version finished/skipped; 0 or absent = never seen. */
+  productTourVersion?: number;
   phoneCountryCode: string | null;
   phoneNumber: string | null;
   /** True after SMS ownership check; absent means unverified. */

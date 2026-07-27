@@ -103,9 +103,8 @@ export async function authenticate(request: Request): Promise<PulseViewer> {
     .collection("platformConfig")
     .doc("pulseAi")
     .get();
-  const aiEnabled = aiConfigSnap.exists
-    ? aiConfigSnap.data()?.enabled !== false
-    : true;
+  const aiEnabled =
+    aiConfigSnap.exists && aiConfigSnap.data()?.enabled === true;
   if (!aiEnabled) {
     throw new PulseHttpError(
       403,

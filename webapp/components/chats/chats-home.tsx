@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, startTransition, useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
@@ -48,14 +48,13 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
   const canChat =
     profile && canParticipateInChats(profile.role, profile.isAnonymous);
   const canGroup = profile && canCreateChatGroups(profile.role);
+  const rtdbConfigured = Boolean(process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL);
+  const displayInboxError =
+    inboxError ?? (!rtdbConfigured ? t("errorRtdbConfig") : null);
 
   useEffect(() => {
-    if (!profile) return;
-    if (!process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL) {
-      setInboxError(t("errorRtdbConfig"));
-      return;
-    }
-    setInboxError(null);
+    if (!profile || !rtdbConfigured) return;
+    startTransition(() => setInboxError(null));
     return watchInbox(
       profile.uid,
       (next) => {
@@ -67,7 +66,7 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
         setInboxError(t("errorGeneric"));
       },
     );
-  }, [profile, t]);
+  }, [profile, t, rtdbConfigured]);
 
   useEffect(() => {
     if (!showNew || !profile) return;
@@ -253,10 +252,10 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
         )}
 
         <div className="flex-1 space-y-4 overflow-y-auto p-3">
-          {inboxError && (
-            <p className="p-4 text-sm text-red-400">{inboxError}</p>
+          {displayInboxError && (
+            <p className="p-4 text-sm text-red-400">{displayInboxError}</p>
           )}
-          {!inboxError && !chats.length && (
+          {!displayInboxError && !chats.length && (
             <p className="p-4 text-sm text-muted">{t("chatsEmpty")}</p>
           )}
           {sections && showSectionHeaders && (
@@ -294,11 +293,8 @@ export function ConversationPane({ chatId }: { chatId: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL) {
-      setError(t("errorRtdbConfig"));
-      return;
-    }
-    setError(null);
+    if (!process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL) return;
+    startTransition(() => setError(null));
     const onErr = (err: Error) => {
       console.error(err);
       setError(t("errorGeneric"));
@@ -317,8 +313,13 @@ export function ConversationPane({ chatId }: { chatId: string }) {
     }
   }, [chatId, chat, profile, messages.length]);
 
-  if (error) {
-    return <p className="p-6 text-sm text-red-400">{error}</p>;
+  const configError = !process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL
+    ? t("errorRtdbConfig")
+    : null;
+  const paneError = error ?? configError;
+
+  if (paneError) {
+    return <p className="p-6 text-sm text-red-400">{paneError}</p>;
   }
 
   if (!profile || !chat) {

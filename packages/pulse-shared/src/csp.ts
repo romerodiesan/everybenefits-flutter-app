@@ -10,6 +10,11 @@
 export type CspBuildOptions = {
   /** Include Firebase emulator hosts (Auth/Firestore/RTDB/Storage/Functions). */
   includeEmulators?: boolean;
+  /**
+   * Extra emulator hostname(s) besides 127.0.0.1 / localhost — e.g. LAN IP
+   * used by Flutter (`NEXT_PUBLIC_FIREBASE_EMULATOR_HOST=10.0.0.77`).
+   */
+  emulatorHosts?: string | string[];
   /** DotLottie / lottie CDN connect-src (Pulse landing). Default true. */
   includeLottie?: boolean;
   /** GA4 / GTM script+connect+img (consent-gated Analytics). Default true. */
@@ -20,18 +25,30 @@ function join(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(" ");
 }
 
-function emulatorHttpHosts(ports: number[]): string[] {
+function normalizeEmulatorHosts(extra?: string | string[]): string[] {
+  const base = ["127.0.0.1", "localhost"];
+  const more = (Array.isArray(extra) ? extra : extra ? [extra] : [])
+    .map((h) => h.trim())
+    .filter(Boolean);
+  return Array.from(new Set([...base, ...more]));
+}
+
+function emulatorHttpHosts(hosts: string[], ports: number[]): string[] {
   const out: string[] = [];
-  for (const port of ports) {
-    out.push(`http://127.0.0.1:${port}`, `http://localhost:${port}`);
+  for (const host of hosts) {
+    for (const port of ports) {
+      out.push(`http://${host}:${port}`);
+    }
   }
   return out;
 }
 
-function emulatorWsHosts(ports: number[]): string[] {
+function emulatorWsHosts(hosts: string[], ports: number[]): string[] {
   const out: string[] = [];
-  for (const port of ports) {
-    out.push(`ws://127.0.0.1:${port}`, `ws://localhost:${port}`);
+  for (const host of hosts) {
+    for (const port of ports) {
+      out.push(`ws://${host}:${port}`);
+    }
   }
   return out;
 }
@@ -45,28 +62,29 @@ export function buildContentSecurityPolicy(
   const includeEmulators = options.includeEmulators ?? false;
   const includeLottie = options.includeLottie ?? true;
   const includeAnalytics = options.includeAnalytics ?? true;
+  const hosts = normalizeEmulatorHosts(options.emulatorHosts);
 
   // Auth 9099, Firestore 8080, RTDB 9000, Storage 9199, Functions 5001, Emulator UI 4000
   const emulatorConnect = includeEmulators
     ? join(
-        ...emulatorHttpHosts([4000, 5001, 8080, 9099, 9000, 9199]),
-        ...emulatorWsHosts([8080, 9000]),
+        ...emulatorHttpHosts(hosts, [4000, 5001, 8080, 9099, 9000, 9199]),
+        ...emulatorWsHosts(hosts, [8080, 9000]),
       )
     : "";
 
   // RTDB .lp JSONP scripts + disconnect iframe (emulator).
   const emulatorRtdbScriptFrame = includeEmulators
-    ? join(...emulatorHttpHosts([9000]))
+    ? join(...emulatorHttpHosts(hosts, [9000]))
     : "";
 
   // Auth popup/iframe relay (emulator).
   const emulatorAuthFrame = includeEmulators
-    ? join(...emulatorHttpHosts([9099]))
+    ? join(...emulatorHttpHosts(hosts, [9099]))
     : "";
 
   // Storage download URLs in <img> / <video> against the emulator.
   const emulatorStorageMedia = includeEmulators
-    ? join(...emulatorHttpHosts([9199]))
+    ? join(...emulatorHttpHosts(hosts, [9199]))
     : "";
 
   const analyticsScript = includeAnalytics
@@ -139,6 +157,9 @@ export function buildContentSecurityPolicy(
     "https://lh3.googleusercontent.com",
     "https://www.gstatic.com",
     "https://ssl.gstatic.com",
+    // Auth / reCAPTCHA pixel (cleardot.gif)
+    "https://www.google.com",
+    "https://www.recaptcha.net",
     emulatorStorageMedia,
     analyticsImg,
   );

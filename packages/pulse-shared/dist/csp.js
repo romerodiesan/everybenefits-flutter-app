@@ -13,17 +13,28 @@ exports.shouldIncludeEmulatorCsp = shouldIncludeEmulatorCsp;
 function join(...parts) {
     return parts.filter(Boolean).join(" ");
 }
-function emulatorHttpHosts(ports) {
+function normalizeEmulatorHosts(extra) {
+    const base = ["127.0.0.1", "localhost"];
+    const more = (Array.isArray(extra) ? extra : extra ? [extra] : [])
+        .map((h) => h.trim())
+        .filter(Boolean);
+    return Array.from(new Set([...base, ...more]));
+}
+function emulatorHttpHosts(hosts, ports) {
     const out = [];
-    for (const port of ports) {
-        out.push(`http://127.0.0.1:${port}`, `http://localhost:${port}`);
+    for (const host of hosts) {
+        for (const port of ports) {
+            out.push(`http://${host}:${port}`);
+        }
     }
     return out;
 }
-function emulatorWsHosts(ports) {
+function emulatorWsHosts(hosts, ports) {
     const out = [];
-    for (const port of ports) {
-        out.push(`ws://127.0.0.1:${port}`, `ws://localhost:${port}`);
+    for (const host of hosts) {
+        for (const port of ports) {
+            out.push(`ws://${host}:${port}`);
+        }
     }
     return out;
 }
@@ -34,21 +45,22 @@ function buildContentSecurityPolicy(options = {}) {
     const includeEmulators = options.includeEmulators ?? false;
     const includeLottie = options.includeLottie ?? true;
     const includeAnalytics = options.includeAnalytics ?? true;
+    const hosts = normalizeEmulatorHosts(options.emulatorHosts);
     // Auth 9099, Firestore 8080, RTDB 9000, Storage 9199, Functions 5001, Emulator UI 4000
     const emulatorConnect = includeEmulators
-        ? join(...emulatorHttpHosts([4000, 5001, 8080, 9099, 9000, 9199]), ...emulatorWsHosts([8080, 9000]))
+        ? join(...emulatorHttpHosts(hosts, [4000, 5001, 8080, 9099, 9000, 9199]), ...emulatorWsHosts(hosts, [8080, 9000]))
         : "";
     // RTDB .lp JSONP scripts + disconnect iframe (emulator).
     const emulatorRtdbScriptFrame = includeEmulators
-        ? join(...emulatorHttpHosts([9000]))
+        ? join(...emulatorHttpHosts(hosts, [9000]))
         : "";
     // Auth popup/iframe relay (emulator).
     const emulatorAuthFrame = includeEmulators
-        ? join(...emulatorHttpHosts([9099]))
+        ? join(...emulatorHttpHosts(hosts, [9099]))
         : "";
     // Storage download URLs in <img> / <video> against the emulator.
     const emulatorStorageMedia = includeEmulators
-        ? join(...emulatorHttpHosts([9199]))
+        ? join(...emulatorHttpHosts(hosts, [9199]))
         : "";
     const analyticsScript = includeAnalytics
         ? join("https://www.googletagmanager.com", "https://*.googletagmanager.com", "https://www.google-analytics.com", "https://ssl.google-analytics.com", "https://*.google-analytics.com")
@@ -68,7 +80,9 @@ function buildContentSecurityPolicy(options = {}) {
     // RTDB long-poll JSONP (production + emulator)
     "https://*.firebaseio.com", emulatorRtdbScriptFrame, analyticsScript);
     const styleSrc = join("style-src", "'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://www.gstatic.com");
-    const imgSrc = join("img-src", "'self'", "data:", "blob:", "https://firebasestorage.googleapis.com", "https://lh3.googleusercontent.com", "https://www.gstatic.com", "https://ssl.gstatic.com", emulatorStorageMedia, analyticsImg);
+    const imgSrc = join("img-src", "'self'", "data:", "blob:", "https://firebasestorage.googleapis.com", "https://lh3.googleusercontent.com", "https://www.gstatic.com", "https://ssl.gstatic.com", 
+    // Auth / reCAPTCHA pixel (cleardot.gif)
+    "https://www.google.com", "https://www.recaptcha.net", emulatorStorageMedia, analyticsImg);
     const fontSrc = join("font-src", "'self'", "data:", "https://fonts.gstatic.com", "https://www.gstatic.com");
     const mediaSrc = join("media-src", "'self'", "blob:", "https://firebasestorage.googleapis.com", emulatorStorageMedia);
     // FCM messaging SW importScripts from gstatic.

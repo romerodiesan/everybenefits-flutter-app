@@ -7,11 +7,20 @@ import {
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
+const emulatorHost =
+  process.env.NEXT_PUBLIC_FIREBASE_EMULATOR_HOST?.trim() ||
+  process.env.FIREBASE_EMULATOR_HOST?.trim() ||
+  "127.0.0.1";
+
+const useEmulators =
+  process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+
 const contentSecurityPolicy = buildContentSecurityPolicy({
   includeEmulators: shouldIncludeEmulatorCsp({
     useFirebaseEmulators: process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS,
     nodeEnv: process.env.NODE_ENV,
   }),
+  emulatorHosts: emulatorHost,
   // Studio has no DotLottie / GA runtime, but keep Analytics hosts for parity
   // with shared Firebase project tooling and avoid drift with Pulse CSP.
   includeLottie: false,
@@ -38,6 +47,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["firebase", "@firebase/app", "@firebase/auth"],
   transpilePackages: ["@pulse/shared"],
   images: {
+    unoptimized: useEmulators,
     remotePatterns: [
       {
         protocol: "https",
@@ -45,8 +55,38 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "*.firebasestorage.app",
+      },
+      {
+        protocol: "https",
+        hostname: "*.appspot.com",
+      },
+      {
+        protocol: "https",
         hostname: "lh3.googleusercontent.com",
       },
+      ...(useEmulators
+        ? [
+            {
+              protocol: "http" as const,
+              hostname: emulatorHost,
+              port: "9199",
+              pathname: "/**" as const,
+            },
+            {
+              protocol: "http" as const,
+              hostname: "127.0.0.1",
+              port: "9199",
+              pathname: "/**" as const,
+            },
+            {
+              protocol: "http" as const,
+              hostname: "localhost",
+              port: "9199",
+              pathname: "/**" as const,
+            },
+          ]
+        : []),
     ],
   },
   async headers() {

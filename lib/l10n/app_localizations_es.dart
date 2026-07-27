@@ -1934,4 +1934,70 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get dangerReauthFailed =>
       'No pudimos confirmar tu identidad. Revisa tu contraseña e inténtalo de nuevo.';
+
+  @override
+  String get tourEyebrow => 'Bienvenido a Pulse';
+
+  @override
+  String tourStep(int current, int total) {
+    return '$current de $total';
+  }
+
+  @override
+  String get tourSkip => 'Omitir';
+
+  @override
+  String get tourBack => 'Atrás';
+
+  @override
+  String get tourNext => 'Siguiente';
+
+  @override
+  String get tourDone => 'Empezar';
+
+  @override
+  String get tourWelcomeTitle => 'Un Pulse renovado';
+
+  @override
+  String get tourWelcomeBody =>
+      'Foros, chats, academia y Pulse AI — rediseñados para sentirse más rápidos y claros. Este tour rápido te muestra qué puedes hacer.';
+
+  @override
+  String get tourCommunityTitle => 'Pregunta a la red';
+
+  @override
+  String get tourCommunityBody =>
+      'Inicio es tu feed de comunidad. Publica preguntas, sigue hilos destacados y encuentra respuestas aceptadas de agentes y colegas.';
+
+  @override
+  String get tourChatsTitle => 'Conversemos';
+
+  @override
+  String get tourChatsBody =>
+      'Escribe a compañeros, crea grupos o abre Soporte cuando lo necesites. Las insignias de no leídos te mantienen al día.';
+
+  @override
+  String get tourAcademyTitle => 'Aprende a tu ritmo';
+
+  @override
+  String get tourAcademyBody =>
+      'Explora cursos y rutas publicados, retoma donde lo dejaste y sigue tu progreso en Academia.';
+
+  @override
+  String get tourAiTitle => 'Pregunta a Pulse AI';
+
+  @override
+  String get tourAiBody =>
+      'Tu asistente en la app para dudas del oficio — con contexto de la comunidad cuando esté disponible.';
+
+  @override
+  String get tourYouTitle => 'Tu espacio';
+
+  @override
+  String get tourYouBody =>
+      'En Perfil están tus datos, preferencias de notificación y seguridad. Puedes volver a todo desde la navegación cuando quieras.';
+
+  @override
+  String get tourYouBodyAgent =>
+      'En Perfil están tus datos, notificaciones y seguridad. Los agentes pueden saltar a Studio desde el selector de apps para crear cursos.';
 }

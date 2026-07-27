@@ -77,10 +77,22 @@ Future<void> connectFirebaseEmulators({
   // (exact host string can differ after IP / override changes mid-session).
   final existingHost = FirebaseFirestore.instance.settings.host;
   if (looksLikeEmulatorFirestoreHost(existingHost, port: firestorePort)) {
+    final wantedPrefix = '$emulatorHost:';
+    final matchesWanted =
+        existingHost != null && existingHost.startsWith(wantedPrefix);
+    if (matchesWanted) {
+      debugPrint(
+        'Firebase emulators already bound → $existingHost '
+        '(skip rebind; avoids gRPC too_many_pings).',
+      );
+      return;
+    }
+    // LAN IP often rotates (10.0.0.77 → .161). Native channels keep the old
+    // host; rebinding stacks gRPC. Force a full process restart instead.
     debugPrint(
-      'Firebase emulators already bound → $existingHost '
-      '(skip rebind; avoids gRPC too_many_pings). '
-      'If Auth/Storage seem wrong, fully quit the app and run again.',
+      'Firebase emulator HOST MISMATCH: native=$existingHost '
+      'wanted=$firestoreEmulator. Fully quit the app (not hot restart) and run:\n'
+      '  flutter run --dart-define=FIREBASE_EMULATOR_HOST=$emulatorHost',
     );
     return;
   }

@@ -50,11 +50,13 @@ export function SecurityPanel() {
   const [reauthPassword, setReauthPassword] = useState("");
 
   const refresh = useCallback(async () => {
-    setHasPassword(hasPasswordProvider());
     try {
-      setFactors(await listEnrolledFactors());
+      const next = await listEnrolledFactors();
+      setFactors(next);
+      setHasPassword(hasPasswordProvider());
     } catch {
       setFactors([]);
+      setHasPassword(hasPasswordProvider());
     }
   }, []);
 

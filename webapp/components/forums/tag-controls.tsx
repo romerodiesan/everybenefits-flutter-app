@@ -78,6 +78,9 @@ export function TagEditor({
     onChange([...value, normalized]);
     setDraft("");
     setOpen(false);
+  }
+
+  function focusInput() {
     inputRef.current?.focus();
   }
 
@@ -88,7 +91,10 @@ export function TagEditor({
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter" || e.key === ",") {
       e.preventDefault();
-      if (draft.trim()) addTag(draft);
+      if (draft.trim()) {
+        addTag(draft);
+        focusInput();
+      }
     } else if (e.key === "Backspace" && !draft && value.length) {
       removeTag(value[value.length - 1]);
     } else if (e.key === "Escape") {
@@ -149,7 +155,10 @@ export function TagEditor({
             <button
               type="button"
               onClick={() => {
-                if (draft.trim()) addTag(draft);
+                if (draft.trim()) {
+                  addTag(draft);
+                  focusInput();
+                }
               }}
               disabled={!draft.trim()}
               className="h-8 shrink-0 rounded-lg bg-brand/14 px-3 text-xs font-semibold text-brand disabled:opacity-40"
@@ -166,7 +175,10 @@ export function TagEditor({
                     type="button"
                     className="block w-full px-3 py-1.5 text-left text-xs font-medium hover:bg-brand/[0.08]"
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => addTag(tag)}
+                    onClick={() => {
+                      addTag(tag);
+                      focusInput();
+                    }}
                   >
                     #{tag}
                   </button>
@@ -185,7 +197,10 @@ export function TagEditor({
                         type="button"
                         className="block w-full px-3 py-1.5 text-left text-xs font-medium text-brand hover:bg-brand/[0.08]"
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => addTag(draft)}
+                        onClick={() => {
+                          addTag(draft);
+                          focusInput();
+                        }}
                       >
                         {t("forumsCreateTag", { tag: created })}
                       </button>

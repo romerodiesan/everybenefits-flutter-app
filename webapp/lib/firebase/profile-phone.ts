@@ -36,7 +36,7 @@ export async function startProfilePhoneVerification(
   e164: string,
   containerId = "profile-phone-recaptcha",
 ): Promise<string> {
-  const user = requireUser();
+  requireUser();
   const provider = new PhoneAuthProvider(getFirebaseAuth());
   const verifier = getOrCreateRecaptcha(containerId);
   return provider.verifyPhoneNumber(e164.trim(), verifier);

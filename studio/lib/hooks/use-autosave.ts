@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useRef, useState } from "react";
 
 export type AutosaveStatus = "idle" | "saving" | "saved" | "error";
 
@@ -13,8 +13,7 @@ export function useAutosave<T>(
 ) {
   const [status, setStatus] = useState<AutosaveStatus>("idle");
   const first = useRef(true);
-  const saveRef = useRef(save);
-  saveRef.current = save;
+  const onSave = useEffectEvent(save);
 
   useEffect(() => {
     if (!enabled) return;
@@ -24,8 +23,7 @@ export function useAutosave<T>(
     }
     setStatus("saving");
     const timer = window.setTimeout(() => {
-      void saveRef
-        .current()
+      void onSave()
         .then(() => setStatus("saved"))
         .catch(() => setStatus("error"));
     }, delayMs);

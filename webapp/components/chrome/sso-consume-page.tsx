@@ -4,10 +4,17 @@ import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { getToken } from "firebase/app-check";
+import { onAuthStateChanged } from "firebase/auth";
 import { signInWithCustomAuthToken } from "@/lib/firebase/auth";
-import { getFirebaseAppCheck } from "@/lib/firebase/client";
+import {
+  getFirebaseAppCheck,
+  getFirebaseAuth,
+  initFirebaseClient,
+} from "@/lib/firebase/client";
 import { clearSsoAttempt, takeHandoffCode } from "@/lib/sso";
 import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
+
+const SSO_CUSTOM_TOKEN_KEY = "pulse_sso_ct";
 
 async function exchangeHandoffCode(code: string): Promise<string> {
   const headers: Record<string, string> = {
@@ -29,12 +36,64 @@ async function exchangeHandoffCode(code: string): Promise<string> {
   if (!res.ok) {
     const payload = (await res.json().catch(() => null)) as {
       error?: string;
+      code?: string;
     } | null;
-    throw new Error(payload?.error ?? `exchange failed (${res.status})`);
+    const err = new Error(payload?.error ?? `exchange failed (${res.status})`) as Error & {
+      status?: number;
+      ssoCode?: string;
+    };
+    err.status = res.status;
+    err.ssoCode = payload?.code;
+    throw err;
   }
   const data = (await res.json()) as { customToken?: string };
   if (!data.customToken) throw new Error("customToken missing");
   return data.customToken;
+}
+
+function readStashedCustomToken(): string | null {
+  try {
+    const token = sessionStorage.getItem(SSO_CUSTOM_TOKEN_KEY);
+    return token && token.length > 20 ? token : null;
+  } catch {
+    return null;
+  }
+}
+
+function stashCustomToken(token: string) {
+  try {
+    sessionStorage.setItem(SSO_CUSTOM_TOKEN_KEY, token);
+  } catch {
+    // ignore
+  }
+}
+
+function clearStashedCustomToken() {
+  try {
+    sessionStorage.removeItem(SSO_CUSTOM_TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+function waitForSignedIn(timeoutMs = 8_000): Promise<boolean> {
+  return new Promise((resolve) => {
+    const auth = getFirebaseAuth();
+    if (auth.currentUser) {
+      resolve(true);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      unsub();
+      resolve(Boolean(auth.currentUser));
+    }, timeoutMs);
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) return;
+      window.clearTimeout(timer);
+      unsub();
+      resolve(true);
+    });
+  });
 }
 
 type Step = "token" | "exchange" | "signin" | "open";
@@ -46,10 +105,44 @@ function consumeSsoOnce(): Promise<void> {
   if (ssoConsumeDone) return Promise.resolve();
   if (ssoConsumePromise) return ssoConsumePromise;
   ssoConsumePromise = (async () => {
+    initFirebaseClient();
+
+    // Resume after a prior exchange that minted a token but failed sign-in
+    // (CSP / Strict Mode / Fast Refresh). Never re-exchange a one-time code.
+    const stashedToken = readStashedCustomToken();
+    if (stashedToken) {
+      await signInWithCustomAuthToken(stashedToken);
+      clearStashedCustomToken();
+      clearSsoAttempt();
+      ssoConsumeDone = true;
+      return;
+    }
+
+    if (getFirebaseAuth().currentUser) {
+      clearSsoAttempt();
+      ssoConsumeDone = true;
+      return;
+    }
+
     const code = takeHandoffCode();
     if (!code) throw new Error("missing-token");
-    const customToken = await exchangeHandoffCode(code);
+
+    let customToken: string;
+    try {
+      customToken = await exchangeHandoffCode(code);
+    } catch (error) {
+      const status = (error as Error & { status?: number }).status;
+      if (status === 401 && (await waitForSignedIn(2_500))) {
+        clearSsoAttempt();
+        ssoConsumeDone = true;
+        return;
+      }
+      throw error;
+    }
+
+    stashCustomToken(customToken);
     await signInWithCustomAuthToken(customToken);
+    clearStashedCustomToken();
     clearSsoAttempt();
     ssoConsumeDone = true;
   })().catch((error) => {
@@ -75,11 +168,6 @@ export function SsoConsumePage({ homePath = "/home" }: { homePath?: string }) {
       try {
         if (!ssoConsumeDone) {
           setStep("exchange");
-          const code = takeHandoffCode();
-          if (!code && !ssoConsumePromise) {
-            if (alive) setError(t("ssoMissingToken"));
-            return;
-          }
           setStep("signin");
           await consumeSsoOnce();
         }

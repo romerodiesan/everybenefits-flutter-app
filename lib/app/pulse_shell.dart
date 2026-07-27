@@ -16,12 +16,14 @@ import '../features/profile/profile_screen.dart';
 import '../features/university/course_repository.dart';
 import '../features/university/course_search_screen.dart';
 import '../features/university/university_screen.dart';
+import '../features/product_tour/product_tour_overlay.dart';
 import '../firebase/platform_config.dart';
 import '../l10n/l10n.dart';
 import '../users/users.dart';
 import 'pulse_haptics.dart';
 import 'widgets/lifebuoy_icon.dart';
 import 'widgets/pulse_chrome.dart';
+
 /// App shell: forums home, chats, Pulse AI, academy, profile.
 class PulseShell extends StatefulWidget {
   const PulseShell({
@@ -61,7 +63,14 @@ class PulseShellState extends State<PulseShell> {
   int _chatUnread = 0;
   int _forumBadge = 0;
   int _notifUnread = 0;
-  bool _pulseAiEnabled = true;
+  bool _pulseAiEnabled = false;
+
+  final _tourBarKey = GlobalKey();
+  final _tourHomeKey = GlobalKey();
+  final _tourChatsKey = GlobalKey();
+  final _tourAiKey = GlobalKey();
+  final _tourAcademyKey = GlobalKey();
+  final _tourProfileKey = GlobalKey();
 
   static const _tabCount = 5;
   static const _aiTabIndex = 2;
@@ -80,7 +89,7 @@ class PulseShellState extends State<PulseShell> {
         },
         onError: (_) {
           if (!mounted) return;
-          setState(() => _pulseAiEnabled = true);
+          setState(() => _pulseAiEnabled = false);
         },
       ),
     );
@@ -102,8 +111,9 @@ class PulseShellState extends State<PulseShell> {
     );
     _subs.add(
       _notifications.watchState(profile.uid).listen((state) async {
-        final newThreads =
-            await _notifications.countNewFeedThreads(state.lastFeedSeenAt);
+        final newThreads = await _notifications.countNewFeedThreads(
+          state.lastFeedSeenAt,
+        );
         if (!mounted) return;
         setState(() {
           _notifUnread = state.unreadCount;
@@ -139,9 +149,9 @@ class PulseShellState extends State<PulseShell> {
 
   void _openNotifications() {
     if (widget.profile.isAnonymous) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.notificationsSignIn)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.notificationsSignIn)));
       return;
     }
     Navigator.of(context).push(
@@ -159,15 +169,15 @@ class PulseShellState extends State<PulseShell> {
 
   void _openAi() {
     if (!_pulseAiEnabled) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.aiDisabled)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.aiDisabled)));
       return;
     }
     if (widget.profile.isAnonymous || widget.profile.role == UserRole.guest) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.aiSignInRequired)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(context.l10n.aiSignInRequired)));
       return;
     }
     Navigator.of(context).push(
@@ -181,37 +191,46 @@ class PulseShellState extends State<PulseShell> {
     AppLocalizations l10n, {
     int chatUnread = 0,
     int forumBadge = 0,
-  }) =>
-      [
-        PulseTabItem(
-          label: l10n.navHome,
-          icon: Icons.home_outlined,
-          selectedIcon: Icons.home_rounded,
-          badgeCount: forumBadge,
-        ),
-        PulseTabItem(
-          label: l10n.navChats,
-          icon: Icons.chat_bubble_outline_rounded,
-          selectedIcon: Icons.chat_bubble_rounded,
-          badgeCount: chatUnread,
-        ),
-        PulseTabItem(
-          label: l10n.navAi,
-          icon: Icons.auto_awesome_outlined,
-          selectedIcon: Icons.auto_awesome,
-        ),
-        PulseTabItem(
-          label: l10n.navAcademy,
-          icon: Icons.school_outlined,
-          selectedIcon: Icons.school_rounded,
-        ),
-        PulseTabItem(
-          label: l10n.navProfile,
-          icon: Icons.person_outline_rounded,
-          selectedIcon: Icons.person_rounded,
-          badgeCount: 0,
-        ),
-      ];
+    GlobalKey? homeKey,
+    GlobalKey? chatsKey,
+    GlobalKey? aiKey,
+    GlobalKey? academyKey,
+    GlobalKey? profileKey,
+  }) => [
+    PulseTabItem(
+      label: l10n.navHome,
+      icon: Icons.home_outlined,
+      selectedIcon: Icons.home_rounded,
+      badgeCount: forumBadge,
+      tourKey: homeKey,
+    ),
+    PulseTabItem(
+      label: l10n.navChats,
+      icon: Icons.chat_bubble_outline_rounded,
+      selectedIcon: Icons.chat_bubble_rounded,
+      badgeCount: chatUnread,
+      tourKey: chatsKey,
+    ),
+    PulseTabItem(
+      label: l10n.navAi,
+      icon: Icons.auto_awesome_outlined,
+      selectedIcon: Icons.auto_awesome,
+      tourKey: aiKey,
+    ),
+    PulseTabItem(
+      label: l10n.navAcademy,
+      icon: Icons.school_outlined,
+      selectedIcon: Icons.school_rounded,
+      tourKey: academyKey,
+    ),
+    PulseTabItem(
+      label: l10n.navProfile,
+      icon: Icons.person_outline_rounded,
+      selectedIcon: Icons.person_rounded,
+      badgeCount: 0,
+      tourKey: profileKey,
+    ),
+  ];
 
   List<int> get _visibleTabIndices {
     if (_pulseAiEnabled) return const [0, 1, 2, 3, 4];
@@ -223,6 +242,7 @@ class PulseShellState extends State<PulseShell> {
     if (visibleIndex < 0 || visibleIndex >= indices.length) return;
     selectTab(indices[visibleIndex]);
   }
+
   _ShellFabConfig? _fabConfig(AppLocalizations l10n) {
     final profile = widget.profile;
     switch (_index) {
@@ -297,9 +317,7 @@ class PulseShellState extends State<PulseShell> {
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
     final repo = widget.chatRepository ?? ChatRepository();
-    messenger.showSnackBar(
-      SnackBar(content: Text(l10n.supportChatOpening)),
-    );
+    messenger.showSnackBar(SnackBar(content: Text(l10n.supportChatOpening)));
     try {
       final chat = await repo.getOrCreateSupportChat(
         me: widget.profile,
@@ -409,25 +427,46 @@ class PulseShellState extends State<PulseShell> {
       l10n,
       chatUnread: _chatUnread,
       forumBadge: _forumBadge,
+      homeKey: _tourHomeKey,
+      chatsKey: _tourChatsKey,
+      aiKey: _tourAiKey,
+      academyKey: _tourAcademyKey,
+      profileKey: _tourProfileKey,
     );
     final visibleIndices = _visibleTabIndices;
-    final navItems = [
-      for (final i in visibleIndices) allItems[i],
-    ];
+    final navItems = [for (final i in visibleIndices) allItems[i]];
     final selectedVisible = visibleIndices.indexOf(_index);
-    final selectedIndex =
-        selectedVisible >= 0 ? selectedVisible : 0;
+    final selectedIndex = selectedVisible >= 0 ? selectedVisible : 0;
 
-    return PulseScaffold(
-      extendBody: true,
-      resizeToAvoidBottomInset: false,
-      body: PulseTabBody(index: _index, children: pages),
-      floatingActionButton: fabButton,
-      bottomNavigationBar: PulseTabBar(
-        items: navItems,
-        selectedIndex: selectedIndex,
-        onSelect: _selectVisibleTab,
-      ),
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        PulseScaffold(
+          extendBody: true,
+          resizeToAvoidBottomInset: false,
+          body: PulseTabBody(index: _index, children: pages),
+          floatingActionButton: fabButton,
+          bottomNavigationBar: PulseTabBar(
+            barTourKey: _tourBarKey,
+            items: navItems,
+            selectedIndex: selectedIndex,
+            onSelect: _selectVisibleTab,
+          ),
+        ),
+        ProductTourOverlay(
+          profile: profile,
+          userRepository: widget.userRepository,
+          pulseAiEnabled: _pulseAiEnabled,
+          targets: ProductTourTargets(
+            bar: _tourBarKey,
+            home: _tourHomeKey,
+            chats: _tourChatsKey,
+            academy: _tourAcademyKey,
+            profile: _tourProfileKey,
+            ai: _pulseAiEnabled ? _tourAiKey : null,
+          ),
+        ),
+      ],
     );
   }
 }

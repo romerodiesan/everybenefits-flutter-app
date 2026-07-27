@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useState } from "react";
 
 /**
  * Runs `subscribe` while the document is visible; tears down when the tab is
@@ -11,8 +11,7 @@ export function useVisibleSubscription(
   subscribe: () => () => void,
   deps: unknown[] = [],
 ) {
-  const subscribeRef = useRef(subscribe);
-  subscribeRef.current = subscribe;
+  const onSubscribe = useEffectEvent(subscribe);
 
   useEffect(() => {
     if (!enabled || typeof document === "undefined") return;
@@ -21,7 +20,7 @@ export function useVisibleSubscription(
 
     const start = () => {
       if (stop) return;
-      stop = subscribeRef.current();
+      stop = onSubscribe();
     };
     const pause = () => {
       stop?.();

@@ -1,9 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
+import { useAuth } from "@/lib/providers/auth-provider";
+import { canAccessTools } from "@/lib/roles";
+import { AGENT_TOOLS } from "@/lib/tools/catalog";
 
 type Command = {
   id: string;
@@ -20,12 +23,16 @@ export function CommandPalette({
 }) {
   const t = useTranslations();
   const router = useRouter();
+  const { profile } = useAuth();
   const pulseAiEnabled = usePulseAiEnabled();
   const [query, setQuery] = useState("");
+  const activeQuery = open ? query : "";
+  const toolsAllowed = profile ? canAccessTools(profile.role) : false;
 
-  useEffect(() => {
-    if (!open) setQuery("");
-  }, [open]);
+  const close = () => {
+    setQuery("");
+    onOpenChange(false);
+  };
 
   const commands = useMemo<Command[]>(() => {
     const items: Command[] = [
@@ -47,12 +54,21 @@ export function CommandPalette({
         run: () => router.push("/ai"),
       });
     }
+    items.push({
+      id: "academy",
+      label: t("navAcademy"),
+      run: () => router.push("/academy"),
+    });
+    if (toolsAllowed) {
+      for (const tool of AGENT_TOOLS) {
+        items.push({
+          id: `tool-${tool.id}`,
+          label: t(tool.titleKey),
+          run: () => router.push(tool.href),
+        });
+      }
+    }
     items.push(
-      {
-        id: "academy",
-        label: t("navAcademy"),
-        run: () => router.push("/academy"),
-      },
       {
         id: "notifications",
         label: t("navNotifications"),
@@ -65,10 +81,10 @@ export function CommandPalette({
       },
     );
     return items;
-  }, [pulseAiEnabled, router, t]);
+  }, [pulseAiEnabled, toolsAllowed, router, t]);
 
   const filtered = commands.filter((c) =>
-    c.label.toLowerCase().includes(query.trim().toLowerCase()),
+    c.label.toLowerCase().includes(activeQuery.trim().toLowerCase()),
   );
 
   if (!open) return null;
@@ -76,7 +92,7 @@ export function CommandPalette({
   return (
     <div
       className="fixed inset-0 z-50 flex items-start justify-center bg-black/45 p-4 pt-[12vh] dark:bg-black/55"
-      onClick={() => onOpenChange(false)}
+      onClick={close}
     >
       <div
         className="pulse-sheet w-full max-w-lg overflow-hidden shadow-2xl"
@@ -89,10 +105,10 @@ export function CommandPalette({
           placeholder={t("navCommand")}
           className="w-full border-b border-glass-border bg-transparent px-4 py-3.5 text-sm outline-none placeholder:text-muted"
           onKeyDown={(e) => {
-            if (e.key === "Escape") onOpenChange(false);
+            if (e.key === "Escape") close();
             if (e.key === "Enter" && filtered[0]) {
               filtered[0].run();
-              onOpenChange(false);
+              close();
             }
           }}
         />
@@ -107,7 +123,7 @@ export function CommandPalette({
                   className="flex w-full px-4 py-2.5 text-left text-sm font-medium transition hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"
                   onClick={() => {
                     cmd.run();
-                    onOpenChange(false);
+                    close();
                   }}
                 >
                   {cmd.label}

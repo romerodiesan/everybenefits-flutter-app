@@ -48,6 +48,7 @@ class FirestoreUserProfileStore implements UserProfileStore {
       'role': profile.role.wireValue,
       'isAnonymous': profile.isAnonymous,
       'profileCompleted': profile.profileCompleted,
+      'productTourVersion': profile.productTourVersion,
       'phoneCountryCode': profile.phoneCountryCode,
       'phoneNumber': profile.phoneNumber,
       'phoneVerified': profile.phoneVerified,

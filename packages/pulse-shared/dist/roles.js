@@ -8,6 +8,7 @@ exports.canManageCourses = canManageCourses;
 exports.canEditCourse = canEditCourse;
 exports.canEditPath = canEditPath;
 exports.belongsInDefaultAgentGroup = belongsInDefaultAgentGroup;
+exports.canAccessTools = canAccessTools;
 exports.canCreateChatGroups = canCreateChatGroups;
 exports.canParticipateInForums = canParticipateInForums;
 exports.canParticipateInChats = canParticipateInChats;
@@ -76,6 +77,10 @@ function canEditPath(path, viewer) {
 }
 function belongsInDefaultAgentGroup(role) {
     return exports.DEFAULT_GROUP_ROLES.includes(role);
+}
+/** Agent tools (quote calculators, etc.) — not for students or guests. */
+function canAccessTools(role) {
+    return belongsInDefaultAgentGroup(role);
 }
 function canCreateChatGroups(role) {
     return exports.GROUP_CREATOR_ROLES.includes(role);

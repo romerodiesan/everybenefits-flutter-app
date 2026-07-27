@@ -830,5 +830,30 @@
   "dangerDeleteAnonymizeHint": "Tus publicaciones en foros y chats permanecen con un nombre anónimo. Si cancelas, recuperan tu nombre.",
   "dangerDeleteConfirm": "Eliminar mi cuenta",
   "dangerCurrentPassword": "Contraseña actual",
-  "dangerReauthFailed": "No pudimos confirmar tu identidad. Revisa tu contraseña e inténtalo de nuevo."
+  "dangerReauthFailed": "No pudimos confirmar tu identidad. Revisa tu contraseña e inténtalo de nuevo.",
+  "tourEyebrow": "Bienvenido a Pulse",
+  "tourStep": "{current} de {total}",
+  "@tourStep": {
+    "placeholders": {
+      "current": { "type": "int" },
+      "total": { "type": "int" }
+    }
+  },
+  "tourSkip": "Omitir",
+  "tourBack": "Atrás",
+  "tourNext": "Siguiente",
+  "tourDone": "Empezar",
+  "tourWelcomeTitle": "Un Pulse renovado",
+  "tourWelcomeBody": "Foros, chats, academia y Pulse AI — rediseñados para sentirse más rápidos y claros. Este tour rápido te muestra qué puedes hacer.",
+  "tourCommunityTitle": "Pregunta a la red",
+  "tourCommunityBody": "Inicio es tu feed de comunidad. Publica preguntas, sigue hilos destacados y encuentra respuestas aceptadas de agentes y colegas.",
+  "tourChatsTitle": "Conversemos",
+  "tourChatsBody": "Escribe a compañeros, crea grupos o abre Soporte cuando lo necesites. Las insignias de no leídos te mantienen al día.",
+  "tourAcademyTitle": "Aprende a tu ritmo",
+  "tourAcademyBody": "Explora cursos y rutas publicados, retoma donde lo dejaste y sigue tu progreso en Academia.",
+  "tourAiTitle": "Pregunta a Pulse AI",
+  "tourAiBody": "Tu asistente en la app para dudas del oficio — con contexto de la comunidad cuando esté disponible.",
+  "tourYouTitle": "Tu espacio",
+  "tourYouBody": "En Perfil están tus datos, preferencias de notificación y seguridad. Puedes volver a todo desde la navegación cuando quieras.",
+  "tourYouBodyAgent": "En Perfil están tus datos, notificaciones y seguridad. Los agentes pueden saltar a Studio desde el selector de apps para crear cursos."
 }

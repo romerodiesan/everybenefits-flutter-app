@@ -30,6 +30,8 @@ export declare function canEditPath(path: {
     role: UserRole;
 }): boolean;
 export declare function belongsInDefaultAgentGroup(role: UserRole): boolean;
+/** Agent tools (quote calculators, etc.) — not for students or guests. */
+export declare function canAccessTools(role: UserRole): boolean;
 export declare function canCreateChatGroups(role: UserRole): boolean;
 export declare function canParticipateInForums(role: UserRole, isAnonymous: boolean): boolean;
 export declare function canParticipateInChats(role: UserRole, isAnonymous: boolean): boolean;

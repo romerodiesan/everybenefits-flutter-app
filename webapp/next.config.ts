@@ -11,11 +11,20 @@ const studioOrigin =
   process.env.NEXT_PUBLIC_STUDIO_URL?.replace(/\/$/, "") ||
   "http://localhost:3001";
 
+const emulatorHost =
+  process.env.NEXT_PUBLIC_FIREBASE_EMULATOR_HOST?.trim() ||
+  process.env.FIREBASE_EMULATOR_HOST?.trim() ||
+  "127.0.0.1";
+
+const useEmulators =
+  process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+
 const contentSecurityPolicy = buildContentSecurityPolicy({
   includeEmulators: shouldIncludeEmulatorCsp({
     useFirebaseEmulators: process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS,
     nodeEnv: process.env.NODE_ENV,
   }),
+  emulatorHosts: emulatorHost,
   includeLottie: true,
   includeAnalytics: true,
 });
@@ -36,22 +45,45 @@ const securityHeaders = [
   { key: "Content-Security-Policy", value: contentSecurityPolicy },
 ];
 
+const storageImagePatterns = [
+  {
+    protocol: "https" as const,
+    hostname: "firebasestorage.googleapis.com",
+  },
+  {
+    protocol: "https" as const,
+    hostname: "*.firebasestorage.app",
+  },
+  {
+    protocol: "https" as const,
+    hostname: "*.appspot.com",
+  },
+  {
+    protocol: "https" as const,
+    hostname: "lh3.googleusercontent.com",
+  },
+];
+
+const emulatorImagePatterns = useEmulators
+  ? Array.from(
+      new Set([emulatorHost, "127.0.0.1", "localhost", "10.0.0.77"]),
+    ).map((hostname) => ({
+      protocol: "http" as const,
+      hostname,
+      port: "9199",
+      pathname: "/**" as const,
+    }))
+  : [];
+
 const nextConfig: NextConfig = {
   // Keep Firebase out of the RSC/Turbopack CJS interop path (avoids
   // "require is not defined" when client modules are SSR'd).
   serverExternalPackages: ["firebase", "@firebase/app", "@firebase/auth"],
   transpilePackages: ["@pulse/shared"],
   images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "firebasestorage.googleapis.com",
-      },
-      {
-        protocol: "https",
-        hostname: "lh3.googleusercontent.com",
-      },
-    ],
+    // Emulator Storage serves http://<lan-ip>:9199/...; skip optimizer locally.
+    unoptimized: useEmulators,
+    remotePatterns: [...storageImagePatterns, ...emulatorImagePatterns],
   },
   async headers() {
     return [

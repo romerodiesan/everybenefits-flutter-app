@@ -217,9 +217,10 @@ export async function markNotificationsRead(
   if (!ids.length) return { ok: true };
 
   await db().runTransaction(async (tx) => {
-    const snaps = await Promise.all(
-      ids.map((id) => tx.get(col.doc(id))),
-    );
+    // Firestore requires all reads before any writes.
+    const snaps = await Promise.all(ids.map((id) => tx.get(col.doc(id))));
+    const stateSnap = await tx.get(stateRef);
+
     let unreadDelta = 0;
     let forumDelta = 0;
     for (const snap of snaps) {
@@ -228,10 +229,14 @@ export async function markNotificationsRead(
       if (FORUM_TYPES.has(snap.data()?.type as NotificationType)) {
         forumDelta += 1;
       }
-      tx.update(snap.ref, { read: true });
     }
     if (unreadDelta === 0) return;
-    const stateSnap = await tx.get(stateRef);
+
+    for (const snap of snaps) {
+      if (!snap.exists || snap.data()?.read === true) continue;
+      tx.update(snap.ref, { read: true });
+    }
+
     const nextUnread = Math.max(
       0,
       Number(stateSnap.data()?.unreadCount ?? 0) - unreadDelta,

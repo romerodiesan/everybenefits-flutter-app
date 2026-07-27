@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
 
 export function Button({
@@ -92,22 +91,23 @@ export function Avatar({
   className?: string;
 }) {
   const initial = (name.trim() || "U").charAt(0).toUpperCase();
+  // Native <img>: Storage emulator URLs use LAN IPs (e.g. 10.0.0.77:9199)
+  // that next/image rejects unless every host is listed in next.config.
   return (
     <div
       className={`relative shrink-0 overflow-hidden rounded-full bg-brand/14 text-brand ${className}`}
       style={{ width: size, height: size }}
     >
       {photoUrl ? (
-        <Image
+        // eslint-disable-next-line @next/next/no-img-element -- emulator/LAN photo URLs
+        <img
           src={photoUrl}
           alt=""
           width={size}
           height={size}
+          decoding="async"
+          referrerPolicy="no-referrer"
           className="h-full w-full object-cover"
-          unoptimized={
-            photoUrl.includes("firebasestorage.googleapis.com") ||
-            photoUrl.includes("googleusercontent.com")
-          }
         />
       ) : (
         <span

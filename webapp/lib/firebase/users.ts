@@ -45,6 +45,10 @@ export function profileFromData(
     role: parseRole(data.role),
     isAnonymous: Boolean(data.isAnonymous),
     profileCompleted: (data.profileCompleted as boolean) ?? true,
+    productTourVersion:
+      typeof data.productTourVersion === "number"
+        ? data.productTourVersion
+        : Number(data.productTourVersion) || 0,
     phoneCountryCode: (data.phoneCountryCode as string) ?? null,
     phoneNumber: (data.phoneNumber as string) ?? null,
     phoneVerified: Boolean(data.phoneVerified),
@@ -83,6 +87,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     role: isAnonymous ? "guest" : "student",
     isAnonymous,
     profileCompleted: isAnonymous,
+    productTourVersion: 0,
     phoneCountryCode: null,
     phoneNumber: null,
     phoneVerified: false,
@@ -106,6 +111,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     role: profile.role,
     isAnonymous: profile.isAnonymous,
     profileCompleted: profile.profileCompleted,
+    productTourVersion: 0,
     phoneCountryCode: null,
     phoneNumber: null,
     phoneVerified: false,
@@ -163,6 +169,7 @@ export async function updateUserProfile(
     role: next.role,
     isAnonymous: next.isAnonymous,
     profileCompleted: next.profileCompleted,
+    productTourVersion: Number(next.productTourVersion ?? 0),
     phoneCountryCode: next.phoneCountryCode,
     phoneNumber: next.phoneNumber,
     phoneVerified: Boolean(next.phoneVerified),

@@ -42,13 +42,6 @@ export function AccountPanel() {
     return () => clearProfilePhoneRecaptcha();
   }, []);
 
-  useEffect(() => {
-    if (!profile) return;
-    setDisplayName(profile.displayName ?? "");
-    setPhoneCountryCode(profile.phoneCountryCode ?? "+1");
-    setPhoneNumber(profile.phoneNumber ?? "");
-  }, [profile]);
-
   if (!profile) return null;
 
   const phoneChanged =
@@ -62,12 +55,9 @@ export function AccountPanel() {
     setStatus(null);
     setError(null);
     try {
-      let phoneVerified = Boolean(profile.phoneVerified);
-
       if (phoneChanged) {
         const digits = phoneNumber.trim();
         if (!digits) {
-          phoneVerified = false;
           await updateUserProfile(profile, {
             displayName: displayName.trim() || profile.displayName,
             phoneCountryCode: phoneCountryCode.trim() || null,
@@ -83,7 +73,6 @@ export function AccountPanel() {
           return;
         } else {
           await confirmProfilePhone(verificationId, smsCode);
-          phoneVerified = true;
           await updateUserProfile(profile, {
             displayName: displayName.trim() || profile.displayName,
             phoneCountryCode: phoneCountryCode.trim() || null,

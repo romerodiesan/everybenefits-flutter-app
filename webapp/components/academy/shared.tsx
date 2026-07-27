@@ -127,16 +127,20 @@ export function CourseCover({
         background: `linear-gradient(145deg, ${color}2E, transparent 70%), color-mix(in srgb, ${color} 18%, var(--mesh-deep))`,
       }}
     >
-      {url && (
-        <Image
-          src={url}
-          alt=""
-          fill
-          sizes="(max-width: 640px) 100vw, 33vw"
-          className="object-cover"
-          unoptimized={url.includes("firebasestorage.googleapis.com")}
-        />
-      )}
+      {url &&
+        (url.startsWith("http://") ? (
+          // eslint-disable-next-line @next/next/no-img-element -- Storage emulator LAN URLs
+          <img src={url} alt="" className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <Image
+            src={url}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 100vw, 33vw"
+            className="object-cover"
+            unoptimized={url.includes("firebasestorage.googleapis.com")}
+          />
+        ))}
       {showLevel && (
         <span
           className="absolute left-3 top-3 rounded-md px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ink backdrop-blur-sm"
