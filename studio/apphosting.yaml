@@ -85,12 +85,12 @@ env:
 
   # --- Cross-app URLs ---
   - variable: NEXT_PUBLIC_PULSE_WEB_URL
-    value: https://pulse-web-app--every-benefits-us.us-central1.hosted.app
+    value: https://pulse.everybenefits.us
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_STUDIO_URL
-    value: https://studio-web-app--every-benefits-us.us-central1.hosted.app
+    value: https://studio.everybenefits.us
     availability:
       - BUILD
       - RUNTIME
