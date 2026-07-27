@@ -20,6 +20,32 @@
   "database": {
     "rules": "database.rules.json"
   },
+  "apphosting": [
+    {
+      "backendId": "pulse-web-app",
+      "rootDir": "webapp",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "**/.*",
+        "**/*.local"
+      ]
+    },
+    {
+      "backendId": "studio-web-app",
+      "rootDir": "studio",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "**/.*",
+        "**/*.local"
+      ]
+    }
+  ],
   "functions": [
     {
       "source": "functions",

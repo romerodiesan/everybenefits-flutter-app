@@ -14,6 +14,7 @@ const APP_NAME = "pulse-ai";
  */
 function readServiceAccount() {
   const raw =
+    process.env.SERVICE_ACCOUNT_KEY ??
     process.env.FIREBASE_SERVICE_ACCOUNT_KEY ??
     process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!raw?.trim()) return null;

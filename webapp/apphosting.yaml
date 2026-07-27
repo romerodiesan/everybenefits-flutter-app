@@ -1,0 +1,160 @@
+# Firebase App Hosting — Pulse (webapp)
+# Project: every-benefits-us
+# Backend rootDir: webapp
+#
+# Secrets (create once, then grant to this backend):
+#   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us
+#   npx -y firebase-tools@latest apphosting:secrets:set AI_GATEWAY_API_KEY --project every-benefits-us
+#   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_WEB_SEARCH_API_KEY --project every-benefits-us
+#   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_ADMIN_TASK_KEY --project every-benefits-us
+#
+# After first deploy, replace NEXT_PUBLIC_PULSE_WEB_URL / NEXT_PUBLIC_STUDIO_URL
+# with the real *.hosted.app (or custom) domains and redeploy.
+
+runConfig:
+  cpu: 1
+  memoryMiB: 1024
+  minInstances: 0
+  maxInstances: 10
+  concurrency: 80
+
+env:
+  # --- Firebase client (every-benefits-us) ---
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyBOrESVcS2kvM1_QSBb0vV1CwdpHtpsF1s
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: every-benefits-us.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: every-benefits-us
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: every-benefits-us.appspot.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "1001601265155"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:1001601265155:web:6f95f8ad37ec4458d8e836
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
+    value: https://every-benefits-us-default-rtdb.firebaseio.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: G-QVYHYMYYSC
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION
+    value: us-central1
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_USE_FIREBASE_EMULATORS
+    value: "false"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # Web Push — set in Console → Cloud Messaging → Web Push certificates
+  # - variable: NEXT_PUBLIC_FIREBASE_VAPID_KEY
+  #   value: REPLACE_ME
+  #   availability: [BUILD, RUNTIME]
+
+  # Optional App Check (reCAPTCHA v3 site key)
+  # - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
+  #   value: REPLACE_ME
+  #   availability: [BUILD, RUNTIME]
+
+  # --- Admin ---
+  - variable: FIREBASE_PROJECT_ID
+    value: every-benefits-us
+    availability:
+      - BUILD
+      - RUNTIME
+  # Env var cannot start with FIREBASE_ (reserved). Secret name can.
+  - variable: SERVICE_ACCOUNT_KEY
+    secret: FIREBASE_SERVICE_ACCOUNT_KEY
+
+  # --- Cross-app URLs ---
+  - variable: NEXT_PUBLIC_PULSE_WEB_URL
+    value: https://pulse-web-app--every-benefits-us.us-central1.hosted.app
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_STUDIO_URL
+    value: https://studio-web-app--every-benefits-us.us-central1.hosted.app
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # --- Pulse AI (server) ---
+  # Uncomment after:
+  #   npx -y firebase-tools@latest apphosting:secrets:set AI_GATEWAY_API_KEY --project every-benefits-us
+  #   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_WEB_SEARCH_API_KEY --project every-benefits-us
+  #   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_ADMIN_TASK_KEY --project every-benefits-us
+  # - variable: AI_GATEWAY_API_KEY
+  #   secret: AI_GATEWAY_API_KEY
+  - variable: PULSE_AI_MODEL
+    value: anthropic/claude-sonnet-5
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_FAST_MODEL
+    value: google/gemini-3.6-flash
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_EMBEDDING_MODEL
+    value: google/gemini-embedding-001
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_EMBEDDING_DIMENSIONS
+    value: "768"
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_DAILY_MESSAGE_LIMIT
+    value: "60"
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_PER_MINUTE_MESSAGE_LIMIT
+    value: "8"
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_MAX_WEB_SEARCHES_PER_RUN
+    value: "1"
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_MAX_EMBEDDING_SEARCHES_PER_RUN
+    value: "4"
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_REQUIRE_APP_CHECK
+    value: "false"
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_ALLOW_ANONYMOUS
+    value: "false"
+    availability:
+      - RUNTIME
+  - variable: PULSE_AI_WEB_SEARCH_PROVIDER
+    value: none
+    availability:
+      - RUNTIME
+  # - variable: PULSE_AI_WEB_SEARCH_API_KEY
+  #   secret: PULSE_AI_WEB_SEARCH_API_KEY
+  # - variable: PULSE_AI_ADMIN_TASK_KEY
+  #   secret: PULSE_AI_ADMIN_TASK_KEY
