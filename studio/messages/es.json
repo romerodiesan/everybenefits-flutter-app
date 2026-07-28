@@ -168,5 +168,7 @@
   "ssoStepExchange": "Intercambiando sesión…",
   "ssoStepSignIn": "Iniciando sesión…",
   "ssoStepOpen": "Abriendo la app…",
-  "logoutEverywhere": "Cerrando sesión en todas las apps…"
+  "logoutEverywhere": "Cerrando sesión en todas las apps…",
+  "appSwitchAdmin": "Admin",
+  "appSwitchAdminBlurb": "Usuarios, orgs y operaciones"
 }

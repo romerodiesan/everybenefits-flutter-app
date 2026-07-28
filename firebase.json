@@ -45,6 +45,19 @@
         "**/.*",
         "**/*.local"
       ]
+    },
+    {
+      "backendId": "admin-web-app",
+      "rootDir": "admin",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "**/.*",
+        "**/*.local"
+      ],
+      "alwaysDeployFromSource": true
     }
   ],
   "functions": [

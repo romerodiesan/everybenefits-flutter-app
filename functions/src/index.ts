@@ -41,26 +41,30 @@ const enforceAppCheck =
 const callableOpts = {
   // Emulator Gen2 often drops Access-Control headers on preflight when cors is
   // an allow-list; open it fully locally. Production keeps an explicit list.
-  cors: usingFunctionsEmulator
+      cors: usingFunctionsEmulator
     ? true
     : [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
         "https://every-insurance.web.app",
         "https://every-insurance.firebaseapp.com",
         "https://pulse.everybenefits.us",
         "https://studio.everybenefits.us",
+        "https://admin.everybenefits.us",
         "https://pulse-web-app--every-benefits-us.us-central1.hosted.app",
         "https://studio-web-app--every-benefits-us.us-central1.hosted.app",
+        "https://admin-web-app--every-benefits-us.us-central1.hosted.app",
         ...(process.env.FUNCTIONS_ALLOWED_ORIGINS ?? "")
           .split(",")
           .map((origin) => origin.trim())
           .filter(Boolean),
       ],
   // Emulator clients skip App Check. Production stays off until site keys are
-  // configured on pulse.everybenefits.us / studio.everybenefits.us, then set
+  // configured on pulse.everybenefits.us / studio.everybenefits.us / admin.everybenefits.us, then set
   // FUNCTIONS_ENFORCE_APP_CHECK=true.
   enforceAppCheck,
   // Auth is enforced inside the handler; Cloud Run must allow the OPTIONS preflight.

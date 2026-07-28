@@ -104,6 +104,12 @@ env:
       - BUILD
       - RUNTIME
 
+  - variable: NEXT_PUBLIC_ADMIN_URL
+    value: https://admin.everybenefits.us
+    availability:
+      - BUILD
+      - RUNTIME
+
   # --- Pulse AI (server) ---
   # Uncomment after:
   #   npx -y firebase-tools@latest apphosting:secrets:set AI_GATEWAY_API_KEY --project every-benefits-us

@@ -675,5 +675,7 @@
   "tourYouTitle": "Tu espacio",
   "tourYouBody": "En Perfil están tus datos, preferencias de notificación y seguridad. Puedes volver a todo desde la navegación cuando quieras.",
   "tourYouBodyAgent": "En Perfil están tus datos, notificaciones y seguridad. Los agentes pueden saltar a Studio desde el selector de apps para crear cursos.",
-  "tourWaitingTarget": "Buscando ese control en pantalla…"
+  "tourWaitingTarget": "Buscando ese control en pantalla…",
+  "appSwitchAdmin": "Admin",
+  "appSwitchAdminBlurb": "Usuarios, orgs y operaciones"
 }

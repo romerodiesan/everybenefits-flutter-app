@@ -675,5 +675,7 @@
   "tourYouTitle": "Your space",
   "tourYouBody": "Profile holds your details, notification preferences, and security options. You can revisit anything from the nav anytime.",
   "tourYouBodyAgent": "Profile holds your details, notification preferences, and security. Agents can jump to Studio from the app switcher to author courses.",
-  "tourWaitingTarget": "Looking for that control on screen…"
+  "tourWaitingTarget": "Looking for that control on screen…",
+  "appSwitchAdmin": "Admin",
+  "appSwitchAdminBlurb": "Users, orgs, and platform ops"
 }

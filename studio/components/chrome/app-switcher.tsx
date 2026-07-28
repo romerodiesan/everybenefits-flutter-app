@@ -12,7 +12,7 @@ import {
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { getFirebaseAuth } from "@/lib/firebase/client";
-import { canAuthorCourses } from "@/lib/roles";
+import { canAccessAdmin, canAuthorCourses } from "@/lib/roles";
 import {
   appBaseUrl,
   buildSsoHandoffUrl,
@@ -57,6 +57,27 @@ function IconStudioMark(props: IconProps) {
   );
 }
 
+
+function IconAdminMark(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
+      <path
+        d="M12 3.5 19 7v5c0 4.5-3 7.5-7 8.5-4-1-7-4-7-8.5V7l7-3.5Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M9.5 12.2l1.8 1.8 3.4-3.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function IconChevron(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden {...props}>
@@ -73,8 +94,11 @@ function IconChevron(props: IconProps) {
 
 type AppMeta = {
   id: PulseAppId;
-  labelKey: "appSwitchPulse" | "appSwitchStudio";
-  blurbKey: "appSwitchPulseBlurb" | "appSwitchStudioBlurb";
+  labelKey: "appSwitchPulse" | "appSwitchStudio" | "appSwitchAdmin";
+  blurbKey:
+    | "appSwitchPulseBlurb"
+    | "appSwitchStudioBlurb"
+    | "appSwitchAdminBlurb";
   homePath: string;
   Icon: (props: IconProps) => ReactNode;
   tileClass: string;
@@ -99,6 +123,15 @@ export const APPS: AppMeta[] = [
     Icon: IconStudioMark,
     tileClass: "bg-ink/[0.08] text-ink dark:bg-white/[0.1] dark:text-white",
     visible: (role) => Boolean(role && canAuthorCourses(role)),
+  },
+  {
+    id: "admin",
+    labelKey: "appSwitchAdmin",
+    blurbKey: "appSwitchAdminBlurb",
+    homePath: "/",
+    Icon: IconAdminMark,
+    tileClass: "bg-brand/10 text-brand",
+    visible: (role) => Boolean(role && canAccessAdmin(role)),
   },
 ];
 
