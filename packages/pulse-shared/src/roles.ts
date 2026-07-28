@@ -99,6 +99,21 @@ export function canCreateChatGroups(role: UserRole) {
   return (GROUP_CREATOR_ROLES as readonly string[]).includes(role);
 }
 
+/** Who may enable persistent auto-join-by-role on a group. */
+export function canConfigureGroupAutoJoin(role: UserRole) {
+  return role === "admin" || role === "manager";
+}
+
+/** Roles that can be targeted for group seed / auto-join (not guest). */
+export const GROUP_SEED_ROLES = [
+  "student",
+  "agent",
+  "instructor",
+  "manager",
+  "admin",
+] as const satisfies readonly UserRole[];
+
+
 export function canParticipateInForums(role: UserRole, isAnonymous: boolean) {
   if (isAnonymous || role === "guest") return false;
   return (FORUM_ROLES as readonly string[]).includes(role);
@@ -115,4 +130,14 @@ export function canAccessSupport(role: UserRole, isAnonymous: boolean) {
   return (
     role === "student" || role === "agent" || role === "instructor"
   );
+}
+
+/** Pulse Admin portal — managers and admins only. */
+export function canAccessAdmin(role: UserRole) {
+  return role === "manager" || role === "admin";
+}
+
+/** Platform-wide ops (role changes, deactivate any user, root org). */
+export function canManagePlatform(role: UserRole) {
+  return role === "admin";
 }

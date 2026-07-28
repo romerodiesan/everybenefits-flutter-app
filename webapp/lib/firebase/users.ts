@@ -14,7 +14,7 @@ import {
 } from "firebase/storage";
 import { updateProfile, type User } from "firebase/auth";
 import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
-import { listPublicProfiles } from "./functions";
+import { listPublicProfiles, searchDirectory as searchDirectoryFn } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
 import { composeUsAddress, headlineName, parseRole, parseApprovalStatus } from "../roles";
@@ -241,6 +241,10 @@ export async function listDirectory(excludeUid?: string, max = 80) {
     .sort((a, b) =>
       headlineName(a).toLowerCase().localeCompare(headlineName(b).toLowerCase()),
     );
+}
+
+export async function searchDirectoryContacts(query: string, max = 40) {
+  return searchDirectoryFn(query, max);
 }
 
 export { headlineName };

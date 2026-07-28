@@ -18,6 +18,7 @@ import type {
   ChatMessage,
   SharedPostPreview,
   UserProfile,
+  UserRole,
 } from "../types";
 import { AGENTS_DEFAULT_ID, SUPPORT_AI_UID } from "../types";
 import {
@@ -107,6 +108,10 @@ export function chatFrom(id: string, data: Record<string, unknown>): ChatConvers
     Boolean(data.isSupportChat) || id.startsWith("support_");
   const isDefaultAgentGroup =
     Boolean(data.isDefaultAgentGroup) || id === AGENTS_DEFAULT_ID;
+  const autoJoinRaw = asMap(data.autoJoinRoles);
+  const autoJoinRoles = Object.keys(autoJoinRaw).filter(
+    (role) => autoJoinRaw[role] === true,
+  ) as ChatConversation["autoJoinRoles"];
   return {
     id,
     memberIds: Object.keys(members).sort(),
@@ -123,6 +128,7 @@ export function chatFrom(id: string, data: Record<string, unknown>): ChatConvers
     createdBy: String(data.createdBy ?? ""),
     isDefaultAgentGroup,
     isSupportChat,
+    autoJoinRoles,
   };
 }
 
@@ -166,6 +172,9 @@ function chatToRtdb(chat: ChatConversation) {
     createdBy: chat.createdBy,
     isDefaultAgentGroup: chat.isDefaultAgentGroup,
     isSupportChat: chat.isSupportChat,
+    autoJoinRoles: Object.fromEntries(
+      (chat.autoJoinRoles ?? []).map((role) => [role, true]),
+    ),
   };
 }
 
@@ -325,6 +334,9 @@ async function createChat(chat: ChatConversation): Promise<ChatConversation> {
       createdBy: saved.createdBy,
       isDefaultAgentGroup: saved.isDefaultAgentGroup,
       isSupportChat: saved.isSupportChat,
+      autoJoinRoles: Object.fromEntries(
+        (saved.autoJoinRoles ?? []).map((role) => [role, true]),
+      ),
     },
   };
   await update(ref(db), updates);
@@ -375,6 +387,7 @@ export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
     createdBy: me.uid,
     isDefaultAgentGroup: false,
     isSupportChat: false,
+    autoJoinRoles: [],
   });
 }
 
@@ -382,12 +395,15 @@ export async function createGroupChat(input: {
   creator: UserProfile;
   title: string;
   members: UserProfile[];
+  seedRoles?: UserRole[];
+  autoJoin?: boolean;
 }) {
   if (!canCreateChatGroups(input.creator.role)) {
     throw new Error("Not allowed to create groups");
   }
   const title = input.title.trim();
   if (!title) throw new Error("Group name required");
+  const seedRoles = [...new Set(input.seedRoles ?? [])];
   const seen = new Set([input.creator.uid]);
   const others: UserProfile[] = [];
   for (const member of input.members) {
@@ -395,20 +411,36 @@ export async function createGroupChat(input: {
     seen.add(member.uid);
     others.push(member);
   }
-  if (!others.length) throw new Error("Pick at least one member");
+  if (!others.length && !seedRoles.length) {
+    throw new Error("Pick at least one member or role");
+  }
   const all = [input.creator, ...others];
-  if (all.length > 20) throw new Error("Max 20 members");
   const memberIds = all.map((profile) => profile.uid);
   const result = await callCloudFunction<{
     chatId?: string;
     createdAt?: number;
-  }>("createGroupChat", { title, memberIds }, { timeoutMs: 20_000 });
+    memberCount?: number;
+    truncated?: boolean;
+    autoJoinRoles?: string[];
+  }>(
+    "createGroupChat",
+    {
+      title,
+      memberIds,
+      seedRoles,
+      autoJoin: input.autoJoin === true,
+    },
+    { timeoutMs: 45_000 },
+  );
   const chatId = String(result?.chatId ?? "").trim();
   if (!chatId) throw new Error("Group creation failed");
   const createdAt = Number(result?.createdAt ?? Date.now());
+  const autoJoinRoles = (result?.autoJoinRoles ?? []).map(
+    String,
+  ) as UserRole[];
   // Do not await an RTDB read here — a stuck client connection hangs the UI
   // forever even after the callable succeeds. Reconstruct from the request.
-  return {
+  const chat: ChatConversation & { truncated?: boolean } = {
     id: chatId,
     memberIds: [...memberIds].sort(),
     memberNames: Object.fromEntries(
@@ -426,7 +458,10 @@ export async function createGroupChat(input: {
     createdBy: input.creator.uid,
     isDefaultAgentGroup: false,
     isSupportChat: false,
+    autoJoinRoles,
   };
+  if (result?.truncated === true) chat.truncated = true;
+  return chat;
 }
 
 async function ensureUserChatIndex(
@@ -479,6 +514,7 @@ export async function getOrCreateSupportChat(
     createdBy: me.uid,
     isDefaultAgentGroup: false,
     isSupportChat: true,
+    autoJoinRoles: [],
   });
   if (welcomeMessage?.trim()) {
     await postSupportAiMessage({

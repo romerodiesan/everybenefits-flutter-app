@@ -225,6 +225,8 @@ export type ChatConversation = {
   createdBy: string;
   isDefaultAgentGroup: boolean;
   isSupportChat: boolean;
+  /** Roles that auto-join when a user is approved. Empty = none. */
+  autoJoinRoles: UserRole[];
 };
 
 export type ChatMessage = {

@@ -1,6 +1,12 @@
 "use client";
 
-import { FormEvent, startTransition, useEffect, useMemo, useState } from "react";
+import {
+  FormEvent,
+  startTransition,
+  useEffect,
+  useMemo,
+  useState,
+} from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
@@ -17,16 +23,23 @@ import {
   watchInbox,
   watchMessages,
 } from "@/lib/firebase/chats";
-import { listDirectory, headlineName } from "@/lib/firebase/users";
+import {
+  listDirectory,
+  searchDirectoryContacts,
+  headlineName,
+} from "@/lib/firebase/users";
 import {
   canCreateChatGroups,
+  canConfigureGroupAutoJoin,
   canParticipateInChats,
   canAccessSupport,
+  GROUP_SEED_ROLES,
 } from "@/lib/roles";
 import {
   type ChatConversation,
   type ChatMessage,
   type UserProfile,
+  type UserRole,
 } from "@/lib/types";
 import { Button, Input, Panel, Avatar } from "@/components/ui/primitives";
 import {
@@ -40,6 +53,21 @@ import {
 } from "@/components/chats/message-reactions";
 
 const CHAT_SEED_PREFIX = "pulse:chat-seed:";
+
+const ROLE_LABEL_KEYS: Record<
+  Exclude<UserRole, "guest">,
+  | "chatsRoleStudent"
+  | "chatsRoleAgent"
+  | "chatsRoleInstructor"
+  | "chatsRoleManager"
+  | "chatsRoleAdmin"
+> = {
+  student: "chatsRoleStudent",
+  agent: "chatsRoleAgent",
+  instructor: "chatsRoleInstructor",
+  manager: "chatsRoleManager",
+  admin: "chatsRoleAdmin",
+};
 
 function writeChatSeed(chat: ChatConversation) {
   try {
@@ -60,6 +88,15 @@ function readChatSeed(chatId: string): ChatConversation | null {
   }
 }
 
+function contactSubtitle(person: UserProfile) {
+  const parts = [
+    person.email?.trim() || null,
+    person.npn?.trim() ? `NPN ${person.npn.trim()}` : null,
+    person.role,
+  ].filter(Boolean);
+  return parts.join(" · ");
+}
+
 export function ChatsHome({ selectedId }: { selectedId?: string }) {
   const t = useTranslations();
   const router = useRouter();
@@ -69,8 +106,18 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
   const [showNew, setShowNew] = useState<"dm" | "group" | null>(null);
   const [showNewMenu, setShowNewMenu] = useState(false);
   const [directory, setDirectory] = useState<UserProfile[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<UserProfile[] | null>(
+    null,
+  );
+  const [searchLoading, setSearchLoading] = useState(false);
   const [groupTitle, setGroupTitle] = useState("");
   const [selectedMembers, setSelectedMembers] = useState<string[]>([]);
+  const [selectedPeople, setSelectedPeople] = useState<
+    Record<string, UserProfile>
+  >({});
+  const [seedRoles, setSeedRoles] = useState<UserRole[]>([]);
+  const [autoJoin, setAutoJoin] = useState(false);
   const [composerError, setComposerError] = useState<string | null>(null);
   const [composerBusy, setComposerBusy] = useState(false);
   const [directoryLoading, setDirectoryLoading] = useState(false);
@@ -79,9 +126,13 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
   const canChat =
     profile && canParticipateInChats(profile.role, profile.isAnonymous);
   const canGroup = profile && canCreateChatGroups(profile.role);
+  const canAutoJoin =
+    profile && canConfigureGroupAutoJoin(profile.role);
   const rtdbConfigured = Boolean(process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL);
   const displayInboxError =
     inboxError ?? (!rtdbConfigured ? t("errorRtdbConfig") : null);
+
+  const visibleDirectory = searchResults ?? directory;
 
   useEffect(() => {
     if (!profile?.uid || !rtdbConfigured) return;
@@ -130,6 +181,8 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
     let cancelled = false;
     setDirectoryLoading(true);
     setComposerError(null);
+    setSearchQuery("");
+    setSearchResults(null);
     listDirectory(profile.uid)
       .then((people) => {
         if (!cancelled) setDirectory(people);
@@ -148,6 +201,38 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
       cancelled = true;
     };
   }, [showNew, profile, t]);
+
+  useEffect(() => {
+    if (!showNew) return;
+    const q = searchQuery.trim();
+    if (q.length < 2) {
+      setSearchResults(null);
+      setSearchLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setSearchLoading(true);
+    const timer = window.setTimeout(() => {
+      searchDirectoryContacts(q)
+        .then((people) => {
+          if (!cancelled) setSearchResults(people);
+        })
+        .catch((error) => {
+          console.error(error);
+          if (!cancelled) {
+            setSearchResults([]);
+            setComposerError(t("chatsDirectoryError"));
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setSearchLoading(false);
+        });
+    }, 250);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [searchQuery, showNew, t]);
 
   const sections = useMemo(() => {
     if (!profile) return null;
@@ -211,21 +296,22 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
       setComposerError(t("chatsGroupNameRequired"));
       return;
     }
-    if (!selectedMembers.length) {
+    if (!selectedMembers.length && !seedRoles.length) {
       setComposerError(t("chatsGroupMembersRequired"));
       return;
     }
     setComposerBusy(true);
     setComposerError(null);
     try {
-      const members = directory.filter((d) => selectedMembers.includes(d.uid));
-      if (!members.length) {
-        throw new Error(t("chatsGroupMembersRequired"));
-      }
+      const members = selectedMembers
+        .map((id) => selectedPeople[id] ?? directory.find((d) => d.uid === id))
+        .filter((person): person is UserProfile => Boolean(person));
       const chat = await createGroupChat({
         creator: profile,
         title: groupTitle,
         members,
+        seedRoles,
+        autoJoin: Boolean(canAutoJoin && autoJoin),
       });
       writeChatSeed(chat);
       setChats((prev) =>
@@ -234,6 +320,13 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
       setShowNew(null);
       setGroupTitle("");
       setSelectedMembers([]);
+      setSelectedPeople({});
+      setSeedRoles([]);
+      setAutoJoin(false);
+      if (chat.truncated) {
+        // Soft notice via console; inbox will show full membership.
+        console.info(t("chatsGroupTruncated"));
+      }
       router.push(`/chats/${chat.id}`);
     } catch (error) {
       console.error(error);
@@ -241,6 +334,41 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
     } finally {
       setComposerBusy(false);
     }
+  }
+
+  function toggleMember(person: UserProfile) {
+    setSelectedMembers((prev) => {
+      const checked = prev.includes(person.uid);
+      if (checked) {
+        setSelectedPeople((map) => {
+          const next = { ...map };
+          delete next[person.uid];
+          return next;
+        });
+        return prev.filter((id) => id !== person.uid);
+      }
+      setSelectedPeople((map) => ({ ...map, [person.uid]: person }));
+      return [...prev, person.uid];
+    });
+  }
+
+  function toggleSeedRole(role: UserRole) {
+    setSeedRoles((prev) =>
+      prev.includes(role) ? prev.filter((r) => r !== role) : [...prev, role],
+    );
+  }
+
+  function closeComposer() {
+    setShowNew(null);
+    setShowNewMenu(false);
+    setGroupTitle("");
+    setSelectedMembers([]);
+    setSelectedPeople({});
+    setSeedRoles([]);
+    setAutoJoin(false);
+    setSearchQuery("");
+    setSearchResults(null);
+    setComposerError(null);
   }
 
   function renderList(items: ChatConversation[], label?: string) {
@@ -335,70 +463,211 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
         </div>
 
         {showNew && (
-          <div className="max-h-72 overflow-y-auto border-b border-glass-border p-4">
-            <p className="mb-3 text-sm font-semibold">{t("chatsPickContact")}</p>
-            {composerError && (
-              <p className="mb-3 text-sm text-red-400">{composerError}</p>
-            )}
-            {showNew === "group" && (
-              <form onSubmit={startGroup} className="mb-3 space-y-2">
-                <Input
-                  placeholder={t("chatsGroupName")}
-                  value={groupTitle}
-                  onChange={(e) => setGroupTitle(e.target.value)}
-                  required
-                  disabled={composerBusy}
-                />
-                <Button
-                  type="submit"
-                  disabled={!selectedMembers.length || composerBusy}
-                >
-                  {composerBusy ? t("loading") : t("chatsCreateGroup")}
-                </Button>
-              </form>
-            )}
-            {directoryLoading && <ChatDirectorySkeleton />}
-            {!directoryLoading && !directory.length && !composerError && (
-              <p className="py-2 text-sm text-muted">{t("chatsNoContacts")}</p>
-            )}
-            {!directoryLoading && (
-            <div className="space-y-1">
-              {directory.map((person) => {
-                const checked = selectedMembers.includes(person.uid);
-                return (
-                  <button
-                    key={person.uid}
-                    type="button"
-                    disabled={composerBusy}
-                    className="flex w-full cursor-pointer items-center gap-3 rounded-[18px] px-2 py-2 text-left hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={() => {
-                      if (showNew === "dm") {
-                        void startDm(person);
-                        return;
-                      }
-                      setSelectedMembers((prev) =>
-                        checked
-                          ? prev.filter((id) => id !== person.uid)
-                          : [...prev, person.uid],
-                      );
-                    }}
-                  >
-                    <Avatar
-                      name={headlineName(person)}
-                      photoUrl={person.photoUrl}
-                      size={40}
-                    />
-                    <span className="flex-1 font-semibold">
-                      {headlineName(person)}
-                    </span>
-                    {showNew === "group" && (
-                      <span className="text-brand">{checked ? "✓" : "+"}</span>
-                    )}
-                  </button>
-                );
-              })}
+          <div className="flex max-h-[min(70vh,32rem)] flex-col border-b border-glass-border">
+            <div className="flex items-center justify-between gap-2 px-4 pt-3">
+              <p className="text-sm font-semibold">
+                {showNew === "group" ? t("chatsNewGroup") : t("chatsPickContact")}
+              </p>
+              <button
+                type="button"
+                className="text-xs font-semibold text-muted hover:text-ink"
+                onClick={closeComposer}
+              >
+                {t("chatsCloseComposer")}
+              </button>
             </div>
-            )}
+
+            <div className="space-y-3 overflow-y-auto px-4 pb-4 pt-2">
+              {composerError && (
+                <p className="text-sm text-red-400">{composerError}</p>
+              )}
+
+              {showNew === "group" && (
+                <form onSubmit={startGroup} className="space-y-3">
+                  <Input
+                    placeholder={t("chatsGroupName")}
+                    value={groupTitle}
+                    onChange={(e) => setGroupTitle(e.target.value)}
+                    required
+                    disabled={composerBusy}
+                  />
+
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted">
+                      {t("chatsIncludeRoles")}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {GROUP_SEED_ROLES.map((role) => {
+                        const on = seedRoles.includes(role);
+                        return (
+                          <button
+                            key={role}
+                            type="button"
+                            disabled={composerBusy}
+                            onClick={() => toggleSeedRole(role)}
+                            className={`rounded-full px-2.5 py-1 text-xs font-semibold transition ${
+                              on
+                                ? "bg-brand text-on-brand"
+                                : "bg-white/[0.06] text-muted hover:bg-white/[0.1] hover:text-ink"
+                            }`}
+                          >
+                            {t(ROLE_LABEL_KEYS[role])}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {seedRoles.length > 0 && (
+                      <p className="mt-1.5 text-[11px] text-muted">
+                        {t("chatsRoleSeedHint")}
+                      </p>
+                    )}
+                  </div>
+
+                  {canAutoJoin && seedRoles.length > 0 && (
+                    <label className="flex cursor-pointer items-start gap-2.5 rounded-xl bg-white/[0.03] px-3 py-2.5">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={autoJoin}
+                        disabled={composerBusy}
+                        onChange={(e) => setAutoJoin(e.target.checked)}
+                      />
+                      <span>
+                        <span className="block text-sm font-semibold">
+                          {t("chatsAutoJoin")}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] text-muted">
+                          {t("chatsAutoJoinHint")}
+                        </span>
+                      </span>
+                    </label>
+                  )}
+
+                  <Button
+                    type="submit"
+                    disabled={
+                      composerBusy ||
+                      (!selectedMembers.length && !seedRoles.length)
+                    }
+                  >
+                    {composerBusy
+                      ? t("loading")
+                      : `${t("chatsCreateGroup")}${
+                          selectedMembers.length
+                            ? ` · ${t("chatsSelectedCount", {
+                                count: selectedMembers.length,
+                              })}`
+                            : ""
+                        }`}
+                  </Button>
+                </form>
+              )}
+
+              {showNew === "group" && selectedMembers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedMembers.map((id) => {
+                    const person =
+                      selectedPeople[id] ??
+                      directory.find((d) => d.uid === id) ??
+                      visibleDirectory.find((d) => d.uid === id);
+                    if (!person) return null;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        disabled={composerBusy}
+                        onClick={() => toggleMember(person)}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-full bg-brand/15 px-2.5 py-1 text-xs font-semibold text-brand"
+                      >
+                        <span className="truncate">{headlineName(person)}</span>
+                        <span aria-hidden>×</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              <Input
+                placeholder={t("chatsSearchContacts")}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                disabled={composerBusy}
+                autoComplete="off"
+              />
+
+              {(directoryLoading || searchLoading) && <ChatDirectorySkeleton />}
+
+              {!directoryLoading &&
+                !searchLoading &&
+                searchQuery.trim().length === 1 && (
+                  <p className="py-2 text-sm text-muted">
+                    {t("chatsSearchMinChars")}
+                  </p>
+                )}
+
+              {!directoryLoading &&
+                !searchLoading &&
+                searchQuery.trim().length >= 2 &&
+                visibleDirectory.length === 0 && (
+                  <p className="py-2 text-sm text-muted">{t("chatsSearchEmpty")}</p>
+                )}
+
+              {!directoryLoading &&
+                !searchLoading &&
+                searchQuery.trim().length < 2 &&
+                !directory.length &&
+                !composerError && (
+                  <p className="py-2 text-sm text-muted">{t("chatsNoContacts")}</p>
+                )}
+
+              {!directoryLoading && !searchLoading && (
+                <div className="space-y-0.5">
+                  {visibleDirectory.map((person) => {
+                    const checked = selectedMembers.includes(person.uid);
+                    return (
+                      <button
+                        key={person.uid}
+                        type="button"
+                        disabled={composerBusy}
+                        className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50"
+                        onClick={() => {
+                          if (showNew === "dm") {
+                            void startDm(person);
+                            return;
+                          }
+                          toggleMember(person);
+                        }}
+                      >
+                        <Avatar
+                          name={headlineName(person)}
+                          photoUrl={person.photoUrl}
+                          size={40}
+                        />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-semibold">
+                            {headlineName(person)}
+                          </span>
+                          <span className="block truncate text-[11px] text-muted">
+                            {contactSubtitle(person)}
+                          </span>
+                        </span>
+                        {showNew === "group" && (
+                          <span
+                            className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                              checked
+                                ? "bg-brand text-on-brand"
+                                : "bg-white/[0.06] text-muted"
+                            }`}
+                          >
+                            {checked ? "✓" : "+"}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
         )}
 

@@ -75,7 +75,7 @@ env:
   #   value: REPLACE_ME
   #   availability: [BUILD, RUNTIME]
 
-  // App Check (reCAPTCHA v3). RTDB App Check is ENFORCED — required in prod.
+  # App Check (reCAPTCHA v3). RTDB App Check is ENFORCED — required in prod.
   - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
     value: 6Lc1OiAsAAAAADabSgXEcqU2G17BFdxZ3qZnYVx6
     availability:

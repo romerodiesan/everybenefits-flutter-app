@@ -10,9 +10,13 @@ import {
   ALL_ROLES,
   FORUM_ROLES,
   GROUP_CREATOR_ROLES,
+  GROUP_SEED_ROLES,
   belongsInDefaultAgentGroup,
   canAuthorCourses,
+  canConfigureGroupAutoJoin,
+  canParticipateInChats,
   parseRole,
+  type UserRole,
 } from "@pulse/shared";
 import {
   ensureThreadParticipant,
@@ -75,6 +79,7 @@ const DEFAULT_QUIZ_PASS_PERCENT = 70;
 /** Upper bound on option indexes, so a hostile payload can't balloon a set. */
 const MAX_QUIZ_OPTIONS = 20;
 const MAX_GROUP_MEMBERS = 20;
+const MAX_ROLE_SEED_MEMBERS = 200;
 const MAX_FUNCTION_CALLS_PER_MINUTE = 30;
 
 type VoteValue = -1 | 0 | 1;
@@ -152,6 +157,8 @@ function chatInboxRow(
   const unreadCounts =
     (chat.unreadCounts ?? {}) as Record<string, unknown>;
   const pinnedBy = (chat.pinnedBy ?? {}) as Record<string, unknown>;
+  const autoJoinRoles =
+    (chat.autoJoinRoles ?? {}) as Record<string, unknown>;
   return {
     chatId,
     memberIds: members,
@@ -168,7 +175,107 @@ function chatInboxRow(
     createdBy: String(chat.createdBy ?? ""),
     isDefaultAgentGroup: chat.isDefaultAgentGroup === true,
     isSupportChat: chat.isSupportChat === true,
+    autoJoinRoles,
   };
+}
+
+function isUserApprovedForJoin(data: admin.firestore.DocumentData | undefined) {
+  if (!data || data.isAnonymous === true) return false;
+  const status = String(data.approvalStatus ?? "approved");
+  return status === "approved";
+}
+
+async function addMemberToChat(
+  chatId: string,
+  uid: string,
+  displayName: string,
+) {
+  const chatRef = rtdb.ref(`chats/${chatId}`);
+  let joinedChat: Record<string, unknown> | null = null;
+  await chatRef.transaction((current) => {
+    if (current === null || typeof current !== "object") {
+      return; // abort — chat gone
+    }
+    const members =
+      current.members && typeof current.members === "object"
+        ? { ...current.members }
+        : {};
+    if (members[uid] === true) {
+      joinedChat = current as Record<string, unknown>;
+      return; // abort — already a member
+    }
+    members[uid] = true;
+    const memberNames =
+      current.memberNames && typeof current.memberNames === "object"
+        ? { ...current.memberNames, [uid]: displayName }
+        : { [uid]: displayName };
+    const unreadCounts =
+      current.unreadCounts && typeof current.unreadCounts === "object"
+        ? { ...current.unreadCounts, [uid]: 0 }
+        : { [uid]: 0 };
+    joinedChat = {
+      ...current,
+      members,
+      memberCount: Object.keys(members).length,
+      memberNames,
+      unreadCounts,
+    };
+    return joinedChat;
+  });
+  if (!joinedChat) {
+    const snap = await chatRef.get();
+    joinedChat = (snap.val() as Record<string, unknown> | null) ?? null;
+  }
+  if (joinedChat?.members &&
+      (joinedChat.members as Record<string, unknown>)[uid] === true) {
+    await rtdb
+      .ref(`userChats/${uid}/${chatId}`)
+      .set(chatInboxRow(chatId, joinedChat, uid));
+  }
+}
+
+async function ensureAutoJoinMemberships(
+  uid: string,
+  role: UserRole,
+  approvalStatus: string,
+  displayName: string,
+  isAnonymous: boolean,
+) {
+  if (isAnonymous || role === "guest") return;
+  if (approvalStatus !== "approved") return;
+  const indexSnap = await rtdb.ref(`autoJoinGroups/${role}`).get();
+  const chatIds = Object.keys(
+    (indexSnap.val() ?? {}) as Record<string, unknown>,
+  ).filter((chatId) => chatId && chatId !== DEFAULT_AGENT_GROUP_ID);
+  await Promise.all(
+    chatIds.map((chatId) => addMemberToChat(chatId, uid, displayName)),
+  );
+}
+
+async function collectUsersByRoles(
+  roles: UserRole[],
+  cap: number,
+): Promise<Map<string, admin.firestore.DocumentData>> {
+  const byUid = new Map<string, admin.firestore.DocumentData>();
+  if (!roles.length) return byUid;
+  // Query per role (avoids composite index); filter approval in memory.
+  await Promise.all(
+    roles.map(async (role) => {
+      const snap = await db
+        .collection("users")
+        .where("role", "==", role)
+        .limit(cap)
+        .get();
+      for (const doc of snap.docs) {
+        if (byUid.size >= cap) break;
+        const data = doc.data();
+        if (!isUserApprovedForJoin(data)) continue;
+        if (parseRole(data.role) === "guest") continue;
+        byUid.set(doc.id, data);
+      }
+    }),
+  );
+  return byUid;
 }
 
 async function addAgentToDefaultGroup(uid: string, displayName: string) {
@@ -255,6 +362,37 @@ export const syncPublicProfile = onDocumentWritten(
       isAnonymous: data.isAnonymous === true,
       updatedAt: FieldValue.serverTimestamp(),
     });
+  },
+);
+
+/** Join auto-join groups when role or approvalStatus changes. */
+export const syncUserAutoJoinGroups = onDocumentWritten(
+  "users/{uid}",
+  async (event) => {
+    const uid = event.params.uid;
+    const before = event.data?.before;
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    const beforeData = before?.exists ? before.data() : undefined;
+    const afterData = after.data() ?? {};
+    const beforeRole = beforeData ? parseRole(beforeData.role) : null;
+    const afterRole = parseRole(afterData.role);
+    const beforeApproval = String(beforeData?.approvalStatus ?? "approved");
+    const afterApproval = String(afterData.approvalStatus ?? "approved");
+    if (
+      before?.exists &&
+      beforeRole === afterRole &&
+      beforeApproval === afterApproval
+    ) {
+      return;
+    }
+    await ensureAutoJoinMemberships(
+      uid,
+      afterRole,
+      afterApproval,
+      headlineName(afterData),
+      afterData.isAnonymous === true,
+    );
   },
 );
 
@@ -349,29 +487,93 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
   const requested = Array.isArray(request.data?.memberIds)
     ? request.data.memberIds.map(String)
     : [];
-  const memberIds = [...new Set([uid, ...requested])]
-    .filter((id) => id && id !== SUPPORT_AI_UID);
+  const rawSeedRoles = Array.isArray(request.data?.seedRoles)
+    ? request.data.seedRoles.map(String)
+    : [];
+  const wantAutoJoin = request.data?.autoJoin === true;
+
+  const seedRoles = [
+    ...new Set(
+      rawSeedRoles
+        .map((role: string) => parseRole(role))
+        .filter((role: UserRole) =>
+          (GROUP_SEED_ROLES as readonly string[]).includes(role),
+        ),
+    ),
+  ] as UserRole[];
+
   if (!title || title.length > 120) {
     throw new HttpsError("invalid-argument", "Valid group title required.");
   }
-  if (memberIds.length < 2 || memberIds.length > MAX_GROUP_MEMBERS) {
-    throw new HttpsError("invalid-argument", "Group must have 2–20 members.");
-  }
+
   const creator = await db.doc(`users/${uid}`).get();
-  if (!(GROUP_CREATOR_ROLES as readonly string[]).includes(
-    parseRole(creator.data()?.role),
-  )) {
+  const creatorRole = parseRole(creator.data()?.role);
+  if (!(GROUP_CREATOR_ROLES as readonly string[]).includes(creatorRole)) {
     throw new HttpsError("permission-denied", "Not allowed to create groups.");
   }
-  const profiles = await db.getAll(
-    ...memberIds.map((memberId) => db.doc(`users/${memberId}`)),
-  );
-  if (profiles.some((profile) => !profile.exists)) {
+
+  const persistAutoJoin =
+    wantAutoJoin &&
+    seedRoles.length > 0 &&
+    canConfigureGroupAutoJoin(creatorRole);
+  if (wantAutoJoin && seedRoles.length > 0 && !persistAutoJoin) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only admins and managers can enable auto-join.",
+    );
+  }
+
+  const explicitIds = [...new Set([uid, ...requested])]
+    .filter((id) => id && id !== SUPPORT_AI_UID);
+
+  const roleUsers = await collectUsersByRoles(seedRoles, MAX_ROLE_SEED_MEMBERS);
+  const truncated =
+    seedRoles.length > 0 && roleUsers.size >= MAX_ROLE_SEED_MEMBERS;
+
+  const memberIdSet = new Set<string>(explicitIds);
+  for (const memberId of roleUsers.keys()) {
+    if (memberIdSet.size >= MAX_ROLE_SEED_MEMBERS) {
+      break;
+    }
+    memberIdSet.add(memberId);
+  }
+  const memberIds = [...memberIdSet];
+
+  const maxAllowed =
+    seedRoles.length > 0 ? MAX_ROLE_SEED_MEMBERS : MAX_GROUP_MEMBERS;
+  if (memberIds.length < 2) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Group must include the creator and at least one other member or matching role.",
+    );
+  }
+  if (memberIds.length > maxAllowed) {
+    throw new HttpsError(
+      "invalid-argument",
+      `Group cannot exceed ${maxAllowed} members.`,
+    );
+  }
+
+  // Fetch any explicit members not already loaded via role query.
+  const missing = memberIds.filter((id) => !roleUsers.has(id));
+  const fetched =
+    missing.length > 0
+      ? await db.getAll(...missing.map((id) => db.doc(`users/${id}`)))
+      : [];
+  if (fetched.some((profile) => !profile.exists)) {
     throw new HttpsError("failed-precondition", "Unknown group member.");
   }
+  for (const profile of fetched) {
+    roleUsers.set(profile.id, profile.data() ?? {});
+  }
+
   const memberNames = Object.fromEntries(
-    profiles.map((profile) => [profile.id, headlineName(profile.data())]),
+    memberIds.map((id) => [id, headlineName(roleUsers.get(id))]),
   );
+  const autoJoinRolesMap = persistAutoJoin
+    ? Object.fromEntries(seedRoles.map((role) => [role, true]))
+    : {};
+
   const now = Date.now();
   const chatRef = rtdb.ref("chats").push();
   const chatId = chatRef.key!;
@@ -391,9 +593,9 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     createdBy: uid,
     isDefaultAgentGroup: false,
     isSupportChat: false,
+    autoJoinRoles: autoJoinRolesMap,
   };
-  // Write chat + every member's inbox row in one update so the creator sees
-  // the group immediately (do not rely only on syncChatInbox timing).
+
   const updates: Record<string, unknown> = {
     [`chats/${chatId}`]: chat,
   };
@@ -404,8 +606,19 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
       memberId,
     );
   }
+  if (persistAutoJoin) {
+    for (const role of seedRoles) {
+      updates[`autoJoinGroups/${role}/${chatId}`] = true;
+    }
+  }
   await rtdb.ref().update(updates);
-  return { chatId, createdAt: now };
+  return {
+    chatId,
+    createdAt: now,
+    memberCount: memberIds.length,
+    truncated,
+    autoJoinRoles: persistAutoJoin ? seedRoles : [],
+  };
 });
 
 export const enrollInCourse = onCall(callableOpts, async (request) => {
@@ -796,6 +1009,15 @@ export const setUserRole = onCall(callableOpts, async (request) => {
     await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
   }
 
+  const approvalStatus = String(target.data()?.approvalStatus ?? "approved");
+  await ensureAutoJoinMemberships(
+    targetUid,
+    parseRole(role),
+    approvalStatus,
+    headlineName({ ...target.data(), role }),
+    target.data()?.isAnonymous === true,
+  );
+
   return { ok: true, uid: targetUid, role };
 });
 
@@ -825,6 +1047,16 @@ export const setUserApproval = onCall(callableOpts, async (request) => {
     approvedAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
+  if (status === "approved") {
+    const data = target.data();
+    await ensureAutoJoinMemberships(
+      targetUid,
+      parseRole(data?.role),
+      "approved",
+      headlineName(data),
+      data?.isAnonymous === true,
+    );
+  }
   return { ok: true, uid: targetUid, status };
 });
 
@@ -922,6 +1154,115 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
         profileCompleted: data.profileCompleted !== false,
       };
     });
+  return { profiles };
+});
+
+/**
+ * Directory search for chats (name, email, NPN). Returns PII for org members
+ * who can participate in chats.
+ */
+export const searchDirectory = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "searchDirectory");
+  const caller = await db.doc(`users/${uid}`).get();
+  const callerData = caller.data();
+  if (
+    !canParticipateInChats(
+      parseRole(callerData?.role),
+      callerData?.isAnonymous === true,
+    )
+  ) {
+    throw new HttpsError("permission-denied", "Chats not available.");
+  }
+
+  const rawQuery = String(request.data?.query ?? "").trim();
+  if (rawQuery.length < 2) {
+    return { profiles: [] };
+  }
+  const limit = Math.max(
+    1,
+    Math.min(40, Math.round(Number(request.data?.limit ?? 40))),
+  );
+  const q = rawQuery.toLowerCase();
+  const npnDigits = rawQuery.replace(/\D/g, "");
+  const looksEmail = q.includes("@");
+  const looksNpn = npnDigits.length >= 5 && /^\d[\d\s-]*$/.test(rawQuery);
+
+  const matched = new Map<string, Record<string, unknown>>();
+
+  const pushDoc = (doc: {
+    id: string;
+    data: () => admin.firestore.DocumentData;
+  }) => {
+    if (doc.id === uid || matched.has(doc.id)) return;
+    if (matched.size >= limit) return;
+    const data = doc.data();
+    if (data.isAnonymous === true) return;
+    const role = parseRole(data.role);
+    if (role === "guest") return;
+    if (!isUserApprovedForJoin(data) && String(data.approvalStatus ?? "") === "rejected") {
+      return;
+    }
+    // Allow pending for search so admins can still DM? Plan says approved.
+    // Stick to approved (legacy missing = approved).
+    if (!isUserApprovedForJoin(data)) return;
+    matched.set(doc.id, data);
+  };
+
+  if (looksEmail) {
+    const exact = await db
+      .collection("users")
+      .where("email", "==", q)
+      .limit(limit)
+      .get();
+    exact.docs.forEach(pushDoc);
+  }
+
+  if (looksNpn && matched.size < limit) {
+    const exact = await db
+      .collection("users")
+      .where("npn", "==", npnDigits)
+      .limit(limit)
+      .get();
+    exact.docs.forEach(pushDoc);
+  }
+
+  if (matched.size < limit) {
+    // Prefix range on displayName (case-sensitive Firestore limitation —
+    // also scan a pool and filter case-insensitively).
+    const pool = await db
+      .collection("users")
+      .where("isAnonymous", "==", false)
+      .limit(200)
+      .get();
+    for (const doc of pool.docs) {
+      if (matched.size >= limit) break;
+      const data = doc.data();
+      const name = String(data.displayName ?? "").toLowerCase();
+      const email = String(data.email ?? "").toLowerCase();
+      const npn = String(data.npn ?? "").replace(/\D/g, "");
+      if (
+        name.includes(q) ||
+        email.includes(q) ||
+        (npnDigits.length >= 2 && npn.includes(npnDigits))
+      ) {
+        pushDoc(doc);
+      }
+    }
+  }
+
+  const profiles = [...matched.entries()].map(([id, data]) => ({
+    uid: id,
+    displayName:
+      typeof data.displayName === "string" ? data.displayName : null,
+    photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
+    role: String(data.role ?? "student"),
+    agency: typeof data.agency === "string" ? data.agency : null,
+    email: typeof data.email === "string" ? data.email : null,
+    npn: typeof data.npn === "string" ? data.npn : null,
+    isAnonymous: false,
+    profileCompleted: data.profileCompleted !== false,
+  }));
+
   return { profiles };
 });
 

@@ -33,7 +33,15 @@ export declare function belongsInDefaultAgentGroup(role: UserRole): boolean;
 /** Agent tools (quote calculators, etc.) — not for students or guests. */
 export declare function canAccessTools(role: UserRole): boolean;
 export declare function canCreateChatGroups(role: UserRole): boolean;
+/** Who may enable persistent auto-join-by-role on a group. */
+export declare function canConfigureGroupAutoJoin(role: UserRole): role is "manager" | "admin";
+/** Roles that can be targeted for group seed / auto-join (not guest). */
+export declare const GROUP_SEED_ROLES: readonly ["student", "agent", "instructor", "manager", "admin"];
 export declare function canParticipateInForums(role: UserRole, isAnonymous: boolean): boolean;
 export declare function canParticipateInChats(role: UserRole, isAnonymous: boolean): boolean;
 /** Support inbox is for members who need help — not staff (admin/manager). */
 export declare function canAccessSupport(role: UserRole, isAnonymous: boolean): boolean;
+/** Pulse Admin portal — managers and admins only. */
+export declare function canAccessAdmin(role: UserRole): role is "manager" | "admin";
+/** Platform-wide ops (role changes, deactivate any user, root org). */
+export declare function canManagePlatform(role: UserRole): role is "admin";

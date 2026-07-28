@@ -122,6 +122,36 @@ export async function listPublicProfiles(max = 80): Promise<UserProfile[]> {
   }));
 }
 
+export async function searchDirectory(
+  query: string,
+  limit = 40,
+): Promise<UserProfile[]> {
+  const data = await callCloudFunction<{
+    profiles?: Array<Record<string, unknown>>;
+  }>("searchDirectory", { query, limit });
+  return (data?.profiles ?? []).map((entry) => ({
+    uid: String(entry.uid ?? ""),
+    email: (entry.email as string) ?? null,
+    displayName: (entry.displayName as string) ?? null,
+    photoUrl: (entry.photoUrl as string) ?? null,
+    role: parseRole(entry.role),
+    isAnonymous: false,
+    profileCompleted: (entry.profileCompleted as boolean) ?? true,
+    phoneCountryCode: null,
+    phoneNumber: null,
+    npn: (entry.npn as string) ?? null,
+    address: null,
+    addressStreet: null,
+    addressApt: null,
+    addressCity: null,
+    addressState: null,
+    addressZip: null,
+    agency: (entry.agency as string) ?? null,
+    createdAt: null,
+    updatedAt: null,
+  }));
+}
+
 export async function listPendingApprovals(): Promise<UserProfile[]> {
   const data = await callCloudFunction<{
     users?: Array<Record<string, unknown>>;

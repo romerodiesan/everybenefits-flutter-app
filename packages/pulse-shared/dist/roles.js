@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GROUP_CREATOR_ROLES = exports.DEFAULT_GROUP_ROLES = exports.FORUM_ROLES = exports.ALL_ROLES = void 0;
+exports.GROUP_SEED_ROLES = exports.GROUP_CREATOR_ROLES = exports.DEFAULT_GROUP_ROLES = exports.FORUM_ROLES = exports.ALL_ROLES = void 0;
 exports.parseRole = parseRole;
 exports.canAuthorCourses = canAuthorCourses;
 exports.canAuthorPaths = canAuthorPaths;
@@ -10,9 +10,12 @@ exports.canEditPath = canEditPath;
 exports.belongsInDefaultAgentGroup = belongsInDefaultAgentGroup;
 exports.canAccessTools = canAccessTools;
 exports.canCreateChatGroups = canCreateChatGroups;
+exports.canConfigureGroupAutoJoin = canConfigureGroupAutoJoin;
 exports.canParticipateInForums = canParticipateInForums;
 exports.canParticipateInChats = canParticipateInChats;
 exports.canAccessSupport = canAccessSupport;
+exports.canAccessAdmin = canAccessAdmin;
+exports.canManagePlatform = canManagePlatform;
 exports.ALL_ROLES = [
     "guest",
     "student",
@@ -91,6 +94,18 @@ function canAccessTools(role) {
 function canCreateChatGroups(role) {
     return exports.GROUP_CREATOR_ROLES.includes(role);
 }
+/** Who may enable persistent auto-join-by-role on a group. */
+function canConfigureGroupAutoJoin(role) {
+    return role === "admin" || role === "manager";
+}
+/** Roles that can be targeted for group seed / auto-join (not guest). */
+exports.GROUP_SEED_ROLES = [
+    "student",
+    "agent",
+    "instructor",
+    "manager",
+    "admin",
+];
 function canParticipateInForums(role, isAnonymous) {
     if (isAnonymous || role === "guest")
         return false;
@@ -106,4 +121,12 @@ function canAccessSupport(role, isAnonymous) {
     if (role === "admin" || role === "manager")
         return false;
     return (role === "student" || role === "agent" || role === "instructor");
+}
+/** Pulse Admin portal — managers and admins only. */
+function canAccessAdmin(role) {
+    return role === "manager" || role === "admin";
+}
+/** Platform-wide ops (role changes, deactivate any user, root org). */
+function canManagePlatform(role) {
+    return role === "admin";
 }
