@@ -217,7 +217,7 @@ export function LibraryHome() {
           ))}
         </div>
         <Input
-          className="max-w-xs"
+          className="w-full sm:max-w-xs"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("librarySearch")}

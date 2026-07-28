@@ -20,7 +20,9 @@ enum UserRole {
       };
 
   /// Unknown / missing values fail closed as [guest] (no elevated privileges).
+  /// Legacy wire value `teacher` maps to [instructor].
   static UserRole parse(String? value) {
+    if (value == 'teacher') return UserRole.instructor;
     return UserRole.values.firstWhere(
       (role) => role.wireValue == value,
       orElse: () => UserRole.guest,
@@ -41,4 +43,13 @@ bool belongsInDefaultAgentGroup(UserRole role) {
       role == UserRole.instructor ||
       role == UserRole.manager ||
       role == UserRole.admin;
+}
+
+/// Support chat is for members who need help — not staff (admin/manager).
+bool canAccessSupport(UserRole role, {required bool isAnonymous}) {
+  if (isAnonymous || role == UserRole.guest) return false;
+  if (role == UserRole.admin || role == UserRole.manager) return false;
+  return role == UserRole.student ||
+      role == UserRole.agent ||
+      role == UserRole.instructor;
 }

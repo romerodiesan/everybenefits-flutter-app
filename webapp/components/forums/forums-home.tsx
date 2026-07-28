@@ -21,18 +21,24 @@ import {
   addReply,
   castForumVote,
   createThread,
+  deleteReply,
+  deleteThread,
   fetchReplyVotes,
   fetchThreadVotes,
+  getThread,
   queryThreads,
   setAcceptedReply,
+  updateReply,
+  updateThread,
   watchReplies,
   watchThread,
   watchThreadVote,
 } from "@/lib/firebase/forums";
-import { canParticipateInForums, headlineName } from "@/lib/roles";
+import { canParticipateInForums, headlineName, parseRole } from "@/lib/roles";
 import { FORUM_TAGS, type ForumReply, type ForumThread } from "@/lib/types";
 import {
   toggleSavedThread,
+  removeSavedThread,
   useSavedThread,
   useSavedThreadIds,
 } from "@/lib/saved-threads";
@@ -294,6 +300,41 @@ export function ForumsHome() {
   }
 
   useEffect(() => {
+    if (mode !== "saved") return;
+    let cancelled = false;
+    setLoading(true);
+    const ids = [...saved];
+    void Promise.all(
+      ids.map(async (id) => {
+        try {
+          return await getThread(id);
+        } catch {
+          return null;
+        }
+      }),
+    ).then((results) => {
+      if (cancelled) return;
+      const found = results.filter((thread): thread is ForumThread =>
+        Boolean(thread),
+      );
+      const foundIds = new Set(found.map((thread) => thread.id));
+      for (const id of ids) {
+        if (!foundIds.has(id)) removeSavedThread(id);
+      }
+      setThreads(found);
+      setHasMore(false);
+      setCursor(null);
+      setLoading(false);
+      void loadVotes(found.map((thread) => thread.id));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only reload when entering saved mode or saved set identity changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, saved.size, loadVotes]);
+
+  useEffect(() => {
     if (mode === "saved") return;
     let cancelled = false;
     queryThreads({ sort, tag: tag || undefined })
@@ -427,15 +468,20 @@ export function ForumsHome() {
         counts.set(item, (counts.get(item) ?? 0) + 1);
       }
     }
-    const fromFeed = [...counts.entries()].sort((a, b) => b[1] - a[1]);
-    if (fromFeed.length) return fromFeed.slice(0, 10);
-    return FORUM_TAGS.slice(0, 8).map((item) => [item, 0] as [string, number]);
+    return [...counts.entries()]
+      .filter(([, count]) => count > 0)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
   }, [threads]);
 
-  const liveVoices = useMemo(() => {
-    const authors = new Set(threads.map((t) => t.authorId));
-    return Math.max(authors.size, threads.length ? 1 : 0);
-  }, [threads]);
+  const [onlineCount, setOnlineCount] = useState(0);
+  useEffect(() => {
+    let stop: (() => void) | undefined;
+    void import("@/lib/firebase/presence").then(({ watchOnlineCount }) => {
+      stop = watchOnlineCount(setOnlineCount, () => setOnlineCount(0));
+    });
+    return () => stop?.();
+  }, []);
 
   const spotlight = useMemo(() => {
     if (mode === "saved" || !threads.length) return null;
@@ -494,8 +540,8 @@ export function ForumsHome() {
   return (
     <div className="mx-auto grid w-full max-w-[1100px] gap-6 px-3 md:px-4 xl:grid-cols-[minmax(0,680px)_280px] xl:justify-center">
       <div className="relative flex w-full max-w-[680px] flex-col xl:max-w-none">
-        <header className="pt-5">
-          <div className="flex items-start justify-between gap-3 pr-14 lg:pr-0">
+        <header className="pt-2 lg:pt-5">
+          <div className="flex items-start justify-between gap-3 pr-2 sm:pr-14 lg:pr-0">
             <div className="min-w-0">
               <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-brand">
                 Pulse
@@ -511,7 +557,7 @@ export function ForumsHome() {
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-brand" />
                 </span>
                 <span>
-                  {t("forumsLiveVoices", { count: liveVoices || 3 })}
+                  {t("forumsOnlineCount", { count: onlineCount })}
                 </span>
               </div>
             </div>
@@ -834,7 +880,7 @@ export function ForumsHome() {
                           className={`ml-auto rounded-lg p-1.5 transition ${
                             isSaved
                               ? "text-brand"
-                              : "text-muted opacity-0 hover:bg-brand/8 hover:text-ink group-hover:opacity-100"
+                              : "text-muted opacity-100 hover:bg-brand/8 hover:text-ink lg:opacity-0 lg:group-hover:opacity-100"
                           }`}
                           aria-label={t("forumsSave")}
                         >
@@ -966,7 +1012,7 @@ export function ForumsHome() {
                   )}
                   <Link
                     href={`/home/${thread.id}`}
-                    className="text-[11px] font-bold text-brand opacity-0 transition group-hover:opacity-100"
+                    className="text-[11px] font-bold text-brand opacity-100 transition lg:opacity-0 lg:group-hover:opacity-100"
                   >
                     {t("forumsOpenThread")}
                   </Link>
@@ -979,7 +1025,13 @@ export function ForumsHome() {
         {hasMore && mode !== "saved" && (
           <div ref={sentinelRef} className="flex justify-center py-4">
             {loadingMore && (
-              <p className="text-xs font-semibold text-muted">{t("loading")}</p>
+              <div className="w-full max-w-xl px-2" aria-busy="true">
+                <div className="feed-card space-y-2 p-4">
+                  <div className="feed-shimmer h-3 w-1/3 rounded-full" />
+                  <div className="feed-shimmer h-3 w-full rounded-full" />
+                  <div className="feed-shimmer h-3 w-2/3 rounded-full" />
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -1009,6 +1061,7 @@ export function ForumsHome() {
 
 export function ThreadDetail({ threadId }: { threadId: string }) {
   const t = useTranslations();
+  const router = useRouter();
   const { profile } = useAuth();
   const pulseAiEnabled = usePulseAiEnabled();
   const reduceMotion = useSafeReducedMotion();
@@ -1022,6 +1075,12 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
   const [showShare, setShowShare] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [burst, setBurst] = useState(false);
+  const [editingThread, setEditingThread] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editBody, setEditBody] = useState("");
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editingReplyId, setEditingReplyId] = useState<string | null>(null);
+  const [editReplyBody, setEditReplyBody] = useState("");
   const replyIdsKey = useRef("");
   const repliesRef = useRef<HTMLDivElement>(null);
 
@@ -1064,9 +1123,29 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
 
   const canPost =
     profile && canParticipateInForums(profile.role, profile.isAnonymous);
+  const isAdmin = parseRole(profile?.role) === "admin";
   const isAuthor = Boolean(profile && thread && profile.uid === thread.authorId);
+  const canManageThread = Boolean(isAuthor || isAdmin);
+  const canAccept = canManageThread;
   const effectiveReplyVotes =
     profile && replies.length ? replyVotes : ({} as Record<string, number>);
+
+  function startEditThread() {
+    if (!thread) return;
+    setEditTitle(thread.title);
+    setEditBody(thread.body);
+    setEditTags(thread.tags.length ? [...thread.tags] : ["general"]);
+    setEditingThread(true);
+    setEditingReplyId(null);
+    setActionError(null);
+  }
+
+  function startEditReply(reply: ForumReply) {
+    setEditingReplyId(reply.id);
+    setEditReplyBody(reply.body);
+    setEditingThread(false);
+    setActionError(null);
+  }
 
   async function toggleThreadLike() {
     if (!thread || !canPost || isAuthor) return;
@@ -1130,6 +1209,82 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
     }
   }
 
+  async function onSaveThread(e: FormEvent) {
+    e.preventDefault();
+    if (!canManageThread) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await updateThread({
+        threadId,
+        title: editTitle,
+        body: editBody,
+        tags: editTags,
+      });
+      setEditingThread(false);
+    } catch (error) {
+      console.error(error);
+      setActionError(t("errorGeneric"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeleteThread() {
+    if (!canManageThread) return;
+    if (!window.confirm(t("threadDeleteConfirm"))) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await deleteThread(threadId);
+      removeSavedThread(threadId);
+      router.replace("/home");
+    } catch (error) {
+      console.error(error);
+      setActionError(t("errorGeneric"));
+      setBusy(false);
+    }
+  }
+
+  async function onSaveReply(e: FormEvent) {
+    e.preventDefault();
+    if (!editingReplyId) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await updateReply({
+        threadId,
+        replyId: editingReplyId,
+        body: editReplyBody,
+      });
+      setEditingReplyId(null);
+      setEditReplyBody("");
+    } catch (error) {
+      console.error(error);
+      setActionError(t("errorGeneric"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onDeleteReply(reply: ForumReply) {
+    if (!window.confirm(t("replyDeleteConfirm"))) return;
+    setBusy(true);
+    setActionError(null);
+    try {
+      await deleteReply({ threadId, replyId: reply.id });
+      if (editingReplyId === reply.id) {
+        setEditingReplyId(null);
+        setEditReplyBody("");
+      }
+    } catch (error) {
+      console.error(error);
+      setActionError(t("errorGeneric"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (!thread) {
     return (
       <div className="mx-auto w-full max-w-[1100px] px-4 py-8">
@@ -1177,6 +1332,25 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                   {formatRelative(thread.createdAt, t("forumsJustNow"))}
                 </p>
               </div>
+              {canManageThread && !editingThread && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={startEditThread}
+                    className="rounded-xl px-2.5 py-2 text-xs font-semibold text-muted transition hover:bg-brand/8 hover:text-brand"
+                  >
+                    {t("threadEdit")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void onDeleteThread()}
+                    disabled={busy}
+                    className="rounded-xl px-2.5 py-2 text-xs font-semibold text-muted transition hover:bg-red-500/10 hover:text-red-400 disabled:opacity-40"
+                  >
+                    {t("threadDelete")}
+                  </button>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={toggleSave}
@@ -1189,25 +1363,64 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
               </button>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-1.5">
-              {thread.tags.map((item) => (
-                <span
-                  key={item}
-                  className="rounded-full bg-brand/12 px-2.5 py-1 text-[11px] font-bold text-brand"
-                >
-                  #{item}
-                </span>
-              ))}
-            </div>
+            {editingThread ? (
+              <form onSubmit={onSaveThread} className="mt-4 space-y-3 pb-4">
+                <div>
+                  <Label>{t("threadEditTitle")}</Label>
+                  <Input
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    required
+                    maxLength={200}
+                  />
+                </div>
+                <div>
+                  <Label>{t("threadEditBody")}</Label>
+                  <TextArea
+                    value={editBody}
+                    onChange={(e) => setEditBody(e.target.value)}
+                    className="min-h-28"
+                    required
+                  />
+                </div>
+                <TagEditor value={editTags} onChange={setEditTags} />
+                <div className="flex justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setEditingThread(false)}
+                    disabled={busy}
+                  >
+                    {t("threadCancel")}
+                  </Button>
+                  <Button type="submit" disabled={busy}>
+                    {t("threadSave")}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <>
+                <div className="mt-4 flex flex-wrap gap-1.5">
+                  {thread.tags.map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full bg-brand/12 px-2.5 py-1 text-[11px] font-bold text-brand"
+                    >
+                      #{item}
+                    </span>
+                  ))}
+                </div>
 
-            <h1 className="mt-4 font-display text-[1.7rem] font-bold leading-[1.15] tracking-tight md:text-[2rem]">
-              {thread.title}
-            </h1>
-            <p className="mt-3 whitespace-pre-wrap pb-4 text-[15px] leading-relaxed text-ink/95">
-              {thread.body}
-            </p>
+                <h1 className="mt-4 font-display text-[1.7rem] font-bold leading-[1.15] tracking-tight md:text-[2rem]">
+                  {thread.title}
+                </h1>
+                <p className="mt-3 whitespace-pre-wrap pb-4 text-[15px] leading-relaxed text-ink/95">
+                  {thread.body}
+                </p>
+              </>
+            )}
 
-            {(likeCount > 0 || thread.replyCount > 0) && (
+            {(likeCount > 0 || thread.replyCount > 0) && !editingThread && (
               <div className="flex items-center gap-3 border-t border-glass-border py-2.5 text-xs font-semibold text-muted">
                 {likeCount > 0 && (
                   <span>{t("forumsLikesCount", { count: likeCount })}</span>
@@ -1221,49 +1434,51 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
             )}
           </div>
 
-          <div className="mx-3 mb-2 flex items-center gap-0.5 border-t border-glass-border pt-1 md:mx-4">
-            <ActionButton
-              onClick={toggleThreadLike}
-              active={liked}
-              disabled={!canPost || isAuthor}
-              className="relative"
-            >
-              <motion.span
-                key={liked ? "on" : "off"}
-                initial={reduceMotion ? false : { scale: 0.7 }}
-                animate={{ scale: 1 }}
-                transition={{ type: "spring", stiffness: 500, damping: 18 }}
-                className="inline-flex"
+          {!editingThread && (
+            <div className="mx-3 mb-2 flex items-center gap-0.5 border-t border-glass-border pt-1 md:mx-4">
+              <ActionButton
+                onClick={toggleThreadLike}
+                active={liked}
+                disabled={!canPost || isAuthor}
+                className="relative"
               >
-                <IconHeart filled={liked} />
-              </motion.span>
-              {liked ? t("forumsLiked") : t("forumsLike")}
-              <LikeBurst active={burst} />
-            </ActionButton>
-            <ActionButton
-              onClick={() =>
-                repliesRef.current?.scrollIntoView({ behavior: "smooth" })
-              }
-            >
-              <IconComment />
-              {t("forumsComment")}
-            </ActionButton>
-            {canPost && (
-              <ActionButton onClick={() => setShowShare(true)}>
-                <IconShare />
-                {t("forumsShare")}
+                <motion.span
+                  key={liked ? "on" : "off"}
+                  initial={reduceMotion ? false : { scale: 0.7 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 18 }}
+                  className="inline-flex"
+                >
+                  <IconHeart filled={liked} />
+                </motion.span>
+                {liked ? t("forumsLiked") : t("forumsLike")}
+                <LikeBurst active={burst} />
               </ActionButton>
-            )}
-            {pulseAiEnabled && (
-              <Link
-                href="/ai"
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold text-muted transition hover:bg-brand/[0.06] hover:text-brand"
+              <ActionButton
+                onClick={() =>
+                  repliesRef.current?.scrollIntoView({ behavior: "smooth" })
+                }
               >
-                <IconSpark />
-                AI
-              </Link>
-            )}
-          </div>
+                <IconComment />
+                {t("forumsComment")}
+              </ActionButton>
+              {canPost && (
+                <ActionButton onClick={() => setShowShare(true)}>
+                  <IconShare />
+                  {t("forumsShare")}
+                </ActionButton>
+              )}
+              {pulseAiEnabled && (
+                <Link
+                  href="/ai"
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold text-muted transition hover:bg-brand/[0.06] hover:text-brand"
+                >
+                  <IconSpark />
+                  AI
+                </Link>
+              )}
+            </div>
+          )}
         </motion.article>
 
         {actionError && (
@@ -1280,6 +1495,10 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
               const rLiked = effectiveReplyVotes[reply.id] === 1;
               const accepted = thread.acceptedReplyId === reply.id;
               const rLikeCount = Math.max(0, reply.score);
+              const canManageReply = Boolean(
+                profile && (isAdmin || reply.authorId === profile.uid),
+              );
+              const isEditing = editingReplyId === reply.id;
               return (
                 <motion.div
                   key={reply.id}
@@ -1316,32 +1535,81 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                           </span>
                         )}
                       </div>
-                      <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed">
-                        {reply.body}
-                      </p>
-                    </div>
-                    <div className="mt-1.5 flex items-center gap-3 pl-1.5 text-xs font-semibold text-muted">
-                      <button
-                        type="button"
-                        onClick={() => toggleReplyLike(reply)}
-                        disabled={!canPost || reply.authorId === profile?.uid}
-                        className={`inline-flex items-center gap-1 transition disabled:opacity-40 ${
-                          rLiked ? "text-brand" : "hover:text-ink"
-                        }`}
-                      >
-                        <IconHeart filled={rLiked} width={15} height={15} />
-                        {rLikeCount > 0 ? rLikeCount : t("forumsLike")}
-                      </button>
-                      {isAuthor && (
-                        <button
-                          type="button"
-                          onClick={() => toggleAccept(reply.id)}
-                          className="transition hover:text-brand"
-                        >
-                          {accepted ? t("threadUnaccept") : t("threadAccept")}
-                        </button>
+                      {isEditing ? (
+                        <form onSubmit={onSaveReply} className="mt-2 space-y-2">
+                          <TextArea
+                            value={editReplyBody}
+                            onChange={(e) => setEditReplyBody(e.target.value)}
+                            className="min-h-20"
+                            required
+                            aria-label={t("replyEditBody")}
+                          />
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingReplyId(null);
+                                setEditReplyBody("");
+                              }}
+                              disabled={busy}
+                            >
+                              {t("threadCancel")}
+                            </Button>
+                            <Button type="submit" disabled={busy}>
+                              {t("threadSave")}
+                            </Button>
+                          </div>
+                        </form>
+                      ) : (
+                        <p className="mt-1 whitespace-pre-wrap text-[14px] leading-relaxed">
+                          {reply.body}
+                        </p>
                       )}
                     </div>
+                    {!isEditing && (
+                      <div className="mt-1.5 flex flex-wrap items-center gap-3 pl-1.5 text-xs font-semibold text-muted">
+                        <button
+                          type="button"
+                          onClick={() => toggleReplyLike(reply)}
+                          disabled={!canPost || reply.authorId === profile?.uid}
+                          className={`inline-flex items-center gap-1 transition disabled:opacity-40 ${
+                            rLiked ? "text-brand" : "hover:text-ink"
+                          }`}
+                        >
+                          <IconHeart filled={rLiked} width={15} height={15} />
+                          {rLikeCount > 0 ? rLikeCount : t("forumsLike")}
+                        </button>
+                        {canAccept && (
+                          <button
+                            type="button"
+                            onClick={() => toggleAccept(reply.id)}
+                            className="transition hover:text-brand"
+                          >
+                            {accepted ? t("threadUnaccept") : t("threadAccept")}
+                          </button>
+                        )}
+                        {canManageReply && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => startEditReply(reply)}
+                              className="transition hover:text-brand"
+                            >
+                              {t("replyEdit")}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void onDeleteReply(reply)}
+                              disabled={busy}
+                              className="transition hover:text-red-400 disabled:opacity-40"
+                            >
+                              {t("replyDelete")}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </motion.div>
               );

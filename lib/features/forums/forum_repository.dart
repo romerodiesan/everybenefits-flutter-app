@@ -374,21 +374,11 @@ class FirestoreForumStore implements ForumStore {
 
   @override
   Future<void> deleteThread(String threadId) async {
-    final replies = await _replies(threadId).get();
-    final batch = _firestore.batch();
-    for (final doc in replies.docs) {
-      final votes = await doc.reference.collection('votes').get();
-      for (final vote in votes.docs) {
-        batch.delete(vote.reference);
-      }
-      batch.delete(doc.reference);
-    }
-    final threadVotes = await _threads.doc(threadId).collection('votes').get();
-    for (final vote in threadVotes.docs) {
-      batch.delete(vote.reference);
-    }
-    batch.delete(_threads.doc(threadId));
-    await batch.commit();
+    // Cascade (replies/votes/participants) requires Admin SDK — client rules
+    // deny reply/vote deletes.
+    await _functions.httpsCallable('deleteForumThread').call(<String, dynamic>{
+      'threadId': threadId,
+    });
   }
 
   @override

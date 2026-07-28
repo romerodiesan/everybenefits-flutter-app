@@ -17,6 +17,7 @@ import {
   type AfcTier,
 } from "@/lib/tools/afc-rates";
 import { Label, Panel } from "@/components/ui/primitives";
+import { CardListSkeleton } from "@/components/ui/skeleton";
 
 const selectClass =
   "h-10 w-full rounded-xl border border-glass-border bg-sheet px-3.5 text-sm text-ink outline-none focus:border-brand";
@@ -47,8 +48,8 @@ export function AfcQuote() {
 
   if (loading || !profile || !allowed) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted">
-        {t("loading")}
+      <div className="mx-auto w-full max-w-3xl px-4 py-8">
+        <CardListSkeleton rows={3} />
       </div>
     );
   }

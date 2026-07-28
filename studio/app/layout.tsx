@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Figtree, Outfit } from "next/font/google";
 import "./globals.css";
 
@@ -17,6 +17,20 @@ const figtree = Figtree({
 export const metadata: Metadata = {
   title: "Pulse Studio",
   description: "Author courses and learning paths for EVERY Pulse Academy",
+  icons: {
+    icon: [
+      { url: "/icon.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/pulse-logo.png", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#0a0b0e",
 };
 
 export default function RootLayout({

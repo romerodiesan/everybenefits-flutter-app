@@ -384,7 +384,7 @@ function QuizEditor({
               key={question.id}
               className="rounded-xl border border-glass-border bg-sheet p-3"
             >
-              <div className="flex items-start gap-2">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
                 <span className="mt-2.5 w-5 shrink-0 text-xs font-semibold text-muted">
                   {index + 1}.
                 </span>
@@ -397,25 +397,27 @@ function QuizEditor({
                     placeholder={t("studioQuizPrompt")}
                   />
                 </div>
-                <select
-                  value={question.selectionMode}
-                  onChange={(event) =>
-                    setMode(index, event.target.value as QuizSelectionMode)
-                  }
-                  className="h-10 shrink-0 rounded-xl border border-glass-border bg-sheet px-2 text-xs text-ink outline-none focus:border-brand"
-                >
-                  <option value="single">{t("quizPickOne")}</option>
-                  <option value="multi">{t("quizPickMany")}</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => removeQuestion(index)}
-                  title={t("studioDelete")}
-                  aria-label={t("studioDelete")}
-                  className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm text-muted transition hover:bg-ink/[0.05] hover:text-ink dark:hover:bg-white/[0.06]"
-                >
-                  ✕
-                </button>
+                <div className="flex items-center gap-2">
+                  <select
+                    value={question.selectionMode}
+                    onChange={(event) =>
+                      setMode(index, event.target.value as QuizSelectionMode)
+                    }
+                    className="h-10 min-w-0 flex-1 rounded-xl border border-glass-border bg-sheet px-2 text-xs text-ink outline-none focus:border-brand sm:flex-none"
+                  >
+                    <option value="single">{t("quizPickOne")}</option>
+                    <option value="multi">{t("quizPickMany")}</option>
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => removeQuestion(index)}
+                    title={t("studioDelete")}
+                    aria-label={t("studioDelete")}
+                    className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm text-muted transition hover:bg-ink/[0.05] hover:text-ink dark:hover:bg-white/[0.06]"
+                  >
+                    ✕
+                  </button>
+                </div>
               </div>
 
               <ul className="mt-2 space-y-1.5 pl-7">

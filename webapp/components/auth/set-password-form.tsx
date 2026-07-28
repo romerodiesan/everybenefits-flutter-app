@@ -4,12 +4,14 @@ import { FormEvent, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { Button, Input, Label, Panel } from "@/components/ui/primitives";
+import { ProfileFormSkeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/lib/providers/auth-provider";
 import {
   hasPasswordProvider,
   linkPassword,
   signOutEverywhere,
 } from "@/lib/firebase/auth";
+import { needsProfileCompletion } from "@/lib/roles";
 import { useLocale } from "next-intl";
 
 export function SetPasswordForm() {
@@ -29,7 +31,7 @@ export function SetPasswordForm() {
       return;
     }
     if (user.isAnonymous || hasPasswordProvider()) {
-      if (profile && !profile.profileCompleted && !profile.isAnonymous) {
+      if (profile && needsProfileCompletion(profile) && !profile.isAnonymous) {
         router.replace("/complete-profile");
       } else {
         router.replace("/home");
@@ -51,7 +53,7 @@ export function SetPasswordForm() {
     setError(null);
     try {
       await linkPassword(password);
-      if (profile && !profile.profileCompleted && !profile.isAnonymous) {
+      if (profile && needsProfileCompletion(profile) && !profile.isAnonymous) {
         router.replace("/complete-profile");
       } else {
         router.replace("/home");
@@ -76,8 +78,10 @@ export function SetPasswordForm() {
 
   if (loading || !user) {
     return (
-      <div className="mesh-bg flex min-h-[100svh] items-center justify-center text-muted">
-        {t("loading")}
+      <div className="mesh-bg flex min-h-[100svh] items-center justify-center px-4 py-10">
+        <Panel className="w-full max-w-md">
+          <ProfileFormSkeleton />
+        </Panel>
       </div>
     );
   }

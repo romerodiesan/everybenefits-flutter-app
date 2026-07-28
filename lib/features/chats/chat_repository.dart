@@ -316,14 +316,34 @@ class RtdbChatStore implements ChatStore {
         },
       );
       final data = _asStringKeyedMap(result.data);
-      final chatId = '${data['chatId'] ?? ''}';
-      final snap = await _root.child('chats/$chatId').get();
-      if (!snap.exists || snap.value is! Map) {
+      final chatId = '${data['chatId'] ?? ''}'.trim();
+      if (chatId.isEmpty) {
         throw StateError('No se pudo crear el grupo.');
       }
-      return ChatConversation.fromMap(
-        chatId,
-        _asStringKeyedMap(snap.value),
+      final createdAtMs = data['createdAt'] is num
+          ? (data['createdAt'] as num).toInt()
+          : DateTime.now().millisecondsSinceEpoch;
+      final createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtMs);
+      // Do not await an RTDB read here — a stuck client connection hangs the
+      // UI forever even after the callable succeeds.
+      return ChatConversation(
+        id: chatId,
+        memberIds: List<String>.from(chat.memberIds)..sort(),
+        memberNames: Map<String, String>.from(chat.memberNames),
+        isGroup: true,
+        title: chat.title,
+        dmKey: null,
+        lastMessage: '',
+        lastMessageAt: createdAt,
+        lastMessageSenderId: null,
+        unreadCounts: {
+          for (final id in chat.memberIds) id: 0,
+        },
+        pinnedBy: const {},
+        createdAt: createdAt,
+        createdBy: chat.createdBy,
+        isDefaultAgentGroup: false,
+        isSupportChat: false,
       );
     }
     final ref = chat.id.isEmpty
@@ -592,6 +612,9 @@ class ChatRepository {
     String? welcomeMessage,
   }) async {
     _ensureCanChat(me);
+    if (!canAccessSupport(me.role, isAnonymous: me.isAnonymous)) {
+      throw StateError('Support is not available for this account');
+    }
     final id = supportChatIdFor(me.uid);
     // Probe via userChats (always readable by owner). Reading chats/$id when
     // missing is denied by membership rules and surfaces as permission-denied.

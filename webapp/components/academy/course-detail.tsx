@@ -20,6 +20,7 @@ import {
 } from "@/lib/academy-progress";
 import type { Course, CourseContent, Enrollment, Lesson } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
+import { DetailPageSkeleton } from "@/components/ui/skeleton";
 import {
   CourseCover,
   EmptyState,
@@ -114,11 +115,7 @@ export function CourseDetail({ courseId }: { courseId: string }) {
   };
 
   if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-10 text-sm text-muted lg:px-8">
-        {t("loading")}
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!course) {

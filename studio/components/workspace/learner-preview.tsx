@@ -24,6 +24,7 @@ export function LearnerPreview({
     content.lessons[0]?.id ?? null,
   );
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
+  const [syllabusOpen, setSyllabusOpen] = useState(false);
 
   const lesson = useMemo(
     () => content.lessons.find((entry) => entry.id === lessonId) ?? null,
@@ -53,20 +54,44 @@ export function LearnerPreview({
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#0a0b0e]">
-      <header className="flex items-center justify-between gap-3 border-b border-glass-border px-5 py-3">
-        <div className="min-w-0">
-          <p className="text-[11px] uppercase tracking-wide text-muted">
-            {t("actionPreview")}
-          </p>
-          <h1 className="truncate font-display text-lg">{course.title}</h1>
+      <header className="flex items-center justify-between gap-3 border-b border-glass-border px-3 py-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            className="rounded-lg p-2 text-muted hover:bg-white/[0.06] hover:text-ink lg:hidden"
+            aria-label={t("workspaceModules")}
+            onClick={() => setSyllabusOpen((v) => !v)}
+          >
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8">
+              <path d="M4 7h16M4 12h16M4 17h16" strokeLinecap="round" />
+            </svg>
+          </button>
+          <div className="min-w-0">
+            <p className="text-[11px] uppercase tracking-wide text-muted">
+              {t("actionPreview")}
+            </p>
+            <h1 className="truncate font-display text-lg">{course.title}</h1>
+          </div>
         </div>
-        <Button variant="secondary" className="h-9 px-3 text-xs" onClick={onClose}>
+        <Button variant="secondary" className="h-9 shrink-0 px-3 text-xs" onClick={onClose}>
           {t("previewClose")}
         </Button>
       </header>
 
-      <div className="flex min-h-0 flex-1">
-        <aside className="w-[280px] shrink-0 overflow-y-auto border-r border-glass-border p-3">
+      <div className="relative flex min-h-0 flex-1">
+        {syllabusOpen ? (
+          <button
+            type="button"
+            aria-label="Close syllabus"
+            className="absolute inset-0 z-10 bg-black/50 lg:hidden"
+            onClick={() => setSyllabusOpen(false)}
+          />
+        ) : null}
+        <aside
+          className={`absolute inset-y-0 left-0 z-20 w-[min(280px,88vw)] shrink-0 overflow-y-auto border-r border-glass-border bg-[#0a0b0e] p-3 transition-transform lg:static lg:z-auto lg:w-[280px] lg:translate-x-0 ${
+            syllabusOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          }`}
+        >
           {content.modules.length === 0 ? (
             <p className="px-2 py-6 text-sm text-muted">{t("workspaceNoLesson")}</p>
           ) : (
@@ -82,7 +107,10 @@ export function LearnerPreview({
                       <li key={entry.id}>
                         <button
                           type="button"
-                          onClick={() => setLessonId(entry.id)}
+                          onClick={() => {
+                            setLessonId(entry.id);
+                            setSyllabusOpen(false);
+                          }}
                           className={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left text-sm transition ${
                             active
                               ? "bg-brand/20 text-brand"

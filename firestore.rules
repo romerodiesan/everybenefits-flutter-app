@@ -46,15 +46,16 @@ service cloud.firestore {
     function isForumParticipant() {
       return isRegisteredMember()
         && userDoc(request.auth.uid).data.get('role', '') in
-          ['student', 'agent', 'instructor', 'manager', 'admin'];
+          ['student', 'agent', 'instructor', 'teacher', 'manager', 'admin'];
     }
 
     // Instructors and managers author courses (published only after admin
     // approval); admins have full control over the academy catalog.
+    // Legacy role "teacher" is an alias of instructor.
     function isCourseAuthor() {
       return isAccountActive()
         && userDoc(request.auth.uid).data.get('role', '')
-          in ['instructor', 'manager', 'admin'];
+          in ['instructor', 'teacher', 'manager', 'admin'];
     }
 
     function courseData(courseId) {
@@ -105,7 +106,7 @@ service cloud.firestore {
     }
 
     function isProtectedRole(role) {
-      return role in ['instructor', 'manager', 'admin'];
+      return role in ['instructor', 'teacher', 'manager', 'admin'];
     }
 
     function boundedString(value, maxLen) {

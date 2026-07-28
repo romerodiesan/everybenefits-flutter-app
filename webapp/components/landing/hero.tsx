@@ -49,7 +49,10 @@ export function LandingHero() {
     return () => window.clearInterval(id);
   }, [reduced]);
 
-  const [brandFirst, brandSecond = ""] = t("brand").split(" ");
+  const brand = t("brand").trim();
+  const brandParts = brand.split(/\s+/);
+  const brandFirst = brandParts[0] ?? "Pulse";
+  const brandSecond = brandParts.slice(1).join(" ");
 
   return (
     <section
@@ -104,21 +107,25 @@ export function LandingHero() {
         <div className="relative flex flex-1 flex-col justify-center py-14">
           <motion.div style={{ y: typeY }} className="relative z-10">
             <motion.p
-              className="text-outline select-none font-display text-[clamp(4.5rem,17vw,13rem)] font-extrabold uppercase leading-[0.82] tracking-[-0.03em]"
+              className={`select-none font-display text-[clamp(4.5rem,17vw,13rem)] font-extrabold uppercase leading-[0.82] tracking-[-0.03em] ${
+                brandSecond ? "text-outline" : "text-ink"
+              }`}
               initial={reduced ? false : { opacity: 0, y: 40 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: RISE }}
             >
               {brandFirst}
             </motion.p>
-            <motion.p
-              className="select-none font-display text-[clamp(4.5rem,17vw,13rem)] font-extrabold uppercase leading-[0.82] tracking-[-0.03em] text-ink"
-              initial={reduced ? false : { opacity: 0, y: 40 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, delay: 0.08, ease: RISE }}
-            >
-              {brandSecond}
-            </motion.p>
+            {brandSecond ? (
+              <motion.p
+                className="select-none font-display text-[clamp(4.5rem,17vw,13rem)] font-extrabold uppercase leading-[0.82] tracking-[-0.03em] text-ink"
+                initial={reduced ? false : { opacity: 0, y: 40 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.7, delay: 0.08, ease: RISE }}
+              >
+                {brandSecond}
+              </motion.p>
+            ) : null}
 
             <motion.div
               className="mt-6 flex flex-wrap items-baseline gap-x-4 gap-y-1"

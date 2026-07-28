@@ -20,6 +20,7 @@ import {
   type PulseAppId,
 } from "@/lib/sso";
 import type { UserRole } from "@/lib/types";
+import { BrandMark } from "@/components/chrome/brand-mark";
 
 type IconProps = SVGProps<SVGSVGElement>;
 
@@ -170,9 +171,13 @@ export function AppSwitcher({
   const brandInner = (
     <>
       <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${currentMeta.tileClass}`}
+        className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg ${currentMeta.tileClass}`}
       >
-        <CurrentIcon width={18} height={18} />
+        {current === "pulse" ? (
+          <BrandMark size={28} />
+        ) : (
+          <CurrentIcon width={18} height={18} />
+        )}
       </span>
       <span className="min-w-0">
         <span className="block truncate font-display text-lg font-bold leading-tight tracking-tight">
@@ -207,7 +212,7 @@ export function AppSwitcher({
           aria-label={t("appSwitchTitle")}
           disabled={busy}
           onClick={() => setOpen((v) => !v)}
-          className="group inline-flex max-w-full items-center gap-2 rounded-xl px-1.5 py-1 text-left transition hover:bg-ink/[0.05] dark:hover:bg-white/[0.06]"
+          className="group inline-flex max-w-full cursor-pointer items-center gap-2 rounded-xl px-1.5 py-1 text-left transition hover:bg-ink/[0.05] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[0.06]"
         >
           {brandInner}
         </button>
@@ -242,7 +247,7 @@ export function AppSwitcher({
                     disabled={busy}
                     aria-current={active ? "true" : undefined}
                     onClick={() => void switchTo(app.id)}
-                    className={`flex h-full w-full flex-col items-start gap-2 rounded-xl px-2.5 py-2.5 text-left transition ${
+                    className={`flex h-full w-full cursor-pointer flex-col items-start gap-2 rounded-xl px-2.5 py-2.5 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
                       active
                         ? "bg-brand/10 ring-1 ring-brand/30"
                         : "hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"

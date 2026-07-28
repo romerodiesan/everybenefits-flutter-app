@@ -9,6 +9,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
+import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase/client";
 
 export type ThemeMode = "system" | "light" | "dark";
 export type AccentSeed =
@@ -28,6 +30,8 @@ const ACCENTS: Record<AccentSeed, string> = {
   rose: "#E11D48",
 };
 
+const ACCENT_IDS = new Set<string>(Object.keys(ACCENTS));
+
 type ThemeContextValue = {
   mode: ThemeMode;
   accent: AccentSeed;
@@ -43,7 +47,38 @@ function readStored<T extends string>(key: string, fallback: T): T {
   return (window.localStorage.getItem(key) as T) || fallback;
 }
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
+function isAccent(value: string): value is AccentSeed {
+  return ACCENT_IDS.has(value);
+}
+
+async function persistAppearance(mode: ThemeMode, accent: AccentSeed) {
+  const uid = getFirebaseAuth().currentUser?.uid;
+  if (!uid) return;
+  try {
+    await setDoc(
+      doc(getFirebaseDb(), "users", uid),
+      {
+        appearance: { theme: mode, accent, updatedAt: serverTimestamp() },
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true },
+    );
+  } catch {
+    // Offline / rules — localStorage still applies.
+  }
+}
+
+export function ThemeProvider({
+  children,
+  remoteAppearance,
+}: {
+  children: ReactNode;
+  /** When signed in, prefer Firestore appearance from the user profile. */
+  remoteAppearance?: {
+    theme?: string | null;
+    accent?: string | null;
+  } | null;
+}) {
   const [mode, setModeState] = useState<ThemeMode>("dark");
   const [accent, setAccentState] = useState<AccentSeed>("green");
   const [resolvedDark, setResolvedDark] = useState(true);
@@ -54,6 +89,22 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       setAccentState(readStored("pulse-accent", "green"));
     });
   }, []);
+
+  useEffect(() => {
+    if (!remoteAppearance) return;
+    const theme = remoteAppearance.theme;
+    const nextAccent = remoteAppearance.accent;
+    startTransition(() => {
+      if (theme === "system" || theme === "light" || theme === "dark") {
+        setModeState(theme);
+        window.localStorage.setItem("pulse-theme", theme);
+      }
+      if (nextAccent && isAccent(nextAccent)) {
+        setAccentState(nextAccent);
+        window.localStorage.setItem("pulse-accent", nextAccent);
+      }
+    });
+  }, [remoteAppearance?.theme, remoteAppearance?.accent]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -75,11 +126,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const setMode = (next: ThemeMode) => {
     setModeState(next);
     window.localStorage.setItem("pulse-theme", next);
+    void persistAppearance(next, accent);
   };
 
   const setAccent = (next: AccentSeed) => {
     setAccentState(next);
     window.localStorage.setItem("pulse-accent", next);
+    void persistAppearance(mode, next);
   };
 
   const value = useMemo(

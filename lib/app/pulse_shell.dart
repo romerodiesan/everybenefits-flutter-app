@@ -276,6 +276,12 @@ class PulseShellState extends State<PulseShell> {
           tooltip: l10n.fabSearchCourses,
         );
       case 4:
+        if (!canAccessSupport(
+          profile.role,
+          isAnonymous: profile.isAnonymous,
+        )) {
+          return null;
+        }
         return _ShellFabConfig(
           icon: Icons.support_outlined,
           tooltip: l10n.fabSupport,
@@ -314,6 +320,13 @@ class PulseShellState extends State<PulseShell> {
   }
 
   Future<void> _openSupportChat() async {
+    final profile = widget.profile;
+    if (!canAccessSupport(
+      profile.role,
+      isAnonymous: profile.isAnonymous,
+    )) {
+      return;
+    }
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
     final repo = widget.chatRepository ?? ChatRepository();
@@ -378,7 +391,12 @@ class PulseShellState extends State<PulseShell> {
         authService: widget.authService,
         userRepository: widget.userRepository,
         profile: profile,
-        onOpenSupportChat: _openSupportChat,
+        onOpenSupportChat: canAccessSupport(
+          profile.role,
+          isAnonymous: profile.isAnonymous,
+        )
+            ? _openSupportChat
+            : null,
         notificationUnread: _notifUnread,
         onOpenNotifications: _openNotifications,
       ),

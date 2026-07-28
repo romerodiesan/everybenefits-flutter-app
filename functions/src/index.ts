@@ -1,6 +1,6 @@
 import * as admin from "firebase-admin";
 import { randomBytes } from "node:crypto";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type DocumentReference } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onValueWritten } from "firebase-functions/v2/database";
@@ -22,12 +22,18 @@ import {
 } from "./notifications";
 
 admin.initializeApp({
-  databaseURL: "https://every-insurance-default-rtdb.firebaseio.com",
+  databaseURL:
+    process.env.FIREBASE_DATABASE_URL ||
+    "https://every-benefits-us-default-rtdb.firebaseio.com",
 });
 setGlobalOptions({ region: "us-central1", maxInstances: 20 });
 
 /** Gen2 callables need explicit CORS for browser (e.g. localhost webapp). */
 const usingFunctionsEmulator = process.env.FUNCTIONS_EMULATOR === "true";
+/** Opt-in: set FUNCTIONS_ENFORCE_APP_CHECK=true once Pulse/Studio site keys are live. */
+const enforceAppCheck =
+  !usingFunctionsEmulator &&
+  process.env.FUNCTIONS_ENFORCE_APP_CHECK === "true";
 const callableOpts = {
   // Emulator Gen2 often drops Access-Control headers on preflight when cors is
   // an allow-list; open it fully locally. Production keeps an explicit list.
@@ -40,14 +46,19 @@ const callableOpts = {
         "http://127.0.0.1:3001",
         "https://every-insurance.web.app",
         "https://every-insurance.firebaseapp.com",
+        "https://pulse.everybenefits.us",
+        "https://studio.everybenefits.us",
+        "https://pulse-web-app--every-benefits-us.us-central1.hosted.app",
+        "https://studio-web-app--every-benefits-us.us-central1.hosted.app",
         ...(process.env.FUNCTIONS_ALLOWED_ORIGINS ?? "")
           .split(",")
           .map((origin) => origin.trim())
           .filter(Boolean),
       ],
-  // Emulator clients skip App Check; enforcing here turns votes/replies into
-  // opaque `internal` failures. Production keeps enforcement on.
-  enforceAppCheck: !usingFunctionsEmulator,
+  // Emulator clients skip App Check. Production stays off until site keys are
+  // configured on pulse.everybenefits.us / studio.everybenefits.us, then set
+  // FUNCTIONS_ENFORCE_APP_CHECK=true.
+  enforceAppCheck,
   // Auth is enforced inside the handler; Cloud Run must allow the OPTIONS preflight.
   invoker: "public" as const,
 };
@@ -284,6 +295,9 @@ export const syncChatInbox = onValueWritten(
       (before.unreadCounts ?? {}) as Record<string, unknown>;
     const afterUnread =
       (after.unreadCounts ?? {}) as Record<string, unknown>;
+    const memberNames =
+      (after.memberNames ?? {}) as Record<string, unknown>;
+    const senderName = String(memberNames[senderId] ?? "").trim() || "Someone";
 
     await Promise.all(
       members.map(async (uid) => {
@@ -300,6 +314,8 @@ export const syncChatInbox = onValueWritten(
             href: `/chats/${chatId}`,
             deepLink: `pulse://chats/${chatId}`,
             ref: { chatId },
+            actorId: senderId,
+            actorName: senderName,
           },
           { chatIdForDebounce: chatId },
         );
@@ -342,7 +358,9 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     throw new HttpsError("invalid-argument", "Group must have 2–20 members.");
   }
   const creator = await db.doc(`users/${uid}`).get();
-  if (!(GROUP_CREATOR_ROLES as readonly string[]).includes(String(creator.data()?.role ?? ""))) {
+  if (!(GROUP_CREATOR_ROLES as readonly string[]).includes(
+    parseRole(creator.data()?.role),
+  )) {
     throw new HttpsError("permission-denied", "Not allowed to create groups.");
   }
   const profiles = await db.getAll(
@@ -357,7 +375,7 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
   const now = Date.now();
   const chatRef = rtdb.ref("chats").push();
   const chatId = chatRef.key!;
-  await chatRef.set({
+  const chat = {
     members: Object.fromEntries(memberIds.map((id) => [id, true])),
     memberCount: memberIds.length,
     memberNames,
@@ -373,7 +391,20 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     createdBy: uid,
     isDefaultAgentGroup: false,
     isSupportChat: false,
-  });
+  };
+  // Write chat + every member's inbox row in one update so the creator sees
+  // the group immediately (do not rely only on syncChatInbox timing).
+  const updates: Record<string, unknown> = {
+    [`chats/${chatId}`]: chat,
+  };
+  for (const memberId of memberIds) {
+    updates[`userChats/${memberId}/${chatId}`] = chatInboxRow(
+      chatId,
+      chat,
+      memberId,
+    );
+  }
+  await rtdb.ref().update(updates);
   return { chatId, createdAt: now };
 });
 
@@ -562,6 +593,8 @@ export const castForumVote = onCall(callableOpts, async (request) => {
           href: `/home/${threadId}`,
           deepLink: `pulse://forums/${threadId}`,
           ref: { threadId, ...(replyId ? { replyId } : {}) },
+          actorId: uid,
+          actorName: voterName,
         });
       }
     } catch (error) {
@@ -628,6 +661,8 @@ export const addForumReply = onCall(callableOpts, async (request) => {
         href: `/home/${threadId}`,
         deepLink: `pulse://forums/${threadId}`,
         ref: { threadId, replyId: replyRef.id },
+        actorId: uid,
+        actorName: actorName,
       }),
     ),
   );
@@ -649,7 +684,7 @@ export const deleteForumReply = onCall(callableOpts, async (request) => {
   if (!thread.exists || !reply.exists) {
     throw new HttpsError("not-found", "Reply not found.");
   }
-  if (actor.data()?.role !== "admin" && reply.data()?.authorId !== uid) {
+  if (parseRole(actor.data()?.role) !== "admin" && reply.data()?.authorId !== uid) {
     throw new HttpsError("permission-denied", "Not allowed to delete this reply.");
   }
   const remaining = await db
@@ -658,7 +693,9 @@ export const deleteForumReply = onCall(callableOpts, async (request) => {
     .limit(2)
     .get();
   const latest = remaining.docs.find((doc) => doc.id !== replyId);
+  const replyVotes = await replyRef.collection("votes").get();
   const batch = db.batch();
+  for (const vote of replyVotes.docs) batch.delete(vote.ref);
   batch.delete(replyRef);
   batch.update(threadRef, {
     replyCount: FieldValue.increment(-1),
@@ -670,6 +707,54 @@ export const deleteForumReply = onCall(callableOpts, async (request) => {
       : {}),
   });
   await batch.commit();
+  return { ok: true };
+});
+
+export const deleteForumThread = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "deleteForumThread");
+  const threadId = String(request.data?.threadId ?? "");
+  if (!threadId) {
+    throw new HttpsError("invalid-argument", "threadId required");
+  }
+  const threadRef = db.doc(`threads/${threadId}`);
+  const [actor, thread] = await Promise.all([
+    db.doc(`users/${uid}`).get(),
+    threadRef.get(),
+  ]);
+  if (!thread.exists) {
+    throw new HttpsError("not-found", "Thread not found.");
+  }
+  const isAdmin = parseRole(actor.data()?.role) === "admin";
+  if (!isAdmin && thread.data()?.authorId !== uid) {
+    throw new HttpsError("permission-denied", "Not allowed to delete this thread.");
+  }
+
+  const [repliesSnap, threadVotesSnap, participantsSnap] = await Promise.all([
+    threadRef.collection("replies").get(),
+    threadRef.collection("votes").get(),
+    threadRef.collection("participants").get(),
+  ]);
+
+  // Firestore batches cap at 500 ops; chunk if a thread is unusually large.
+  const refsToDelete: DocumentReference[] = [];
+  for (const reply of repliesSnap.docs) {
+    const voteSnap = await reply.ref.collection("votes").get();
+    for (const vote of voteSnap.docs) refsToDelete.push(vote.ref);
+    refsToDelete.push(reply.ref);
+  }
+  for (const vote of threadVotesSnap.docs) refsToDelete.push(vote.ref);
+  for (const participant of participantsSnap.docs) {
+    refsToDelete.push(participant.ref);
+  }
+  refsToDelete.push(threadRef);
+
+  for (let i = 0; i < refsToDelete.length; i += 450) {
+    const batch = db.batch();
+    for (const ref of refsToDelete.slice(i, i + 450)) {
+      batch.delete(ref);
+    }
+    await batch.commit();
+  }
   return { ok: true };
 });
 
@@ -712,6 +797,67 @@ export const setUserRole = onCall(callableOpts, async (request) => {
   }
 
   return { ok: true, uid: targetUid, role };
+});
+
+/**
+ * Admin or manager: approve / reject newly registered accounts.
+ * Legacy users without approvalStatus are already treated as approved.
+ */
+export const setUserApproval = onCall(callableOpts, async (request) => {
+  const actorUid = await requireCaller(request, "setUserApproval");
+  const targetUid = String(request.data?.uid ?? "");
+  const status = String(request.data?.status ?? "");
+  if (!targetUid || (status !== "approved" && status !== "rejected")) {
+    throw new HttpsError("invalid-argument", "uid and status required");
+  }
+  const actor = await db.doc(`users/${actorUid}`).get();
+  const actorRole = parseRole(actor.data()?.role);
+  if (actorRole !== "admin" && actorRole !== "manager") {
+    throw new HttpsError("permission-denied", "Admins and managers only.");
+  }
+  const target = await db.doc(`users/${targetUid}`).get();
+  if (!target.exists) {
+    throw new HttpsError("not-found", "User not found.");
+  }
+  await db.doc(`users/${targetUid}`).update({
+    approvalStatus: status,
+    approvedBy: actorUid,
+    approvedAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return { ok: true, uid: targetUid, status };
+});
+
+/** Admin/manager directory of users awaiting approval. */
+export const listPendingApprovals = onCall(callableOpts, async (request) => {
+  const actorUid = await requireCaller(request, "listPendingApprovals");
+  const actor = await db.doc(`users/${actorUid}`).get();
+  const actorRole = parseRole(actor.data()?.role);
+  if (actorRole !== "admin" && actorRole !== "manager") {
+    throw new HttpsError("permission-denied", "Admins and managers only.");
+  }
+  const snap = await db
+    .collection("users")
+    .where("approvalStatus", "==", "pending")
+    .limit(100)
+    .get();
+  const users = snap.docs
+    .filter((doc) => doc.id !== actorUid && doc.data()?.isAnonymous !== true)
+    .map((doc) => {
+      const data = doc.data();
+      return {
+        uid: doc.id,
+        email: typeof data.email === "string" ? data.email : null,
+        displayName:
+          typeof data.displayName === "string" ? data.displayName : null,
+        photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
+        role: String(data.role ?? "student"),
+        profileCompleted: data.profileCompleted !== false,
+        agency: typeof data.agency === "string" ? data.agency : null,
+        approvalStatus: "pending",
+      };
+    });
+  return { users };
 });
 
 /**

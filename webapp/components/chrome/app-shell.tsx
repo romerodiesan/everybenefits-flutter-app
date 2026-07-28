@@ -22,15 +22,15 @@ import {
   registerWebPushToken,
   watchNotificationState,
 } from "@/lib/firebase/notifications";
-import { canAccessTools, headlineName } from "@/lib/roles";
+import { canAccessTools, canAccessSupport, headlineName, isUserApproved } from "@/lib/roles";
 import { AGENT_TOOLS } from "@/lib/tools/catalog";
 import { AppSwitcher } from "@/components/chrome/app-switcher";
 import { useVisibleSubscription } from "@/lib/hooks/use-visible-subscription";
 import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
-import { useEnrollments } from "@/lib/providers/enrollments-provider";
 import type { UserProfile, UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
 import { AccountGate } from "@/components/chrome/account-gate";
+import { PendingApprovalGate } from "@/components/chrome/pending-approval-gate";
 import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
 import { ProductTour } from "@/components/chrome/product-tour";
 import dynamic from "next/dynamic";
@@ -305,7 +305,6 @@ const NAV = [
 ];
 
 function useShellStats(profile: UserProfile | null) {
-  const { learningCount } = useEnrollments();
   const [unreadTotal, setUnreadTotal] = useState(0);
   const [notifUnread, setNotifUnread] = useState(0);
   const [forumUnread, setForumUnread] = useState(0);
@@ -365,6 +364,13 @@ function useShellStats(profile: UserProfile | null) {
       return;
     }
 
+    let stopPresence: (() => void) | undefined;
+    void import("@/lib/firebase/presence").then(({ startPresence }) => {
+      void startPresence(uid).then((stop) => {
+        stopPresence = stop;
+      });
+    });
+
     let pushTimer: ReturnType<typeof setTimeout> | undefined;
     let pushIdle: number | undefined;
     if (typeof window !== "undefined" && "requestIdleCallback" in window) {
@@ -388,6 +394,7 @@ function useShellStats(profile: UserProfile | null) {
     });
 
     return () => {
+      stopPresence?.();
       stopForeground?.();
       if (toastTimer) clearTimeout(toastTimer);
       if (pushIdle !== undefined && typeof window !== "undefined") {
@@ -399,7 +406,7 @@ function useShellStats(profile: UserProfile | null) {
 
   const forumBadge = forumUnread + newThreads;
 
-  return { unreadTotal, learningCount, notifUnread, forumBadge, pushToast };
+  return { unreadTotal, notifUnread, forumBadge, pushToast };
 }
 
 function formatBadge(n: number) {
@@ -418,7 +425,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
-  const { unreadTotal, learningCount, notifUnread, forumBadge, pushToast } =
+  const { unreadTotal, notifUnread, forumBadge, pushToast } =
     useShellStats(profile);
 
   const navItems = useMemo(
@@ -441,6 +448,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     return trimmed ? trimmed.charAt(0).toUpperCase() : "?";
   }, [name]);
 
+  // Profile field remediation runs only after login/register/set-password —
+  // not on every AppShell mount (slim session cache would false-trigger).
   useEffect(() => {
     if (loading) return;
     if (!user) {
@@ -449,12 +458,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
     if (!user.isAnonymous && !hasPasswordProvider() && user.email) {
       router.replace("/set-password");
-      return;
     }
-    if (profile && !profile.profileCompleted && !profile.isAnonymous) {
-      router.replace("/complete-profile");
-    }
-  }, [loading, user, profile, router]);
+  }, [loading, user, router]);
 
   useEffect(() => {
     if (!profile || profile.isAnonymous) return;
@@ -475,7 +480,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, []);
 
   const openSupport = async () => {
-    if (!profile || supportBusy || profile.isAnonymous) return;
+    if (
+      !profile ||
+      supportBusy ||
+      !canAccessSupport(profile.role, profile.isAnonymous)
+    ) {
+      return;
+    }
     setSupportBusy(true);
     try {
       const chat = await getOrCreateSupportChat(
@@ -504,6 +515,10 @@ export function AppShell({ children }: { children: ReactNode }) {
     profile.accountStatus === "pendingDeletion"
   ) {
     return <AccountGate profile={profile} />;
+  }
+
+  if (!profile.isAnonymous && !isUserApproved(profile.approvalStatus)) {
+    return <PendingApprovalGate />;
   }
 
   const unreadLabel = formatBadge(unreadTotal);
@@ -682,26 +697,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="mt-auto space-y-2.5 border-t border-glass-border px-2.5 py-3">
-          <div className="grid grid-cols-2 gap-1.5">
-            <div className="rounded-xl bg-ink/[0.035] px-2.5 py-2 dark:bg-white/[0.04]">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-                {t("navStatUnreadShort")}
-              </p>
-              <p className="mt-1 font-display text-xl font-bold tabular-nums leading-none">
-                {unreadTotal}
-              </p>
-            </div>
-            <div className="rounded-xl bg-ink/[0.035] px-2.5 py-2 dark:bg-white/[0.04]">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-muted">
-                {t("navStatLearningShort")}
-              </p>
-              <p className="mt-1 font-display text-xl font-bold tabular-nums leading-none">
-                {learningCount}
-              </p>
-            </div>
-          </div>
-
-          {!profile.isAnonymous && (
+          {canAccessSupport(profile.role, profile.isAnonymous) && (
             <button
               type="button"
               disabled={supportBusy}
@@ -782,7 +778,11 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         )}
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto pb-[calc(48px+env(safe-area-inset-bottom,0px)+16px)] lg:pb-0">
+        <main
+          className={`flex min-h-0 flex-1 flex-col pt-[max(3.5rem,env(safe-area-inset-top,0px)+2.85rem)] pb-[calc(48px+env(safe-area-inset-bottom,0px)+16px)] lg:pt-0 lg:pb-0 ${
+            onChats ? "overflow-hidden" : "overflow-y-auto"
+          }`}
+        >
           {children}
         </main>
       </div>
@@ -829,7 +829,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     height={20}
                   />
                   {active && (
-                    <span className="truncate text-[11px] font-semibold tracking-tight">
+                    <span className="hidden truncate text-[11px] font-semibold tracking-tight min-[390px]:inline">
                       {t(item.key)}
                     </span>
                   )}
@@ -861,7 +861,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                         height={20}
                       />
                       {(toolsActive || mobileToolsOpen) && (
-                        <span className="truncate text-[11px] font-semibold tracking-tight">
+                        <span className="hidden truncate text-[11px] font-semibold tracking-tight min-[390px]:inline">
                           {t("navTools")}
                         </span>
                       )}
@@ -875,7 +875,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                           className="fixed inset-0 z-40 cursor-default bg-transparent"
                           onClick={() => setMobileToolsOpen(false)}
                         />
-                        <ul className="pulse-sheet absolute bottom-[calc(100%+8px)] left-1/2 z-50 min-w-[12.5rem] -translate-x-1/2 overflow-hidden py-1 shadow-lg">
+                        <ul className="pulse-sheet absolute bottom-[calc(100%+8px)] right-0 z-50 max-w-[calc(100vw-1.5rem)] min-w-[12.5rem] overflow-hidden py-1 shadow-lg sm:left-1/2 sm:right-auto sm:-translate-x-1/2">
                           {AGENT_TOOLS.map((tool) => {
                             const toolActive =
                               pathname === tool.href ||
@@ -907,7 +907,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {!profile.isAnonymous && !onChats && (
+      {canAccessSupport(profile.role, profile.isAnonymous) && !onChats && (
         <button
           type="button"
           disabled={supportBusy}

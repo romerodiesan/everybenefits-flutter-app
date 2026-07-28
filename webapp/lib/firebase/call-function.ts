@@ -35,9 +35,13 @@ function isUnavailable(error: unknown): boolean {
 export async function callCloudFunction<TResult = unknown>(
   name: string,
   data: unknown = {},
+  options?: { timeoutMs?: number },
 ): Promise<TResult> {
   try {
-    const callable = httpsCallable(getFirebaseFunctions(), name);
+    const timeout = options?.timeoutMs ?? 25_000;
+    const callable = httpsCallable(getFirebaseFunctions(), name, {
+      timeout,
+    });
     const result = await callable(data);
     return result.data as TResult;
   } catch (error) {

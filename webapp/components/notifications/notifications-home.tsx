@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import {
+  channelForType,
   markAllNotificationsRead,
   markNotificationRead,
   watchNotifications,
   type AppNotification,
+  type NotificationChannelFilter,
 } from "@/lib/firebase/notifications";
 import { Button } from "@/components/ui/primitives";
 
@@ -28,7 +30,6 @@ function formatWhen(date: Date | null, fallback: string) {
 
 function destinationFor(item: AppNotification): string {
   const href = item.href?.trim();
-  // Trust the stored href (seeds intentionally point at /notifications).
   if (href) return href;
   const ref = item.ref ?? {};
   if (ref.chatId) return `/chats/${ref.chatId}`;
@@ -37,6 +38,17 @@ function destinationFor(item: AppNotification): string {
   return "/notifications";
 }
 
+const FILTERS: {
+  id: NotificationChannelFilter;
+  labelKey: string;
+}[] = [
+  { id: "all", labelKey: "notificationsFilterAll" },
+  { id: "chats", labelKey: "notificationsFilterChats" },
+  { id: "forums", labelKey: "notificationsFilterForums" },
+  { id: "academy", labelKey: "notificationsFilterAcademy" },
+  { id: "support", labelKey: "notificationsFilterSupport" },
+];
+
 export function NotificationsHome() {
   const t = useTranslations();
   const router = useRouter();
@@ -44,14 +56,18 @@ export function NotificationsHome() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [busy, setBusy] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [filter, setFilter] = useState<NotificationChannelFilter>("all");
 
   useEffect(() => {
     if (!profile || profile.isAnonymous) return;
     return watchNotifications(profile.uid, setItems, () => setItems([]));
   }, [profile]);
 
-  const visibleItems =
-    !profile || profile.isAnonymous ? [] : items;
+  const visibleItems = useMemo(() => {
+    if (!profile || profile.isAnonymous) return [];
+    if (filter === "all") return items;
+    return items.filter((item) => channelForType(item.type) === filter);
+  }, [filter, items, profile]);
 
   const openItem = async (item: AppNotification) => {
     if (!profile || openingId) return;
@@ -83,7 +99,7 @@ export function NotificationsHome() {
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6 lg:px-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-bold tracking-tight">
             {t("notificationsTitle")}
@@ -106,7 +122,7 @@ export function NotificationsHome() {
             {t("notificationsMarkAll")}
           </Button>
           <Link
-            href="/profile#notifications"
+            href="/profile?section=notifications#notifications"
             aria-label={t("notificationsPrefsTitle")}
             title={t("notificationsPrefsTitle")}
             className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition hover:bg-white/[0.04] hover:text-ink"
@@ -128,6 +144,26 @@ export function NotificationsHome() {
             </svg>
           </Link>
         </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {FILTERS.map((item) => {
+          const active = filter === item.id;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              onClick={() => setFilter(item.id)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold transition ${
+                active
+                  ? "bg-brand text-on-brand"
+                  : "bg-ink/[0.05] text-muted hover:text-ink dark:bg-white/[0.06]"
+              }`}
+            >
+              {t(item.labelKey)}
+            </button>
+          );
+        })}
       </div>
 
       {visibleItems.length === 0 ? (
@@ -187,6 +223,11 @@ function NotificationRow({ item }: { item: AppNotification }) {
             />
           )}
           {item.title}
+          {item.count > 1 && (
+            <span className="ml-1.5 rounded-full bg-brand/15 px-1.5 py-0.5 text-[10px] font-bold text-brand">
+              {item.count}
+            </span>
+          )}
         </p>
         <span className="shrink-0 text-[11px] text-muted">
           {formatWhen(item.createdAt, "")}

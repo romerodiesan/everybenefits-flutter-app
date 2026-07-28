@@ -10,13 +10,13 @@ export default function ChatConversationPage({
 }) {
   const { chatId } = use(params);
   return (
-    <>
-      <div className="hidden h-full lg:block">
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="hidden min-h-0 flex-1 lg:flex lg:flex-col">
         <ChatsHome selectedId={chatId} />
       </div>
-      <div className="flex h-full min-h-0 flex-col lg:hidden">
+      <div className="flex min-h-0 flex-1 flex-col lg:hidden">
         <ConversationPane chatId={chatId} />
       </div>
-    </>
+    </div>
   );
 }

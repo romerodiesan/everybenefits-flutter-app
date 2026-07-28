@@ -40,13 +40,30 @@ export type AppNotification = {
   ref: Record<string, string>;
   read: boolean;
   createdAt: Date | null;
+  updatedAt: Date | null;
+  groupKey: string | null;
+  count: number;
+  actors: string[];
 };
+
+export type NotificationChannelFilter =
+  | "all"
+  | "chats"
+  | "forums"
+  | "academy"
+  | "support";
 
 export type NotificationPrefs = {
   pushChats: boolean;
   pushForums: boolean;
   pushAcademy: boolean;
   pushSupport: boolean;
+  pushForumVotes: boolean;
+  pushForumReplies: boolean;
+  inAppChats: boolean;
+  inAppForums: boolean;
+  inAppAcademy: boolean;
+  inAppSupport: boolean;
 };
 
 export type NotificationState = {
@@ -61,7 +78,21 @@ export const DEFAULT_PREFS: NotificationPrefs = {
   pushForums: true,
   pushAcademy: true,
   pushSupport: true,
+  pushForumVotes: true,
+  pushForumReplies: true,
+  inAppChats: true,
+  inAppForums: true,
+  inAppAcademy: true,
+  inAppSupport: true,
 };
+
+export function channelForType(type: string): NotificationChannelFilter {
+  if (type === "chat_message") return "chats";
+  if (type === "support_message") return "support";
+  if (type.startsWith("forum_")) return "forums";
+  if (type === "course_published") return "academy";
+  return "all";
+}
 
 function toDate(value: unknown): Date | null {
   if (value instanceof Timestamp) return value.toDate();
@@ -73,15 +104,22 @@ function stateFrom(
   data: Record<string, unknown> | undefined,
 ): NotificationState {
   const prefsRaw = (data?.prefs ?? {}) as Record<string, unknown>;
+  const pushForums = prefsRaw.pushForums !== false;
   return {
     unreadCount: Number(data?.unreadCount ?? 0),
     unreadForumCount: Number(data?.unreadForumCount ?? 0),
     lastFeedSeenAt: toDate(data?.lastFeedSeenAt),
     prefs: {
       pushChats: prefsRaw.pushChats !== false,
-      pushForums: prefsRaw.pushForums !== false,
+      pushForums,
       pushAcademy: prefsRaw.pushAcademy !== false,
       pushSupport: prefsRaw.pushSupport !== false,
+      pushForumVotes: prefsRaw.pushForumVotes !== false && pushForums,
+      pushForumReplies: prefsRaw.pushForumReplies !== false && pushForums,
+      inAppChats: prefsRaw.inAppChats !== false,
+      inAppForums: prefsRaw.inAppForums !== false,
+      inAppAcademy: prefsRaw.inAppAcademy !== false,
+      inAppSupport: prefsRaw.inAppSupport !== false,
     },
   };
 }
@@ -127,6 +165,9 @@ export function watchNotifications(
       onChange(
         snap.docs.map((d) => {
           const data = d.data() as Record<string, unknown>;
+          const actors = Array.isArray(data.actors)
+            ? data.actors.map(String)
+            : [];
           return {
             id: d.id,
             type: String(data.type ?? ""),
@@ -136,7 +177,12 @@ export function watchNotifications(
             deepLink: String(data.deepLink ?? ""),
             ref: (data.ref as Record<string, string>) ?? {},
             read: data.read === true,
-            createdAt: toDate(data.createdAt),
+            createdAt: toDate(data.updatedAt) ?? toDate(data.createdAt),
+            updatedAt: toDate(data.updatedAt),
+            groupKey:
+              typeof data.groupKey === "string" ? data.groupKey : null,
+            count: Math.max(1, Number(data.count ?? 1)),
+            actors,
           };
         }),
       );

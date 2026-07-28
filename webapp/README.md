@@ -1,6 +1,6 @@
-# EVERY Pulse Web
+# Pulse Web
 
-Next.js web client for EVERY Pulse. Shares Firebase Auth, Firestore, Realtime Database, Storage, and Cloud Functions with the Flutter mobile app (`every-insurance`).
+Next.js web client for Pulse. Shares Firebase Auth, Firestore, Realtime Database, Storage, and Cloud Functions with the Flutter mobile app (`every-insurance`).
 
 ## Stack
 

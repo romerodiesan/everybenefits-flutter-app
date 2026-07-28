@@ -11,6 +11,7 @@ import {
 import { useAuth } from "@/lib/providers/auth-provider";
 import { Button, Input, Label } from "@/components/ui/primitives";
 import { StudioShellSkeleton } from "@/components/chrome/studio-shell-skeleton";
+import { BrandMark } from "@/components/chrome/brand-mark";
 import {
   hasSsoAttempted,
   markSsoAttempted,
@@ -89,7 +90,8 @@ export function LoginPage() {
   return (
     <div className="studio-bg flex min-h-screen items-center justify-center p-6">
       <div className="studio-panel w-full max-w-md p-8">
-        <p className="font-display text-sm tracking-wide text-brand">
+        <p className="inline-flex items-center gap-2 font-display text-sm tracking-wide text-brand">
+          <BrandMark size={28} priority />
           {t("brand")}
         </p>
         <h1 className="mt-2 font-display text-3xl">{t("loginTitle")}</h1>

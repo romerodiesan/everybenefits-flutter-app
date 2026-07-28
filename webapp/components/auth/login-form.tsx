@@ -14,14 +14,15 @@ import {
   completeMagicLink,
   hasPasswordProvider,
   sendMagicLink,
-  signInAsGuest,
   signInWithEmail,
   signInWithGoogle,
 } from "@/lib/firebase/auth";
 import { isMultiFactorError, resolverFromError } from "@/lib/firebase/mfa";
 import { MfaChallengeForm } from "@/components/auth/mfa-challenge-form";
 import { useAuth } from "@/lib/providers/auth-provider";
+import { needsProfileCompletion } from "@/lib/roles";
 import type { MultiFactorResolver } from "firebase/auth";
+import { BrandMark } from "@/components/chrome/brand-mark";
 
 export function LoginForm() {
   const t = useTranslations();
@@ -62,7 +63,7 @@ export function LoginForm() {
       router.replace("/set-password");
       return;
     }
-    if (profile && !profile.profileCompleted && !profile.isAnonymous) {
+    if (profile && needsProfileCompletion(profile) && !profile.isAnonymous) {
       router.replace("/complete-profile");
       return;
     }
@@ -109,7 +110,11 @@ export function LoginForm() {
   return (
     <div className="mesh-bg flex min-h-[100svh] items-center justify-center px-4 py-10">
       <Panel className="w-full max-w-md">
-        <Link href="/" className="font-display text-2xl font-extrabold">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-2.5 font-display text-2xl font-extrabold"
+        >
+          <BrandMark size={36} priority />
           {t("brand")}
         </Link>
         {mfaResolver ? (
@@ -194,24 +199,6 @@ export function LoginForm() {
                 }}
               >
                 {t("sendMagicLink")}
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                className="w-full"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  try {
-                    await signInAsGuest();
-                    router.replace("/home");
-                  } catch {
-                    setError(t("errorAuth"));
-                    setBusy(false);
-                  }
-                }}
-              >
-                {t("ctaGuest")}
               </Button>
             </div>
 

@@ -108,6 +108,14 @@
         ".read": "auth != null",
         ".write": false
       }
+    },
+
+    "presence": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && auth.uid === $uid",
+        ".validate": "newData.hasChildren(['online']) && newData.child('online').val() === true"
+      }
     }
   }
 }

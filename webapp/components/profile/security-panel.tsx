@@ -5,9 +5,12 @@ import { useTranslations } from "next-intl";
 import type { TotpSecret } from "firebase/auth";
 import {
   changePassword,
+  hasGoogleProvider,
   hasPasswordProvider,
+  linkGoogleAccount,
   linkPassword,
   reauthenticate,
+  unlinkGoogleAccount,
 } from "@/lib/firebase/auth";
 import {
   finishPhoneEnrollment,
@@ -29,6 +32,7 @@ export function SecurityPanel() {
   const t = useTranslations();
   const [factors, setFactors] = useState<EnrolledFactor[]>([]);
   const [hasPassword, setHasPassword] = useState(hasPasswordProvider());
+  const [hasGoogle, setHasGoogle] = useState(hasGoogleProvider());
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<"saved" | "error" | "factor" | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,9 +58,11 @@ export function SecurityPanel() {
       const next = await listEnrolledFactors();
       setFactors(next);
       setHasPassword(hasPasswordProvider());
+      setHasGoogle(hasGoogleProvider());
     } catch {
       setFactors([]);
       setHasPassword(hasPasswordProvider());
+      setHasGoogle(hasGoogleProvider());
     }
   }, []);
 
@@ -237,6 +243,70 @@ export function SecurityPanel() {
           <StatusBanner kind="success">{t("securityPasswordSaved")}</StatusBanner>
         )}
       </form>
+
+      <div className="mt-6 space-y-3 border-t border-glass-border pt-6">
+        <div>
+          <h3 className="text-sm font-bold">{t("securityGoogleTitle")}</h3>
+          <p className="mt-1 text-sm text-muted">{t("securityGoogleHint")}</p>
+        </div>
+        {hasGoogle ? (
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="rounded-lg bg-brand/12 px-2.5 py-1 text-xs font-bold text-brand">
+              {t("securityGoogleLinked")}
+            </span>
+            <Button
+              type="button"
+              variant="secondary"
+              className="h-8 px-3 text-xs"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                setStatus(null);
+                try {
+                  await unlinkGoogleAccount();
+                  await refresh();
+                  setStatus("saved");
+                } catch (err) {
+                  setStatus("error");
+                  setError(
+                    err instanceof Error && err.message === "last-provider"
+                      ? t("securityGoogleLastProvider")
+                      : t("errorGeneric"),
+                  );
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {t("securityGoogleUnlink")}
+            </Button>
+          </div>
+        ) : (
+          <Button
+            type="button"
+            variant="secondary"
+            disabled={busy}
+            onClick={async () => {
+              setBusy(true);
+              setError(null);
+              setStatus(null);
+              try {
+                await linkGoogleAccount();
+                await refresh();
+                setStatus("saved");
+              } catch {
+                setStatus("error");
+                setError(t("errorGeneric"));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          >
+            {t("securityGoogleLink")}
+          </Button>
+        )}
+      </div>
 
       <div className="mt-6 space-y-4">
         <div>

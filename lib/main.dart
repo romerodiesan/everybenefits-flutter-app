@@ -15,6 +15,7 @@ import 'auth/auth.dart';
 import 'features/chats/chat_repository.dart';
 import 'features/forums/forum_repository.dart';
 import 'features/university/course_repository.dart';
+import 'features/onboarding/pending_approval_screen.dart';
 import 'features/onboarding/set_password_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/profile/profile_completion_flow.dart';
@@ -359,10 +360,28 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
           builder: (context, watchSnapshot) {
             final profile = watchSnapshot.data ?? initial;
 
-            if (!profile.isAnonymous && !profile.profileCompleted) {
+            if (!profile.isAnonymous &&
+                needsProfileCompletion(
+                  isAnonymous: profile.isAnonymous,
+                  roleName: profile.role.wireValue,
+                  displayName: profile.displayName,
+                  profileCompleted: profile.profileCompleted,
+                  npn: profile.npn,
+                  addressStreet: profile.addressStreet,
+                  addressCity: profile.addressCity,
+                  addressState: profile.addressState,
+                  addressZip: profile.addressZip,
+                )) {
               return ProfileCompletionFlow(
                 profile: profile,
                 userRepository: widget.userRepository,
+                authService: widget.authService,
+              );
+            }
+
+            if (!profile.isAnonymous && !isUserApproved(profile.approvalStatus)) {
+              return PendingApprovalScreen(
+                profile: profile,
                 authService: widget.authService,
               );
             }

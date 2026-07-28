@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Figtree, Outfit } from "next/font/google";
 import "./globals.css";
 
@@ -15,8 +15,25 @@ const figtree = Figtree({
 });
 
 export const metadata: Metadata = {
-  title: "EVERY Pulse",
-  description: "Community and learning for insurance professionals",
+  title: "Pulse",
+  description: "Community, learning, and tools for insurance professionals.",
+  icons: {
+    icon: [
+      { url: "/icon.png", sizes: "32x32", type: "image/png" },
+      { url: "/brand/pulse-logo.png", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180", type: "image/png" }],
+  },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#0a0b0e" },
+    { media: "(prefers-color-scheme: light)", color: "#f4f6f5" },
+  ],
 };
 
 export default function RootLayout({

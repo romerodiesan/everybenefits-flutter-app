@@ -12,11 +12,24 @@ export {
   canParticipateInForums,
   canParticipateInChats,
   canCreateChatGroups,
+  canAccessSupport,
   ALL_ROLES,
   FORUM_ROLES,
   DEFAULT_GROUP_ROLES,
   GROUP_CREATOR_ROLES,
+  needsProfileCompletion,
+  validateDisplayName,
+  validateNpn,
+  normalizePersonName,
+  requiresLicenseProfile,
+  isUserApproved,
+  parseApprovalStatus,
+  validateUsState,
+  validateUsZip,
 } from "@pulse/shared";
+
+export type { ApprovalStatus, DisplayNameIssue, NpnIssue } from "@pulse/shared";
+
 
 export function headlineName(profile: {
   displayName: string | null;

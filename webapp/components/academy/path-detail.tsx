@@ -14,6 +14,7 @@ import {
   ProgressBar,
   useLevelLabels,
 } from "./shared";
+import { DetailPageSkeleton } from "@/components/ui/skeleton";
 
 export function PathDetail({ pathId }: { pathId: string }) {
   const t = useTranslations();
@@ -63,11 +64,7 @@ export function PathDetail({ pathId }: { pathId: string }) {
   );
 
   if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-5xl px-4 py-10 text-sm text-muted lg:px-8">
-        {t("loading")}
-      </div>
-    );
+    return <DetailPageSkeleton />;
   }
 
   if (!path) {

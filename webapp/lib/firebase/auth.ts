@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   isSignInWithEmailLink,
   linkWithCredential,
+  linkWithPopup,
   reauthenticateWithCredential,
   reauthenticateWithPopup,
   sendPasswordResetEmail,
@@ -15,6 +16,7 @@ import {
   signInWithPopup,
   signInWithCustomToken,
   signOut,
+  unlink,
   updatePassword,
   updateProfile,
   type User,
@@ -276,6 +278,38 @@ export async function reauthenticate(password?: string): Promise<void> {
     return;
   }
   await reauthenticateWithPopup(user, googleProvider);
+}
+
+export function hasGoogleProvider(user?: User | null): boolean {
+  const u = user ?? getFirebaseAuth().currentUser;
+  return Boolean(u?.providerData.some((p) => p.providerId === "google.com"));
+}
+
+export async function linkGoogleAccount(): Promise<void> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error("Not signed in");
+  if (hasGoogleProvider(user)) return;
+  if (usingAuthEmulator()) {
+    const email = user.email?.trim();
+    if (!email) throw new Error("email-required");
+    await linkWithCredential(
+      user,
+      emulatorGoogleCredential(email, user.displayName ?? undefined),
+    );
+    return;
+  }
+  await linkWithPopup(user, googleProvider);
+}
+
+export async function unlinkGoogleAccount(): Promise<void> {
+  const user = getFirebaseAuth().currentUser;
+  if (!user) throw new Error("Not signed in");
+  if (!hasGoogleProvider(user)) return;
+  // Keep at least one sign-in method.
+  if (user.providerData.length <= 1) {
+    throw new Error("last-provider");
+  }
+  await unlink(user, "google.com");
 }
 
 export function currentUser(): User | null {

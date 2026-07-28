@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/providers/auth-provider";
 import { headlineName } from "@/lib/firebase/users";
 import { getOrCreateSupportChat } from "@/lib/firebase/chats";
 import { signOutEverywhere } from "@/lib/firebase/auth";
+import { canAccessSupport } from "@/lib/roles";
 import type { UserProfile } from "@/lib/types";
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
 import {
@@ -36,9 +37,12 @@ function roleLabel(
   }[role];
 }
 
-function sectionFromHash(): SettingsSection | null {
+function sectionFromLocation(): SettingsSection | null {
   if (typeof window === "undefined") return null;
   const hash = window.location.hash.replace("#", "");
+  const params = new URLSearchParams(window.location.search);
+  const fromQuery = params.get("section") ?? "";
+  const candidate = hash || fromQuery;
   const known: SettingsSection[] = [
     "account",
     "appearance",
@@ -48,8 +52,8 @@ function sectionFromHash(): SettingsSection | null {
     "admin",
     "danger",
   ];
-  return known.includes(hash as SettingsSection)
-    ? (hash as SettingsSection)
+  return known.includes(candidate as SettingsSection)
+    ? (candidate as SettingsSection)
     : null;
 }
 
@@ -119,19 +123,26 @@ export function ProfilePage() {
   const router = useRouter();
   const { profile } = useAuth();
   const [section, setSection] = useState<SettingsSection>(
-    () => sectionFromHash() ?? "account",
+    () => sectionFromLocation() ?? "account",
   );
 
   useEffect(() => {
-    const onHash = () => {
-      const next = sectionFromHash();
+    const sync = () => {
+      const next = sectionFromLocation();
       if (next) setSection(next);
     };
-    window.addEventListener("hashchange", onHash);
-    return () => window.removeEventListener("hashchange", onHash);
+    sync();
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
   }, []);
 
   const isAdmin = profile?.role === "admin";
+  const canApprove =
+    profile?.role === "admin" || profile?.role === "manager";
   const isAnonymous = profile?.isAnonymous ?? true;
 
   const navItems = useMemo<SettingsNavItem[]>(() => {
@@ -169,7 +180,7 @@ export function ProfilePage() {
       description: t("profilePrivacyNav"),
       icon: ICONS.privacy,
     });
-    if (isAdmin) {
+    if (canApprove) {
       items.push({
         id: "admin",
         label: t("profileAdmin"),
@@ -187,7 +198,7 @@ export function ProfilePage() {
       });
     }
     return items;
-  }, [t, isAdmin, isAnonymous]);
+  }, [t, canApprove, isAnonymous]);
 
   if (!profile) return null;
 
@@ -202,7 +213,7 @@ export function ProfilePage() {
     : "account";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-8 lg:py-8">
+    <div className="mx-auto w-full max-w-6xl px-4 pb-8 pt-4 lg:px-8 lg:pt-8">
       <header className="mb-5 border-b border-glass-border pb-4">
         <h1 className="font-display text-2xl font-bold tracking-tight md:text-3xl">
           {t("profileTitle")}
@@ -234,7 +245,7 @@ export function ProfilePage() {
               </p>
             )}
             <div className="mt-3 space-y-1.5">
-              {!profile.isAnonymous && (
+              {canAccessSupport(profile.role, profile.isAnonymous) && (
                 <Button
                   className="h-9 w-full text-xs"
                   onClick={async () => {
@@ -276,7 +287,7 @@ export function ProfilePage() {
           )}
           {available === "security" && !profile.isAnonymous && <SecurityPanel />}
           {available === "privacy" && <PrivacyPanel />}
-          {available === "admin" && isAdmin && <AdminPanel />}
+          {available === "admin" && canApprove && <AdminPanel />}
           {available === "danger" && !profile.isAnonymous && <DangerPanel />}
         </div>
       </div>

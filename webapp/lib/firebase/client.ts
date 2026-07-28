@@ -112,8 +112,10 @@ export function initFirebaseClient() {
     emulatorsConnected = true;
   }
 
-  const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY;
-  if (siteKey && !appCheck) {
+  // RTDB App Check can be ENFORCED in production — initialize before any
+  // database listeners. Skip on emulators (debug tokens are opt-in).
+  const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim();
+  if (siteKey && !useEmulators && !appCheck) {
     try {
       appCheck = initializeAppCheck(app, {
         provider: new ReCaptchaV3Provider(siteKey),

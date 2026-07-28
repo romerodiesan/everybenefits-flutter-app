@@ -8,8 +8,7 @@
 #   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_WEB_SEARCH_API_KEY --project every-benefits-us
 #   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_ADMIN_TASK_KEY --project every-benefits-us
 #
-# After first deploy, replace NEXT_PUBLIC_PULSE_WEB_URL / NEXT_PUBLIC_STUDIO_URL
-# with the real *.hosted.app (or custom) domains and redeploy.
+# Cross-app URLs: pulse.everybenefits.us / studio.everybenefits.us (build-time).
 
 runConfig:
   cpu: 1
@@ -76,10 +75,12 @@ env:
   #   value: REPLACE_ME
   #   availability: [BUILD, RUNTIME]
 
-  # Optional App Check (reCAPTCHA v3 site key)
-  # - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
-  #   value: REPLACE_ME
-  #   availability: [BUILD, RUNTIME]
+  // App Check (reCAPTCHA v3). RTDB App Check is ENFORCED — required in prod.
+  - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
+    value: 6Lc1OiAsAAAAADabSgXEcqU2G17BFdxZ3qZnYVx6
+    availability:
+      - BUILD
+      - RUNTIME
 
   # --- Admin ---
   - variable: FIREBASE_PROJECT_ID

@@ -5,8 +5,7 @@
 # Secrets:
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us
 #
-# After first deploy, replace NEXT_PUBLIC_PULSE_WEB_URL / NEXT_PUBLIC_STUDIO_URL
-# with the real *.hosted.app (or custom) domains and redeploy.
+# Cross-app URLs: pulse.everybenefits.us / studio.everybenefits.us (build-time).
 
 runConfig:
   cpu: 1
@@ -68,7 +67,8 @@ env:
       - BUILD
       - RUNTIME
 
-  # Optional App Check
+  # Optional App Check (reCAPTCHA v3). When set, also set Cloud Functions
+  # env FUNCTIONS_ENFORCE_APP_CHECK=true so callables require tokens.
   # - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
   #   value: REPLACE_ME
   #   availability: [BUILD, RUNTIME]

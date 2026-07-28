@@ -3,7 +3,7 @@ import { getMessages, setRequestLocale } from "next-intl/server";
 import { notFound } from "next/navigation";
 import { routing } from "@/i18n/routing";
 import { AuthProvider } from "@/lib/providers/auth-provider";
-import { ThemeProvider } from "@/lib/providers/theme-provider";
+import { ThemedApp } from "@/components/chrome/themed-app";
 
 export function generateStaticParams() {
   return routing.locales.map((locale) => ({ locale }));
@@ -23,9 +23,9 @@ export default async function LocaleLayout({
 
   return (
     <NextIntlClientProvider messages={messages}>
-      <ThemeProvider>
-        <AuthProvider>{children}</AuthProvider>
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemedApp>{children}</ThemedApp>
+      </AuthProvider>
     </NextIntlClientProvider>
   );
 }

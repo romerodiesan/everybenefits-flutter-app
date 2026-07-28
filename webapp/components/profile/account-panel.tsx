@@ -90,9 +90,27 @@ export function AccountPanel() {
 
       await refreshProfile();
       setStatus("saved");
-    } catch {
+    } catch (err) {
       setStatus("error");
-      setError(t("errorGeneric"));
+      const code =
+        err && typeof err === "object" && "code" in err
+          ? String((err as { code: string }).code)
+          : "";
+      if (code.includes("invalid-phone-number")) {
+        setError(t("phoneVerifyInvalid"));
+      } else if (code.includes("too-many-requests")) {
+        setError(t("phoneVerifyTooMany"));
+      } else if (
+        phoneChanged &&
+        (code.includes("captcha") ||
+          code.includes("argument") ||
+          code.includes("internal") ||
+          code.includes("auth/"))
+      ) {
+        setError(t("phoneVerifyError"));
+      } else {
+        setError(t("errorGeneric"));
+      }
     } finally {
       setBusy(false);
     }
@@ -162,7 +180,7 @@ export function AccountPanel() {
             onChange={(e) => setDisplayName(e.target.value)}
           />
         </div>
-        <div className="grid max-w-md grid-cols-[7rem_1fr] gap-3">
+        <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-[7rem_1fr]">
           <div>
             <Label>{t("phoneCountryCode")}</Label>
             <Input

@@ -21,6 +21,7 @@ import { LESSON_COMPLETE_THRESHOLD } from "@/lib/types";
 import type { Course, CourseContent, Enrollment, Lesson } from "@/lib/types";
 import { EmptyState, LessonTypeIcon, ProgressBar } from "./shared";
 import { QuizStage, ReadingStage } from "./lesson-stages";
+import { PlayerSkeleton } from "@/components/ui/skeleton";
 
 /** Position writes are throttled so scrubbing doesn't hammer Firestore. */
 const SAVE_INTERVAL_MS = 5000;
@@ -245,11 +246,7 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
   }, []);
 
   if (loading) {
-    return (
-      <div className="mx-auto w-full max-w-6xl px-4 py-10 text-sm text-muted lg:px-8">
-        {t("loading")}
-      </div>
-    );
+    return <PlayerSkeleton />;
   }
 
   if (!course) {

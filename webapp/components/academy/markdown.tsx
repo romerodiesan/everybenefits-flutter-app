@@ -1,17 +1,24 @@
 "use client";
 
-import { createContext, Fragment, useContext, type ReactNode } from "react";
+import { createContext, useContext, type ComponentProps, type ReactNode } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 
 /** Lets Pulse AI turn its `[S1]` markers into clickable source chips. */
 const CitationContext = createContext<((ref: string) => ReactNode) | null>(null);
 
+const CITATION_SCHEME = "pulse-cite:";
+
 /**
- * Minimal Markdown renderer for reading lessons.
+ * GFM Markdown renderer for reading lessons (and Pulse AI answers).
  *
- * Supports the subset the Studio documents: `#`–`###` headings, `-`/`*` and
- * `1.` lists, `>` quotes, `---` rules, plus inline `**bold**`, `*italic*`,
- * `` `code` `` and `[text](url)`. Output is React elements, never raw HTML, so
- * authored content cannot inject markup.
+ * Supports GitHub Flavored Markdown: headings, lists, tables, blockquotes,
+ * fenced code, strikethrough, autolinks, plus inline bold/italic/code/links.
+ * Output is React elements via react-markdown — no raw HTML (`rehype-raw`
+ * is not used), so authored content cannot inject markup.
+ *
+ * Pulse citation markers `[S1]` are rewritten to a private link scheme and
+ * resolved through `renderCitation` when provided.
  */
 export function Markdown({
   source,
@@ -23,221 +30,148 @@ export function Markdown({
   /** Called for each `[S1]`-style marker; return null to drop it. */
   renderCitation?: (ref: string) => ReactNode;
 }) {
-  const blocks = parseBlocks(source);
-  if (blocks.length === 0) return null;
+  const trimmed = source.trim();
+  if (!trimmed) return null;
+
+  const prepared = prepareCitations(trimmed);
 
   return (
     <CitationContext.Provider value={renderCitation ?? null}>
       <div className={className}>
-        {blocks.map((block, index) => (
-          <Block key={index} block={block} />
-        ))}
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm]}
+          urlTransform={safeUrlTransform}
+          components={markdownComponents}
+        >
+          {prepared}
+        </ReactMarkdown>
       </div>
     </CitationContext.Provider>
   );
 }
 
-type Block =
-  | { kind: "heading"; level: 1 | 2 | 3; text: string }
-  | { kind: "paragraph"; text: string }
-  | { kind: "quote"; text: string }
-  | { kind: "rule" }
-  | { kind: "list"; ordered: boolean; items: string[] };
-
-function Block({ block }: { block: Block }) {
-  switch (block.kind) {
-    case "heading": {
-      const size =
-        block.level === 1
-          ? "text-2xl"
-          : block.level === 2
-            ? "text-xl"
-            : "text-lg";
-      return (
-        <p className={`font-display font-bold ${size} pt-1`}>
-          <Inline text={block.text} />
-        </p>
-      );
-    }
-    case "quote":
-      return (
-        <blockquote className="border-l-2 border-brand/50 pl-3 text-muted">
-          <Inline text={block.text} />
-        </blockquote>
-      );
-    case "rule":
-      return <hr className="border-glass-border" />;
-    case "list":
-      return block.ordered ? (
-        <ol className="list-decimal space-y-1 pl-5">
-          {block.items.map((item, index) => (
-            <li key={index}>
-              <Inline text={item} />
-            </li>
-          ))}
-        </ol>
-      ) : (
-        <ul className="list-disc space-y-1 pl-5">
-          {block.items.map((item, index) => (
-            <li key={index}>
-              <Inline text={item} />
-            </li>
-          ))}
-        </ul>
-      );
-    default:
-      return (
-        <p>
-          <Inline text={block.text} />
-        </p>
-      );
-  }
+/** Turns `[S1]` into a private markdown link so react-markdown can hand it off. */
+function prepareCitations(source: string): string {
+  return source.replace(/\[(S\d+)\]/g, "[$1](pulse-cite:$1)");
 }
 
-function parseBlocks(source: string): Block[] {
-  const lines = source.replace(/\r\n/g, "\n").split("\n");
-  const blocks: Block[] = [];
-  let paragraph: string[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
-
-  const flushParagraph = () => {
-    if (paragraph.length === 0) return;
-    blocks.push({ kind: "paragraph", text: paragraph.join(" ") });
-    paragraph = [];
-  };
-  const flushList = () => {
-    if (!list) return;
-    blocks.push({ kind: "list", ordered: list.ordered, items: list.items });
-    list = null;
-  };
-  const flushAll = () => {
-    flushParagraph();
-    flushList();
-  };
-
-  for (const raw of lines) {
-    const line = raw.trim();
-
-    if (!line) {
-      flushAll();
-      continue;
-    }
-    if (/^(-{3,}|\*{3,}|_{3,})$/.test(line)) {
-      flushAll();
-      blocks.push({ kind: "rule" });
-      continue;
-    }
-
-    const heading = /^(#{1,3})\s+(.*)$/.exec(line);
-    if (heading) {
-      flushAll();
-      blocks.push({
-        kind: "heading",
-        level: heading[1].length as 1 | 2 | 3,
-        text: heading[2],
-      });
-      continue;
-    }
-
-    const quote = /^>\s?(.*)$/.exec(line);
-    if (quote) {
-      flushAll();
-      blocks.push({ kind: "quote", text: quote[1] });
-      continue;
-    }
-
-    const bullet = /^[-*+]\s+(.*)$/.exec(line);
-    if (bullet) {
-      flushParagraph();
-      if (!list || list.ordered) {
-        flushList();
-        list = { ordered: false, items: [] };
-      }
-      list.items.push(bullet[1]);
-      continue;
-    }
-
-    const ordered = /^\d+[.)]\s+(.*)$/.exec(line);
-    if (ordered) {
-      flushParagraph();
-      if (!list || !list.ordered) {
-        flushList();
-        list = { ordered: true, items: [] };
-      }
-      list.items.push(ordered[1]);
-      continue;
-    }
-
-    flushList();
-    paragraph.push(line);
-  }
-
-  flushAll();
-  return blocks;
+function safeUrlTransform(url: string): string {
+  if (url.startsWith(CITATION_SCHEME)) return url;
+  if (/^(https?:|mailto:)/i.test(url)) return url;
+  return "";
 }
 
-/** Splits a line into bold / italic / code / link / citation spans. */
-function Inline({ text }: { text: string }) {
-  const renderCitation = useContext(CitationContext);
-  const pattern =
-    /(\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|`[^`]+`|\[[^\]]+\]\([^)\s]+\)|\[S\d+\])/g;
-  const parts = text.split(pattern).filter((part) => part !== "");
+type MdProps<T extends keyof React.JSX.IntrinsicElements> = ComponentProps<T>;
 
-  return (
-    <>
-      {parts.map((part, index) => {
-        const key = `${index}-${part.slice(0, 8)}`;
-
-        const citation = /^\[(S\d+)\]$/.exec(part);
-        if (citation && renderCitation) {
-          return <Fragment key={key}>{renderCitation(citation[1])}</Fragment>;
-        }
-
-        if (
-          (part.startsWith("**") && part.endsWith("**")) ||
-          (part.startsWith("__") && part.endsWith("__"))
-        ) {
-          return (
-            <strong key={key} className="font-semibold">
-              {part.slice(2, -2)}
-            </strong>
-          );
-        }
-        if (
-          part.length > 2 &&
-          ((part.startsWith("*") && part.endsWith("*")) ||
-            (part.startsWith("_") && part.endsWith("_")))
-        ) {
-          return <em key={key}>{part.slice(1, -1)}</em>;
-        }
-        if (part.startsWith("`") && part.endsWith("`")) {
-          return (
-            <code
-              key={key}
-              className="rounded bg-ink/[0.06] px-1 py-0.5 font-mono text-[13px] dark:bg-white/[0.08]"
-            >
-              {part.slice(1, -1)}
-            </code>
-          );
-        }
-
-        const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(part);
-        if (link && /^(https?:|mailto:)/i.test(link[2])) {
-          return (
-            <a
-              key={key}
-              href={link[2]}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-medium text-brand underline underline-offset-2"
-            >
-              {link[1]}
-            </a>
-          );
-        }
-
-        return <Fragment key={key}>{part as ReactNode}</Fragment>;
-      })}
-    </>
-  );
-}
+const markdownComponents = {
+  h1: ({ children }: MdProps<"h1">) => (
+    <h1 className="font-display pt-1 text-2xl font-bold">{children}</h1>
+  ),
+  h2: ({ children }: MdProps<"h2">) => (
+    <h2 className="font-display pt-1 text-xl font-bold">{children}</h2>
+  ),
+  h3: ({ children }: MdProps<"h3">) => (
+    <h3 className="font-display pt-1 text-lg font-bold">{children}</h3>
+  ),
+  h4: ({ children }: MdProps<"h4">) => (
+    <h4 className="font-display pt-1 text-base font-bold">{children}</h4>
+  ),
+  h5: ({ children }: MdProps<"h5">) => (
+    <h5 className="font-display pt-1 text-sm font-bold">{children}</h5>
+  ),
+  h6: ({ children }: MdProps<"h6">) => (
+    <h6 className="font-display pt-1 text-sm font-semibold">{children}</h6>
+  ),
+  p: ({ children }: MdProps<"p">) => <p>{children}</p>,
+  strong: ({ children }: MdProps<"strong">) => (
+    <strong className="font-semibold">{children}</strong>
+  ),
+  em: ({ children }: MdProps<"em">) => <em>{children}</em>,
+  del: ({ children }: MdProps<"del">) => (
+    <del className="text-muted line-through">{children}</del>
+  ),
+  blockquote: ({ children }: MdProps<"blockquote">) => (
+    <blockquote className="border-l-2 border-brand/50 pl-3 text-muted">
+      {children}
+    </blockquote>
+  ),
+  hr: () => <hr className="border-glass-border" />,
+  ul: ({ children }: MdProps<"ul">) => (
+    <ul className="list-disc space-y-1 pl-5">{children}</ul>
+  ),
+  ol: ({ children }: MdProps<"ol">) => (
+    <ol className="list-decimal space-y-1 pl-5">{children}</ol>
+  ),
+  li: ({ children }: MdProps<"li">) => <li>{children}</li>,
+  a: function MarkdownLink({ href, children }: MdProps<"a">) {
+    const renderCitation = useContext(CitationContext);
+    if (href?.startsWith(CITATION_SCHEME)) {
+      const ref = href.slice(CITATION_SCHEME.length);
+      if (renderCitation) return <>{renderCitation(ref)}</>;
+      return <span>[{ref}]</span>;
+    }
+    if (!href) return <span>{children}</span>;
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="font-medium text-brand underline underline-offset-2"
+      >
+        {children}
+      </a>
+    );
+  },
+  code: function MarkdownCode({
+    className,
+    children,
+    ...props
+  }: MdProps<"code">) {
+    const isBlock = Boolean(className?.includes("language-"));
+    if (isBlock) {
+      return (
+        <code
+          className={`${className ?? ""} block overflow-x-auto rounded-lg bg-ink/[0.06] p-3 font-mono text-[13px] leading-relaxed dark:bg-white/[0.08]`}
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    }
+    return (
+      <code
+        className="rounded bg-ink/[0.06] px-1 py-0.5 font-mono text-[13px] dark:bg-white/[0.08]"
+        {...props}
+      >
+        {children}
+      </code>
+    );
+  },
+  pre: ({ children }: MdProps<"pre">) => (
+    <pre className="overflow-x-auto rounded-lg">{children}</pre>
+  ),
+  table: ({ children }: MdProps<"table">) => (
+    <div className="-mx-1 overflow-x-auto">
+      <table className="w-full min-w-[20rem] border-collapse text-left text-[13.5px]">
+        {children}
+      </table>
+    </div>
+  ),
+  thead: ({ children }: MdProps<"thead">) => (
+    <thead className="bg-ink/[0.04] dark:bg-white/[0.06]">{children}</thead>
+  ),
+  tbody: ({ children }: MdProps<"tbody">) => <tbody>{children}</tbody>,
+  tr: ({ children }: MdProps<"tr">) => (
+    <tr className="border-b border-glass-border">{children}</tr>
+  ),
+  th: ({ children }: MdProps<"th">) => (
+    <th className="whitespace-nowrap border border-glass-border px-2.5 py-1.5 font-semibold text-ink">
+      {children}
+    </th>
+  ),
+  td: ({ children }: MdProps<"td">) => (
+    <td className="border border-glass-border px-2.5 py-1.5 align-top text-ink">
+      {children}
+    </td>
+  ),
+};

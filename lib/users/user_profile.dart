@@ -59,6 +59,7 @@ class UserProfile {
     this.addressState,
     this.addressZip,
     this.agency,
+    this.approvalStatus,
   });
 
   final String uid;
@@ -82,6 +83,8 @@ class UserProfile {
   final String? addressState;
   final String? addressZip;
   final String? agency;
+  /// `pending` | `approved` | `rejected`. Null = legacy (treated as approved).
+  final String? approvalStatus;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -155,6 +158,7 @@ class UserProfile {
     String? addressState,
     String? addressZip,
     String? agency,
+    String? approvalStatus,
     DateTime? updatedAt,
     bool clearPhotoUrl = false,
     bool clearNpn = false,
@@ -199,6 +203,7 @@ class UserProfile {
       addressState: nextState,
       addressZip: nextZip,
       agency: clearAgency ? null : (agency ?? this.agency),
+      approvalStatus: approvalStatus ?? this.approvalStatus,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -225,6 +230,7 @@ class UserProfile {
       'addressState': addressState,
       'addressZip': addressZip,
       'agency': agency,
+      if (approvalStatus != null) 'approvalStatus': approvalStatus,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
     };
@@ -266,6 +272,7 @@ class UserProfile {
       addressState: state,
       addressZip: zip,
       agency: data['agency'] as String?,
+      approvalStatus: data['approvalStatus'] as String?,
       createdAt: _readDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readDate(data['updatedAt']) ?? DateTime.now().toUtc(),
     );

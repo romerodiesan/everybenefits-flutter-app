@@ -31,7 +31,8 @@
         "firebase-debug.*.log",
         "**/.*",
         "**/*.local"
-      ]
+      ],
+      "alwaysDeployFromSource": true
     },
     {
       "backendId": "studio-web-app",
@@ -59,6 +60,7 @@
         "*.local"
       ],
       "predeploy": [
+        "npm --prefix \"$RESOURCE_DIR\" run sync:shared",
         "npm --prefix \"$RESOURCE_DIR\" run build"
       ]
     }

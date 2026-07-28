@@ -29,9 +29,19 @@ export type UserProfile = {
   /** Account lifecycle; absent/"active" means normal. Server-managed. */
   accountStatus?: AccountStatus;
   deletionScheduledAt?: Date | null;
+  /**
+   * New registrations start as `pending` until an admin/manager approves.
+   * Legacy users without this field are treated as approved.
+   */
+  approvalStatus?: ApprovalStatus;
+  appearance?: {
+    theme: "system" | "light" | "dark";
+    accent: string;
+  } | null;
 };
 
 export type AccountStatus = "active" | "deactivated" | "pendingDeletion";
+export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export type ForumThread = {
   id: string;

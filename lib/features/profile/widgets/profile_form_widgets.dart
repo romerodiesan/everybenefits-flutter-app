@@ -311,9 +311,14 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
                   hintText: l10n.fieldNpnHint,
                 ),
                 validator: (value) {
-                  if (value == null || value.trim().length < 5) {
+                  if (value == null || value.trim().isEmpty) {
                     return l10n.validationNpn;
                   }
+                  final digits = value.replaceAll(RegExp(r'\D'), '');
+                  if (digits.length < 7 || digits.length > 9) {
+                    return l10n.validationNpn;
+                  }
+                  return null;
                   return null;
                 },
               ),

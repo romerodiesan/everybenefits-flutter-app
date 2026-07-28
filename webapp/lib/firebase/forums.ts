@@ -191,6 +191,50 @@ export async function castForumVote(input: {
   await callCloudFunction("castForumVote", input);
 }
 
+export async function updateThread(input: {
+  threadId: string;
+  title: string;
+  body: string;
+  tags: string[];
+}) {
+  const title = input.title.trim();
+  const body = input.body.trim();
+  if (!title || !body) throw new Error("Title and body are required");
+  await updateDoc(doc(getFirebaseDb(), "threads", input.threadId), {
+    title,
+    body,
+    tags: normalizeForumTags(input.tags),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function updateReply(input: {
+  threadId: string;
+  replyId: string;
+  body: string;
+}) {
+  const body = input.body.trim();
+  if (!body) throw new Error("Reply body is required");
+  await updateDoc(
+    doc(getFirebaseDb(), "threads", input.threadId, "replies", input.replyId),
+    {
+      body,
+      updatedAt: serverTimestamp(),
+    },
+  );
+}
+
+export async function deleteReply(input: {
+  threadId: string;
+  replyId: string;
+}) {
+  await callCloudFunction("deleteForumReply", input);
+}
+
+export async function deleteThread(threadId: string) {
+  await callCloudFunction("deleteForumThread", { threadId });
+}
+
 export async function setAcceptedReply(
   threadId: string,
   replyId: string | null,

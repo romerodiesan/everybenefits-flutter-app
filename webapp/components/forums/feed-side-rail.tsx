@@ -2,8 +2,10 @@
 
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
+import { useAuth } from "@/lib/providers/auth-provider";
 import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
-import { FORUM_TAGS, type ForumThread } from "@/lib/types";
+import { canAccessTools } from "@/lib/roles";
+import type { ForumThread } from "@/lib/types";
 import { useSavedThreadIds } from "@/lib/saved-threads";
 
 type TopicStat = [string, number];
@@ -24,13 +26,14 @@ export function FeedSideRail({
   onOpenSaved?: () => void;
 }) {
   const t = useTranslations();
+  const { profile } = useAuth();
   const savedIds = useSavedThreadIds();
   const pulseAiEnabled = usePulseAiEnabled();
+  const showTools = profile && canAccessTools(profile.role);
 
-  const topicList: TopicStat[] =
-    topics.length > 0
-      ? topics.slice(0, 8)
-      : FORUM_TAGS.slice(0, 8).map((tag) => [tag, 0]);
+  const topicList: TopicStat[] = topics
+    .filter(([, count]) => count > 0)
+    .slice(0, 8);
 
   const byId = new Map(threads.map((thread) => [thread.id, thread]));
   const savedItems = [...savedIds]
@@ -40,33 +43,33 @@ export function FeedSideRail({
   return (
     <aside className="hidden w-[280px] shrink-0 xl:block">
       <div className="sticky top-4 space-y-4">
-        <section className="feed-rail-card">
-          <h2 className="feed-rail-title">{t("forumsRailTrending")}</h2>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              onClick={() => onSelectTag?.("")}
-              className={`feed-topic ${!activeTag ? "feed-topic-active" : ""}`}
-            >
-              {t("forumsAllTags")}
-            </button>
-            {topicList.map(([tag, count]) => (
+        {topicList.length > 0 && (
+          <section className="feed-rail-card">
+            <h2 className="feed-rail-title">{t("forumsRailTrending")}</h2>
+            <div className="mt-2.5 flex flex-wrap gap-1.5">
               <button
-                key={tag}
                 type="button"
-                onClick={() =>
-                  onSelectTag?.(tag === activeTag ? "" : tag)
-                }
-                className={`feed-topic ${activeTag === tag ? "feed-topic-active" : ""}`}
+                onClick={() => onSelectTag?.("")}
+                className={`feed-topic ${!activeTag ? "feed-topic-active" : ""}`}
               >
-                #{tag}
-                {count > 0 && (
-                  <span className="ml-1 tabular-nums opacity-70">{count}</span>
-                )}
+                {t("forumsAllTags")}
               </button>
-            ))}
-          </div>
-        </section>
+              {topicList.map(([tag, count]) => (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={() =>
+                    onSelectTag?.(tag === activeTag ? "" : tag)
+                  }
+                  className={`feed-topic ${activeTag === tag ? "feed-topic-active" : ""}`}
+                >
+                  #{tag}
+                  <span className="ml-1 tabular-nums opacity-70">{count}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="feed-rail-card">
           <div className="flex items-center justify-between gap-2">
@@ -142,6 +145,17 @@ export function FeedSideRail({
               </span>
               {t("forumsRailAcademy")}
             </Link>
+            {showTools && (
+              <Link
+                href="/tools/afc"
+                className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold transition hover:bg-brand/8 hover:text-brand"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/12 text-brand">
+                  $
+                </span>
+                {t("afcQuoteCardTitle")}
+              </Link>
+            )}
           </div>
         </section>
       </div>

@@ -247,8 +247,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             onSignIn: () => _open(
                               LoginScreen(authService: widget.authService),
                             ),
-                            onGuest: () =>
-                                _run(widget.authService.signInAnonymously),
                             onRegister: () => _open(
                               RegisterScreen(authService: widget.authService),
                             ),
@@ -474,14 +472,12 @@ class _AuthPage extends StatelessWidget {
   const _AuthPage({
     required this.busy,
     required this.onSignIn,
-    required this.onGuest,
     required this.onRegister,
     required this.onPhone,
   });
 
   final bool busy;
   final VoidCallback onSignIn;
-  final VoidCallback onGuest;
   final VoidCallback onRegister;
   final VoidCallback onPhone;
 
@@ -512,8 +508,17 @@ class _AuthPage extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
+                Center(
+                  child: Image.asset(
+                    'assets/branding/pulse-logo.png',
+                    width: 88,
+                    height: 88,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'EVERY',
+                  'PULSE',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.displayLarge?.copyWith(
                     fontSize: 52,
@@ -522,7 +527,7 @@ class _AuthPage extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  'INSURANCE',
+                  'EVERY BENEFITS',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: brand,
@@ -547,15 +552,6 @@ class _AuthPage extends StatelessWidget {
                   child: Text(l10n.welcomeEnter),
                 ),
                 const SizedBox(height: AppSpacing.sm),
-                TextButton(
-                  onPressed: busy ? null : onGuest,
-                  child: Text(
-                    l10n.welcomeGuest,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: colors.muted,
-                    ),
-                  ),
-                ),
                 TextButton(
                   onPressed: busy ? null : onRegister,
                   child: Text(

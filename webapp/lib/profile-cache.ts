@@ -1,8 +1,10 @@
 import type { UserProfile, AccountStatus, UserRole } from "@/lib/types";
+import { needsProfileCompletion } from "@/lib/roles";
 
-/** v2 drops phone/NPN/address from sessionStorage (XSS / shared-device blast radius). */
-const CACHE_KEY = "pulse_profile_v2";
-const LEGACY_CACHE_KEY = "pulse_profile_v1";
+/** v3 drops PII from sessionStorage; stores needsCompletion so slim revive
+ * cannot false-trigger licensed-role field checks on reload. */
+const CACHE_KEY = "pulse_profile_v3";
+const LEGACY_CACHE_KEYS = ["pulse_profile_v2", "pulse_profile_v1"];
 
 type CachedProfile = {
   uid: string;
@@ -12,6 +14,8 @@ type CachedProfile = {
   role: UserRole;
   isAnonymous: boolean;
   profileCompleted: boolean;
+  /** Precomputed at write time from the full Firestore profile. */
+  needsCompletion: boolean;
   agency: string | null;
   accountStatus?: AccountStatus;
 };
@@ -25,6 +29,7 @@ function toCached(profile: UserProfile): CachedProfile {
     role: profile.role,
     isAnonymous: profile.isAnonymous,
     profileCompleted: profile.profileCompleted,
+    needsCompletion: needsProfileCompletion(profile),
     agency: profile.agency,
     accountStatus: profile.accountStatus,
   };
@@ -39,7 +44,9 @@ function revive(cached: CachedProfile): UserProfile {
     photoUrl: cached.photoUrl,
     role: cached.role,
     isAnonymous: cached.isAnonymous,
-    profileCompleted: cached.profileCompleted,
+    // Honor precomputed flag — never infer from null NPN/address.
+    profileCompleted:
+      cached.needsCompletion === true ? false : cached.profileCompleted !== false,
     phoneCountryCode: null,
     phoneNumber: null,
     npn: null,
@@ -57,10 +64,16 @@ function revive(cached: CachedProfile): UserProfile {
   };
 }
 
+function clearLegacyCaches() {
+  for (const key of LEGACY_CACHE_KEYS) {
+    sessionStorage.removeItem(key);
+  }
+}
+
 export function readCachedProfile(uid: string): UserProfile | null {
   if (typeof window === "undefined") return null;
   try {
-    sessionStorage.removeItem(LEGACY_CACHE_KEY);
+    clearLegacyCaches();
     const raw = sessionStorage.getItem(CACHE_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw) as CachedProfile;
@@ -74,7 +87,7 @@ export function readCachedProfile(uid: string): UserProfile | null {
 export function writeCachedProfile(profile: UserProfile) {
   if (typeof window === "undefined") return;
   try {
-    sessionStorage.removeItem(LEGACY_CACHE_KEY);
+    clearLegacyCaches();
     sessionStorage.setItem(CACHE_KEY, JSON.stringify(toCached(profile)));
   } catch {
     // ignore
@@ -85,7 +98,7 @@ export function clearCachedProfile() {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.removeItem(CACHE_KEY);
-    sessionStorage.removeItem(LEGACY_CACHE_KEY);
+    clearLegacyCaches();
   } catch {
     // ignore
   }

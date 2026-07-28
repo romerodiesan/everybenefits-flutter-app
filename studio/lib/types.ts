@@ -52,4 +52,8 @@ export type UserProfile = {
   updatedAt: Date | null;
   accountStatus?: AccountStatus;
   deletionScheduledAt?: Date | null;
+  appearance?: {
+    theme: "system" | "light" | "dark";
+    accent: string;
+  } | null;
 };

@@ -2,7 +2,6 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:every_benefits/features/university/course_models.dart';
 import 'package:every_benefits/features/university/course_repository.dart';
-import 'package:every_benefits/features/university/widgets/markdown_body.dart';
 
 import '../../helpers/fake_course_store.dart';
 
@@ -243,42 +242,4 @@ void main() {
     });
   });
 
-  group('Markdown parser', () {
-    test('splits headings, lists, quotes and rules', () {
-      final blocks = parseMarkdownBlocks([
-        '# Título',
-        '',
-        'Un párrafo que sigue',
-        'en la misma idea.',
-        '',
-        '- Uno',
-        '- Dos',
-        '',
-        '1. Primero',
-        '2. Segundo',
-        '',
-        '> Una cita',
-        '',
-        '---',
-      ].join('\n'));
-
-      expect(blocks.map((block) => block.kind).toList(), [
-        MarkdownBlockKind.heading,
-        MarkdownBlockKind.paragraph,
-        MarkdownBlockKind.bullets,
-        MarkdownBlockKind.numbers,
-        MarkdownBlockKind.quote,
-        MarkdownBlockKind.rule,
-      ]);
-      expect(blocks.first.level, 1);
-      // Wrapped lines join into a single paragraph.
-      expect(blocks[1].text, 'Un párrafo que sigue en la misma idea.');
-      expect(blocks[2].items, ['Uno', 'Dos']);
-      expect(blocks[3].items, ['Primero', 'Segundo']);
-    });
-
-    test('returns nothing for blank content', () {
-      expect(parseMarkdownBlocks('   \n\n'), isEmpty);
-    });
-  });
 }

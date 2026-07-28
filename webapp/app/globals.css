@@ -419,7 +419,8 @@ h3,
   border-top: 1px solid var(--glass-border);
   background: color-mix(in srgb, var(--mesh-base) 92%, transparent);
   backdrop-filter: blur(10px);
-  padding: 12px 0 calc(12px + env(safe-area-inset-bottom, 0px));
+  /* Clear Pulse mobile tab bar (~48px) + gap + home indicator */
+  padding: 12px 0 calc(12px + 48px + 12px + env(safe-area-inset-bottom, 0px));
 }
 
 @media (min-width: 1024px) {

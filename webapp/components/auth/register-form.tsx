@@ -12,6 +12,7 @@ import {
 import { isMultiFactorError, resolverFromError } from "@/lib/firebase/mfa";
 import { MfaChallengeForm } from "@/components/auth/mfa-challenge-form";
 import { useAuth } from "@/lib/providers/auth-provider";
+import { needsProfileCompletion } from "@/lib/roles";
 import type { MultiFactorResolver } from "firebase/auth";
 
 export function RegisterForm() {
@@ -34,7 +35,7 @@ export function RegisterForm() {
       router.replace("/set-password");
       return;
     }
-    if (profile && !profile.profileCompleted && !profile.isAnonymous) {
+    if (profile && needsProfileCompletion(profile) && !profile.isAnonymous) {
       router.replace("/complete-profile");
     } else if (user) {
       router.replace("/home");

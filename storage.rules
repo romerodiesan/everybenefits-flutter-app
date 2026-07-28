@@ -62,7 +62,7 @@ service firebase.storage {
       return isAdmin()
         || (
           isAccountActive()
-          && callerRole() in ['instructor', 'manager']
+          && callerRole() in ['instructor', 'teacher', 'manager']
           && ownsCourse(courseId)
         );
     }
@@ -79,9 +79,11 @@ service firebase.storage {
     }
 
     match /avatars/{fileName} {
-      // Members only — guests/anonymous cannot scrape the avatar tree.
-      allow read: if isRegisteredMember();
-      allow write: if isAccountActive()
+      // Own-avatar writes only need Auth + path ownership. Avoid Firestore
+      // cross-service lookups here — a failed get() fails closed as 403 and
+      // blocks profile photo uploads for otherwise valid members.
+      allow read: if isSignedIn();
+      allow write: if isSignedIn()
         && isOwnerFile(fileName)
         && request.resource.size < 5 * 1024 * 1024
         && isAllowedImageType();

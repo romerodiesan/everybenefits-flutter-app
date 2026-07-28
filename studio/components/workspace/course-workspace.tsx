@@ -68,6 +68,9 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [mediaOpen, setMediaOpen] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"syllabus" | "edit" | "details">(
+    "edit",
+  );
   const [students, setStudents] = useState<CourseStudent[]>([]);
 
   const [title, setTitle] = useState("");
@@ -304,8 +307,8 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
           : null;
 
   return (
-    <div className="flex h-[calc(100vh)] flex-col">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-glass-border px-4 py-3">
+    <div className="flex h-[calc(100svh-7.25rem)] flex-col lg:h-[calc(100vh)]">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-glass-border px-3 py-2.5 sm:px-4 sm:py-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Link
@@ -323,11 +326,11 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
             ) : null}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="truncate font-display text-xl">{course.title}</h1>
+            <h1 className="truncate font-display text-lg sm:text-xl">{course.title}</h1>
             <StatusChip status={course.status} />
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex max-w-full flex-wrap items-center gap-2">
           <Button
             variant="ghost"
             className="h-9 px-3 text-xs"
@@ -391,24 +394,58 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
         </div>
       </header>
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[260px_minmax(0,1fr)_300px]">
-        <SyllabusPane
-          courseId={course.id}
-          content={content}
-          selectedLessonId={selectedLessonId}
-          selectedModuleId={activeModuleId}
-          busy={busy}
-          onSelectLesson={(lesson) => {
-            setSelectedLessonId(lesson.id);
-            setSelectedModuleId(lesson.moduleId);
-          }}
-          onSelectModule={setSelectedModuleId}
-          onAddModule={() => void addModule()}
-          onAddLesson={(moduleId) => void addLesson(moduleId)}
-          onBusy={setBusy}
-        />
+      <div className="flex gap-1 border-b border-glass-border px-2 py-1.5 lg:hidden">
+        {(
+          [
+            ["syllabus", t("workspaceModules")],
+            ["edit", t("workspaceEdit")],
+            ["details", t("workspaceInspector")],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setMobilePane(id)}
+            className={`flex-1 rounded-lg px-2 py-2 text-xs font-semibold ${
+              mobilePane === id
+                ? "bg-brand/15 text-brand"
+                : "text-muted hover:bg-ink/[0.04]"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-        <section className="min-h-0 overflow-y-auto border-x border-glass-border p-4">
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[260px_minmax(0,1fr)_300px]">
+        <div
+          className={`min-h-0 overflow-hidden ${
+            mobilePane === "syllabus" ? "block" : "hidden"
+          } lg:block`}
+        >
+          <SyllabusPane
+            courseId={course.id}
+            content={content}
+            selectedLessonId={selectedLessonId}
+            selectedModuleId={activeModuleId}
+            busy={busy}
+            onSelectLesson={(lesson) => {
+              setSelectedLessonId(lesson.id);
+              setSelectedModuleId(lesson.moduleId);
+              setMobilePane("edit");
+            }}
+            onSelectModule={setSelectedModuleId}
+            onAddModule={() => void addModule()}
+            onAddLesson={(moduleId) => void addLesson(moduleId)}
+            onBusy={setBusy}
+          />
+        </div>
+
+        <section
+          className={`min-h-0 overflow-y-auto border-x border-glass-border p-3 sm:p-4 ${
+            mobilePane === "edit" ? "block" : "hidden"
+          } lg:block`}
+        >
           {selectedLesson ? (
             <div>
               <LessonTitleEditor
@@ -429,21 +466,27 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
           )}
         </section>
 
-        <InspectorPane
-          course={course}
-          title={title}
-          description={description}
-          teacherName={teacherName}
-          level={level}
-          onTitle={setTitle}
-          onDescription={setDescription}
-          onTeacherName={setTeacherName}
-          onLevel={setLevel}
-          coverRef={coverRef}
-          coverProgress={coverProgress}
-          onCover={(file) => void pickCover(file)}
-          students={students}
-        />
+        <div
+          className={`min-h-0 overflow-hidden ${
+            mobilePane === "details" ? "block" : "hidden"
+          } lg:block`}
+        >
+          <InspectorPane
+            course={course}
+            title={title}
+            description={description}
+            teacherName={teacherName}
+            level={level}
+            onTitle={setTitle}
+            onDescription={setDescription}
+            onTeacherName={setTeacherName}
+            onLevel={setLevel}
+            coverRef={coverRef}
+            coverProgress={coverProgress}
+            onCover={(file) => void pickCover(file)}
+            students={students}
+          />
+        </div>
       </div>
 
       {previewOpen ? (
@@ -821,7 +864,7 @@ function LessonTreeRow({
         </button>
         <button
           type="button"
-          className="hidden px-1 text-[10px] text-muted group-hover:inline hover:text-danger"
+          className="inline px-1 text-[10px] text-muted hover:text-danger lg:invisible lg:group-hover:visible"
           disabled={busy}
           onClick={() => void remove()}
         >

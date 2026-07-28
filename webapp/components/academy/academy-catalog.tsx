@@ -22,6 +22,7 @@ import {
   ProgressBar,
   useLevelLabels,
 } from "./shared";
+import { CourseGridSkeleton } from "@/components/ui/skeleton";
 
 export function AcademyCatalog() {
   const t = useTranslations();
@@ -213,7 +214,7 @@ export function AcademyCatalog() {
 
         <div className="mt-5">
           {loading ? (
-            <p className="text-sm text-muted">{t("loading")}</p>
+            <CourseGridSkeleton />
           ) : failed ? (
             <EmptyState message={t("academyLoadError")} />
           ) : filtered.length === 0 ? (

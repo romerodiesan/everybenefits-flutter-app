@@ -62,7 +62,24 @@ export function profileFromData(
         ? data.accountStatus
         : "active",
     deletionScheduledAt: toDate(data.deletionScheduledAt),
+    appearance: appearanceFrom(data.appearance),
   };
+}
+
+function appearanceFrom(
+  raw: unknown,
+): UserProfile["appearance"] {
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as Record<string, unknown>;
+  const theme = data.theme;
+  const accent = data.accent;
+  if (
+    (theme === "system" || theme === "light" || theme === "dark") &&
+    typeof accent === "string"
+  ) {
+    return { theme, accent };
+  }
+  return null;
 }
 
 export async function ensureProfile(user: User): Promise<UserProfile> {
@@ -188,7 +205,13 @@ export async function updateUserProfile(
 
 export async function uploadAvatar(uid: string, file: File): Promise<string> {
   const storageRef = ref(getFirebaseStorage(), `avatars/${uid}.jpg`);
-  await uploadBytes(storageRef, file, { contentType: "image/jpeg" });
+  const contentType =
+    file.type === "image/jpeg" ||
+    file.type === "image/png" ||
+    file.type === "image/webp"
+      ? file.type
+      : "image/jpeg";
+  await uploadBytes(storageRef, file, { contentType });
   return getDownloadURL(storageRef);
 }
 

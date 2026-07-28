@@ -40,7 +40,10 @@ export const GROUP_CREATOR_ROLES: readonly UserRole[] = [
 ] as const;
 
 export function parseRole(value: unknown): UserRole {
-  if (typeof value === "string" && (ALL_ROLES as readonly string[]).includes(value)) {
+  if (typeof value !== "string") return "guest";
+  // Legacy every-benefits-us used "teacher" for course authors.
+  if (value === "teacher") return "instructor";
+  if ((ALL_ROLES as readonly string[]).includes(value)) {
     return value as UserRole;
   }
   return "guest";
@@ -103,4 +106,13 @@ export function canParticipateInForums(role: UserRole, isAnonymous: boolean) {
 
 export function canParticipateInChats(role: UserRole, isAnonymous: boolean) {
   return canParticipateInForums(role, isAnonymous);
+}
+
+/** Support inbox is for members who need help — not staff (admin/manager). */
+export function canAccessSupport(role: UserRole, isAnonymous: boolean) {
+  if (isAnonymous || role === "guest") return false;
+  if (role === "admin" || role === "manager") return false;
+  return (
+    role === "student" || role === "agent" || role === "instructor"
+  );
 }

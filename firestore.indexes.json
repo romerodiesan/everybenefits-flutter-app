@@ -51,13 +51,6 @@
       ]
     },
     {
-      "collectionGroup": "replies",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "authorId", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "courses",
       "queryScope": "COLLECTION",
       "fields": [
@@ -103,13 +96,6 @@
       "fields": [
         { "fieldPath": "status", "order": "ASCENDING" },
         { "fieldPath": "updatedAt", "order": "DESCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "enrollments",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "courseId", "order": "ASCENDING" }
       ]
     },
     {

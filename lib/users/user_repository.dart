@@ -207,6 +207,7 @@ class UserRepository {
         createdAt: now,
         updatedAt: now,
         agency: isAnonymous ? null : kDefaultAgency,
+        approvalStatus: isAnonymous ? 'approved' : 'pending',
       );
       await _store.create(profile);
       return profile;

@@ -17,7 +17,7 @@ import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
 import { listPublicProfiles } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
-import { composeUsAddress, headlineName, parseRole } from "../roles";
+import { composeUsAddress, headlineName, parseRole, parseApprovalStatus } from "../roles";
 
 function toDate(value: unknown): Date | null {
   if (!value) return null;
@@ -68,7 +68,25 @@ export function profileFromData(
         ? data.accountStatus
         : "active",
     deletionScheduledAt: toDate(data.deletionScheduledAt),
+    approvalStatus: parseApprovalStatus(data.approvalStatus) ?? undefined,
+    appearance: appearanceFrom(data.appearance),
   };
+}
+
+function appearanceFrom(
+  raw: unknown,
+): UserProfile["appearance"] {
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as Record<string, unknown>;
+  const theme = data.theme;
+  const accent = data.accent;
+  if (
+    (theme === "system" || theme === "light" || theme === "dark") &&
+    typeof accent === "string"
+  ) {
+    return { theme, accent };
+  }
+  return null;
 }
 
 export async function ensureProfile(user: User): Promise<UserProfile> {
@@ -101,6 +119,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     agency: isAnonymous ? null : DEFAULT_AGENCY,
     createdAt: new Date(),
     updatedAt: new Date(),
+    approvalStatus: isAnonymous ? "approved" : "pending",
   };
 
   await setDoc(refDoc, {
@@ -123,6 +142,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     addressState: null,
     addressZip: null,
     agency: profile.agency,
+    approvalStatus: profile.approvalStatus,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -200,8 +220,17 @@ export async function updateUserProfile(
 
 export async function uploadAvatar(uid: string, file: File): Promise<string> {
   const storageRef = ref(getFirebaseStorage(), `avatars/${uid}.jpg`);
-  await uploadBytes(storageRef, file, { contentType: "image/jpeg" });
+  const contentType = isAllowedAvatarType(file.type)
+    ? file.type
+    : "image/jpeg";
+  await uploadBytes(storageRef, file, { contentType });
   return getDownloadURL(storageRef);
+}
+
+function isAllowedAvatarType(type: string) {
+  return (
+    type === "image/jpeg" || type === "image/png" || type === "image/webp"
+  );
 }
 
 export async function listDirectory(excludeUid?: string, max = 80) {

@@ -17,7 +17,7 @@ const privacyEn: LegalDoc = {
     {
       title: "1. Who we are",
       paragraphs: [
-        "Every Benefits (“Every Benefits,” “we,” “us,” or “our”) operates EVERY Pulse, a community and learning platform for insurance professionals available on the web and mobile applications (the “Services”).",
+        "Every Benefits (“Every Benefits,” “we,” “us,” or “our”) operates Pulse, a community and learning platform for insurance professionals available on the web and mobile applications (the “Services”).",
         "This Privacy Policy explains how we collect, use, share, and protect personal information when you use the Services. For privacy questions or requests, contact us at support@everybenefits.com.",
       ],
     },
@@ -126,7 +126,7 @@ const privacyEs: LegalDoc = {
     {
       title: "1. Quiénes somos",
       paragraphs: [
-        "Every Benefits (“Every Benefits”, “nosotros” o “nuestro”) opera EVERY Pulse, una plataforma de comunidad y aprendizaje para profesionales de seguros disponible en la web y en aplicaciones móviles (los “Servicios”).",
+        "Every Benefits (“Every Benefits”, “nosotros” o “nuestro”) opera Pulse, una plataforma de comunidad y aprendizaje para profesionales de seguros disponible en la web y en aplicaciones móviles (los “Servicios”).",
         "Esta Política de privacidad explica cómo recopilamos, usamos, compartimos y protegemos la información personal cuando usas los Servicios. Para consultas o solicitudes de privacidad, escríbenos a support@everybenefits.com.",
       ],
     },
@@ -235,7 +235,7 @@ const termsEn: LegalDoc = {
     {
       title: "1. Agreement to these Terms",
       paragraphs: [
-        "These Terms of Use (“Terms”) govern your access to and use of EVERY Pulse and related web and mobile services operated by Every Benefits (the “Services”). By creating an account or using the Services, you agree to these Terms and our Privacy Policy.",
+        "These Terms of Use (“Terms”) govern your access to and use of Pulse and related web and mobile services operated by Every Benefits (the “Services”). By creating an account or using the Services, you agree to these Terms and our Privacy Policy.",
         "If you do not agree, do not use the Services. Questions: support@everybenefits.com.",
       ],
     },
@@ -249,7 +249,7 @@ const termsEn: LegalDoc = {
     {
       title: "3. The Services",
       paragraphs: [
-        "EVERY Pulse provides community forums, messaging, academy learning content, and Pulse AI assistance for insurance professionals. Features may change, and we may modify, suspend, or discontinue parts of the Services with or without notice when reasonably necessary for operations, security, or legal compliance.",
+        "Pulse provides community forums, messaging, academy learning content, and Pulse AI assistance for insurance professionals. Features may change, and we may modify, suspend, or discontinue parts of the Services with or without notice when reasonably necessary for operations, security, or legal compliance.",
       ],
     },
     {
@@ -331,7 +331,7 @@ const termsEn: LegalDoc = {
     {
       title: "15. Contact",
       paragraphs: [
-        "Every Benefits — EVERY Pulse support: support@everybenefits.com.",
+        "Every Benefits — Pulse support: support@everybenefits.com.",
       ],
     },
   ],
@@ -343,7 +343,7 @@ const termsEs: LegalDoc = {
     {
       title: "1. Aceptación de estos Términos",
       paragraphs: [
-        "Estos Términos de uso (“Términos”) rigen tu acceso y uso de EVERY Pulse y los servicios web y móviles relacionados operados por Every Benefits (los “Servicios”). Al crear una cuenta o usar los Servicios, aceptas estos Términos y nuestra Política de privacidad.",
+        "Estos Términos de uso (“Términos”) rigen tu acceso y uso de Pulse y los servicios web y móviles relacionados operados por Every Benefits (los “Servicios”). Al crear una cuenta o usar los Servicios, aceptas estos Términos y nuestra Política de privacidad.",
         "Si no estás de acuerdo, no uses los Servicios. Consultas: support@everybenefits.com.",
       ],
     },
@@ -357,7 +357,7 @@ const termsEs: LegalDoc = {
     {
       title: "3. Los Servicios",
       paragraphs: [
-        "EVERY Pulse ofrece foros comunitarios, mensajería, contenido de aprendizaje de la academia y asistencia de Pulse AI para profesionales de seguros. Las funciones pueden cambiar, y podemos modificar, suspender o discontinuar partes de los Servicios con o sin aviso cuando sea razonablemente necesario por operaciones, seguridad o cumplimiento legal.",
+        "Pulse ofrece foros comunitarios, mensajería, contenido de aprendizaje de la academia y asistencia de Pulse AI para profesionales de seguros. Las funciones pueden cambiar, y podemos modificar, suspender o discontinuar partes de los Servicios con o sin aviso cuando sea razonablemente necesario por operaciones, seguridad o cumplimiento legal.",
       ],
     },
     {
@@ -439,7 +439,7 @@ const termsEs: LegalDoc = {
     {
       title: "15. Contacto",
       paragraphs: [
-        "Every Benefits — soporte de EVERY Pulse: support@everybenefits.com.",
+        "Every Benefits — soporte de Pulse: support@everybenefits.com.",
       ],
     },
   ],
