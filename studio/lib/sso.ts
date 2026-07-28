@@ -13,7 +13,7 @@
 import { getToken } from "firebase/app-check";
 import { getFirebaseAppCheck } from "@/lib/firebase/client";
 
-export type PulseAppId = "pulse" | "studio";
+export type PulseAppId = "pulse" | "studio" | "admin";
 
 const SSO_ATTEMPT_KEY = "pulse_sso_attempt";
 const SSO_CODE_STASH_KEY = "pulse_sso_hc";
@@ -32,12 +32,27 @@ export function studioWebUrl() {
   );
 }
 
-export function appBaseUrl(app: PulseAppId) {
-  return app === "studio" ? studioWebUrl() : pulseWebUrl();
+export function adminWebUrl() {
+  return (
+    process.env.NEXT_PUBLIC_ADMIN_URL?.replace(/\/$/, "") ||
+    "http://localhost:3002"
+  );
 }
 
+export function appBaseUrl(app: PulseAppId) {
+  if (app === "studio") return studioWebUrl();
+  if (app === "admin") return adminWebUrl();
+  return pulseWebUrl();
+}
+
+/** Prefer Pulse as the SSO hub for silent bridges. */
 export function siblingApp(app: PulseAppId): PulseAppId {
-  return app === "studio" ? "pulse" : "studio";
+  if (app !== "pulse") return "pulse";
+  return "studio";
+}
+
+export function otherApps(current: PulseAppId): PulseAppId[] {
+  return (["pulse", "studio", "admin"] as const).filter((app) => app !== current);
 }
 
 /** Absolute SSO consume URL on `app`, with optional post-login path. */
@@ -201,6 +216,7 @@ export function isAllowedLogoutNext(url: string): boolean {
     const allowed = new Set([
       new URL(pulseWebUrl()).origin,
       new URL(studioWebUrl()).origin,
+      new URL(adminWebUrl()).origin,
     ]);
     return allowed.has(parsed.origin);
   } catch {
