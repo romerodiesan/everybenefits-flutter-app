@@ -1,0 +1,38 @@
+{
+  "name": "@pulse/sso",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "default": "./dist/server.js"
+    },
+    "./client": {
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
+    }
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "peerDependencies": {
+    "@pulse/firebase-client": "workspace:*",
+    "firebase": "^12.0.0",
+    "firebase-admin": "^14.0.0"
+  },
+  "devDependencies": {
+    "@pulse/firebase-client": "workspace:*",
+    "@types/node": "^20",
+    "firebase": "^12.16.0",
+    "firebase-admin": "^14.2.0",
+    "typescript": "^5.9.3"
+  }
+}

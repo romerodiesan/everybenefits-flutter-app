@@ -1,0 +1,15 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.FunctionsUnavailableError = exports.callCloudFunction = exports.initFirebaseClient = exports.getFirebaseAppCheck = exports.getFirebaseFunctions = exports.getFirebaseStorage = exports.getFirebaseRtdb = exports.getFirebaseDb = exports.getFirebaseAuth = exports.getFirebaseApp = void 0;
+var client_1 = require("./client");
+Object.defineProperty(exports, "getFirebaseApp", { enumerable: true, get: function () { return client_1.getFirebaseApp; } });
+Object.defineProperty(exports, "getFirebaseAuth", { enumerable: true, get: function () { return client_1.getFirebaseAuth; } });
+Object.defineProperty(exports, "getFirebaseDb", { enumerable: true, get: function () { return client_1.getFirebaseDb; } });
+Object.defineProperty(exports, "getFirebaseRtdb", { enumerable: true, get: function () { return client_1.getFirebaseRtdb; } });
+Object.defineProperty(exports, "getFirebaseStorage", { enumerable: true, get: function () { return client_1.getFirebaseStorage; } });
+Object.defineProperty(exports, "getFirebaseFunctions", { enumerable: true, get: function () { return client_1.getFirebaseFunctions; } });
+Object.defineProperty(exports, "getFirebaseAppCheck", { enumerable: true, get: function () { return client_1.getFirebaseAppCheck; } });
+Object.defineProperty(exports, "initFirebaseClient", { enumerable: true, get: function () { return client_1.initFirebaseClient; } });
+var call_function_1 = require("./call-function");
+Object.defineProperty(exports, "callCloudFunction", { enumerable: true, get: function () { return call_function_1.callCloudFunction; } });
+Object.defineProperty(exports, "FunctionsUnavailableError", { enumerable: true, get: function () { return call_function_1.FunctionsUnavailableError; } });
