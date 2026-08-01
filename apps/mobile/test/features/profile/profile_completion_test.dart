@@ -54,7 +54,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
+        theme: buildPulseTheme(Brightness.dark),
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
@@ -114,7 +114,7 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
+        theme: buildPulseTheme(Brightness.dark),
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

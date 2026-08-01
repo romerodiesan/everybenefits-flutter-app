@@ -15,12 +15,12 @@ class ChatContactInfoScreen extends StatefulWidget {
     super.key,
     required this.chat,
     required this.profile,
-    this.chatRepository,
+    required this.chatRepository,
   });
 
   final ChatConversation chat;
   final UserProfile profile;
-  final ChatRepository? chatRepository;
+  final ChatRepository chatRepository;
 
   @override
   State<ChatContactInfoScreen> createState() => _ChatContactInfoScreenState();
@@ -28,7 +28,7 @@ class ChatContactInfoScreen extends StatefulWidget {
 
 class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
   late final ChatRepository _repo =
-      widget.chatRepository ?? ChatRepository();
+      widget.chatRepository;
   var _busy = false;
 
   Future<void> _togglePin(ChatConversation chat) async {

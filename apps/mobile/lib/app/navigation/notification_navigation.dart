@@ -1,25 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../../features/chats/chat_models.dart';
+import '../../features/chats/chat_repository.dart';
+import '../../features/chats/chats_screen.dart';
+import '../../features/forums/forum_repository.dart';
+import '../../features/forums/thread_detail_screen.dart';
+import '../../features/notifications/notification_models.dart';
+import '../../features/notifications/notification_target.dart';
+import '../../features/university/course_detail_screen.dart';
+import '../../features/university/course_repository.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
-import '../chats/chat_models.dart';
-import '../chats/chat_repository.dart';
-import '../chats/chats_screen.dart';
-import '../forums/forum_repository.dart';
-import '../forums/thread_detail_screen.dart';
-import '../university/course_detail_screen.dart';
-import '../university/course_repository.dart';
-import 'notification_models.dart';
-import 'notification_target.dart';
 
 /// Opens the destination encoded on [item], if any.
 Future<void> openNotificationTarget(
   BuildContext context, {
   required AppNotification item,
   required UserProfile profile,
-  ForumRepository? forumRepository,
-  ChatRepository? chatRepository,
-  CourseRepository? courseRepository,
+  required ForumRepository forumRepository,
+  required ChatRepository chatRepository,
+  required CourseRepository courseRepository,
 }) async {
   final target = notificationTargetFor(item);
   if (!target.canNavigate) return;
@@ -32,16 +32,15 @@ Future<void> openNotificationTarget(
           builder: (_) => ThreadDetailScreen(
             threadId: id,
             profile: profile,
-            forumRepository: forumRepository ?? ForumRepository(),
+            forumRepository: forumRepository,
             chatRepository: chatRepository,
           ),
         ),
       );
     case NotificationTargetKind.chat:
-      final chats = chatRepository ?? ChatRepository();
       ChatConversation? chat;
       try {
-        chat = await chats.watchChat(id).first;
+        chat = await chatRepository.watchChat(id).first;
       } catch (_) {
         chat = null;
       }
@@ -56,7 +55,7 @@ Future<void> openNotificationTarget(
         context,
         chat: chat,
         profile: profile,
-        chatRepository: chats,
+        chatRepository: chatRepository,
       );
     case NotificationTargetKind.academy:
       await Navigator.of(context).push(
@@ -64,7 +63,7 @@ Future<void> openNotificationTarget(
           builder: (_) => CourseDetailScreen(
             courseId: id,
             profile: profile,
-            courseRepository: courseRepository ?? CourseRepository(),
+            courseRepository: courseRepository,
           ),
         ),
       );

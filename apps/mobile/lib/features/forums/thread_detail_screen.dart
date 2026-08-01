@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
@@ -46,13 +48,19 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
   late final Stream<ForumThread?> _threadStream =
       widget.forumRepository.watchThread(widget.threadId);
-  late final Stream<List<ForumReply>> _repliesStream =
-      widget.forumRepository.watchReplies(widget.threadId);
   late final Stream<RelevanceVote> _threadVoteStream =
       widget.forumRepository.watchThreadVote(
     threadId: widget.threadId,
     uid: widget.profile.uid,
   );
+  StreamSubscription<List<ForumReply>>? _liveRepliesSub;
+
+  List<ForumReply> _liveReplies = const [];
+  List<ForumReply> _olderReplies = const [];
+  Object? _replyCursor;
+  bool _hasMoreReplies = false;
+  bool _loadingMoreReplies = false;
+  bool _repliesReady = false;
 
   static const _composerRadius = BorderRadius.all(Radius.circular(20));
 
@@ -67,7 +75,83 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   @override
+  void initState() {
+    super.initState();
+    _liveRepliesSub = widget.forumRepository
+        .watchReplies(widget.threadId)
+        .listen((live) {
+      if (!mounted) return;
+      final shouldSeed =
+          _replyCursor == null && live.length >= kForumReplyPageSize;
+      final noMore =
+          _replyCursor == null && live.length < kForumReplyPageSize;
+      setState(() {
+        _liveReplies = live;
+        _repliesReady = true;
+        if (noMore) _hasMoreReplies = false;
+      });
+      if (shouldSeed) unawaited(_seedReplyCursor());
+      unawaited(_ensureReplyVotes(_mergedReplies()));
+    });
+  }
+
+  List<ForumReply> _mergedReplies() {
+    final seen = <String>{};
+    return [
+      for (final r in _liveReplies)
+        if (seen.add(r.id)) r,
+      for (final r in _olderReplies)
+        if (seen.add(r.id)) r,
+    ];
+  }
+
+  Future<void> _seedReplyCursor() async {
+    try {
+      final page = await widget.forumRepository.queryReplies(
+        threadId: widget.threadId,
+        limit: kForumReplyPageSize,
+      );
+      if (!mounted) return;
+      setState(() {
+        _replyCursor = page.nextCursor;
+        _hasMoreReplies = page.hasMore;
+      });
+    } catch (_) {
+      // Load-more stays hidden until a successful seed.
+    }
+  }
+
+  Future<void> _loadMoreReplies() async {
+    if (_loadingMoreReplies || !_hasMoreReplies) return;
+    setState(() => _loadingMoreReplies = true);
+    try {
+      final page = await widget.forumRepository.queryReplies(
+        threadId: widget.threadId,
+        cursor: _replyCursor,
+      );
+      if (!mounted) return;
+      final seen = <String>{
+        ..._liveReplies.map((r) => r.id),
+        ..._olderReplies.map((r) => r.id),
+      };
+      final fresh = page.replies.where((r) => seen.add(r.id)).toList();
+      setState(() {
+        _olderReplies = [..._olderReplies, ...fresh];
+        _replyCursor = page.nextCursor;
+        _hasMoreReplies = page.hasMore;
+        _loadingMoreReplies = false;
+      });
+      unawaited(_ensureReplyVotes(_mergedReplies()));
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _loadingMoreReplies = false);
+      _showError(error);
+    }
+  }
+
+  @override
   void dispose() {
+    _liveRepliesSub?.cancel();
     _replyController.dispose();
     _replyFocus.dispose();
     super.dispose();
@@ -138,6 +222,18 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
       );
       if (!mounted) return;
       Navigator.of(context).pop();
+    } catch (error) {
+      _showError(error);
+    }
+  }
+
+  Future<void> _toggleClosed(ForumThread thread) async {
+    try {
+      await widget.forumRepository.setThreadClosed(
+        thread: thread,
+        actor: widget.profile,
+        closed: !thread.closed,
+      );
     } catch (error) {
       _showError(error);
     }
@@ -287,6 +383,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
             thread != null && _isAuthorOrAdmin(thread.authorId);
         final canAccept =
             thread != null && _isAuthorOrAdmin(thread.authorId);
+        final canReply = _canPost && thread != null && !thread.closed;
         final canVote = _canPost &&
             thread != null &&
             thread.authorId != widget.profile.uid;
@@ -327,14 +424,9 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                   : Column(
                       children: [
                         Expanded(
-                          child: StreamBuilder<List<ForumReply>>(
-                            stream: _repliesStream,
-                            builder: (context, repliesSnapshot) {
-                              final raw =
-                                  repliesSnapshot.data ?? const <ForumReply>[];
-                              WidgetsBinding.instance.addPostFrameCallback((_) {
-                                _ensureReplyVotes(raw);
-                              });
+                          child: Builder(
+                            builder: (context) {
+                              final raw = _mergedReplies();
                               final replies = sortRepliesByRelevance(
                                 raw,
                                 acceptedReplyId: thread!.acceptedReplyId,
@@ -343,119 +435,212 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
                               final answersLabel = count == 1
                                   ? l10n.replyCountOne
                                   : l10n.replyCountOther(count);
+                              final showLoadMore = _hasMoreReplies;
 
-                              return ListView(
-                                padding: const EdgeInsets.fromLTRB(
-                                  AppSpacing.md,
-                                  AppSpacing.sm,
-                                  AppSpacing.md,
-                                  AppSpacing.lg,
-                                ),
-                                children: [
-                                  StreamBuilder<RelevanceVote>(
-                                    stream: _threadVoteStream,
-                                    builder: (context, voteSnap) {
-                                      final vote = voteSnap.data ??
-                                          RelevanceVote.none;
-                                      return _OriginalPost(
-                                        thread: thread,
-                                        liked: vote == RelevanceVote.up,
-                                        canLike: canVote,
-                                        canManage: canManageThread,
-                                        onLike: () => _voteThread(
-                                          thread,
-                                          _toggle(vote, RelevanceVote.up),
-                                        ),
-                                        onAnswer: _canPost
-                                            ? () =>
-                                                _replyFocus.requestFocus()
-                                            : null,
-                                        onShare: () {
-                                          PulseHaptics.light();
-                                          showShareToChatSheet(
-                                            context: context,
-                                            thread: thread,
-                                            profile: widget.profile,
-                                            forumRepository:
-                                                widget.forumRepository,
-                                            chatRepository:
-                                                widget.chatRepository,
-                                          );
-                                        },
-                                        onEdit: () => _editThread(thread),
-                                        onDelete: () =>
-                                            _deleteThread(thread),
-                                      );
-                                    },
-                                  ),
-                                  const SizedBox(height: AppSpacing.lg),
-                                  Text(
-                                    answersLabel,
-                                    style: theme.textTheme.labelLarge
-                                        ?.copyWith(
-                                      color: colors.muted,
-                                      letterSpacing: 0.4,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
+                              return CustomScrollView(
+                                slivers: [
+                                  SliverPadding(
+                                    padding: const EdgeInsets.fromLTRB(
+                                      AppSpacing.md,
+                                      AppSpacing.sm,
+                                      AppSpacing.md,
+                                      0,
+                                    ),
+                                    sliver: SliverToBoxAdapter(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          StreamBuilder<RelevanceVote>(
+                                            stream: _threadVoteStream,
+                                            builder: (context, voteSnap) {
+                                              final vote = voteSnap.data ??
+                                                  RelevanceVote.none;
+                                              return _OriginalPost(
+                                                thread: thread,
+                                                liked:
+                                                    vote == RelevanceVote.up,
+                                                canLike: canVote,
+                                                canManage: canManageThread,
+                                                onLike: () => _voteThread(
+                                                  thread,
+                                                  _toggle(
+                                                    vote,
+                                                    RelevanceVote.up,
+                                                  ),
+                                                ),
+                                                onAnswer: canReply
+                                                    ? () => _replyFocus
+                                                        .requestFocus()
+                                                    : null,
+                                                onShare: () {
+                                                  PulseHaptics.light();
+                                                  showShareToChatSheet(
+                                                    context: context,
+                                                    thread: thread,
+                                                    profile: widget.profile,
+                                                    forumRepository: widget
+                                                        .forumRepository,
+                                                    chatRepository:
+                                                        widget.chatRepository,
+                                                  );
+                                                },
+                                                onEdit: () =>
+                                                    _editThread(thread),
+                                                onDelete: () =>
+                                                    _deleteThread(thread),
+                                                onToggleClosed: () =>
+                                                    _toggleClosed(thread),
+                                              );
+                                            },
+                                          ),
+                                          const SizedBox(
+                                            height: AppSpacing.lg,
+                                          ),
+                                          Text(
+                                            answersLabel,
+                                            style: theme
+                                                .textTheme.labelLarge
+                                                ?.copyWith(
+                                              color: colors.muted,
+                                              letterSpacing: 0.4,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            l10n.threadSortedByRelevance,
+                                            style: theme
+                                                .textTheme.bodySmall
+                                                ?.copyWith(
+                                              color: colors.muted,
+                                            ),
+                                          ),
+                                          const SizedBox(
+                                            height: AppSpacing.sm,
+                                          ),
+                                          if (!_repliesReady)
+                                            const Padding(
+                                              padding: EdgeInsets.symmetric(
+                                                vertical: AppSpacing.md,
+                                              ),
+                                              child: Center(
+                                                child: SizedBox(
+                                                  width: 22,
+                                                  height: 22,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                          else if (replies.isEmpty)
+                                            Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                vertical: AppSpacing.sm,
+                                              ),
+                                              child: Text(
+                                                l10n.threadFirstToReply,
+                                                style: theme
+                                                    .textTheme.bodyMedium
+                                                    ?.copyWith(
+                                                  color: colors.muted,
+                                                ),
+                                              ),
+                                            ),
+                                        ],
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    l10n.threadSortedByRelevance,
-                                    style: theme.textTheme.bodySmall
-                                        ?.copyWith(color: colors.muted),
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  if (replies.isEmpty)
-                                    Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        vertical: AppSpacing.sm,
+                                  if (_repliesReady && replies.isNotEmpty)
+                                    SliverPadding(
+                                      padding: const EdgeInsets.fromLTRB(
+                                        AppSpacing.md,
+                                        0,
+                                        AppSpacing.md,
+                                        AppSpacing.sm,
                                       ),
-                                      child: Text(
-                                        l10n.threadFirstToReply,
-                                        style: theme.textTheme.bodyMedium
-                                            ?.copyWith(color: colors.muted),
+                                      sliver: SliverList.builder(
+                                        itemCount: replies.length,
+                                        itemBuilder: (context, i) {
+                                          final reply = replies[i];
+                                          return Padding(
+                                            key: ValueKey(reply.id),
+                                            padding: EdgeInsets.only(
+                                              top: i == 0
+                                                  ? 0
+                                                  : AppSpacing.md,
+                                            ),
+                                            child: _PulseAnswer(
+                                              thread: thread,
+                                              reply: reply,
+                                              profile: widget.profile,
+                                              vote: _replyVotes[reply.id] ??
+                                                  RelevanceVote.none,
+                                              canParticipate: _canPost,
+                                              canManage: _isAuthorOrAdmin(
+                                                reply.authorId,
+                                              ),
+                                              canAccept: canAccept,
+                                              onVote: (next) =>
+                                                  _voteReply(reply, next),
+                                              onEdit: () =>
+                                                  _editReply(reply),
+                                              onDelete: () =>
+                                                  _deleteReply(reply),
+                                              onAccept: () => _acceptReply(
+                                                thread,
+                                                reply,
+                                              ),
+                                            ),
+                                          );
+                                        },
+                                      ),
+                                    ),
+                                  if (showLoadMore)
+                                    SliverToBoxAdapter(
+                                      child: Padding(
+                                        padding: const EdgeInsets.fromLTRB(
+                                          AppSpacing.md,
+                                          AppSpacing.sm,
+                                          AppSpacing.md,
+                                          AppSpacing.lg,
+                                        ),
+                                        child: Center(
+                                          child: _loadingMoreReplies
+                                              ? const SizedBox(
+                                                  width: 24,
+                                                  height: 24,
+                                                  child:
+                                                      CircularProgressIndicator(
+                                                    strokeWidth: 2,
+                                                  ),
+                                                )
+                                              : TextButton(
+                                                  onPressed:
+                                                      _loadMoreReplies,
+                                                  child: Text(
+                                                    l10n.forumsLoadMore,
+                                                  ),
+                                                ),
+                                        ),
                                       ),
                                     )
                                   else
-                                    for (var i = 0;
-                                        i < replies.length;
-                                        i++) ...[
-                                      if (i > 0)
-                                        const SizedBox(
-                                          height: AppSpacing.md,
-                                        ),
-                                      _PulseAnswer(
-                                        key: ValueKey(replies[i].id),
-                                        thread: thread,
-                                        reply: replies[i],
-                                        profile: widget.profile,
-                                        vote: _replyVotes[replies[i].id] ??
-                                            RelevanceVote.none,
-                                        canParticipate: _canPost,
-                                        canManage: _isAuthorOrAdmin(
-                                          replies[i].authorId,
-                                        ),
-                                        canAccept: canAccept,
-                                        onVote: (next) =>
-                                            _voteReply(replies[i], next),
-                                        onEdit: () =>
-                                            _editReply(replies[i]),
-                                        onDelete: () =>
-                                            _deleteReply(replies[i]),
-                                        onAccept: () => _acceptReply(
-                                          thread,
-                                          replies[i],
-                                        ),
-                                      ),
-                                    ],
+                                    const SliverToBoxAdapter(
+                                      child: SizedBox(height: AppSpacing.lg),
+                                    ),
                                 ],
                               );
                             },
                           ),
                         ),
                         _CommentComposerBar(
-                          canPost: _canPost,
+                          canPost: canReply,
+                          closed: thread?.closed == true,
                           controller: _replyController,
                           focusNode: _replyFocus,
                           sending: _sending,
@@ -482,6 +667,7 @@ class _OriginalPost extends StatelessWidget {
     this.onShare,
     this.onEdit,
     this.onDelete,
+    this.onToggleClosed,
   });
 
   final ForumThread thread;
@@ -493,6 +679,7 @@ class _OriginalPost extends StatelessWidget {
   final VoidCallback? onShare;
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onToggleClosed;
 
   @override
   Widget build(BuildContext context) {
@@ -535,6 +722,8 @@ class _OriginalPost extends StatelessWidget {
                           switch (action) {
                             case _ThreadAction.edit:
                               onEdit?.call();
+                            case _ThreadAction.toggleClosed:
+                              onToggleClosed?.call();
                             case _ThreadAction.delete:
                               onDelete?.call();
                           }
@@ -543,6 +732,14 @@ class _OriginalPost extends StatelessWidget {
                           PopupMenuItem(
                             value: _ThreadAction.edit,
                             child: Text(l10n.actionEdit),
+                          ),
+                          PopupMenuItem(
+                            value: _ThreadAction.toggleClosed,
+                            child: Text(
+                              thread.closed
+                                  ? l10n.threadReopenReplies
+                                  : l10n.threadCloseReplies,
+                            ),
                           ),
                           PopupMenuItem(
                             value: _ThreadAction.delete,
@@ -561,6 +758,15 @@ class _OriginalPost extends StatelessWidget {
                     letterSpacing: -0.3,
                   ),
                 ),
+                if (thread.closed) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    l10n.threadClosedNotice,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.muted,
+                    ),
+                  ),
+                ],
                 if (thread.body.trim().isNotEmpty) ...[
                   const SizedBox(height: 6),
                   Text(
@@ -610,7 +816,7 @@ class _OriginalPost extends StatelessWidget {
   }
 }
 
-enum _ThreadAction { edit, delete }
+enum _ThreadAction { edit, toggleClosed, delete }
 
 class _PostAction extends StatelessWidget {
   const _PostAction({
@@ -776,6 +982,8 @@ class _PulseAnswer extends StatelessWidget {
                                         onEdit();
                                       case _ThreadAction.delete:
                                         onDelete();
+                                      case _ThreadAction.toggleClosed:
+                                        break;
                                     }
                                   },
                                   itemBuilder: (context) => [
@@ -1052,6 +1260,7 @@ class _EditReplySheetState extends State<_EditReplySheet> {
 class _CommentComposerBar extends StatelessWidget {
   const _CommentComposerBar({
     required this.canPost,
+    required this.closed,
     required this.controller,
     required this.focusNode,
     required this.sending,
@@ -1061,6 +1270,7 @@ class _CommentComposerBar extends StatelessWidget {
   });
 
   final bool canPost;
+  final bool closed;
   final TextEditingController controller;
   final FocusNode focusNode;
   final bool sending;
@@ -1162,7 +1372,9 @@ class _CommentComposerBar extends StatelessWidget {
                       vertical: AppSpacing.sm,
                     ),
                     child: Text(
-                      l10n.replyRegisterPrompt,
+                      closed
+                          ? l10n.threadClosedNotice
+                          : l10n.replyRegisterPrompt,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: colors.muted,
                       ),

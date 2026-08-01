@@ -1676,6 +1676,24 @@ abstract class AppLocalizations {
   /// **'Delete'**
   String get actionDelete;
 
+  /// No description provided for @threadCloseReplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Close replies'**
+  String get threadCloseReplies;
+
+  /// No description provided for @threadReopenReplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Reopen'**
+  String get threadReopenReplies;
+
+  /// No description provided for @threadClosedNotice.
+  ///
+  /// In en, this message translates to:
+  /// **'This thread is closed to new replies.'**
+  String get threadClosedNotice;
+
   /// No description provided for @actionCancel.
   ///
   /// In en, this message translates to:
@@ -2147,8 +2165,14 @@ abstract class AppLocalizations {
   /// No description provided for @newChatEmpty.
   ///
   /// In en, this message translates to:
-  /// **'No other users yet. When someone signs up, they\'ll appear here.'**
+  /// **'No matches. Try another name, email, or NPN.'**
   String get newChatEmpty;
+
+  /// No description provided for @newChatSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name, email, or NPN'**
+  String get newChatSearchHint;
 
   /// No description provided for @newChatContactsHeader.
   ///

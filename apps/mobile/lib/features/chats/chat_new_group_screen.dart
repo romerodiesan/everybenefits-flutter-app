@@ -17,12 +17,12 @@ class ChatNewGroupScreen extends StatefulWidget {
   const ChatNewGroupScreen({
     super.key,
     required this.profile,
-    this.chatRepository,
+    required this.chatRepository,
     this.userRepository,
   });
 
   final UserProfile profile;
-  final ChatRepository? chatRepository;
+  final ChatRepository chatRepository;
   final UserRepository? userRepository;
 
   @override
@@ -32,7 +32,7 @@ class ChatNewGroupScreen extends StatefulWidget {
 class _ChatNewGroupScreenState extends State<ChatNewGroupScreen> {
   late final Future<List<UserProfile>> _contactsFuture;
   late final ChatRepository _chatRepo =
-      widget.chatRepository ?? ChatRepository();
+      widget.chatRepository;
   late final UserRepository _users =
       widget.userRepository ?? UserRepository();
   final _title = TextEditingController();
@@ -145,87 +145,107 @@ class _ChatNewGroupScreenState extends State<ChatNewGroupScreen> {
                   return const PulseContactListSkeleton();
                 }
                 final contacts = snapshot.data!;
-                return ListView(
+                // header(title+label) + contacts + footer(create)
+                const headerCount = 1;
+                const footerCount = 1;
+                return ListView.builder(
                   padding: const EdgeInsets.fromLTRB(
                     AppSpacing.md,
                     AppSpacing.sm,
                     AppSpacing.md,
                     AppSpacing.xl,
                   ),
-                  children: [
-                    TextField(
-                      controller: _title,
-                      textCapitalization: TextCapitalization.sentences,
-                      decoration: InputDecoration(
-                        labelText: l10n.newGroupNameLabel,
-                        hintText: l10n.newGroupNameHint,
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.xl),
-                    Text(
-                      l10n.newGroupMembersHeader.toUpperCase(),
-                      style: theme.textTheme.labelLarge?.copyWith(
-                        color: colors.muted,
-                        fontSize: 11,
-                        letterSpacing: 1.1,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    for (final person in contacts) ...[
-                      Material(
-                        color: colors.sheet,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(18),
-                          side: BorderSide(
-                            color: _selected.contains(person.uid)
-                                ? AppColors.brandOf(context)
-                                : colors.border,
+                  itemCount: headerCount + contacts.length + footerCount,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            controller: _title,
+                            textCapitalization: TextCapitalization.sentences,
+                            decoration: InputDecoration(
+                              labelText: l10n.newGroupNameLabel,
+                              hintText: l10n.newGroupNameHint,
+                            ),
                           ),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: CheckboxListTile(
-                          value: _selected.contains(person.uid),
-                          onChanged: _busy
-                              ? null
-                              : (value) {
-                                  setState(() {
-                                    if (value == true) {
-                                      _selected.add(person.uid);
-                                    } else {
-                                      _selected.remove(person.uid);
-                                    }
-                                  });
-                                },
-                          secondary: ChatAvatar(
-                            initials: chatInitials(person.headlineName),
-                            size: 42,
-                          ),
-                          title: Text(
-                            person.headlineName,
-                            style: theme.textTheme.titleMedium?.copyWith(
+                          const SizedBox(height: AppSpacing.xl),
+                          Text(
+                            l10n.newGroupMembersHeader.toUpperCase(),
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: colors.muted,
+                              fontSize: 11,
+                              letterSpacing: 1.1,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          subtitle: person.agency?.trim().isNotEmpty == true
-                              ? Text(person.agency!)
-                              : null,
+                          const SizedBox(height: 10),
+                        ],
+                      );
+                    }
+                    final contactIndex = index - headerCount;
+                    if (contactIndex < contacts.length) {
+                      final person = contacts[contactIndex];
+                      return Padding(
+                        key: ValueKey(person.uid),
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Material(
+                          color: colors.sheet,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(18),
+                            side: BorderSide(
+                              color: _selected.contains(person.uid)
+                                  ? AppColors.brandOf(context)
+                                  : colors.border,
+                            ),
+                          ),
+                          clipBehavior: Clip.antiAlias,
+                          child: CheckboxListTile(
+                            value: _selected.contains(person.uid),
+                            onChanged: _busy
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      if (value == true) {
+                                        _selected.add(person.uid);
+                                      } else {
+                                        _selected.remove(person.uid);
+                                      }
+                                    });
+                                  },
+                            secondary: ChatAvatar(
+                              initials: chatInitials(person.headlineName),
+                              size: 42,
+                            ),
+                            title: Text(
+                              person.headlineName,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            subtitle: person.agency?.trim().isNotEmpty == true
+                                ? Text(person.agency!)
+                                : null,
+                          ),
                         ),
+                      );
+                    }
+                    return Padding(
+                      padding: const EdgeInsets.only(top: AppSpacing.lg),
+                      child: FilledButton(
+                        onPressed: _busy ? null : () => _create(contacts),
+                        child: _busy
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : Text(l10n.newGroupCreate),
                       ),
-                      const SizedBox(height: 8),
-                    ],
-                    const SizedBox(height: AppSpacing.lg),
-                    FilledButton(
-                      onPressed: _busy ? null : () => _create(contacts),
-                      child: _busy
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text(l10n.newGroupCreate),
-                    ),
-                  ],
+                    );
+                  },
                 );
               },
             ),

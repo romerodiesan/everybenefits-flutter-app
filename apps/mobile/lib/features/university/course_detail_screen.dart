@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'course_models.dart';
@@ -23,7 +24,7 @@ class CourseDetailScreen extends StatefulWidget {
     required this.courseId,
     required this.profile,
     this.initialCourse,
-    this.courseRepository,
+    required this.courseRepository,
   });
 
   final String courseId;
@@ -31,7 +32,7 @@ class CourseDetailScreen extends StatefulWidget {
 
   /// Renders immediately while the live document loads.
   final Course? initialCourse;
-  final CourseRepository? courseRepository;
+  final CourseRepository courseRepository;
 
   @override
   State<CourseDetailScreen> createState() => _CourseDetailScreenState();
@@ -39,7 +40,7 @@ class CourseDetailScreen extends StatefulWidget {
 
 class _CourseDetailScreenState extends State<CourseDetailScreen> {
   late final CourseRepository _repository =
-      widget.courseRepository ?? CourseRepository();
+      widget.courseRepository;
 
   final _subscriptions = <StreamSubscription<void>>[];
 
@@ -196,7 +197,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 icon: Icons.cloud_off_rounded,
                 message: friendlyCourseError(_error!, l10n),
               )
-            : const Center(child: CircularProgressIndicator()),
+            : const PulseCourseDetailSkeleton(),
       );
     }
 
@@ -295,10 +296,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           Text(l10n.playerClasses, style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpacing.sm),
           if (_loadingContent)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const PulseLessonListSkeleton()
           else if (_content.lessons.isEmpty)
             AcademyMessage(
               icon: Icons.playlist_add_rounded,

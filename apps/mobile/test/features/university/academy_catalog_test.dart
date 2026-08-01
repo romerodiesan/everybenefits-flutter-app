@@ -57,7 +57,7 @@ Course _course({
 
 Widget _wrap(Widget child) {
   return MaterialApp(
-    theme: buildEveryInsuranceTheme(Brightness.dark),
+    theme: buildPulseTheme(Brightness.dark),
     locale: const Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,

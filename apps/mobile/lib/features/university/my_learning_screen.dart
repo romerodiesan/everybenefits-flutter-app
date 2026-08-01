@@ -17,11 +17,11 @@ class MyLearningScreen extends StatefulWidget {
   const MyLearningScreen({
     super.key,
     required this.profile,
-    this.courseRepository,
+    required this.courseRepository,
   });
 
   final UserProfile profile;
-  final CourseRepository? courseRepository;
+  final CourseRepository courseRepository;
 
   @override
   State<MyLearningScreen> createState() => _MyLearningScreenState();
@@ -29,7 +29,7 @@ class MyLearningScreen extends StatefulWidget {
 
 class _MyLearningScreenState extends State<MyLearningScreen> {
   late final CourseRepository _repository =
-      widget.courseRepository ?? CourseRepository();
+      widget.courseRepository;
 
   final _subscriptions = <StreamSubscription<void>>[];
 
@@ -37,6 +37,10 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
   Map<String, Enrollment> _enrollments = const {};
   bool _loading = true;
   Object? _error;
+  static const _enrollmentPageSize = 50;
+  int _enrollmentLimit = _enrollmentPageSize;
+  bool _hasMoreEnrollments = false;
+  bool _loadingMore = false;
 
   @override
   void initState() {
@@ -59,24 +63,45 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
         },
       ),
     );
-    _subscriptions.add(
-      _repository.watchEnrollments(widget.profile.uid).listen(
-        (list) {
-          if (!mounted) return;
-          setState(() {
-            _enrollments = {for (final e in list) e.courseId: e};
-            _loading = false;
-          });
-        },
-        onError: (Object error) {
-          if (!mounted) return;
-          setState(() {
-            _loading = false;
-            _error = error;
-          });
-        },
-      ),
+    _listenEnrollments();
+  }
+
+  void _listenEnrollments() {
+    final sub = _repository
+        .watchEnrollments(widget.profile.uid, limit: _enrollmentLimit)
+        .listen(
+      (list) {
+        if (!mounted) return;
+        setState(() {
+          _enrollments = {for (final e in list) e.courseId: e};
+          _hasMoreEnrollments = list.length >= _enrollmentLimit;
+          _loading = false;
+          _loadingMore = false;
+        });
+      },
+      onError: (Object error) {
+        if (!mounted) return;
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+          _error = error;
+        });
+      },
     );
+    _subscriptions.add(sub);
+  }
+
+  void _loadMoreEnrollments() {
+    if (_loadingMore || !_hasMoreEnrollments) return;
+    setState(() {
+      _loadingMore = true;
+      _enrollmentLimit += _enrollmentPageSize;
+    });
+    // Cancel prior enrollment listener (last subscription).
+    if (_subscriptions.length > 1) {
+      unawaited(_subscriptions.removeLast().cancel());
+    }
+    _listenEnrollments();
   }
 
   @override
@@ -123,34 +148,105 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
                       icon: Icons.school_outlined,
                       message: l10n.myLearningEmpty,
                     )
-                  : ListView(
+                  : ListView.builder(
                       padding: const EdgeInsets.all(AppSpacing.lg),
-                      children: [
-                        if (inProgress.isNotEmpty) ...[
-                          Text(
-                            l10n.myLearningInProgress,
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          for (final entry in inProgress) ...[
-                            _card(entry),
-                            const SizedBox(height: AppSpacing.sm),
-                          ],
-                        ],
-                        if (completed.isNotEmpty) ...[
-                          const SizedBox(height: AppSpacing.md),
-                          Text(
-                            l10n.myLearningCompleted,
-                            style: theme.textTheme.titleLarge,
-                          ),
-                          const SizedBox(height: AppSpacing.md),
-                          for (final entry in completed) ...[
-                            _card(entry),
-                            const SizedBox(height: AppSpacing.sm),
-                          ],
-                        ],
-                      ],
+                      itemCount: _myLearningItemCount(
+                        inProgress: inProgress,
+                        completed: completed,
+                      ),
+                      itemBuilder: (context, index) {
+                        return _myLearningItemAt(
+                          index: index,
+                          inProgress: inProgress,
+                          completed: completed,
+                          theme: theme,
+                          l10n: l10n,
+                        );
+                      },
                     ),
+    );
+  }
+
+  int _myLearningItemCount({
+    required List<EnrolledCourse> inProgress,
+    required List<EnrolledCourse> completed,
+  }) {
+    var count = 0;
+    if (inProgress.isNotEmpty) {
+      count += 1 + inProgress.length; // header + cards
+    }
+    if (completed.isNotEmpty) {
+      count += 1 + completed.length;
+    }
+    if (_hasMoreEnrollments) count += 1;
+    return count;
+  }
+
+  Widget _myLearningItemAt({
+    required int index,
+    required List<EnrolledCourse> inProgress,
+    required List<EnrolledCourse> completed,
+    required ThemeData theme,
+    required AppLocalizations l10n,
+  }) {
+    var cursor = index;
+    if (inProgress.isNotEmpty) {
+      if (cursor == 0) {
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.md),
+          child: Text(
+            l10n.myLearningInProgress,
+            style: theme.textTheme.titleLarge,
+          ),
+        );
+      }
+      cursor -= 1;
+      if (cursor < inProgress.length) {
+        return Padding(
+          key: ValueKey('ip-${inProgress[cursor].course.id}'),
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: _card(inProgress[cursor]),
+        );
+      }
+      cursor -= inProgress.length;
+    }
+    if (completed.isNotEmpty) {
+      if (cursor == 0) {
+        return Padding(
+          padding: EdgeInsets.only(
+            top: inProgress.isNotEmpty ? AppSpacing.md : 0,
+            bottom: AppSpacing.md,
+          ),
+          child: Text(
+            l10n.myLearningCompleted,
+            style: theme.textTheme.titleLarge,
+          ),
+        );
+      }
+      cursor -= 1;
+      if (cursor < completed.length) {
+        return Padding(
+          key: ValueKey('done-${completed[cursor].course.id}'),
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: _card(completed[cursor]),
+        );
+      }
+      cursor -= completed.length;
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
+      child: Center(
+        child: _loadingMore
+            ? const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : TextButton(
+                onPressed: _loadMoreEnrollments,
+                child: Text(l10n.forumsLoadMore),
+              ),
+      ),
     );
   }
 

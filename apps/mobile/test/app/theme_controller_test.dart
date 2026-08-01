@@ -52,7 +52,7 @@ void main() {
     late Color primary;
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.light),
+        theme: buildPulseTheme(Brightness.light),
         home: Builder(
           builder: (context) {
             colors = AppColors.of(context);
@@ -76,7 +76,7 @@ void main() {
     const violet = Color(0xFF7C3AED);
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.light, brand: violet),
+        theme: buildPulseTheme(Brightness.light, brand: violet),
         home: Builder(
           builder: (context) {
             primary = Theme.of(context).colorScheme.primary;
@@ -94,7 +94,7 @@ void main() {
     late AppColors colors;
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
+        theme: buildPulseTheme(Brightness.dark),
         home: Builder(
           builder: (context) {
             colors = AppColors.of(context);

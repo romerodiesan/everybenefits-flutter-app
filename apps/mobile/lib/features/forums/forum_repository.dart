@@ -29,6 +29,13 @@ abstract class ForumStore {
     int limit = kForumReplyPageSize,
   });
 
+  /// One-shot reply page (newest first) with optional cursor for older pages.
+  Future<ForumReplyPage> queryReplies({
+    required String threadId,
+    int limit = kForumReplyPageSize,
+    Object? cursor,
+  });
+
   Stream<RelevanceVote> watchThreadVote({
     required String threadId,
     required String uid,
@@ -89,6 +96,11 @@ abstract class ForumStore {
   Future<void> setAcceptedReply({
     required String threadId,
     required String? replyId,
+  });
+
+  Future<void> setThreadClosed({
+    required String threadId,
+    required bool closed,
   });
 
   /// Sets the actor's relevance vote. Passing [RelevanceVote.none] clears it.
@@ -203,26 +215,53 @@ class FirestoreForumStore implements ForumStore {
   }
 
   @override
+  Future<ForumReplyPage> queryReplies({
+    required String threadId,
+    int limit = kForumReplyPageSize,
+    Object? cursor,
+  }) async {
+    Query<Map<String, dynamic>> query = _replies(threadId)
+        .orderBy('createdAt', descending: true)
+        .limit(limit + 1);
+    if (cursor is DocumentSnapshot<Map<String, dynamic>>) {
+      query = query.startAfterDocument(cursor);
+    }
+    final snapshot = await query.get();
+    final docs = snapshot.docs;
+    final hasMore = docs.length > limit;
+    final pageDocs = hasMore ? docs.sublist(0, limit) : docs;
+    return ForumReplyPage(
+      replies: pageDocs
+          .map((doc) => ForumReply.fromMap(threadId, doc.id, doc.data()))
+          .toList(),
+      nextCursor: hasMore ? pageDocs.last : null,
+    );
+  }
+
+  @override
   Future<Map<String, RelevanceVote>> fetchReplyVotes({
     required String threadId,
     required String uid,
     required List<String> replyIds,
   }) async {
     if (replyIds.isEmpty) return {};
-    final snap = await _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('forumVotes')
-        .get();
     final out = {for (final id in replyIds) id: RelevanceVote.none};
-    final wanted = replyIds.toSet();
-    for (final vote in snap.docs) {
-      final data = vote.data();
-      final replyId = '${data['replyId'] ?? ''}';
-      if ('${data['threadId'] ?? ''}' == threadId && wanted.contains(replyId)) {
-        out[replyId] =
-            RelevanceVote.fromValue((data['value'] as num?)?.toInt());
-      }
+    final refs = replyIds
+        .map(
+          (replyId) => _firestore
+              .collection('users')
+              .doc(uid)
+              .collection('forumVotes')
+              .doc('${threadId}_$replyId'),
+        )
+        .toList();
+    final snaps = await Future.wait(refs.map((r) => r.get()));
+    for (var i = 0; i < snaps.length; i++) {
+      final snap = snaps[i];
+      final replyId = replyIds[i];
+      if (!snap.exists) continue;
+      out[replyId] =
+          RelevanceVote.fromValue((snap.data()?['value'] as num?)?.toInt());
     }
     return out;
   }
@@ -233,20 +272,25 @@ class FirestoreForumStore implements ForumStore {
     required List<String> threadIds,
   }) async {
     if (threadIds.isEmpty) return {};
-    final snap = await _firestore
-        .collection('users')
-        .doc(uid)
-        .collection('forumVotes')
-        .get();
     final out = {for (final id in threadIds) id: RelevanceVote.none};
-    final wanted = threadIds.toSet();
-    for (final vote in snap.docs) {
-      final data = vote.data();
-      final threadId = '${data['threadId'] ?? ''}';
-      if (data['replyId'] == null && wanted.contains(threadId)) {
-        out[threadId] =
-            RelevanceVote.fromValue((data['value'] as num?)?.toInt());
-      }
+    final snaps = await Future.wait(
+      threadIds.map(
+        (threadId) => _firestore
+            .collection('users')
+            .doc(uid)
+            .collection('forumVotes')
+            .doc(threadId)
+            .get(),
+      ),
+    );
+    for (var i = 0; i < snaps.length; i++) {
+      final snap = snaps[i];
+      final threadId = threadIds[i];
+      if (!snap.exists) continue;
+      final data = snap.data();
+      if (data?['replyId'] != null) continue;
+      out[threadId] =
+          RelevanceVote.fromValue((data?['value'] as num?)?.toInt());
     }
     return out;
   }
@@ -310,6 +354,7 @@ class FirestoreForumStore implements ForumStore {
       'replyCount': 0,
       'score': 0,
       'acceptedReplyId': null,
+      'closed': false,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
       'lastReplyAt': FieldValue.serverTimestamp(),
@@ -403,6 +448,17 @@ class FirestoreForumStore implements ForumStore {
     });
   }
 
+  @override
+  Future<void> setThreadClosed({
+    required String threadId,
+    required bool closed,
+  }) async {
+    await _threads.doc(threadId).update({
+      'closed': closed,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<void> _applyVote({
     required DocumentReference<Map<String, dynamic>> target,
     required DocumentReference<Map<String, dynamic>> voteRef,
@@ -463,11 +519,16 @@ class FirestoreForumStore implements ForumStore {
     required String authorId,
     required String? photoUrl,
   }) async {
-    final threadsSnap =
-        await _threads.where('authorId', isEqualTo: authorId).get();
+    // Cap cascade: resolve avatars from publicProfiles for older posts when
+    // possible; only rewrite a bounded recent window here.
+    final threadsSnap = await _threads
+        .where('authorId', isEqualTo: authorId)
+        .limit(100)
+        .get();
     final repliesSnap = await _firestore
         .collectionGroup('replies')
         .where('authorId', isEqualTo: authorId)
+        .limit(100)
         .get();
 
     const chunk = 450;
@@ -539,6 +600,13 @@ class ForumRepository {
     int limit = kForumReplyPageSize,
   }) =>
       _store.watchReplies(threadId, limit: limit);
+
+  Future<ForumReplyPage> queryReplies({
+    required String threadId,
+    int limit = kForumReplyPageSize,
+    Object? cursor,
+  }) =>
+      _store.queryReplies(threadId: threadId, limit: limit, cursor: cursor);
 
   Stream<RelevanceVote> watchThreadVote({
     required String threadId,
@@ -714,6 +782,19 @@ class ForumRepository {
     final nextId =
         thread.acceptedReplyId == reply.id ? null : reply.id;
     return _store.setAcceptedReply(threadId: thread.id, replyId: nextId);
+  }
+
+  Future<void> setThreadClosed({
+    required ForumThread thread,
+    required UserProfile actor,
+    required bool closed,
+  }) {
+    final allowed =
+        actor.role == UserRole.admin || thread.authorId == actor.uid;
+    if (!allowed) {
+      throw StateError('No puedes cerrar esta pregunta.');
+    }
+    return _store.setThreadClosed(threadId: thread.id, closed: closed);
   }
 
   Future<void> setThreadRelevance({

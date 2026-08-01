@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'package:flutter/foundation.dart' as foundation;
 import 'package:flutter/material.dart';
@@ -23,15 +25,15 @@ class ChatConversationScreen extends StatefulWidget {
     super.key,
     required this.chat,
     required this.profile,
-    this.chatRepository,
-    this.forumRepository,
+    required this.chatRepository,
+    required this.forumRepository,
     this.initialSharedPost,
   });
 
   final ChatConversation chat;
   final UserProfile profile;
-  final ChatRepository? chatRepository;
-  final ForumRepository? forumRepository;
+  final ChatRepository chatRepository;
+  final ForumRepository forumRepository;
   final SharedPostPreview? initialSharedPost;
 
   @override
@@ -43,11 +45,15 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
   late final ChatRepository _repo =
-      widget.chatRepository ?? ChatRepository();
-  late final Stream<ChatConversation?> _chatStream =
-      _repo.watchChat(widget.chat.id);
-  late final Stream<List<ChatMessage>> _messagesStream =
-      _repo.watchMessages(widget.chat.id);
+      widget.chatRepository;
+  late final StreamSubscription<ChatConversation?> _chatSub;
+  late ChatConversation _chat;
+  late final StreamSubscription<List<ChatMessage>> _messagesSub;
+  List<ChatMessage> _liveMessages = const [];
+  var _messagesReady = false;
+  final _olderMessages = <ChatMessage>[];
+  var _hasMoreOlder = true;
+  var _loadingOlder = false;
   var _sending = false;
   var _sharedBootstrapped = false;
   var _emojiOpen = false;
@@ -55,10 +61,76 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   @override
   void initState() {
     super.initState();
+    _chat = widget.chat;
+    _chatSub = _repo.watchChat(widget.chat.id).listen((next) {
+      if (!mounted || next == null) return;
+      setState(() => _chat = next);
+    });
+    _messagesSub = _repo.watchMessages(widget.chat.id).listen(
+      (live) {
+        if (!mounted) return;
+        setState(() {
+          _liveMessages = live;
+          _messagesReady = true;
+          if (_olderMessages.isEmpty && live.length < kChatMessagePageSize) {
+            _hasMoreOlder = false;
+          }
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() => _messagesReady = true);
+      },
+    );
+    _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _repo.markRead(chatId: widget.chat.id, uid: widget.profile.uid);
       _bootstrapSharedPost();
     });
+  }
+
+  void _onScroll() {
+    if (!_scrollController.hasClients || _loadingOlder || !_hasMoreOlder) {
+      return;
+    }
+    // reverse: true → older messages live toward maxScrollExtent.
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 80) {
+      unawaited(_loadOlder());
+    }
+  }
+
+  Future<void> _loadOlder() async {
+    if (_loadingOlder || !_hasMoreOlder) return;
+    final live = _liveMessages;
+    final anchor = _olderMessages.isNotEmpty
+        ? _olderMessages.last
+        : (live.isNotEmpty ? live.last : null);
+    if (anchor == null) {
+      setState(() => _hasMoreOlder = false);
+      return;
+    }
+    setState(() => _loadingOlder = true);
+    try {
+      final page = await _repo.loadOlderMessages(
+        widget.chat.id,
+        beforeCreatedAt: anchor.createdAt,
+        beforeKey: anchor.id,
+      );
+      if (!mounted) return;
+      final seen = <String>{
+        ...live.map((m) => m.id),
+        ..._olderMessages.map((m) => m.id),
+      };
+      final fresh = page.messages.where((m) => seen.add(m.id)).toList();
+      setState(() {
+        _olderMessages.addAll(fresh);
+        _hasMoreOlder = page.hasMore;
+        _loadingOlder = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingOlder = false);
+    }
   }
 
   Future<void> _bootstrapSharedPost() async {
@@ -82,6 +154,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   void dispose() {
+    _chatSub.cancel();
+    _messagesSub.cancel();
+    _scrollController.removeListener(_onScroll);
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -180,7 +255,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         builder: (_) => ThreadDetailScreen(
           threadId: preview.threadId,
           profile: widget.profile,
-          forumRepository: widget.forumRepository ?? ForumRepository(),
+          forumRepository: widget.forumRepository,
         ),
       ),
     );
@@ -193,160 +268,162 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
     final uid = widget.profile.uid;
+    final chat = _chat;
+    final showSenderNames = chat.isGroup;
 
     return PulseScaffold(
       appBar: AppBar(
         titleSpacing: 0,
-        title: StreamBuilder<ChatConversation?>(
-          stream: _chatStream,
-          initialData: widget.chat,
-          builder: (context, snapshot) {
-            final chat = snapshot.data ?? widget.chat;
-            return InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => ChatContactInfoScreen(
-                      chat: chat,
-                      profile: widget.profile,
-                      chatRepository: _repo,
-                    ),
-                  ),
-                );
-              },
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-                child: Row(
-                  children: [
-                    ChatAvatar(
-                      initials: chat.initialsFor(uid, l10n: context.l10n),
-                      isGroup: chat.isGroup,
-                      size: 38,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            chat.titleFor(uid, l10n: l10n),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                          Text(
-                            chat.isSupportChat
-                                ? l10n.supportChatSubtitle
-                                : chat.isDefaultAgentGroup
-                                    ? l10n.chatsDefaultGroupBadge
-                                    : (chat.isGroup
-                                        ? l10n.chatTypeGroup
-                                        : l10n.chatTypePrivate),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colors.muted,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+        title: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => ChatContactInfoScreen(
+                  chat: chat,
+                  profile: widget.profile,
+                  chatRepository: _repo,
                 ),
               ),
             );
           },
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Row(
+              children: [
+                ChatAvatar(
+                  initials: chat.initialsFor(uid, l10n: context.l10n),
+                  isGroup: chat.isGroup,
+                  size: 38,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        chat.titleFor(uid, l10n: l10n),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Text(
+                        chat.isSupportChat
+                            ? l10n.supportChatSubtitle
+                            : chat.isDefaultAgentGroup
+                                ? l10n.chatsDefaultGroupBadge
+                                : (chat.isGroup
+                                    ? l10n.chatTypeGroup
+                                    : l10n.chatTypePrivate),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: colors.muted,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
       body: Column(
         children: [
           Expanded(
-            child: StreamBuilder<List<ChatMessage>>(
-              stream: _messagesStream,
-              builder: (context, snapshot) {
-                if (snapshot.hasError) {
-                  return Center(
-                    child: Text(
-                      friendlyChatError(snapshot.error!, l10n),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colors.muted,
-                      ),
-                    ),
-                  );
-                }
-                final messages = snapshot.data;
-                if (messages == null) {
-                  return const PulseMessageListSkeleton();
-                }
-                if (messages.isEmpty) {
-                  return Center(
-                    child: Text(
-                      l10n.chatEmptyThread,
-                      textAlign: TextAlign.center,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colors.muted,
-                      ),
-                    ),
-                  );
-                }
-
-                return StreamBuilder<ChatConversation?>(
-                  stream: _chatStream,
-                  initialData: widget.chat,
-                  builder: (context, chatSnap) {
-                    final chat = chatSnap.data ?? widget.chat;
-                    final showSenderNames = chat.isGroup;
-
-                    return ListView.builder(
-                      controller: _scrollController,
-                      reverse: true,
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.sm,
-                      ),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = messages[index];
-                        final mine = msg.isMine(uid);
-                        final shared = msg.sharedPost;
-                        final time = formatChatTime(msg.createdAt, l10n);
-                        final showName = showSenderNames &&
-                            !mine &&
-                            msg.senderName.trim().isNotEmpty;
-
-                        final reactionsEnabled = !widget.chat.isSupportChat;
-
-                        return _MessageRow(
-                          key: ValueKey(msg.id),
-                          msg: msg,
-                          mine: mine,
-                          time: time,
-                          showName: showName,
-                          shared: shared,
-                          viewerUid: uid,
-                          reactionsEnabled: reactionsEnabled,
-                          onOpenShared: shared == null
-                              ? null
-                              : () => _openSharedPost(shared),
-                          onLongPress: reactionsEnabled
-                              ? (anchor) => _showReactionPicker(msg, anchor)
-                              : null,
-                          onTapReaction: reactionsEnabled
-                              ? (emoji) => _react(msg, emoji)
-                              : null,
+            child: !_messagesReady
+                ? const PulseMessageListSkeleton()
+                : Builder(
+                    builder: (context) {
+                      final live = _liveMessages;
+                      final seen = <String>{};
+                      final messages = <ChatMessage>[
+                        for (final m in live)
+                          if (seen.add(m.id)) m,
+                        for (final m in _olderMessages)
+                          if (seen.add(m.id)) m,
+                      ];
+                      if (messages.isEmpty) {
+                        return Center(
+                          child: Text(
+                            l10n.chatEmptyThread,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.muted,
+                            ),
+                          ),
                         );
-                      },
-                    );
-                  },
-                );
-              },
-            ),
+                      }
+
+                      final footerCount =
+                          _loadingOlder || _hasMoreOlder ? 1 : 0;
+                      return ListView.builder(
+                        controller: _scrollController,
+                        reverse: true,
+                        padding: const EdgeInsets.fromLTRB(
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.md,
+                          AppSpacing.sm,
+                        ),
+                        itemCount: messages.length + footerCount,
+                        itemBuilder: (context, index) {
+                          if (index >= messages.length) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 12),
+                              child: Center(
+                                child: _loadingOlder
+                                    ? const SizedBox(
+                                        width: 22,
+                                        height: 22,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const SizedBox(height: 22),
+                              ),
+                            );
+                          }
+                          final msg = messages[index];
+                          final mine = msg.isMine(uid);
+                          final shared = msg.sharedPost;
+                          final time = formatChatTime(msg.createdAt, l10n);
+                          final showName = showSenderNames &&
+                              !mine &&
+                              msg.senderName.trim().isNotEmpty;
+
+                          final reactionsEnabled =
+                              !widget.chat.isSupportChat;
+
+                          return _MessageRow(
+                            key: ValueKey(msg.id),
+                            msg: msg,
+                            mine: mine,
+                            time: time,
+                            showName: showName,
+                            shared: shared,
+                            viewerUid: uid,
+                            reactionsEnabled: reactionsEnabled,
+                            onOpenShared: shared == null
+                                ? null
+                                : () => _openSharedPost(shared),
+                            onLongPress: reactionsEnabled
+                                ? (anchor) =>
+                                    _showReactionPicker(msg, anchor)
+                                : null,
+                            onTapReaction: reactionsEnabled
+                                ? (emoji) => _react(msg, emoji)
+                                : null,
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
           DecoratedBox(
             decoration: BoxDecoration(

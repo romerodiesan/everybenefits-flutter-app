@@ -1,24 +1,23 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../features/ai_chat/pulse_ai_models.dart';
+import '../../features/forums/forum_repository.dart';
+import '../../features/forums/thread_detail_screen.dart';
+import '../../features/university/course_detail_screen.dart';
+import '../../features/university/course_repository.dart';
+import '../../features/university/path_detail_screen.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
-import '../forums/forum_repository.dart';
-import '../forums/thread_detail_screen.dart';
-import '../university/course_detail_screen.dart';
-import '../university/course_repository.dart';
-import '../university/path_detail_screen.dart';
-import 'pulse_ai_models.dart';
 
 /// Opens a citation using the same destinations the web agent links to.
 Future<void> openPulseSource(
   BuildContext context, {
   required PulseSource source,
   required UserProfile profile,
-  CourseRepository? courseRepository,
+  required CourseRepository courseRepository,
+  required ForumRepository forumRepository,
 }) async {
-  final courses = courseRepository ?? CourseRepository();
-
   switch (source.type) {
     case PulseSourceType.acceptedForumAnswer:
       if (source.sourceId.isEmpty) return;
@@ -27,7 +26,7 @@ Future<void> openPulseSource(
           builder: (_) => ThreadDetailScreen(
             threadId: source.sourceId,
             profile: profile,
-            forumRepository: ForumRepository(),
+            forumRepository: forumRepository,
           ),
         ),
       );
@@ -38,13 +37,13 @@ Future<void> openPulseSource(
           builder: (_) => CourseDetailScreen(
             courseId: source.sourceId,
             profile: profile,
-            courseRepository: courses,
+            courseRepository: courseRepository,
           ),
         ),
       );
     case PulseSourceType.path:
       if (source.sourceId.isEmpty) return;
-      final path = await courses.fetchPath(source.sourceId);
+      final path = await courseRepository.fetchPath(source.sourceId);
       if (!context.mounted) return;
       if (path == null) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -57,7 +56,7 @@ Future<void> openPulseSource(
           builder: (_) => PathDetailScreen(
             path: path,
             profile: profile,
-            courseRepository: courses,
+            courseRepository: courseRepository,
           ),
         ),
       );
@@ -69,7 +68,7 @@ Future<void> openPulseSource(
           builder: (_) => CourseDetailScreen(
             courseId: courseId,
             profile: profile,
-            courseRepository: courses,
+            courseRepository: courseRepository,
           ),
         ),
       );

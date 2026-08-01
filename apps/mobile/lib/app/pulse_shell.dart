@@ -31,32 +31,30 @@ class PulseShell extends StatefulWidget {
     required this.authService,
     required this.userRepository,
     required this.profile,
-    this.forumRepository,
-    this.chatRepository,
-    this.courseRepository,
+    required this.forumRepository,
+    required this.chatRepository,
+    required this.courseRepository,
+    required this.notificationRepository,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
   final UserProfile profile;
-  final ForumRepository? forumRepository;
-  final ChatRepository? chatRepository;
-  final CourseRepository? courseRepository;
+  final ForumRepository forumRepository;
+  final ChatRepository chatRepository;
+  final CourseRepository courseRepository;
+  final NotificationRepository notificationRepository;
 
   @override
   State<PulseShell> createState() => PulseShellState();
 }
 
-typedef HomeShell = PulseShell;
-typedef HomeShellState = PulseShellState;
 
 class PulseShellState extends State<PulseShell> {
   int _index = 0;
 
   final _forumsKey = GlobalKey<ForumsScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
-  final _notifications = NotificationRepository();
-  final _chatRepoFallback = ChatRepository();
   final _platformConfig = PlatformConfig();
   final _subs = <StreamSubscription<dynamic>>[];
 
@@ -98,30 +96,24 @@ class PulseShellState extends State<PulseShell> {
   void _bindBadgeStreams() {
     final profile = widget.profile;
     if (profile.isAnonymous) return;
-    final chatRepo = widget.chatRepository ?? _chatRepoFallback;
+    final chatRepo = widget.chatRepository;
     _subs.add(
-      chatRepo.watchChats(profile.uid).listen((chats) {
+      chatRepo.watchChatUnreadTotal(profile.uid).listen((sum) {
         if (!mounted) return;
-        final sum = chats.fold<int>(
-          0,
-          (acc, chat) => acc + chat.unreadFor(profile.uid),
-        );
         setState(() => _chatUnread = sum);
       }),
     );
     _subs.add(
-      _notifications.watchState(profile.uid).listen((state) async {
-        final newThreads = await _notifications.countNewFeedThreads(
-          state.lastFeedSeenAt,
-        );
+      widget.notificationRepository.watchState(profile.uid).listen((state) {
         if (!mounted) return;
         setState(() {
           _notifUnread = state.unreadCount;
-          _forumBadge = state.unreadForumCount + newThreads;
+          // Server-owned forum unread; avoid counting all threads client-side.
+          _forumBadge = state.unreadForumCount;
         });
       }),
     );
-    unawaited(_notifications.registerPushToken(profile.uid));
+    unawaited(widget.notificationRepository.registerPushToken(profile.uid));
   }
 
   @override
@@ -143,7 +135,7 @@ class PulseShellState extends State<PulseShell> {
     if (next == _index) return;
     setState(() => _index = next);
     if (next == 0 && !widget.profile.isAnonymous) {
-      _notifications.markFeedSeen(widget.profile.uid);
+      widget.notificationRepository.markFeedSeen(widget.profile.uid);
     }
   }
 
@@ -160,7 +152,7 @@ class PulseShellState extends State<PulseShell> {
           uid: widget.profile.uid,
           profile: widget.profile,
           forumRepository: widget.forumRepository,
-          chatRepository: widget.chatRepository ?? _chatRepoFallback,
+          chatRepository: widget.chatRepository,
           courseRepository: widget.courseRepository,
         ),
       ),
@@ -329,7 +321,7 @@ class PulseShellState extends State<PulseShell> {
     }
     final l10n = context.l10n;
     final messenger = ScaffoldMessenger.of(context);
-    final repo = widget.chatRepository ?? ChatRepository();
+    final repo = widget.chatRepository;
     messenger.showSnackBar(SnackBar(content: Text(l10n.supportChatOpening)));
     try {
       final chat = await repo.getOrCreateSupportChat(

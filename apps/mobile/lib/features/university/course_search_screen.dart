@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'course_detail_screen.dart';
@@ -17,11 +18,11 @@ class CourseSearchScreen extends StatefulWidget {
   const CourseSearchScreen({
     super.key,
     required this.profile,
-    this.courseRepository,
+    required this.courseRepository,
   });
 
   final UserProfile profile;
-  final CourseRepository? courseRepository;
+  final CourseRepository courseRepository;
 
   @override
   State<CourseSearchScreen> createState() => _CourseSearchScreenState();
@@ -29,7 +30,7 @@ class CourseSearchScreen extends StatefulWidget {
 
 class _CourseSearchScreenState extends State<CourseSearchScreen> {
   late final CourseRepository _repository =
-      widget.courseRepository ?? CourseRepository();
+      widget.courseRepository;
   final _controller = TextEditingController();
 
   StreamSubscription<List<Course>>? _subscription;
@@ -142,7 +143,14 @@ class _CourseSearchScreenState extends State<CourseSearchScreen> {
           ),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const PulseCatalogSkeleton(
+                    padding: EdgeInsets.fromLTRB(
+                      AppSpacing.lg,
+                      0,
+                      AppSpacing.lg,
+                      AppSpacing.xl,
+                    ),
+                  )
                 : _error != null
                     ? AcademyMessage(
                         icon: Icons.cloud_off_rounded,

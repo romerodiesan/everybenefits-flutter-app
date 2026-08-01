@@ -39,7 +39,7 @@ void main() {
   Future<void> pumpAuth(WidgetTester tester, Widget home) async {
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
+        theme: buildPulseTheme(Brightness.dark),
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,

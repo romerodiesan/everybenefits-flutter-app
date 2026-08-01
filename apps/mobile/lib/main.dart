@@ -6,14 +6,17 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 
-import 'app/home_shell.dart';
+import 'app/pulse_shell.dart';
 import 'app/locale_controller.dart';
 import 'app/theme.dart';
 import 'app/theme_controller.dart';
 import 'app/widgets/pulse_chrome.dart';
 import 'auth/auth.dart';
+import 'core/app_scope.dart';
+import 'core/di.dart';
 import 'features/chats/chat_repository.dart';
 import 'features/forums/forum_repository.dart';
+import 'features/notifications/notification_repository.dart';
 import 'features/university/course_repository.dart';
 import 'features/onboarding/pending_approval_screen.dart';
 import 'features/onboarding/set_password_screen.dart';
@@ -74,23 +77,20 @@ Future<void> main() async {
   final themeController = results[1]! as ThemeController;
   final localeController = results[2]! as LocaleController;
 
-  final forumRepository = ForumRepository();
+  final deps = AppDependencies.create();
   runApp(
-    EveryInsuranceApp(
-      authService: AuthService(),
-      userRepository: UserRepository(
-        onAuthorPhotoChanged: ({required authorId, required photoUrl}) {
-          return forumRepository.syncAuthorPhotoUrl(
-            authorId: authorId,
-            photoUrl: photoUrl,
-          );
-        },
-      ),
+    AppScope(
+      deps: deps,
+      child: PulseApp(
+      authService: deps.authService,
+      userRepository: deps.userRepository,
       themeController: themeController,
       localeController: localeController,
-      forumRepository: forumRepository,
-      chatRepository: ChatRepository(),
-      courseRepository: CourseRepository(),
+      forumRepository: deps.forumRepository,
+      chatRepository: deps.chatRepository,
+      courseRepository: deps.courseRepository,
+      notificationRepository: deps.notificationRepository,
+      ),
     ),
   );
 }
@@ -114,31 +114,33 @@ class _BootSplashApp extends StatelessWidget {
   }
 }
 
-class EveryInsuranceApp extends StatefulWidget {
-  const EveryInsuranceApp({
+class PulseApp extends StatefulWidget {
+  const PulseApp({
     super.key,
     required this.authService,
     required this.userRepository,
     required this.themeController,
     required this.localeController,
-    this.forumRepository,
-    this.chatRepository,
-    this.courseRepository,
+    required this.forumRepository,
+    required this.chatRepository,
+    required this.courseRepository,
+    required this.notificationRepository,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
   final ThemeController themeController;
   final LocaleController localeController;
-  final ForumRepository? forumRepository;
-  final ChatRepository? chatRepository;
-  final CourseRepository? courseRepository;
+  final ForumRepository forumRepository;
+  final ChatRepository chatRepository;
+  final CourseRepository courseRepository;
+  final NotificationRepository notificationRepository;
 
   @override
-  State<EveryInsuranceApp> createState() => _EveryInsuranceAppState();
+  State<PulseApp> createState() => _PulseAppState();
 }
 
-class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
+class _PulseAppState extends State<PulseApp> {
   /// Cached so theme rebuilds do not resubscribe auth (which resets navigation).
   late final Stream<User?> _authStream = widget.authService.authStateChanges;
   late final MagicLinkHandler _magicLinks = MagicLinkHandler(
@@ -191,11 +193,11 @@ class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
                     GlobalCupertinoLocalizations.delegate,
                   ],
                   supportedLocales: LocaleController.supportedLocales,
-                  theme: buildEveryInsuranceTheme(
+                  theme: buildPulseTheme(
                     Brightness.light,
                     brand: brand,
                   ),
-                  darkTheme: buildEveryInsuranceTheme(
+                  darkTheme: buildPulseTheme(
                     Brightness.dark,
                     brand: brand,
                   ),
@@ -214,6 +216,7 @@ class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
                     forumRepository: widget.forumRepository,
                     chatRepository: widget.chatRepository,
                     courseRepository: widget.courseRepository,
+                    notificationRepository: widget.notificationRepository,
                     connectionState: snapshot.connectionState,
                     user: snapshot.data,
                   ),
@@ -234,15 +237,17 @@ class _AuthHome extends StatelessWidget {
     required this.forumRepository,
     required this.chatRepository,
     required this.courseRepository,
+    required this.notificationRepository,
     required this.connectionState,
     required this.user,
   });
 
   final AuthService authService;
   final UserRepository userRepository;
-  final ForumRepository? forumRepository;
-  final ChatRepository? chatRepository;
-  final CourseRepository? courseRepository;
+  final ForumRepository forumRepository;
+  final ChatRepository chatRepository;
+  final CourseRepository courseRepository;
+  final NotificationRepository notificationRepository;
   final ConnectionState connectionState;
   final User? user;
 
@@ -266,6 +271,7 @@ class _AuthHome extends StatelessWidget {
       forumRepository: forumRepository,
       chatRepository: chatRepository,
       courseRepository: courseRepository,
+      notificationRepository: notificationRepository,
     );
   }
 }
@@ -276,17 +282,19 @@ class ProfileBootstrap extends StatefulWidget {
     required this.user,
     required this.authService,
     required this.userRepository,
-    this.forumRepository,
-    this.chatRepository,
-    this.courseRepository,
+    required this.forumRepository,
+    required this.chatRepository,
+    required this.courseRepository,
+    required this.notificationRepository,
   });
 
   final User user;
   final AuthService authService;
   final UserRepository userRepository;
-  final ForumRepository? forumRepository;
-  final ChatRepository? chatRepository;
-  final CourseRepository? courseRepository;
+  final ForumRepository forumRepository;
+  final ChatRepository chatRepository;
+  final CourseRepository courseRepository;
+  final NotificationRepository notificationRepository;
 
   @override
   State<ProfileBootstrap> createState() => _ProfileBootstrapState();
@@ -393,6 +401,7 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
               forumRepository: widget.forumRepository,
               chatRepository: widget.chatRepository,
               courseRepository: widget.courseRepository,
+              notificationRepository: widget.notificationRepository,
             );
           },
         );

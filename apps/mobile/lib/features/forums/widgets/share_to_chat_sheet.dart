@@ -32,14 +32,14 @@ Future<void> showShareToChatSheet({
   required BuildContext context,
   required ForumThread thread,
   required UserProfile profile,
-  ForumRepository? forumRepository,
-  ChatRepository? chatRepository,
+  required ForumRepository forumRepository,
+  required ChatRepository chatRepository,
 }) {
   final colors = AppColors.of(context);
   final l10n = context.l10n;
   final shared = sharedPostFromThread(thread);
-  final forumRepo = forumRepository ?? ForumRepository();
-  final chatRepo = chatRepository ?? ChatRepository();
+  final forumRepo = forumRepository;
+  final chatRepo = chatRepository;
 
   return showModalBottomSheet<void>(
     context: context,

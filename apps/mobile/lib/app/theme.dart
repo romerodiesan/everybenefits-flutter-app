@@ -138,7 +138,7 @@ TextStyle? _withFamily(
   );
 }
 
-ThemeData buildEveryInsuranceTheme(
+ThemeData buildPulseTheme(
   Brightness brightness, {
   Color brand = AppColors.brand,
 }) {
@@ -357,7 +357,7 @@ ThemeData themeForController(
   ThemeController controller,
   Brightness brightness,
 ) {
-  return buildEveryInsuranceTheme(
+  return buildPulseTheme(
     brightness,
     brand: controller.primaryColor,
   );

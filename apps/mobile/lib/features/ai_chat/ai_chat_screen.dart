@@ -4,9 +4,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/navigation/pulse_source_navigation.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../core/app_scope.dart';
 import '../../firebase/platform_config.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
@@ -14,7 +16,6 @@ import '../university/widgets/markdown_body.dart';
 import 'ai_settings_screen.dart';
 import 'pulse_ai_client.dart';
 import 'pulse_ai_models.dart';
-import 'pulse_source_navigation.dart';
 /// Pulse AI — full-screen conversation (no shell tab bar), ambient aurora,
 /// streaming answers from the web `/api/ai/stream` backend.
 class AiChatScreen extends StatefulWidget {
@@ -869,11 +870,16 @@ class _AssistantBubble extends StatelessWidget {
                           padding: const EdgeInsets.only(bottom: 8),
                           child: _SourceCard(
                             source: source,
-                            onTap: () => openPulseSource(
-                              context,
-                              source: source,
-                              profile: profile,
-                            ),
+                            onTap: () {
+                              final deps = AppScope.of(context);
+                              return openPulseSource(
+                                context,
+                                source: source,
+                                profile: profile,
+                                courseRepository: deps.courseRepository,
+                                forumRepository: deps.forumRepository,
+                              );
+                            },
                           ),
                         ),
                     ],

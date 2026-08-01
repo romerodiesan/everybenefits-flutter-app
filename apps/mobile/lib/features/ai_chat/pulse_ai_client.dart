@@ -34,7 +34,7 @@ String pulseAiBaseUrl() {
   }
   throw StateError(
     'PULSE_AI_BASE_URL is required outside debug. '
-    'Pass --dart-define=PULSE_AI_BASE_URL=https://your-webapp.vercel.app',
+    'Pass --dart-define=PULSE_AI_BASE_URL=https://pulse.everybenefits.us',
   );
 }
 

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
@@ -18,12 +20,12 @@ class ChatNewChatScreen extends StatefulWidget {
   const ChatNewChatScreen({
     super.key,
     required this.profile,
-    this.chatRepository,
+    required this.chatRepository,
     this.userRepository,
   });
 
   final UserProfile profile;
-  final ChatRepository? chatRepository;
+  final ChatRepository chatRepository;
   final UserRepository? userRepository;
 
   @override
@@ -31,17 +33,57 @@ class ChatNewChatScreen extends StatefulWidget {
 }
 
 class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
-  late final Future<List<UserProfile>> _contactsFuture;
   late final ChatRepository _chatRepo =
-      widget.chatRepository ?? ChatRepository();
+      widget.chatRepository;
   late final UserRepository _users =
       widget.userRepository ?? UserRepository();
+  final _searchController = TextEditingController();
+  Timer? _debounce;
   String? _openingUid;
+  List<UserProfile> _contacts = const [];
+  bool _searching = false;
+  String? _error;
 
   @override
-  void initState() {
-    super.initState();
-    _contactsFuture = _users.listDirectory(excludeUid: widget.profile.uid);
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String value) {
+    _debounce?.cancel();
+    final q = value.trim();
+    if (q.length < 2) {
+      setState(() {
+        _contacts = const [];
+        _searching = false;
+        _error = null;
+      });
+      return;
+    }
+    setState(() => _searching = true);
+    _debounce = Timer(const Duration(milliseconds: 280), () async {
+      try {
+        final results = await _users.searchDirectory(
+          query: q,
+          excludeUid: widget.profile.uid,
+        );
+        if (!mounted || _searchController.text.trim() != q) return;
+        setState(() {
+          _contacts = results;
+          _searching = false;
+          _error = null;
+        });
+      } catch (error) {
+        if (!mounted) return;
+        setState(() {
+          _searching = false;
+          _error = friendlyChatError(error, context.l10n);
+          _contacts = const [];
+        });
+      }
+    });
   }
 
   Future<void> _openDm(UserProfile other) async {
@@ -76,6 +118,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final l10n = context.l10n;
+    final query = _searchController.text.trim();
 
     return PulseScaffold(
       appBar: AppBar(
@@ -86,162 +129,161 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
           ),
         ),
       ),
-      body: FutureBuilder<List<UserProfile>>(
-        future: _contactsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Text(
-                  friendlyChatError(snapshot.error!, l10n),
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: colors.muted,
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.xl,
+        ),
+        children: [
+          if (canCreateChatGroups(widget.profile.role)) ...[
+            Material(
+              color: colors.sheet,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: colors.border),
+              ),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                leading: Icon(
+                  Icons.groups_rounded,
+                  color: AppColors.brandOf(context),
+                ),
+                title: Text(
+                  l10n.newChatCreateGroup,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-              ),
-            );
-          }
-          if (!snapshot.hasData) {
-            return const PulseContactListSkeleton();
-          }
-
-          final contacts = snapshot.data!;
-          if (contacts.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Text(
-                  l10n.newChatEmpty,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colors.muted,
-                    height: 1.4,
-                  ),
-                ),
-              ),
-            );
-          }
-
-          return ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.xl,
-            ),
-            children: [
-              if (canCreateChatGroups(widget.profile.role)) ...[
-                Material(
-                  color: colors.sheet,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    side: BorderSide(color: colors.border),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: ListTile(
-                    leading: Icon(
-                      Icons.groups_rounded,
-                      color: AppColors.brandOf(context),
-                    ),
-                    title: Text(
-                      l10n.newChatCreateGroup,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () {
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute<void>(
+                      builder: (_) => ChatNewGroupScreen(
+                        profile: widget.profile,
+                        chatRepository: _chatRepo,
+                        userRepository: _users,
                       ),
                     ),
-                    trailing: const Icon(Icons.chevron_right_rounded),
-                    onTap: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute<void>(
-                          builder: (_) => ChatNewGroupScreen(
-                            profile: widget.profile,
-                            chatRepository: _chatRepo,
-                            userRepository: _users,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.lg),
-              ],
-              Text(
-                l10n.newChatContactsHeader,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: colors.muted,
-                  fontSize: 11,
-                  letterSpacing: 1.1,
-                  fontWeight: FontWeight.w800,
-                ),
+                  );
+                },
               ),
-              const SizedBox(height: 10),
-              for (final person in contacts) ...[
-                Material(
-                  color: colors.sheet,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(18),
-                    side: BorderSide(color: colors.border),
-                  ),
-                  clipBehavior: Clip.antiAlias,
-                  child: InkWell(
-                    onTap: _openingUid == null ? () => _openDm(person) : null,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
-                      child: Row(
-                        children: [
-                          ChatAvatar(
-                            initials: chatInitials(person.headlineName),
-                            size: 46,
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
+            ),
+            const SizedBox(height: AppSpacing.lg),
+          ],
+          TextField(
+            controller: _searchController,
+            onChanged: _onQueryChanged,
+            textInputAction: TextInputAction.search,
+            decoration: InputDecoration(
+              hintText: l10n.newChatSearchHint,
+              prefixIcon: const Icon(Icons.search_rounded),
+              filled: true,
+              fillColor: colors.sheet,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.border),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(16),
+                borderSide: BorderSide(color: colors.border),
+              ),
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          if (_error != null)
+            Text(
+              _error!,
+              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+            )
+          else if (_searching)
+            const PulseContactListSkeleton(
+              shrinkWrap: true,
+              itemCount: 5,
+              padding: EdgeInsets.zero,
+            )
+          else if (query.length < 2)
+            Text(
+              l10n.newChatSearchHint,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: colors.muted,
+                height: 1.4,
+              ),
+            )
+          else if (_contacts.isEmpty)
+            Text(
+              l10n.newChatEmpty,
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: colors.muted,
+                height: 1.4,
+              ),
+            )
+          else ...[
+            Text(
+              l10n.newChatContactsHeader,
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: colors.muted,
+                fontSize: 11,
+                letterSpacing: 1.1,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            for (final person in _contacts) ...[
+              Material(
+                color: colors.sheet,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(18),
+                  side: BorderSide(color: colors.border),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: InkWell(
+                  onTap: _openingUid == null ? () => _openDm(person) : null,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+                    child: Row(
+                      children: [
+                        ChatAvatar(
+                          initials: chatInitials(person.headlineName),
+                          size: 44,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                person.headlineName,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              if ((person.email ?? '').isNotEmpty)
                                 Text(
-                                  person.headlineName,
-                                  style: theme.textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.2,
+                                  person.email!,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: colors.muted,
                                   ),
                                 ),
-                                if (person.agency?.trim().isNotEmpty ==
-                                    true) ...[
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    person.agency!,
-                                    style: theme.textTheme.bodySmall?.copyWith(
-                                      color: colors.muted,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
+                            ],
                           ),
-                          if (_openingUid == person.uid)
-                            const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else
-                            Icon(
-                              Icons.chevron_right_rounded,
-                              color: colors.muted.withValues(alpha: 0.7),
-                            ),
-                        ],
-                      ),
+                        ),
+                        if (_openingUid == person.uid)
+                          const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                      ],
                     ),
                   ),
                 ),
-                const SizedBox(height: 8),
-              ],
+              ),
+              const SizedBox(height: 8),
             ],
-          );
-        },
+          ],
+        ],
       ),
     );
   }

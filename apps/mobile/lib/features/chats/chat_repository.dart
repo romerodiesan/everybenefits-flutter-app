@@ -11,6 +11,17 @@ typedef ChatIdFactory = String Function();
 
 const kChatMessagePageSize = 40;
 
+/// One page of older chat messages (newest first within the page).
+class ChatMessagePage {
+  const ChatMessagePage({
+    required this.messages,
+    required this.hasMore,
+  });
+
+  final List<ChatMessage> messages;
+  final bool hasMore;
+}
+
 /// Persistence port for chats (testable without Firebase).
 abstract class ChatStore {
   Stream<List<ChatConversation>> watchChats(String uid);
@@ -20,6 +31,14 @@ abstract class ChatStore {
   /// Newest messages first (for reverse ListView). Limited page size.
   Stream<List<ChatMessage>> watchMessages(
     String chatId, {
+    int limit = kChatMessagePageSize,
+  });
+
+  /// Messages strictly older than [beforeCreatedAt]/[beforeKey], newest first.
+  Future<ChatMessagePage> loadOlderMessages(
+    String chatId, {
+    required DateTime beforeCreatedAt,
+    String? beforeKey,
     int limit = kChatMessagePageSize,
   });
 
@@ -48,6 +67,13 @@ abstract class ChatStore {
     required String chatId,
     required int lastMessageAt,
     bool? pinned,
+  });
+
+  /// Clears unread for [uid] without rewriting every member's inbox via full chat set.
+  Future<void> markChatReadLocal({
+    required String chatId,
+    required String uid,
+    required int previousUnread,
   });
 
   /// Ensures inbox rows exist for all indexable members (e.g. after a new message).
@@ -189,7 +215,7 @@ class RtdbChatStore implements ChatStore {
   /// `.listen` start a fresh native subscription (needed when the inbox pauses).
   @override
   Stream<List<ChatConversation>> watchChats(String uid) {
-    unawaited(_rebuildInbox());
+    _rebuildInboxOnce();
     return Stream.multi((controller) {
       final sub = _root.child('userChats/$uid').onValue.listen(
         (event) async {
@@ -211,7 +237,26 @@ class RtdbChatStore implements ChatStore {
     });
   }
 
-  Future<void> _rebuildInbox() async {
+  Stream<int> watchChatUnreadTotal(String uid) {
+    return Stream.multi((controller) {
+      final sub = _root.child('userMeta/$uid/chatUnreadTotal').onValue.listen(
+        (event) {
+          final value = event.snapshot.value;
+          controller.add(
+            value is num ? value.toInt().clamp(0, 1 << 30) : 0,
+          );
+        },
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    });
+  }
+
+  bool _rebuildAttempted = false;
+  Future<void> _rebuildInboxOnce() async {
+    if (_rebuildAttempted) return;
+    _rebuildAttempted = true;
     try {
       await _functions.httpsCallable('rebuildChatInbox').call(<String, dynamic>{});
     } catch (_) {
@@ -252,27 +297,47 @@ class RtdbChatStore implements ChatStore {
           .limitToLast(limit);
       final sub = query.onValue.listen(
         (event) {
-          final raw = event.snapshot.value;
-          if (raw is! Map) {
-            controller.add(<ChatMessage>[]);
-            return;
-          }
-          final list = <ChatMessage>[];
-          for (final entry in raw.entries) {
-            final data = _asStringKeyedMap(entry.value);
-            list.add(ChatMessage.fromMap('${entry.key}', {
-              ...data,
-              'chatId': chatId,
-            }));
-          }
-          list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-          controller.add(list);
+          controller.add(_messagesFromSnapshot(chatId, event.snapshot.value));
         },
         onError: controller.addError,
         onDone: controller.close,
       );
       controller.onCancel = sub.cancel;
     });
+  }
+
+  @override
+  Future<ChatMessagePage> loadOlderMessages(
+    String chatId, {
+    required DateTime beforeCreatedAt,
+    String? beforeKey,
+    int limit = kChatMessagePageSize,
+  }) async {
+    final beforeMs = beforeCreatedAt.toUtc().millisecondsSinceEpoch;
+    var query = _root
+        .child('messages/$chatId')
+        .orderByChild('createdAt')
+        .endBefore(beforeMs, key: beforeKey);
+    query = query.limitToLast(limit + 1);
+    final snap = await query.get();
+    final list = _messagesFromSnapshot(chatId, snap.value);
+    final hasMore = list.length > limit;
+    final page = hasMore ? list.sublist(0, limit) : list;
+    return ChatMessagePage(messages: page, hasMore: hasMore);
+  }
+
+  List<ChatMessage> _messagesFromSnapshot(String chatId, Object? raw) {
+    if (raw is! Map) return <ChatMessage>[];
+    final list = <ChatMessage>[];
+    for (final entry in raw.entries) {
+      final data = _asStringKeyedMap(entry.value);
+      list.add(ChatMessage.fromMap('${entry.key}', {
+        ...data,
+        'chatId': chatId,
+      }));
+    }
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return list;
   }
 
   @override
@@ -383,9 +448,8 @@ class RtdbChatStore implements ChatStore {
     // Do not touch userChats here: reading other members' indexes is denied
     // (owner-only), and writing them would recreate a chat someone hid.
     // New messages call [ensureUserChatIndexes] to refresh every inbox row.
+    // title / photoUrl / memberNames are Admin SDK only (updateGroupChat).
     await _root.update({
-      'chats/${chat.id}/memberNames': chat.memberNames,
-      'chats/${chat.id}/title': chat.title,
       'chats/${chat.id}/lastMessage': chat.lastMessage,
       'chats/${chat.id}/lastMessageAt': at,
       'chats/${chat.id}/lastMessageSenderId': chat.lastMessageSenderId,
@@ -419,6 +483,19 @@ class RtdbChatStore implements ChatStore {
       updates['userChats/$uid/$chatId/pinned'] = pinned;
     }
     await _root.update(updates);
+  }
+
+  @override
+  Future<void> markChatReadLocal({
+    required String chatId,
+    required String uid,
+    required int previousUnread,
+  }) async {
+    // syncChatInbox owns userMeta/chatUnreadTotal deltas.
+    await _root.update({
+      'userChats/$uid/$chatId/unreadCount': 0,
+      'chats/$chatId/unreadCounts/$uid': 0,
+    });
   }
 
   @override
@@ -476,13 +553,27 @@ class RtdbChatStore implements ChatStore {
     required String uid,
     String? emoji,
   }) async {
-    final ref = _root.child('messages/$chatId/$messageId/reactions/$uid');
     final trimmed = emoji?.trim();
-    if (trimmed == null || trimmed.isEmpty) {
+    final emojiValue =
+        (trimmed == null || trimmed.isEmpty) ? null : trimmed;
+
+    // RTDB-primary: rules enforce own-uid + membership + no support.
+    final authUid = uid; // callers pass the signed-in uid
+    final ref = _root.child('messages/$chatId/$messageId/reactions/$authUid');
+    if (emojiValue == null) {
       await ref.remove();
     } else {
-      await ref.set(trimmed);
+      await ref.set(emojiValue);
     }
+
+    // Best-effort callable (does not block UX on IAM / cold start).
+    try {
+      await _functions.httpsCallable('setChatReaction').call(<String, dynamic>{
+        'chatId': chatId,
+        'messageId': messageId,
+        'emoji': emojiValue,
+      });
+    } catch (_) {}
   }
 
   int _readMillis(Object? value) {
@@ -507,6 +598,15 @@ class ChatRepository {
   Stream<List<ChatConversation>> watchChats(String uid) =>
       _store.watchChats(uid);
 
+  Stream<int> watchChatUnreadTotal(String uid) {
+    if (_store is RtdbChatStore) {
+      return (_store as RtdbChatStore).watchChatUnreadTotal(uid);
+    }
+    return watchChats(uid).map(
+      (chats) => chats.fold<int>(0, (acc, chat) => acc + chat.unreadFor(uid)),
+    );
+  }
+
   Stream<ChatConversation?> watchChat(String chatId) =>
       _store.watchChat(chatId);
 
@@ -515,6 +615,19 @@ class ChatRepository {
     int limit = kChatMessagePageSize,
   }) =>
       _store.watchMessages(chatId, limit: limit);
+
+  Future<ChatMessagePage> loadOlderMessages(
+    String chatId, {
+    required DateTime beforeCreatedAt,
+    String? beforeKey,
+    int limit = kChatMessagePageSize,
+  }) =>
+      _store.loadOlderMessages(
+        chatId,
+        beforeCreatedAt: beforeCreatedAt,
+        beforeKey: beforeKey,
+        limit: limit,
+      );
 
   Future<ChatConversation> getOrCreateDm({
     required UserProfile me,
@@ -730,9 +843,13 @@ class ChatRepository {
     if (!chat.memberIds.contains(uid)) {
       throw StateError('No eres miembro de este chat.');
     }
-    if (chat.unreadFor(uid) == 0) return;
-    final nextUnread = Map<String, int>.from(chat.unreadCounts)..[uid] = 0;
-    await _store.updateChat(chat.copyWith(unreadCounts: nextUnread));
+    final previous = chat.unreadFor(uid);
+    if (previous == 0) return;
+    await _store.markChatReadLocal(
+      chatId: chatId,
+      uid: uid,
+      previousUnread: previous,
+    );
   }
 
   Future<void> setPinned({

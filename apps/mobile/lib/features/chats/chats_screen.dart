@@ -26,7 +26,7 @@ class ChatsScreen extends StatefulWidget {
   const ChatsScreen({
     super.key,
     required this.profile,
-    this.chatRepository,
+    required this.chatRepository,
     this.userRepository,
     this.showFab = true,
     this.notificationUnread = 0,
@@ -34,7 +34,7 @@ class ChatsScreen extends StatefulWidget {
   });
 
   final UserProfile profile;
-  final ChatRepository? chatRepository;
+  final ChatRepository chatRepository;
   final UserRepository? userRepository;
 
   /// When false, the shell owns the FAB.
@@ -48,7 +48,7 @@ class ChatsScreen extends StatefulWidget {
 
 class _ChatsScreenState extends State<ChatsScreen> {
   late final ChatRepository _repo =
-      widget.chatRepository ?? ChatRepository();
+      widget.chatRepository;
   final _gate = StreamController<List<ChatConversation>>.broadcast();
   StreamSubscription<List<ChatConversation>>? _sub;
   List<ChatConversation>? _latest;
@@ -436,7 +436,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
 void openNewChat(
   BuildContext context, {
   required UserProfile profile,
-  ChatRepository? chatRepository,
+  required ChatRepository chatRepository,
   UserRepository? userRepository,
 }) {
   Navigator.of(context).push(
@@ -453,7 +453,7 @@ void openNewChat(
 void openNewGroup(
   BuildContext context, {
   required UserProfile profile,
-  ChatRepository? chatRepository,
+  required ChatRepository chatRepository,
   UserRepository? userRepository,
 }) {
   Navigator.of(context).push(

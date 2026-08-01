@@ -65,6 +65,7 @@ class ForumThread {
     required this.lastReplyAt,
     this.authorPhotoUrl,
     this.acceptedReplyId,
+    this.closed = false,
   });
 
   final String id;
@@ -82,6 +83,7 @@ class ForumThread {
   final DateTime updatedAt;
   final DateTime lastReplyAt;
   final String? acceptedReplyId;
+  final bool closed;
 
   ForumThread copyWith({
     List<String>? tags,
@@ -94,6 +96,7 @@ class ForumThread {
     String? authorPhotoUrl,
     String? acceptedReplyId,
     bool clearAcceptedReplyId = false,
+    bool? closed,
   }) {
     return ForumThread(
       id: id,
@@ -112,6 +115,7 @@ class ForumThread {
       acceptedReplyId: clearAcceptedReplyId
           ? null
           : (acceptedReplyId ?? this.acceptedReplyId),
+      closed: closed ?? this.closed,
     );
   }
 
@@ -127,6 +131,7 @@ class ForumThread {
       'replyCount': replyCount,
       'score': score,
       'acceptedReplyId': acceptedReplyId,
+      'closed': closed,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
       'lastReplyAt': lastReplyAt.toUtc().toIso8601String(),
@@ -147,6 +152,7 @@ class ForumThread {
       replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
       score: (data['score'] as num?)?.toInt() ?? 0,
       acceptedReplyId: data['acceptedReplyId'] as String?,
+      closed: data['closed'] == true,
       createdAt: _readForumDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readForumDate(data['updatedAt']) ?? DateTime.now().toUtc(),
       lastReplyAt: _readForumDate(data['lastReplyAt']) ??
@@ -252,6 +258,18 @@ class ForumThreadPage {
   });
 
   final List<ForumThread> threads;
+  final Object? nextCursor;
+
+  bool get hasMore => nextCursor != null;
+}
+
+class ForumReplyPage {
+  const ForumReplyPage({
+    required this.replies,
+    this.nextCursor,
+  });
+
+  final List<ForumReply> replies;
   final Object? nextCursor;
 
   bool get hasMore => nextCursor != null;

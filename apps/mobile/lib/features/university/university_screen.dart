@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'course_detail_screen.dart';
@@ -24,13 +25,13 @@ class UniversityScreen extends StatefulWidget {
   const UniversityScreen({
     super.key,
     required this.profile,
-    this.courseRepository,
+    required this.courseRepository,
     this.notificationUnread = 0,
     this.onOpenNotifications,
   });
 
   final UserProfile profile;
-  final CourseRepository? courseRepository;
+  final CourseRepository courseRepository;
   final int notificationUnread;
   final VoidCallback? onOpenNotifications;
 
@@ -40,7 +41,7 @@ class UniversityScreen extends StatefulWidget {
 
 class _UniversityScreenState extends State<UniversityScreen> {
   late final CourseRepository _repository =
-      widget.courseRepository ?? CourseRepository();
+      widget.courseRepository;
 
   final _subscriptions = <StreamSubscription<void>>[];
   bool _active = false;
@@ -54,6 +55,10 @@ class _UniversityScreenState extends State<UniversityScreen> {
   bool _loading = true;
   Object? _error;
   CourseLevel? _levelFilter;
+  static const _coursePageSize = 60;
+  int _courseLimit = _coursePageSize;
+  bool _hasMoreCourses = false;
+  bool _loadingMoreCourses = false;
 
   bool get _canAuthor => canAuthorCourses(widget.profile.role);
   bool get _isAdmin => canManageCourses(widget.profile.role);
@@ -74,12 +79,14 @@ class _UniversityScreenState extends State<UniversityScreen> {
   void _listen() {
     if (_subscriptions.isNotEmpty) return;
     _subscriptions.add(
-      _repository.watchPublishedCourses().listen(
+      _repository.watchPublishedCourses(limit: _courseLimit).listen(
         (courses) {
           if (!mounted) return;
           setState(() {
             _published = courses;
+            _hasMoreCourses = courses.length >= _courseLimit;
             _loading = false;
+            _loadingMoreCourses = false;
             _error = null;
           });
         },
@@ -87,6 +94,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
           if (!mounted) return;
           setState(() {
             _loading = false;
+            _loadingMoreCourses = false;
             _error = error;
           });
         },
@@ -146,6 +154,16 @@ class _UniversityScreenState extends State<UniversityScreen> {
       unawaited(sub.cancel());
     }
     _subscriptions.clear();
+  }
+
+  void _loadMoreCourses() {
+    if (_loadingMoreCourses || !_hasMoreCourses) return;
+    setState(() {
+      _loadingMoreCourses = true;
+      _courseLimit += _coursePageSize;
+    });
+    _cancelListeners();
+    _listen();
   }
 
   @override
@@ -265,221 +283,272 @@ class _UniversityScreenState extends State<UniversityScreen> {
           // Streams are live; the pull gesture is a reassurance affordance.
           await Future<void>.delayed(const Duration(milliseconds: 350));
         },
-        child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            pulseShellListBottomPad(context, hasFab: true),
-          ),
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: _NavTile(
-                    icon: Icons.school_outlined,
-                    label: l10n.academyMyLearning,
-                    tint: AppColors.brandOf(context),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => MyLearningScreen(
-                            profile: widget.profile,
-                            courseRepository: _repository,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                0,
+              ),
+              sliver: SliverToBoxAdapter(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _NavTile(
+                            icon: Icons.school_outlined,
+                            label: l10n.academyMyLearning,
+                            tint: AppColors.brandOf(context),
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => MyLearningScreen(
+                                    profile: widget.profile,
+                                    courseRepository: _repository,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      );
-                    },
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _NavTile(
-                    icon: Icons.route_outlined,
-                    label: l10n.academyPaths,
-                    tint: colors.ink,
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => LearningPathScreen(
-                            profile: widget.profile,
-                            courseRepository: _repository,
+                        const SizedBox(width: AppSpacing.sm),
+                        Expanded(
+                          child: _NavTile(
+                            icon: Icons.route_outlined,
+                            label: l10n.academyPaths,
+                            tint: colors.ink,
+                            onTap: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => LearningPathScreen(
+                                    profile: widget.profile,
+                                    courseRepository: _repository,
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ],
+                    ),
+                    if (continueLearning.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xl),
+                      _SectionTitle(l10n.academyContinueLearning),
+                      const SizedBox(height: AppSpacing.sm),
+                      for (final entry in continueLearning.take(3)) ...[
+                        _ContinueRow(
+                          entry: entry,
+                          repository: _repository,
+                          onTap: () => _openCourse(entry.course),
+                        ),
+                        const SizedBox(height: AppSpacing.xs),
+                      ],
+                    ],
+                    if (_isAdmin && _pending.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xl),
+                      _SectionTitle(l10n.academyPendingReview),
+                      const SizedBox(height: AppSpacing.sm),
+                      for (final course in _pending) ...[
+                        CourseCard(
+                          course: course,
+                          repository: _repository,
+                          showStatus: true,
+                          onTap: () => _openCourse(course),
+                          trailing: CourseManageMenu(
+                            course: course,
+                            profile: widget.profile,
+                            repository: _repository,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                    ],
+                    if (myUnpublished.isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xl),
+                      _SectionTitle(l10n.academyMyCourses),
+                      const SizedBox(height: AppSpacing.sm),
+                      for (final course in myUnpublished) ...[
+                        CourseCard(
+                          course: course,
+                          repository: _repository,
+                          showStatus: true,
+                          onTap: () => _openCourse(course),
+                          trailing: CourseManageMenu(
+                            course: course,
+                            profile: widget.profile,
+                            repository: _repository,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                    ],
+                    const SizedBox(height: AppSpacing.xl),
+                    Row(
+                      children: [
+                        Expanded(child: _SectionTitle(l10n.academyPaths)),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => LearningPathScreen(
+                                  profile: widget.profile,
+                                  courseRepository: _repository,
+                                ),
+                              ),
+                            );
+                          },
+                          child: Text(l10n.academySeeAll),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    if (_paths.isEmpty)
+                      _AcademyMessage(
+                        icon: Icons.route_outlined,
+                        message: l10n.pathsEmpty,
+                      )
+                    else
+                      for (final path in _paths.take(4)) ...[
+                        PulseSheet(
+                          onTap: () => _openPath(path),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      path.title,
+                                      style: theme.textTheme.titleMedium
+                                          ?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ),
+                                  AcademyChip(path.level.label(l10n)),
+                                ],
+                              ),
+                              if (path.description.isNotEmpty) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  path.description,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: theme.textTheme.bodyMedium
+                                      ?.copyWith(color: colors.muted),
+                                ),
+                              ],
+                              const SizedBox(height: 8),
+                              Text(
+                                l10n.pathMetaCoursesHours(
+                                  path.courseIds.length,
+                                  (_pathMinutes(path) / 60).round(),
+                                ),
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                    const SizedBox(height: AppSpacing.xl),
+                    Row(
+                      children: [
+                        Expanded(child: _SectionTitle(l10n.academyCourses)),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    _LevelFilters(
+                      selected: _levelFilter,
+                      onSelect: (level) =>
+                          setState(() => _levelFilter = level),
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    if (_loading)
+                      const PulseCatalogSkeleton(
+                        shrinkWrap: true,
+                        padding: EdgeInsets.zero,
+                        itemCount: 3,
+                      )
+                    else if (_error != null)
+                      _AcademyMessage(
+                        icon: Icons.cloud_off_rounded,
+                        message: friendlyCourseError(_error!, l10n),
+                      )
+                    else if (filtered.isEmpty)
+                      _AcademyMessage(
+                        icon: Icons.school_outlined,
+                        message: l10n.academyCatalogEmpty,
+                      ),
+                  ],
                 ),
-              ],
+              ),
             ),
-            if (continueLearning.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xl),
-              _SectionTitle(l10n.academyContinueLearning),
-              const SizedBox(height: AppSpacing.sm),
-              for (final entry in continueLearning.take(3)) ...[
-                _ContinueRow(
-                  entry: entry,
-                  repository: _repository,
-                  onTap: () => _openCourse(entry.course),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-              ],
-            ],
-            if (_isAdmin && _pending.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xl),
-              _SectionTitle(l10n.academyPendingReview),
-              const SizedBox(height: AppSpacing.sm),
-              for (final course in _pending) ...[
-                CourseCard(
-                  course: course,
-                  repository: _repository,
-                  showStatus: true,
-                  onTap: () => _openCourse(course),
-                  trailing: CourseManageMenu(
-                    course: course,
-                    profile: widget.profile,
-                    repository: _repository,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-            ],
-            if (myUnpublished.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xl),
-              _SectionTitle(l10n.academyMyCourses),
-              const SizedBox(height: AppSpacing.sm),
-              for (final course in myUnpublished) ...[
-                CourseCard(
-                  course: course,
-                  repository: _repository,
-                  showStatus: true,
-                  onTap: () => _openCourse(course),
-                  trailing: CourseManageMenu(
-                    course: course,
-                    profile: widget.profile,
-                    repository: _repository,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-            ],
-            const SizedBox(height: AppSpacing.xl),
-            Row(
-              children: [
-                Expanded(child: _SectionTitle(l10n.academyPaths)),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => LearningPathScreen(
-                          profile: widget.profile,
-                          courseRepository: _repository,
-                        ),
+            if (!_loading && _error == null && filtered.isNotEmpty)
+              SliverPadding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                sliver: SliverList.builder(
+                  itemCount: filtered.length,
+                  itemBuilder: (context, index) {
+                    final course = filtered[index];
+                    return Padding(
+                      key: ValueKey(course.id),
+                      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                      child: CourseCard(
+                        course: course,
+                        repository: _repository,
+                        progress: _enrollments[course.id]
+                            ?.progressFor(course.lessonCount),
+                        onTap: () => _openCourse(course),
+                        trailing: canEditCourse(
+                          course: course,
+                          uid: widget.profile.uid,
+                          role: widget.profile.role,
+                        )
+                            ? CourseManageMenu(
+                                course: course,
+                                profile: widget.profile,
+                                repository: _repository,
+                              )
+                            : null,
                       ),
                     );
                   },
-                  child: Text(l10n.academySeeAll),
                 ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            if (_paths.isEmpty)
-              _AcademyMessage(
-                icon: Icons.route_outlined,
-                message: l10n.pathsEmpty,
-              )
-            else
-              for (final path in _paths.take(4)) ...[
-                PulseSheet(
-                  onTap: () => _openPath(path),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              path.title,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+              ),
+            if (_hasMoreCourses && !_loading && _error == null)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.lg,
+                    AppSpacing.sm,
+                    AppSpacing.lg,
+                    AppSpacing.md,
+                  ),
+                  child: Center(
+                    child: _loadingMoreCourses
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : TextButton(
+                            onPressed: _loadMoreCourses,
+                            child: Text(l10n.forumsLoadMore),
                           ),
-                          AcademyChip(path.level.label(l10n)),
-                        ],
-                      ),
-                      if (path.description.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          path.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(color: colors.muted),
-                        ),
-                      ],
-                      const SizedBox(height: 8),
-                      Text(
-                        l10n.pathMetaCoursesHours(
-                          path.courseIds.length,
-                          (_pathMinutes(path) / 60).round(),
-                        ),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-            const SizedBox(height: AppSpacing.xl),
-            Row(
-              children: [
-                Expanded(child: _SectionTitle(l10n.academyCourses)),
-              ],
+              ),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: pulseShellListBottomPad(context, hasFab: true),
+              ),
             ),
-            const SizedBox(height: AppSpacing.sm),
-            _LevelFilters(
-              selected: _levelFilter,
-              onSelect: (level) => setState(() => _levelFilter = level),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (_error != null)
-              _AcademyMessage(
-                icon: Icons.cloud_off_rounded,
-                message: friendlyCourseError(_error!, l10n),
-              )
-            else if (filtered.isEmpty)
-              _AcademyMessage(
-                icon: Icons.school_outlined,
-                message: l10n.academyCatalogEmpty,
-              )
-            else
-              for (final course in filtered) ...[
-                CourseCard(
-                  course: course,
-                  repository: _repository,
-                  progress: _enrollments[course.id]
-                      ?.progressFor(course.lessonCount),
-                  onTap: () => _openCourse(course),
-                  trailing: canEditCourse(
-                    course: course,
-                    uid: widget.profile.uid,
-                    role: widget.profile.role,
-                  )
-                      ? CourseManageMenu(
-                          course: course,
-                          profile: widget.profile,
-                          repository: _repository,
-                        )
-                      : null,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
           ],
         ),
       ),

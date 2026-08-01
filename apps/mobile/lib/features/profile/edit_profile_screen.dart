@@ -32,9 +32,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _save(ProfileFormData data) async {
     setState(() => _busy = true);
     try {
-      final isAgentFields = widget.profile.role == UserRole.agent ||
-          widget.profile.role == UserRole.instructor ||
-          widget.profile.role == UserRole.admin;
+      final isAgentFields = requiresLicenseProfile(widget.profile.role.wireValue);
 
       final changed = phoneChangedFromProfile(
         previousCode: widget.profile.phoneCountryCode,

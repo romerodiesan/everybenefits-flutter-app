@@ -12,7 +12,7 @@ import 'course_repository.dart';
 import 'widgets/lesson_stages.dart';
 
 /// Persist cadence while playing, so a crash loses at most a few seconds.
-const _saveInterval = Duration(seconds: 5);
+const _saveInterval = Duration(seconds: 20);
 
 /// Lesson player for video, reading and quiz lessons.
 ///
@@ -26,7 +26,7 @@ class CoursePlayerScreen extends StatefulWidget {
     required this.enrollment,
     required this.initialLessonId,
     required this.profile,
-    this.courseRepository,
+    required this.courseRepository,
   });
 
   final Course course;
@@ -34,7 +34,7 @@ class CoursePlayerScreen extends StatefulWidget {
   final Enrollment enrollment;
   final String initialLessonId;
   final UserProfile profile;
-  final CourseRepository? courseRepository;
+  final CourseRepository courseRepository;
 
   @override
   State<CoursePlayerScreen> createState() => _CoursePlayerScreenState();
@@ -42,7 +42,7 @@ class CoursePlayerScreen extends StatefulWidget {
 
 class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
   late final CourseRepository _repository =
-      widget.courseRepository ?? CourseRepository();
+      widget.courseRepository;
 
   VideoPlayerController? _controller;
   late Enrollment _enrollment;

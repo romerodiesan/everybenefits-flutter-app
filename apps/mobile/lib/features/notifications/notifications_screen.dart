@@ -1,13 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../chats/chat_repository.dart';
 import '../forums/forum_repository.dart';
 import '../university/course_repository.dart';
 import 'notification_models.dart';
-import 'notification_navigation.dart';
+import '../../app/navigation/notification_navigation.dart';
 import 'notification_repository.dart';
 import 'notification_target.dart';
 
@@ -37,6 +40,56 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   late final NotificationRepository _repo =
       widget.repository ?? NotificationRepository();
   String? _openingId;
+  static const _pageSize = 50;
+  int _limit = _pageSize;
+  bool _hasMore = false;
+  bool _loadingMore = false;
+  bool _ready = false;
+  List<AppNotification> _items = const [];
+  StreamSubscription<List<AppNotification>>? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _listen();
+  }
+
+  void _listen() {
+    _sub?.cancel();
+    _sub = _repo.watchNotifications(widget.uid, max: _limit).listen(
+      (items) {
+        if (!mounted) return;
+        setState(() {
+          _items = items;
+          _hasMore = items.length >= _limit;
+          _ready = true;
+          _loadingMore = false;
+        });
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _ready = true;
+          _loadingMore = false;
+        });
+      },
+    );
+  }
+
+  void _loadMore() {
+    if (_loadingMore || !_hasMore) return;
+    setState(() {
+      _loadingMore = true;
+      _limit += _pageSize;
+    });
+    _listen();
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
 
   Future<void> _openItem(AppNotification item) async {
     if (_openingId != null) return;
@@ -82,91 +135,104 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           ),
         ],
       ),
-      body: StreamBuilder<List<AppNotification>>(
-        stream: _repo.watchNotifications(widget.uid),
-        builder: (context, snap) {
-          final items = snap.data ?? const <AppNotification>[];
-          if (snap.connectionState == ConnectionState.waiting &&
-              items.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          if (items.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  l10n.notificationsEmpty,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: colors.muted),
-                ),
-              ),
-            );
-          }
-          return ListView.separated(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
-            itemCount: items.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final item = items[index];
-              final busy = _openingId == item.id;
-              return Material(
-                color: colors.sheet,
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTap: busy ? null : () => _openItem(item),
+      body: !_ready
+          ? const PulseNotificationListSkeleton()
+          : _items.isEmpty
+              ? Center(
                   child: Padding(
-                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            if (!item.read)
-                              Container(
-                                width: 7,
-                                height: 7,
-                                margin: const EdgeInsets.only(right: 8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.brandOf(context),
-                                  shape: BoxShape.circle,
-                                ),
-                              ),
-                            Expanded(
-                              child: Text(
-                                item.title,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 15,
-                                ),
-                              ),
-                            ),
-                            if (busy)
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          item.body,
-                          style: TextStyle(
-                            color: colors.muted,
-                            fontSize: 13,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      l10n.notificationsEmpty,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: colors.muted),
                     ),
                   ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+                  itemCount: _items.length + (_hasMore ? 1 : 0),
+                  separatorBuilder: (_, _) => const SizedBox(height: 8),
+                  itemBuilder: (context, index) {
+                    if (index >= _items.length) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: _loadingMore
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : TextButton(
+                                  onPressed: _loadMore,
+                                  child: Text(l10n.forumsLoadMore),
+                                ),
+                        ),
+                      );
+                    }
+                    final item = _items[index];
+                    final busy = _openingId == item.id;
+                    return Material(
+                      key: ValueKey(item.id),
+                      color: colors.sheet,
+                      borderRadius: BorderRadius.circular(14),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(14),
+                        onTap: busy ? null : () => _openItem(item),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  if (!item.read)
+                                    Container(
+                                      width: 7,
+                                      height: 7,
+                                      margin: const EdgeInsets.only(right: 8),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.brandOf(context),
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                  Expanded(
+                                    child: Text(
+                                      item.title,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w700,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                  ),
+                                  if (busy)
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                item.body,
+                                style: TextStyle(
+                                  color: colors.muted,
+                                  fontSize: 13,
+                                  height: 1.35,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          );
-        },
-      ),
     );
   }
 }

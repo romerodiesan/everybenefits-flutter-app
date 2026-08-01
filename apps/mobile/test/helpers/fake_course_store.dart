@@ -92,11 +92,11 @@ class FakeCourseStore implements CourseStore {
   Future<LearningPath?> fetchPath(String pathId) async => paths[pathId];
 
   @override
-  Stream<List<Enrollment>> watchEnrollments(String uid) {
+  Stream<List<Enrollment>> watchEnrollments(String uid, {int limit = 50}) {
     return _watch(() {
       final list = (enrollments[uid] ?? const {}).values.toList()
         ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-      return list;
+      return list.take(limit).toList();
     });
   }
 
@@ -122,8 +122,10 @@ class FakeCourseStore implements CourseStore {
     (enrollments[uid] ??= {})[courseId] = enrollment;
     final course = courses[courseId];
     if (course != null) {
-      courses[courseId] =
-          course.copyWith(studentCount: course.studentCount + 1);
+      courses[courseId] = course.copyWith(
+        studentCount: course.studentCount + 1,
+        activeStudentCount: course.activeStudentCount + 1,
+      );
     }
     _notify();
     return enrollment;

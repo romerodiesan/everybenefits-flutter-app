@@ -60,6 +60,14 @@ class _MemoryForumStore implements ForumStore {
   }
 
   @override
+  Future<ForumReplyPage> queryReplies({
+    required String threadId,
+    int limit = kForumReplyPageSize,
+    Object? cursor,
+  }) async =>
+      const ForumReplyPage(replies: []);
+
+  @override
   Stream<RelevanceVote> watchThreadVote({
     required String threadId,
     required String uid,
@@ -139,6 +147,12 @@ class _MemoryForumStore implements ForumStore {
   }) async {}
 
   @override
+  Future<void> setThreadClosed({
+    required String threadId,
+    required bool closed,
+  }) async {}
+
+  @override
   Future<void> setThreadRelevance({
     required String threadId,
     required String uid,
@@ -199,7 +213,7 @@ UserProfile _profile({required UserRole role, bool anonymous = false}) {
 
 Widget _wrap(Widget child) {
   return MaterialApp(
-    theme: buildEveryInsuranceTheme(Brightness.dark),
+    theme: buildPulseTheme(Brightness.dark),
     locale: const Locale('en'),
     localizationsDelegates: AppLocalizations.localizationsDelegates,
     supportedLocales: AppLocalizations.supportedLocales,

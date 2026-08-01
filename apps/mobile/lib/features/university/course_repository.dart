@@ -20,7 +20,7 @@ abstract class CourseStore {
 
   Future<LearningPath?> fetchPath(String pathId);
 
-  Stream<List<Enrollment>> watchEnrollments(String uid);
+  Stream<List<Enrollment>> watchEnrollments(String uid, {int limit = 50});
 
   Stream<Enrollment?> watchEnrollment({
     required String uid,
@@ -181,9 +181,10 @@ class FirestoreCourseStore implements CourseStore {
   }
 
   @override
-  Stream<List<Enrollment>> watchEnrollments(String uid) {
+  Stream<List<Enrollment>> watchEnrollments(String uid, {int limit = 50}) {
     return _enrollments(uid)
         .orderBy('updatedAt', descending: true)
+        .limit(limit)
         .snapshots()
         .map(
           (snap) => snap.docs
@@ -333,6 +334,7 @@ class FirestoreCourseStore implements CourseStore {
       lessonCount: 0,
       durationMinutes: 0,
       studentCount: 0,
+      activeStudentCount: 0,
       createdBy: createdBy,
       createdAt: now,
       updatedAt: now,
@@ -349,6 +351,7 @@ class FirestoreCourseStore implements CourseStore {
       'lessonCount': 0,
       'durationMinutes': 0,
       'studentCount': 0,
+      'activeStudentCount': 0,
       'createdBy': createdBy,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -449,8 +452,8 @@ class CourseRepository {
 
   Future<LearningPath?> fetchPath(String pathId) => _store.fetchPath(pathId);
 
-  Stream<List<Enrollment>> watchEnrollments(String uid) =>
-      _store.watchEnrollments(uid);
+  Stream<List<Enrollment>> watchEnrollments(String uid, {int limit = 50}) =>
+      _store.watchEnrollments(uid, limit: limit);
 
   Stream<Enrollment?> watchEnrollment({
     required String uid,

@@ -398,4 +398,47 @@ void main() {
       );
     });
   });
+
+  group('loadOlderMessages', () {
+    test('returns messages older than the cursor and reports hasMore', () async {
+      final me = _user('me', name: 'María');
+      final other = _user('other', name: 'Carlos');
+      final chat = await repo.getOrCreateDm(me: me, other: other);
+      final base = DateTime.utc(2024, 6, 1, 12);
+
+      for (var i = 0; i < 5; i++) {
+        await store.addMessage(
+          ChatMessage(
+            id: 'm$i',
+            chatId: chat.id,
+            body: 'msg $i',
+            senderId: me.uid,
+            senderName: me.headlineName,
+            createdAt: base.add(Duration(minutes: i)),
+          ),
+        );
+      }
+
+      final live = await repo.watchMessages(chat.id, limit: 2).first;
+      expect(live.map((m) => m.id), ['m4', 'm3']);
+
+      final older = await repo.loadOlderMessages(
+        chat.id,
+        beforeCreatedAt: live.last.createdAt,
+        beforeKey: live.last.id,
+        limit: 2,
+      );
+      expect(older.messages.map((m) => m.id), ['m2', 'm1']);
+      expect(older.hasMore, isTrue);
+
+      final rest = await repo.loadOlderMessages(
+        chat.id,
+        beforeCreatedAt: older.messages.last.createdAt,
+        beforeKey: older.messages.last.id,
+        limit: 2,
+      );
+      expect(rest.messages.map((m) => m.id), ['m0']);
+      expect(rest.hasMore, isFalse);
+    });
+  });
 }

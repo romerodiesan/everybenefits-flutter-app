@@ -65,6 +65,7 @@ class Course {
     required this.lessonCount,
     required this.durationMinutes,
     required this.studentCount,
+    this.activeStudentCount = 0,
     required this.createdBy,
     required this.createdAt,
     required this.updatedAt,
@@ -89,6 +90,7 @@ class Course {
   final int lessonCount;
   final int durationMinutes;
   final int studentCount;
+  final int activeStudentCount;
   final String createdBy;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -107,6 +109,7 @@ class Course {
     int? lessonCount,
     int? durationMinutes,
     int? studentCount,
+    int? activeStudentCount,
     DateTime? updatedAt,
     DateTime? publishedAt,
   }) {
@@ -122,6 +125,7 @@ class Course {
       lessonCount: lessonCount ?? this.lessonCount,
       durationMinutes: durationMinutes ?? this.durationMinutes,
       studentCount: studentCount ?? this.studentCount,
+      activeStudentCount: activeStudentCount ?? this.activeStudentCount,
       createdBy: createdBy,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -141,6 +145,7 @@ class Course {
       'lessonCount': lessonCount,
       'durationMinutes': durationMinutes,
       'studentCount': studentCount,
+      'activeStudentCount': activeStudentCount,
       'createdBy': createdBy,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
@@ -162,6 +167,9 @@ class Course {
       lessonCount: (data['lessonCount'] as num?)?.toInt() ?? 0,
       durationMinutes: (data['durationMinutes'] as num?)?.toInt() ?? 0,
       studentCount: (data['studentCount'] as num?)?.toInt() ?? 0,
+      activeStudentCount: (data['activeStudentCount'] as num?)?.toInt() ??
+          (data['studentCount'] as num?)?.toInt() ??
+          0,
       createdBy: data['createdBy'] as String? ?? '',
       createdAt: readCourseDate(data['createdAt']) ?? now,
       updatedAt: readCourseDate(data['updatedAt']) ??

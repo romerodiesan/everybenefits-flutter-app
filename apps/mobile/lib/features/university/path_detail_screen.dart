@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'course_detail_screen.dart';
@@ -19,12 +20,12 @@ class PathDetailScreen extends StatefulWidget {
     super.key,
     required this.path,
     required this.profile,
-    this.courseRepository,
+    required this.courseRepository,
   });
 
   final LearningPath path;
   final UserProfile profile;
-  final CourseRepository? courseRepository;
+  final CourseRepository courseRepository;
 
   @override
   State<PathDetailScreen> createState() => _PathDetailScreenState();
@@ -32,7 +33,7 @@ class PathDetailScreen extends StatefulWidget {
 
 class _PathDetailScreenState extends State<PathDetailScreen> {
   late final CourseRepository _repository =
-      widget.courseRepository ?? CourseRepository();
+      widget.courseRepository;
 
   final _subscriptions = <StreamSubscription<void>>[];
 
@@ -111,7 +112,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
     return PulseScaffold(
       appBar: AppBar(title: Text(l10n.pathDetailTitle)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PulseCatalogSkeleton(showProgress: true)
           : ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [

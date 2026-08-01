@@ -68,6 +68,30 @@ class FakeChatStore implements ChatStore {
   }
 
   @override
+  Future<ChatMessagePage> loadOlderMessages(
+    String chatId, {
+    required DateTime beforeCreatedAt,
+    String? beforeKey,
+    int limit = kChatMessagePageSize,
+  }) async {
+    final list = List<ChatMessage>.from(messages[chatId] ?? const []);
+    list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final beforeMs = beforeCreatedAt.toUtc().millisecondsSinceEpoch;
+    final older = list.where((m) {
+      final ms = m.createdAt.toUtc().millisecondsSinceEpoch;
+      if (ms < beforeMs) return true;
+      if (ms > beforeMs) return false;
+      if (beforeKey == null) return false;
+      return m.id.compareTo(beforeKey) < 0;
+    }).toList();
+    final hasMore = older.length > limit;
+    return ChatMessagePage(
+      messages: hasMore ? older.sublist(0, limit) : older,
+      hasMore: hasMore,
+    );
+  }
+
+  @override
   Future<ChatConversation?> findDmByKey(
     String dmKey, {
     required String viewerUid,
@@ -115,6 +139,19 @@ class FakeChatStore implements ChatStore {
       chats[chatId] = chat.copyWith(pinnedBy: next);
     }
     _hiddenInbox.remove(_hideKey(uid, chatId));
+    _bumpChats();
+  }
+
+  @override
+  Future<void> markChatReadLocal({
+    required String chatId,
+    required String uid,
+    required int previousUnread,
+  }) async {
+    final chat = chats[chatId];
+    if (chat == null) return;
+    final next = Map<String, int>.from(chat.unreadCounts)..[uid] = 0;
+    chats[chatId] = chat.copyWith(unreadCounts: next);
     _bumpChats();
   }
 

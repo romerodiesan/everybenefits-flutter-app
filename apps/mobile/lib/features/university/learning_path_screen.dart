@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'course_models.dart';
@@ -18,11 +19,11 @@ class LearningPathScreen extends StatefulWidget {
   const LearningPathScreen({
     super.key,
     required this.profile,
-    this.courseRepository,
+    required this.courseRepository,
   });
 
   final UserProfile profile;
-  final CourseRepository? courseRepository;
+  final CourseRepository courseRepository;
 
   @override
   State<LearningPathScreen> createState() => _LearningPathScreenState();
@@ -30,7 +31,7 @@ class LearningPathScreen extends StatefulWidget {
 
 class _LearningPathScreenState extends State<LearningPathScreen> {
   late final CourseRepository _repository =
-      widget.courseRepository ?? CourseRepository();
+      widget.courseRepository;
 
   final _subscriptions = <StreamSubscription<void>>[];
 
@@ -125,7 +126,7 @@ class _LearningPathScreenState extends State<LearningPathScreen> {
     return PulseScaffold(
       appBar: AppBar(title: Text(l10n.academyPaths)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PulsePathListSkeleton()
           : _error != null
               ? AcademyMessage(
                   icon: Icons.cloud_off_rounded,

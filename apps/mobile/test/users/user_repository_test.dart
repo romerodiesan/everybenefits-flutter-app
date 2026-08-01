@@ -65,6 +65,27 @@ class FakeUserStore implements UserProfileStore {
         .take(limit)
         .toList();
   }
+
+  @override
+  Future<List<UserProfile>> searchDirectory({
+    required String query,
+    String? excludeUid,
+    int limit = 40,
+  }) async {
+    final q = query.trim().toLowerCase();
+    if (q.length < 2) return const [];
+    return profiles.values
+        .where(
+          (p) =>
+              !p.isAnonymous &&
+              p.role != UserRole.guest &&
+              p.uid != excludeUid &&
+              ((p.displayName ?? '').toLowerCase().contains(q) ||
+                  (p.email ?? '').toLowerCase().contains(q)),
+        )
+        .take(limit)
+        .toList();
+  }
 }
 
 void main() {

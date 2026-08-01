@@ -101,10 +101,29 @@ class FakeForumStore implements ForumStore {
     String threadId, {
     int limit = kForumReplyPageSize,
   }) async* {
-    yield (replies[threadId] ?? const []).take(limit).toList();
-    yield* _repliesFor(threadId).stream.map(
-          (list) => list.take(limit).toList(),
-        );
+    List<ForumReply> current() {
+      final list = List<ForumReply>.from(replies[threadId] ?? const [])
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return list.take(limit).toList();
+    }
+
+    yield current();
+    yield* _repliesFor(threadId).stream.map((_) => current());
+  }
+
+  @override
+  Future<ForumReplyPage> queryReplies({
+    required String threadId,
+    int limit = kForumReplyPageSize,
+    Object? cursor,
+  }) async {
+    final list = List<ForumReply>.from(replies[threadId] ?? const [])
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    final start = cursor is int ? cursor : 0;
+    final end = (start + limit).clamp(0, list.length);
+    final page = list.sublist(start.clamp(0, list.length), end);
+    final next = end < list.length ? end : null;
+    return ForumReplyPage(replies: page, nextCursor: next);
   }
 
   @override
@@ -291,6 +310,16 @@ class FakeForumStore implements ForumStore {
         : thread.copyWith(acceptedReplyId: replyId);
     _emitThreads();
     _repliesFor(threadId).add(replies[threadId] ?? const []);
+  }
+
+  @override
+  Future<void> setThreadClosed({
+    required String threadId,
+    required bool closed,
+  }) async {
+    final thread = threads[threadId]!;
+    threads[threadId] = thread.copyWith(closed: closed);
+    _emitThreads();
   }
 
   @override
@@ -811,6 +840,56 @@ void main() {
     );
     expect(next.threads, hasLength(1));
     expect(next.hasMore, isFalse);
+  });
+
+  test('queryReplies paginates newest-first with cursor', () async {
+    final author = _agent(uid: 'author');
+    final answerer = _agent(uid: 'answerer');
+    final thread = await repository.createThread(
+      tags: ['general'],
+      title: 'Pregunta con muchas respuestas',
+      body: 'Necesito varias respuestas para paginar',
+      author: author,
+    );
+    for (var i = 0; i < 5; i++) {
+      final reply = await repository.addReply(
+        threadId: thread.id,
+        body: 'Respuesta número $i con contenido',
+        author: answerer,
+      );
+      store.replies[thread.id]![i] = ForumReply(
+        id: reply.id,
+        threadId: reply.threadId,
+        body: reply.body,
+        authorId: reply.authorId,
+        authorName: reply.authorName,
+        authorRole: reply.authorRole,
+        score: reply.score,
+        createdAt: DateTime.utc(2024, 1, i + 1),
+        updatedAt: DateTime.utc(2024, 1, i + 1),
+      );
+    }
+
+    final first = await repository.queryReplies(threadId: thread.id, limit: 2);
+    expect(first.replies, hasLength(2));
+    expect(first.replies.map((r) => r.createdAt.day), [5, 4]);
+    expect(first.hasMore, isTrue);
+
+    final second = await repository.queryReplies(
+      threadId: thread.id,
+      limit: 2,
+      cursor: first.nextCursor,
+    );
+    expect(second.replies.map((r) => r.createdAt.day), [3, 2]);
+    expect(second.hasMore, isTrue);
+
+    final third = await repository.queryReplies(
+      threadId: thread.id,
+      limit: 2,
+      cursor: second.nextCursor,
+    );
+    expect(third.replies.map((r) => r.createdAt.day), [1]);
+    expect(third.hasMore, isFalse);
   });
 
   test('syncAuthorPhotoUrl updates threads and replies for that author only',

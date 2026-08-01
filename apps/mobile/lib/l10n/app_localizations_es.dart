@@ -853,6 +853,16 @@ class AppLocalizationsEs extends AppLocalizations {
   String get actionDelete => 'Eliminar';
 
   @override
+  String get threadCloseReplies => 'Cerrar respuestas';
+
+  @override
+  String get threadReopenReplies => 'Reabrir';
+
+  @override
+  String get threadClosedNotice =>
+      'Este hilo está cerrado a nuevas respuestas.';
+
+  @override
   String get actionCancel => 'Cancelar';
 
   @override
@@ -1107,8 +1117,10 @@ class AppLocalizationsEs extends AppLocalizations {
   String get newChatTitle => 'Nuevo chat';
 
   @override
-  String get newChatEmpty =>
-      'No hay otros usuarios todavía. Cuando alguien se registre, aparecerá aquí.';
+  String get newChatEmpty => 'Sin resultados. Prueba otro nombre, email o NPN.';
+
+  @override
+  String get newChatSearchHint => 'Busca por nombre, email o NPN';
 
   @override
   String get newChatContactsHeader => 'CONTACTOS';

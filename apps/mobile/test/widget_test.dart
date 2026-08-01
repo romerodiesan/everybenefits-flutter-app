@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:every_benefits/app/home_shell.dart';
+import 'package:every_benefits/app/pulse_shell.dart';
 import 'package:every_benefits/app/locale_controller.dart';
 import 'package:every_benefits/app/theme.dart';
 import 'package:every_benefits/app/theme_controller.dart';
@@ -15,6 +15,7 @@ import 'package:every_benefits/features/chats/chat_repository.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/university/course_repository.dart';
+import 'package:every_benefits/features/notifications/notification_repository.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/onboarding_prefs.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
@@ -71,7 +72,7 @@ void main() {
   });
 
   Widget app() {
-    return EveryInsuranceApp(
+    return PulseApp(
       authService: auth,
       userRepository: users,
       themeController: ThemeController(),
@@ -79,6 +80,7 @@ void main() {
       forumRepository: emptyForums,
       chatRepository: emptyChats,
       courseRepository: emptyCourses,
+      notificationRepository: NotificationRepository(),
     );
   }
 
@@ -298,17 +300,18 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        theme: buildEveryInsuranceTheme(Brightness.dark),
+        theme: buildPulseTheme(Brightness.dark),
         locale: const Locale('en'),
         localizationsDelegates: AppLocalizations.localizationsDelegates,
         supportedLocales: AppLocalizations.supportedLocales,
-        home: HomeShell(
+        home: PulseShell(
           authService: authService,
           userRepository: usersRepo,
           profile: profile,
           forumRepository: ForumRepository(store: _EmptyForumStore()),
           chatRepository: emptyChats,
           courseRepository: emptyCourses,
+          notificationRepository: NotificationRepository(),
         ),
       ),
     );
@@ -348,7 +351,7 @@ void main() {
 
     final themeController = ThemeController();
     await tester.pumpWidget(
-      EveryInsuranceApp(
+      PulseApp(
         authService: auth,
         userRepository: users,
         themeController: themeController,
@@ -410,6 +413,14 @@ class _EmptyForumStore implements ForumStore {
     int limit = kForumReplyPageSize,
   }) =>
       Stream.value(const []);
+
+  @override
+  Future<ForumReplyPage> queryReplies({
+    required String threadId,
+    int limit = kForumReplyPageSize,
+    Object? cursor,
+  }) async =>
+      const ForumReplyPage(replies: []);
 
   @override
   Stream<RelevanceVote> watchThreadVote({
@@ -488,6 +499,12 @@ class _EmptyForumStore implements ForumStore {
   Future<void> setAcceptedReply({
     required String threadId,
     required String? replyId,
+  }) async {}
+
+  @override
+  Future<void> setThreadClosed({
+    required String threadId,
+    required bool closed,
   }) async {}
 
   @override

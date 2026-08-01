@@ -24,16 +24,16 @@ class ForumsScreen extends StatefulWidget {
   const ForumsScreen({
     super.key,
     required this.profile,
-    this.forumRepository,
-    this.chatRepository,
+    required this.forumRepository,
+    required this.chatRepository,
     this.embeddedInShell = false,
     this.notificationUnread = 0,
     this.onOpenNotifications,
   });
 
   final UserProfile profile;
-  final ForumRepository? forumRepository;
-  final ChatRepository? chatRepository;
+  final ForumRepository forumRepository;
+  final ChatRepository chatRepository;
   final bool embeddedInShell;
   final int notificationUnread;
   final VoidCallback? onOpenNotifications;
@@ -44,7 +44,7 @@ class ForumsScreen extends StatefulWidget {
 
 class ForumsScreenState extends State<ForumsScreen> {
   late final ForumRepository _repository =
-      widget.forumRepository ?? ForumRepository();
+      widget.forumRepository;
   final _searchController = TextEditingController();
 
   List<ForumThread> _threads = const [];

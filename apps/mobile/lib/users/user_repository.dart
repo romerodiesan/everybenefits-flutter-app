@@ -23,6 +23,13 @@ abstract class UserProfileStore {
     String? excludeUid,
     int limit = 80,
   });
+
+  /// Server-side directory search (min 2 chars). Prefer this over listDirectory.
+  Future<List<UserProfile>> searchDirectory({
+    required String query,
+    String? excludeUid,
+    int limit = 40,
+  });
 }
 
 class FirestoreUserProfileStore implements UserProfileStore {
@@ -127,6 +134,27 @@ class FirestoreUserProfileStore implements UserProfileStore {
             ),
       );
     return list;
+  }
+
+  @override
+  Future<List<UserProfile>> searchDirectory({
+    required String query,
+    String? excludeUid,
+    int limit = 40,
+  }) async {
+    final trimmed = query.trim();
+    if (trimmed.length < 2) return const [];
+    final result = await _functions.httpsCallable('searchDirectory').call(
+      <String, dynamic>{'query': trimmed, 'limit': limit},
+    );
+    final payload = result.data is Map ? result.data as Map : const {};
+    final raw = payload['profiles'];
+    return (raw is List ? raw : const [])
+        .whereType<Map>()
+        .map((data) => UserProfile.fromMap(Map<String, dynamic>.from(data)))
+        .where((p) => p.uid != excludeUid && p.role != UserRole.guest)
+        .take(limit)
+        .toList();
   }
 }
 
@@ -266,5 +294,17 @@ class UserRepository {
     int limit = 80,
   }) {
     return _store.listDirectory(excludeUid: excludeUid, limit: limit);
+  }
+
+  Future<List<UserProfile>> searchDirectory({
+    required String query,
+    String? excludeUid,
+    int limit = 40,
+  }) {
+    return _store.searchDirectory(
+      query: query,
+      excludeUid: excludeUid,
+      limit: limit,
+    );
   }
 }

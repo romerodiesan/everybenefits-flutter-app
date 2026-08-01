@@ -146,9 +146,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   late PhoneCountry _country;
 
   bool get _isAgent =>
-      widget.accountType == UserRole.agent ||
-      widget.accountType == UserRole.instructor ||
-      widget.accountType == UserRole.admin;
+      requiresLicenseProfile(widget.accountType.wireValue);
 
   @override
   void initState() {
