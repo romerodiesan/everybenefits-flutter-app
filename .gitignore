@@ -4,6 +4,11 @@
 *.pyc
 *.swp
 .DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
 .atom/
 .build/
 .buildlog/
@@ -131,9 +136,37 @@ webapp/.next/
 webapp/out/
 webapp/.env*.local
 
+# Functions emulator secret overrides (never commit real keys)
+functions/.secret.local
+functions/.env
+functions/.env.*
+!functions/.env.example
+apps/functions/.secret.local
+apps/functions/.env
+apps/functions/.env.*
+!apps/functions/.env.example
+
+# Local operator secrets (reCAPTCHA Enterprise, etc.) — never commit
+.secrets/
+
 # Studio Next.js app
 studio/node_modules/
 studio/.next/
 
 # Shared packages
 packages/*/node_modules/
+
+# Flutter (apps/mobile)
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.packages
+apps/mobile/build/
+apps/mobile/.pub-cache/
+apps/mobile/android/.gradle/
+apps/mobile/android/app/build/
+apps/mobile/android/build/
+apps/mobile/ios/Pods/
+apps/mobile/ios/.symlinks/
+apps/mobile/test/rules/node_modules/
+apps/mobile/test/rules/package-lock.json
+

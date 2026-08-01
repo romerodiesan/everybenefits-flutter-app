@@ -1,0 +1,24 @@
+{
+  "name": "pulse",
+  "private": true,
+  "packageManager": "pnpm@11.15.1",
+  "scripts": {
+    "dev:web": "pnpm --filter pulse-web dev",
+    "dev:studio": "pnpm --filter pulse-studio dev",
+    "dev:admin": "pnpm --filter pulse-admin dev",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "functions:sync": "pnpm --filter @pulse/functions sync:shared",
+    "functions:build": "pnpm --filter @pulse/functions build",
+    "functions:deploy": "pnpm functions:sync && pnpm functions:build && firebase deploy --only functions"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

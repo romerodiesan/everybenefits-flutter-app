@@ -1,17 +1,51 @@
-# every_benefits
+# Pulse / Every Benefits
 
-A new Flutter project.
+Multi-app product monorepo: Flutter mobile, three Next.js surfaces (Web, Studio, Admin), and Firebase Cloud Functions.
 
-## Getting Started
+## Quick map
 
-This project is a starting point for a Flutter application.
+| Path | What |
+|------|------|
+| [`apps/web`](apps/web) | Learner web (forums, chats, academy, Pulse AI) — port 3000 |
+| [`apps/studio`](apps/studio) | Course authoring + insights — port 3001 |
+| [`apps/admin`](apps/admin) | Users, orgs, approvals — port 3002 |
+| [`apps/functions`](apps/functions) | Trusted callables & triggers |
+| [`apps/mobile`](apps/mobile) | Flutter iOS / Android / desktop |
+| [`packages/`](packages) | Shared domain & UI libraries (`@pulse/*`) |
+| [`scripts/`](scripts) | Emulators, seeds, migrations |
+| [`docs/architecture.md`](docs/architecture.md) | **Architecture & conventions** |
+| [`docs/deploy.md`](docs/deploy.md) | App Hosting + App Check |
+| [`docs/pulse-ai.md`](docs/pulse-ai.md) | Pulse AI agent |
 
-A few resources to get you started if this is your first Flutter project:
+## Prerequisites
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+- Node 22 + [pnpm](https://pnpm.io) 11+
+- Flutter stable (for mobile)
+- Firebase CLI (`npx firebase-tools`)
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+## Setup
+
+```bash
+pnpm install
+./scripts/start-emulators.sh   # other terminal
+pnpm dev:web                   # or dev:studio / dev:admin
+```
+
+Mobile:
+
+```bash
+cd apps/mobile && flutter pub get && flutter run
+```
+
+## Deploy
+
+Primary hosting for the three Next apps is **Firebase App Hosting** (see `firebase.json` and [`docs/deploy.md`](docs/deploy.md)). Functions:
+
+```bash
+pnpm --filter @pulse/functions build
+firebase deploy --only functions
+```
+
+## License
+
+Private — Every Benefits.

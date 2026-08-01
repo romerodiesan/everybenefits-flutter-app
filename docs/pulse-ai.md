@@ -1,8 +1,8 @@
 # Pulse AI
 
 Bilingual US-insurance agent for the Next.js web app and Flutter mobile app.
-Generation, tools, policy, RAG and quotas all live in `webapp`; Flutter consumes
-the same agent over SSE.
+Generation, tools, policy, RAG and quotas all live in `apps/web`; Flutter
+(`apps/mobile`) consumes the same agent over SSE.
 
 ## Architecture
 
@@ -20,15 +20,15 @@ corpus, allowlisted official web search, and the caller's learning context.
 
 ## Environment
 
-Copy from `webapp/.env.example`. Required for a real agent:
+Copy from `apps/web/.env.example`. Required for a real agent:
 
 | Variable | Purpose |
 |----------|---------|
-| `AI_GATEWAY_API_KEY` | Vercel AI Gateway. On Vercel, OIDC can provision this. |
+| `AI_GATEWAY_API_KEY` | AI Gateway API key (`vck_…`). |
 | `FIREBASE_SERVICE_ACCOUNT_KEY` | Admin SDK JSON (raw or base64) for Auth, Firestore, App Check. |
 | `FIREBASE_PROJECT_ID` | Defaults to the client project id when unset. |
 | `PULSE_AI_ADMIN_TASK_KEY` | Shared secret for `/api/ai/reindex`. |
-| `CRON_SECRET` | Also accepted by the reindex route (Vercel Cron). |
+| `CRON_SECRET` | Optional alternate secret accepted by the reindex route. |
 
 Useful knobs:
 
@@ -48,8 +48,9 @@ Useful knobs:
 Flutter release builds need the web origin:
 
 ```bash
-flutter run --dart-define=PULSE_AI_BASE_URL=https://your-webapp.vercel.app
+flutter run --dart-define=PULSE_AI_BASE_URL=https://pulse.everybenefits.us
 ```
+
 
 Debug builds default to `http://<emulator-host>:3000` (Android emulator → `10.0.2.2`).
 
@@ -90,8 +91,9 @@ Rebuild:
 # Manual
 PULSE_AI_ADMIN_TASK_KEY=… node scripts/reindex-ai-knowledge.mjs
 
-# Or hit the route (also wired as a daily Vercel cron in webapp/vercel.json)
-curl -H "Authorization: Bearer $CRON_SECRET" https://your-webapp.vercel.app/api/ai/reindex
+# Or hit the route (Cloud Scheduler / App Hosting scheduled job)
+curl -H "Authorization: Bearer $PULSE_AI_ADMIN_TASK_KEY" \
+  https://pulse.everybenefits.us/api/ai/reindex
 ```
 
 Official live search (optional) is limited to allowlisted regulator domains;
