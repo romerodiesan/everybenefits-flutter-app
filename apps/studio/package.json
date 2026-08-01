@@ -1,0 +1,46 @@
+{
+  "name": "pulse-studio",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@11.15.1",
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start --port 3001",
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@pulse/firebase-admin": "workspace:*",
+    "@pulse/firebase-client": "workspace:*",
+    "@pulse/i18n": "workspace:*",
+    "@pulse/insights-metrics": "workspace:*",
+    "@pulse/shared": "workspace:*",
+    "@pulse/sso": "workspace:*",
+    "@pulse/ui": "workspace:*",
+    "firebase": "^12.16.0",
+    "firebase-admin": "^14.2.0",
+    "motion": "^12.42.2",
+    "next": "16.2.11",
+    "next-intl": "^4.13.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-markdown": "^10.1.0",
+    "recharts": "^3.1.2",
+    "remark-gfm": "^4.0.1",
+    "server-only": "^0.0.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.11",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.10"
+  }
+}

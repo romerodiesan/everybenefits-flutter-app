@@ -145,6 +145,8 @@ apps/functions/.secret.local
 apps/functions/.env
 apps/functions/.env.*
 !apps/functions/.env.example
+apps/functions/node_modules/
+apps/functions/lib/
 
 # Local operator secrets (reCAPTCHA Enterprise, etc.) — never commit
 .secrets/

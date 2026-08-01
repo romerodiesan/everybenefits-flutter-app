@@ -1,0 +1,1243 @@
+import {
+  collection,
+  collectionGroup,
+  deleteDoc,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+  where,
+  writeBatch,
+  type Unsubscribe,
+} from "firebase/firestore";
+import {
+  deleteObject,
+  getDownloadURL,
+  listAll,
+  ref,
+  uploadBytesResumable,
+} from "firebase/storage";
+import { getFirebaseDb, getFirebaseStorage } from "@pulse/firebase-client";
+import { callCloudFunction } from "@pulse/firebase-client";
+import type {
+  Course,
+  CourseContent,
+  CourseLevel,
+  CourseModule,
+  CourseStatus,
+  CourseStudent,
+  Enrollment,
+  LearningPath,
+  Lesson,
+  LessonType,
+  QuizAnswerKey,
+  QuizAttempt,
+  QuizAttemptResult,
+  QuizQuestion,
+  QuizSelectionMode,
+} from "../types";
+import { QUIZ_DEFAULT_PASS_PERCENT } from "../types";
+
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    return (value as { toDate: () => Date }).toDate();
+  }
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  return null;
+}
+
+function parseLevel(value: unknown): CourseLevel {
+  return value === "intermediate" || value === "advanced" ? value : "basic";
+}
+
+function parseStatus(value: unknown): CourseStatus {
+  return value === "pending" || value === "published" ? value : "draft";
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(String).filter((entry) => entry.length > 0);
+}
+
+export function courseFrom(id: string, data: Record<string, unknown>): Course {
+  return {
+    id,
+    title: String(data.title ?? ""),
+    description: String(data.description ?? ""),
+    teacherName: String(data.teacherName ?? ""),
+    level: parseLevel(data.level),
+    status: parseStatus(data.status),
+    coverPath: (data.coverPath as string) ?? null,
+    coverUrl: (data.coverUrl as string) ?? null,
+    lessonCount: Number(data.lessonCount ?? 0),
+    durationMinutes: Number(data.durationMinutes ?? 0),
+    studentCount: Number(data.studentCount ?? 0),
+    activeStudentCount:
+      data.activeStudentCount != null
+        ? Number(data.activeStudentCount)
+        : Number(data.studentCount ?? 0),
+    createdBy: String(data.createdBy ?? ""),
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt) ?? toDate(data.createdAt),
+    publishedAt: toDate(data.publishedAt),
+  };
+}
+
+function moduleFrom(id: string, data: Record<string, unknown>): CourseModule {
+  return {
+    id,
+    title: String(data.title ?? ""),
+    order: Number(data.order ?? 0),
+  };
+}
+
+/** Legacy lessons predate the field and are always videos. */
+function parseLessonType(value: unknown): LessonType {
+  return value === "reading" || value === "quiz" ? value : "video";
+}
+
+function parseSelectionMode(value: unknown): QuizSelectionMode {
+  return value === "multi" ? "multi" : "single";
+}
+
+function questionsFrom(value: unknown): QuizQuestion[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry, index) => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const raw = entry as Record<string, unknown>;
+    const id = String(raw.id ?? "").trim() || `q${index + 1}`;
+    return [
+      {
+        id,
+        prompt: String(raw.prompt ?? ""),
+        selectionMode: parseSelectionMode(raw.selectionMode),
+        options: Array.isArray(raw.options) ? raw.options.map(String) : [],
+      },
+    ];
+  });
+}
+
+function attemptsFrom(value: unknown): Record<string, QuizAttempt> {
+  if (typeof value !== "object" || value === null) return {};
+  const out: Record<string, QuizAttempt> = {};
+  for (const [lessonId, raw] of Object.entries(value)) {
+    if (typeof raw !== "object" || raw === null) continue;
+    const entry = raw as Record<string, unknown>;
+    out[lessonId] = {
+      score: Number(entry.score ?? 0),
+      passed: entry.passed === true,
+      at: toDate(entry.at),
+    };
+  }
+  return out;
+}
+
+function lessonFrom(id: string, data: Record<string, unknown>): Lesson {
+  return {
+    id,
+    moduleId: String(data.moduleId ?? ""),
+    title: String(data.title ?? ""),
+    order: Number(data.order ?? 0),
+    durationSeconds: Number(data.durationSeconds ?? 0),
+    type: parseLessonType(data.type),
+    videoPath: (data.videoPath as string) ?? null,
+    videoUrl: (data.videoUrl as string) ?? null,
+    bodyMarkdown: (data.bodyMarkdown as string) ?? null,
+    questions: questionsFrom(data.questions),
+    passPercent: Number(data.passPercent ?? QUIZ_DEFAULT_PASS_PERCENT),
+  };
+}
+
+/** Whether a lesson is ready for learners, whatever its type. */
+export function lessonHasContent(lesson: Lesson): boolean {
+  switch (lesson.type) {
+    case "reading":
+      return Boolean(lesson.bodyMarkdown?.trim());
+    case "quiz":
+      return lesson.questions.length > 0;
+    default:
+      return Boolean(lesson.videoPath?.trim() || lesson.videoUrl?.trim());
+  }
+}
+
+function pathFrom(id: string, data: Record<string, unknown>): LearningPath {
+  return {
+    id,
+    title: String(data.title ?? ""),
+    description: String(data.description ?? ""),
+    level: parseLevel(data.level),
+    status: parseStatus(data.status),
+    courseIds: stringList(data.courseIds),
+    order: Number(data.order ?? 0),
+    createdBy: String(data.createdBy ?? ""),
+  };
+}
+
+function enrollmentFrom(
+  courseId: string,
+  data: Record<string, unknown>,
+): Enrollment {
+  return {
+    courseId: String(data.courseId ?? courseId),
+    completedLessonIds: stringList(data.completedLessonIds),
+    lastLessonId: (data.lastLessonId as string) ?? null,
+    lastPositionSeconds: Number(data.lastPositionSeconds ?? 0),
+    enrolledAt: toDate(data.enrolledAt),
+    updatedAt: toDate(data.updatedAt) ?? toDate(data.enrolledAt),
+    completedAt: toDate(data.completedAt),
+    quizAttempts: attemptsFrom(data.quizAttempts),
+  };
+}
+
+/** Fraction of a course finished, clamped to [0, 1]. */
+export function progressOf(
+  enrollment: Enrollment | null | undefined,
+  lessonCount: number,
+) {
+  if (!enrollment) return 0;
+  if (lessonCount <= 0) return enrollment.completedAt ? 1 : 0;
+  const ratio = enrollment.completedLessonIds.length / lessonCount;
+  return Math.min(1, Math.max(0, ratio));
+}
+
+// --- Catalog reads ---
+
+export function watchPublishedCourses(
+  onChange: (courses: Course[]) => void,
+  onError?: (error: Error) => void,
+  max = 60,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "courses"),
+    where("status", "==", "published"),
+    orderBy("publishedAt", "desc"),
+    limit(max),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          courseFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export function watchCourse(
+  courseId: string,
+  onChange: (course: Course | null) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(getFirebaseDb(), "courses", courseId),
+    (snap) => {
+      if (!snap.exists()) {
+        onChange(null);
+        return;
+      }
+      onChange(courseFrom(snap.id, snap.data() as Record<string, unknown>));
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export async function getCourse(courseId: string) {
+  const snap = await getDoc(doc(getFirebaseDb(), "courses", courseId));
+  if (!snap.exists()) return null;
+  return courseFrom(snap.id, snap.data() as Record<string, unknown>);
+}
+
+export async function fetchCourseContent(
+  courseId: string,
+): Promise<CourseContent> {
+  const db = getFirebaseDb();
+  const [modules, lessons] = await Promise.all([
+    getDocs(
+      query(collection(db, "courses", courseId, "modules"), orderBy("order")),
+    ),
+    getDocs(
+      query(collection(db, "courses", courseId, "lessons"), orderBy("order")),
+    ),
+  ]);
+  return {
+    modules: modules.docs.map((d) =>
+      moduleFrom(d.id, d.data() as Record<string, unknown>),
+    ),
+    lessons: lessons.docs.map((d) =>
+      lessonFrom(d.id, d.data() as Record<string, unknown>),
+    ),
+  };
+}
+
+export function watchCourseContent(
+  courseId: string,
+  onChange: (content: CourseContent) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const db = getFirebaseDb();
+  let modules: CourseModule[] = [];
+  let lessons: Lesson[] = [];
+  const emit = () => onChange({ modules, lessons });
+
+  const stopModules = onSnapshot(
+    query(collection(db, "courses", courseId, "modules"), orderBy("order")),
+    (snap) => {
+      modules = snap.docs.map((d) =>
+        moduleFrom(d.id, d.data() as Record<string, unknown>),
+      );
+      emit();
+    },
+    (error) => onError?.(error),
+  );
+  const stopLessons = onSnapshot(
+    query(collection(db, "courses", courseId, "lessons"), orderBy("order")),
+    (snap) => {
+      lessons = snap.docs.map((d) =>
+        lessonFrom(d.id, d.data() as Record<string, unknown>),
+      );
+      emit();
+    },
+    (error) => onError?.(error),
+  );
+
+  return () => {
+    stopModules();
+    stopLessons();
+  };
+}
+
+export function watchPaths(
+  onChange: (paths: LearningPath[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "paths"),
+    where("status", "==", "published"),
+    orderBy("order"),
+    limit(30),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          pathFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export async function getPath(pathId: string) {
+  const snap = await getDoc(doc(getFirebaseDb(), "paths", pathId));
+  if (!snap.exists()) return null;
+  return pathFrom(snap.id, snap.data() as Record<string, unknown>);
+}
+
+export function watchPath(
+  pathId: string,
+  onChange: (path: LearningPath | null) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(getFirebaseDb(), "paths", pathId),
+    (snap) => {
+      if (!snap.exists()) {
+        onChange(null);
+        return;
+      }
+      onChange(pathFrom(snap.id, snap.data() as Record<string, unknown>));
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export function watchAuthoredPaths(
+  uid: string,
+  onChange: (paths: LearningPath[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "paths"),
+    where("createdBy", "==", uid),
+    orderBy("updatedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          pathFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export function watchPathsByStatus(
+  status: CourseStatus,
+  onChange: (paths: LearningPath[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "paths"),
+    where("status", "==", status),
+    orderBy("updatedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          pathFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+/** Single listener for studio admin path queues. */
+export function watchPathsInStatuses(
+  statuses: CourseStatus[],
+  onChange: (paths: LearningPath[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "paths"),
+    where("status", "in", statuses),
+    orderBy("updatedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          pathFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export async function createPath(input: {
+  title: string;
+  description: string;
+  level: CourseLevel;
+  createdBy: string;
+}) {
+  const db = getFirebaseDb();
+  const pathRef = doc(collection(db, "paths"));
+  await setDoc(pathRef, {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    level: input.level,
+    status: "draft",
+    courseIds: [],
+    order: Date.now(),
+    createdBy: input.createdBy,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    publishedAt: null,
+  });
+  return pathRef.id;
+}
+
+export async function updatePathMeta(input: {
+  pathId: string;
+  title: string;
+  description: string;
+  level: CourseLevel;
+}) {
+  await updateDoc(doc(getFirebaseDb(), "paths", input.pathId), {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    level: input.level,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Replaces the ordered course membership for a path. */
+export async function setPathCourseIds(pathId: string, courseIds: string[]) {
+  await updateDoc(doc(getFirebaseDb(), "paths", pathId), {
+    courseIds: courseIds.filter((id) => id.trim().length > 0),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function setPathStatus(pathId: string, status: CourseStatus) {
+  await updateDoc(doc(getFirebaseDb(), "paths", pathId), {
+    status,
+    updatedAt: serverTimestamp(),
+    ...(status === "published" ? { publishedAt: serverTimestamp() } : {}),
+  });
+}
+
+export async function deletePath(pathId: string) {
+  await deleteDoc(doc(getFirebaseDb(), "paths", pathId));
+}
+
+// --- Enrollment and progress ---
+
+export function watchEnrollments(
+  uid: string,
+  onChange: (enrollments: Enrollment[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "users", uid, "enrollments"),
+    orderBy("updatedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          enrollmentFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export function watchEnrollment(
+  uid: string,
+  courseId: string,
+  onChange: (enrollment: Enrollment | null) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(getFirebaseDb(), "users", uid, "enrollments", courseId),
+    (snap) => {
+      if (!snap.exists()) {
+        onChange(null);
+        return;
+      }
+      onChange(
+        enrollmentFrom(snap.id, snap.data() as Record<string, unknown>),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export async function enrollInCourse(uid: string, courseId: string) {
+  void uid;
+  await callCloudFunction("enrollInCourse", { courseId });
+}
+
+/**
+ * Persists playback position and marks the lesson complete past the threshold.
+ * Returns the enrollment the caller should render.
+ */
+export async function saveLessonProgress(input: {
+  uid: string;
+  courseId: string;
+  lessonCount: number;
+  enrollment: Enrollment;
+  lessonId: string;
+  positionSeconds: number;
+  completed: boolean;
+}): Promise<Enrollment> {
+  const completedLessonIds = [...input.enrollment.completedLessonIds];
+  if (input.completed && !completedLessonIds.includes(input.lessonId)) {
+    completedLessonIds.push(input.lessonId);
+  }
+  const allDone =
+    input.lessonCount > 0 && completedLessonIds.length >= input.lessonCount;
+  const now = new Date();
+  const next: Enrollment = {
+    ...input.enrollment,
+    completedLessonIds,
+    lastLessonId: input.lessonId,
+    lastPositionSeconds: Math.max(0, Math.round(input.positionSeconds)),
+    updatedAt: now,
+    completedAt: allDone ? (input.enrollment.completedAt ?? now) : null,
+  };
+
+  await callCloudFunction("saveCourseProgress", {
+    courseId: input.courseId,
+    lessonId: input.lessonId,
+    positionSeconds: next.lastPositionSeconds,
+    completed: input.completed,
+  });
+  return next;
+}
+
+/**
+ * Grades a quiz on the server: the answer key never reaches the browser, and
+ * the callable is what marks the lesson complete when the learner passes.
+ */
+export async function submitQuizAttempt(input: {
+  courseId: string;
+  lessonId: string;
+  answers: Record<string, number[]>;
+}): Promise<QuizAttemptResult> {
+  const raw = await callCloudFunction<Partial<QuizAttemptResult>>(
+    "submitQuizAttempt",
+    input,
+  );
+  return {
+    score: Number(raw?.score ?? 0),
+    passed: raw?.passed === true,
+    passPercent: Number(raw?.passPercent ?? QUIZ_DEFAULT_PASS_PERCENT),
+    correctByQuestion:
+      typeof raw?.correctByQuestion === "object" && raw.correctByQuestion
+        ? raw.correctByQuestion
+        : {},
+  };
+}
+
+/** Rough reading time so mixed courses still report a sensible duration. */
+export function estimateReadingSeconds(markdown: string) {
+  const words = markdown.trim().split(/\s+/).filter(Boolean).length;
+  if (words === 0) return 0;
+  // ~200 words per minute, floored at half a minute.
+  return Math.max(30, Math.round((words / 200) * 60));
+}
+
+/** Rough quiz duration so the catalog can show something for quiz-only courses. */
+export function estimateQuizSeconds(questionCount: number) {
+  return questionCount * 45;
+}
+
+// --- Media ---
+
+const storageUrlCache = new Map<string, Promise<string>>();
+
+export async function getStorageUrl(path: string) {
+  const normalized = path.trim();
+  const cached = storageUrlCache.get(normalized);
+  if (cached) return cached;
+  const pending = getDownloadURL(ref(getFirebaseStorage(), normalized)).catch(
+    (error) => {
+      storageUrlCache.delete(normalized);
+      throw error;
+    },
+  );
+  storageUrlCache.set(normalized, pending);
+  return pending;
+}
+
+export async function resolveVideoUrl(lesson: Lesson) {
+  if (lesson.videoUrl?.trim()) return lesson.videoUrl.trim();
+  if (!lesson.videoPath?.trim()) return null;
+  return getStorageUrl(lesson.videoPath);
+}
+
+export async function resolveCoverUrl(course: Course) {
+  if (course.coverUrl?.trim()) return course.coverUrl.trim();
+  if (!course.coverPath?.trim()) return null;
+  return getStorageUrl(course.coverPath);
+}
+
+/** Resumable upload so the Studio can render real progress. */
+function uploadWithProgress(
+  path: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+) {
+  const storageRef = ref(getFirebaseStorage(), path);
+  const task = uploadBytesResumable(storageRef, file, {
+    contentType: file.type,
+  });
+  return new Promise<string>((resolve, reject) => {
+    task.on(
+      "state_changed",
+      (snap) => {
+        if (snap.totalBytes > 0) {
+          onProgress?.(snap.bytesTransferred / snap.totalBytes);
+        }
+      },
+      reject,
+      () => resolve(path),
+    );
+  });
+}
+
+/** Mirrors storage.rules image cap. */
+export const MAX_COVER_BYTES = 5 * 1024 * 1024;
+/** Mirrors storage.rules video cap. */
+export const MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024;
+
+async function deleteStoragePathIfPresent(path: string | null | undefined) {
+  const trimmed = path?.trim();
+  if (!trimmed) return;
+  try {
+    await deleteObject(ref(getFirebaseStorage(), trimmed));
+  } catch {
+    // Missing object or permission — non-fatal for replace flows.
+  }
+}
+
+export async function uploadCourseCover(
+  courseId: string,
+  file: File,
+  onProgress?: (fraction: number) => void,
+) {
+  if (file.size > MAX_COVER_BYTES) {
+    throw new Error(
+      `Cover image must be under ${MAX_COVER_BYTES / (1024 * 1024)}MB`,
+    );
+  }
+  const courseRef = doc(getFirebaseDb(), "courses", courseId);
+  const previous = (await getDoc(courseRef)).data()?.coverPath as
+    | string
+    | null
+    | undefined;
+  const extension = file.name.split(".").pop()?.toLowerCase() ?? "jpg";
+  const path = `courses/${courseId}/cover-${Date.now()}.${extension}`;
+  await uploadWithProgress(path, file, onProgress);
+  await updateDoc(courseRef, {
+    coverPath: path,
+    coverUrl: null,
+    updatedAt: serverTimestamp(),
+  });
+  if (previous && previous !== path) {
+    void deleteStoragePathIfPresent(previous);
+  }
+  return path;
+}
+
+export async function uploadLessonVideo(input: {
+  courseId: string;
+  lessonId: string;
+  file: File;
+  durationSeconds?: number;
+  onProgress?: (fraction: number) => void;
+}) {
+  if (input.file.size > MAX_VIDEO_BYTES) {
+    throw new Error("Video must be under 2GB");
+  }
+  const lessonRef = doc(
+    getFirebaseDb(),
+    "courses",
+    input.courseId,
+    "lessons",
+    input.lessonId,
+  );
+  const previous = (await getDoc(lessonRef)).data()?.videoPath as
+    | string
+    | null
+    | undefined;
+  const extension = input.file.name.split(".").pop()?.toLowerCase() ?? "mp4";
+  const path = `courses/${input.courseId}/lessons/${input.lessonId}-${Date.now()}.${extension}`;
+  await uploadWithProgress(path, input.file, input.onProgress);
+  await updateDoc(lessonRef, {
+    videoPath: path,
+    videoUrl: null,
+    ...(input.durationSeconds
+      ? { durationSeconds: Math.round(input.durationSeconds) }
+      : {}),
+    updatedAt: serverTimestamp(),
+  });
+  if (previous && previous !== path) {
+    void deleteStoragePathIfPresent(previous);
+  }
+  scheduleRecomputeCourseTotals(input.courseId);
+  return path;
+}
+
+/** Reads a local video file's duration without uploading it first. */
+export function readVideoDuration(file: File) {
+  return new Promise<number>((resolve) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      const seconds = Number.isFinite(video.duration) ? video.duration : 0;
+      URL.revokeObjectURL(url);
+      resolve(Math.round(seconds));
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(0);
+    };
+    video.src = url;
+  });
+}
+
+// --- Authoring ---
+
+export function watchAuthoredCourses(
+  uid: string,
+  onChange: (courses: Course[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "courses"),
+    where("createdBy", "==", uid),
+    orderBy("updatedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          courseFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export function watchCoursesByStatus(
+  status: CourseStatus,
+  onChange: (courses: Course[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "courses"),
+    where("status", "==", status),
+    orderBy("updatedAt", "desc"),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          courseFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+/** Single listener for studio admin queues (draft + pending + published). */
+export function watchCoursesInStatuses(
+  statuses: CourseStatus[],
+  onChange: (courses: Course[]) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const q = query(
+    collection(getFirebaseDb(), "courses"),
+    where("status", "in", statuses),
+    orderBy("updatedAt", "desc"),
+    limit(100),
+  );
+  return onSnapshot(
+    q,
+    (snap) => {
+      onChange(
+        snap.docs.map((d) =>
+          courseFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+      );
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export async function createCourse(input: {
+  title: string;
+  description: string;
+  teacherName: string;
+  level: CourseLevel;
+  createdBy: string;
+}) {
+  const db = getFirebaseDb();
+  const courseRef = doc(collection(db, "courses"));
+  await setDoc(courseRef, {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    teacherName: input.teacherName.trim(),
+    level: input.level,
+    // Everything starts as a draft; admins publish from the review queue.
+    status: "draft",
+    coverPath: null,
+    coverUrl: null,
+    lessonCount: 0,
+    durationMinutes: 0,
+    studentCount: 0,
+    activeStudentCount: 0,
+    createdBy: input.createdBy,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+    publishedAt: null,
+  });
+  return courseRef.id;
+}
+
+export async function updateCourseMeta(input: {
+  courseId: string;
+  title: string;
+  description: string;
+  teacherName: string;
+  level: CourseLevel;
+}) {
+  await updateDoc(doc(getFirebaseDb(), "courses", input.courseId), {
+    title: input.title.trim(),
+    description: input.description.trim(),
+    teacherName: input.teacherName.trim(),
+    level: input.level,
+    updatedAt: serverTimestamp(),
+  });
+}
+
+export async function setCourseStatus(
+  courseId: string,
+  status: CourseStatus,
+) {
+  await updateDoc(doc(getFirebaseDb(), "courses", courseId), {
+    status,
+    updatedAt: serverTimestamp(),
+    ...(status === "published" ? { publishedAt: serverTimestamp() } : {}),
+  });
+}
+
+export async function deleteCourse(courseId: string) {
+  const db = getFirebaseDb();
+  const [modules, lessons] = await Promise.all([
+    getDocs(collection(db, "courses", courseId, "modules")),
+    getDocs(collection(db, "courses", courseId, "lessons")),
+  ]);
+  const batch = writeBatch(db);
+  modules.docs.forEach((d) => batch.delete(d.ref));
+  lessons.docs.forEach((d) => {
+    batch.delete(doc(d.ref, "secure", "answerKey"));
+    batch.delete(d.ref);
+  });
+  batch.delete(doc(db, "courses", courseId));
+  await batch.commit();
+
+  // Best effort: the Firestore docs are already gone either way.
+  try {
+    await deleteStorageFolder(`courses/${courseId}`);
+  } catch {
+    // Missing folder or storage rules.
+  }
+}
+
+async function deleteStorageFolder(path: string) {
+  const folder = await listAll(ref(getFirebaseStorage(), path));
+  await Promise.all([
+    ...folder.items.map((item) => deleteObject(item)),
+    ...folder.prefixes.map((prefix) => deleteStorageFolder(prefix.fullPath)),
+  ]);
+}
+
+export async function upsertModule(input: {
+  courseId: string;
+  moduleId?: string;
+  title: string;
+  order: number;
+}) {
+  const db = getFirebaseDb();
+  const moduleRef = input.moduleId
+    ? doc(db, "courses", input.courseId, "modules", input.moduleId)
+    : doc(collection(db, "courses", input.courseId, "modules"));
+  await setDoc(
+    moduleRef,
+    {
+      title: input.title.trim(),
+      order: input.order,
+      updatedAt: serverTimestamp(),
+      ...(input.moduleId ? {} : { createdAt: serverTimestamp() }),
+    },
+    { merge: true },
+  );
+  return moduleRef.id;
+}
+
+/** Deleting a module also removes its lessons, so counters stay honest. */
+export async function deleteModule(courseId: string, moduleId: string) {
+  const db = getFirebaseDb();
+  const lessons = await getDocs(
+    query(
+      collection(db, "courses", courseId, "lessons"),
+      where("moduleId", "==", moduleId),
+    ),
+  );
+  const batch = writeBatch(db);
+  lessons.docs.forEach((d) => {
+    batch.delete(doc(d.ref, "secure", "answerKey"));
+    batch.delete(d.ref);
+  });
+  batch.delete(doc(db, "courses", courseId, "modules", moduleId));
+  await batch.commit();
+  scheduleRecomputeCourseTotals(courseId);
+}
+
+export async function reorderModules(
+  courseId: string,
+  orderedIds: string[],
+) {
+  const db = getFirebaseDb();
+  const batch = writeBatch(db);
+  orderedIds.forEach((id, index) => {
+    batch.update(doc(db, "courses", courseId, "modules", id), {
+      order: index,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await batch.commit();
+}
+
+export async function upsertLesson(input: {
+  courseId: string;
+  lessonId?: string;
+  moduleId: string;
+  title: string;
+  order: number;
+  durationSeconds?: number;
+  type?: LessonType;
+}) {
+  const db = getFirebaseDb();
+  const lessonRef = input.lessonId
+    ? doc(db, "courses", input.courseId, "lessons", input.lessonId)
+    : doc(collection(db, "courses", input.courseId, "lessons"));
+  await setDoc(
+    lessonRef,
+    {
+      moduleId: input.moduleId,
+      title: input.title.trim(),
+      order: input.order,
+      updatedAt: serverTimestamp(),
+      ...(input.type ? { type: input.type } : {}),
+      ...(input.durationSeconds === undefined
+        ? {}
+        : { durationSeconds: Math.round(input.durationSeconds) }),
+      ...(input.lessonId
+        ? {}
+        : {
+            type: input.type ?? "video",
+            durationSeconds: Math.round(input.durationSeconds ?? 0),
+            videoPath: null,
+            videoUrl: null,
+            bodyMarkdown: null,
+            questions: [],
+            passPercent: QUIZ_DEFAULT_PASS_PERCENT,
+            createdAt: serverTimestamp(),
+          }),
+    },
+    { merge: true },
+  );
+  // Title-only edits do not change totals; create / duration updates do.
+  if (!input.lessonId || input.durationSeconds !== undefined) {
+    scheduleRecomputeCourseTotals(input.courseId);
+  }
+  return lessonRef.id;
+}
+
+/** Saves the Markdown body and its reading-time estimate. */
+export async function saveLessonReading(input: {
+  courseId: string;
+  lessonId: string;
+  bodyMarkdown: string;
+  durationSeconds: number;
+}) {
+  await updateDoc(
+    doc(getFirebaseDb(), "courses", input.courseId, "lessons", input.lessonId),
+    {
+      type: "reading",
+      bodyMarkdown: input.bodyMarkdown,
+      durationSeconds: Math.max(0, Math.round(input.durationSeconds)),
+      videoPath: null,
+      videoUrl: null,
+      updatedAt: serverTimestamp(),
+    },
+  );
+  scheduleRecomputeCourseTotals(input.courseId);
+}
+
+/**
+ * Writes the public questions and the private answer key in one batch so a
+ * quiz is never readable without its grading data on the server.
+ */
+export async function saveLessonQuiz(input: {
+  courseId: string;
+  lessonId: string;
+  questions: QuizQuestion[];
+  answerKey: QuizAnswerKey;
+  passPercent: number;
+  durationSeconds: number;
+}) {
+  const db = getFirebaseDb();
+  const lessonRef = doc(
+    db,
+    "courses",
+    input.courseId,
+    "lessons",
+    input.lessonId,
+  );
+  const batch = writeBatch(db);
+  batch.update(lessonRef, {
+    type: "quiz",
+    questions: input.questions.map((question) => ({
+      id: question.id,
+      prompt: question.prompt.trim(),
+      selectionMode: question.selectionMode,
+      options: question.options.map((option) => option.trim()),
+    })),
+    passPercent: Math.min(100, Math.max(0, Math.round(input.passPercent))),
+    durationSeconds: Math.max(0, Math.round(input.durationSeconds)),
+    videoPath: null,
+    videoUrl: null,
+    updatedAt: serverTimestamp(),
+  });
+  batch.set(doc(lessonRef, "secure", "answerKey"), {
+    answers: input.answerKey,
+    updatedAt: serverTimestamp(),
+  });
+  await batch.commit();
+  scheduleRecomputeCourseTotals(input.courseId);
+}
+
+/** Answer key for the Studio editor; learners are denied by security rules. */
+export async function getLessonAnswerKey(
+  courseId: string,
+  lessonId: string,
+): Promise<QuizAnswerKey> {
+  const snap = await getDoc(
+    doc(
+      getFirebaseDb(),
+      "courses",
+      courseId,
+      "lessons",
+      lessonId,
+      "secure",
+      "answerKey",
+    ),
+  );
+  if (!snap.exists()) return {};
+  const raw = (snap.data() as Record<string, unknown>).answers;
+  if (typeof raw !== "object" || raw === null) return {};
+  const out: QuizAnswerKey = {};
+  for (const [questionId, indexes] of Object.entries(raw)) {
+    if (!Array.isArray(indexes)) continue;
+    out[questionId] = indexes
+      .map(Number)
+      .filter((n) => Number.isInteger(n) && n >= 0);
+  }
+  return out;
+}
+
+export async function deleteLesson(courseId: string, lessonId: string) {
+  const db = getFirebaseDb();
+  // The answer key is a subdocument, so it needs an explicit delete.
+  await deleteDoc(
+    doc(db, "courses", courseId, "lessons", lessonId, "secure", "answerKey"),
+  ).catch(() => undefined);
+  await deleteDoc(doc(db, "courses", courseId, "lessons", lessonId));
+  scheduleRecomputeCourseTotals(courseId);
+}
+
+export async function reorderLessons(
+  courseId: string,
+  orderedIds: string[],
+) {
+  const db = getFirebaseDb();
+  const batch = writeBatch(db);
+  orderedIds.forEach((id, index) => {
+    batch.update(doc(db, "courses", courseId, "lessons", id), {
+      order: index,
+      updatedAt: serverTimestamp(),
+    });
+  });
+  await batch.commit();
+}
+
+/** Debounce totals recompute across bursty editor mutations. */
+const pendingTotals = new Map<string, ReturnType<typeof setTimeout>>();
+
+export function scheduleRecomputeCourseTotals(
+  courseId: string,
+  delayMs = 800,
+) {
+  const existing = pendingTotals.get(courseId);
+  if (existing) clearTimeout(existing);
+  pendingTotals.set(
+    courseId,
+    setTimeout(() => {
+      pendingTotals.delete(courseId);
+      void recomputeCourseTotals(courseId).catch(() => undefined);
+    }, delayMs),
+  );
+}
+
+/** Keeps `lessonCount` / `durationMinutes` in sync with the lesson docs. */
+export async function recomputeCourseTotals(courseId: string) {
+  const db = getFirebaseDb();
+  const lessons = await getDocs(collection(db, "courses", courseId, "lessons"));
+  const totalSeconds = lessons.docs.reduce(
+    (sum, d) => sum + Number(d.data().durationSeconds ?? 0),
+    0,
+  );
+  await updateDoc(doc(db, "courses", courseId), {
+    lessonCount: lessons.size,
+    durationMinutes: Math.round(totalSeconds / 60),
+    updatedAt: serverTimestamp(),
+  });
+}
+
+/** Studio metrics: paged enrollments via callable (no client collectionGroup). */
+export async function fetchCourseStudents(
+  courseId: string,
+  opts?: { limit?: number; cursor?: string | null },
+): Promise<{ students: CourseStudent[]; nextCursor: string | null }> {
+  const limit = Math.min(100, Math.max(1, opts?.limit ?? 50));
+  const data = await callCloudFunction<{
+    students?: Array<{
+      uid: string;
+      enrollment: {
+        courseId: string;
+        completedLessonIds: string[];
+        lastLessonId: string | null;
+        lastPositionSeconds: number;
+        enrolledAtMs: number | null;
+        updatedAtMs: number | null;
+        completedAtMs: number | null;
+      };
+    }>;
+    nextCursor?: string | null;
+  }>("listCourseStudents", {
+    courseId,
+    limit,
+    cursor: opts?.cursor ?? undefined,
+  });
+
+  const students = (data?.students ?? []).map((row) => ({
+    uid: row.uid,
+    enrollment: {
+      courseId: row.enrollment.courseId,
+      completedLessonIds: row.enrollment.completedLessonIds,
+      lastLessonId: row.enrollment.lastLessonId,
+      lastPositionSeconds: row.enrollment.lastPositionSeconds,
+      quizAttempts: {},
+      enrolledAt: row.enrollment.enrolledAtMs
+        ? new Date(row.enrollment.enrolledAtMs)
+        : null,
+      updatedAt: row.enrollment.updatedAtMs
+        ? new Date(row.enrollment.updatedAtMs)
+        : null,
+      completedAt: row.enrollment.completedAtMs
+        ? new Date(row.enrollment.completedAtMs)
+        : null,
+    },
+  }));
+
+  return {
+    students,
+    nextCursor: data?.nextCursor ?? null,
+  };
+}

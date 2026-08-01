@@ -1,0 +1,26 @@
+{
+  "name": "@pulse/functions",
+  "description": "Trusted callables for votes, roles, org, academy, and notifications",
+  "engines": {
+    "node": "22"
+  },
+  "main": "lib/index.js",
+  "scripts": {
+    "sync:shared": "node ./scripts/sync-pulse-shared.mjs",
+    "build": "pnpm run sync:shared && tsc",
+    "build:watch": "tsc --watch",
+    "serve": "pnpm run build && firebase emulators:start --only functions",
+    "deploy": "firebase deploy --only functions"
+  },
+  "dependencies": {
+    "@google-cloud/functions-framework": "^5.0.5",
+    "@pulse/insights-metrics": "file:./vendor/insights-metrics",
+    "@pulse/shared": "file:./vendor/pulse-shared",
+    "firebase-admin": "^14.2.0",
+    "firebase-functions": "^7.3.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0"
+  },
+  "private": true
+}
