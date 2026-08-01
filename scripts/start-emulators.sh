@@ -6,19 +6,19 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
-# Prefer Node 22 (Cloud Functions Gen2 runtime). Install from functions/.nvmrc.
+# Prefer Node 22 (Cloud Functions Gen2 runtime). Install from apps/functions/.nvmrc.
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
   (
-    cd functions
+    cd apps/functions
     nvm install >/dev/null
     nvm use >/dev/null
   )
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
-  nvm use "$(cat functions/.nvmrc)" >/dev/null
+  nvm use "$(cat apps/functions/.nvmrc)" >/dev/null
 fi
 
 echo "Node $(node -v) (Functions runtime expects 22.x)"
@@ -39,7 +39,19 @@ export FUNCTIONS_EMULATOR=true
 export GCLOUD_PROJECT="${GCLOUD_PROJECT:-every-insurance}"
 export GOOGLE_CLOUD_PROJECT="$GCLOUD_PROJECT"
 
-npm --prefix functions run build
+pnpm --prefix apps/functions run build
+
+# Without local secret stubs, Gen2 discovery calls Secret Manager. A 403 there
+# causes "Failed to load function definition" and the emulator serves ZERO
+# callables (listPublicProfiles, Insights, etc. all look "unavailable").
+SECRET_LOCAL="$ROOT/apps/functions/.secret.local"
+if [[ ! -f "$SECRET_LOCAL" ]]; then
+  cat >"$SECRET_LOCAL" <<'EOF'
+RESEND_API_KEY=local-dev-not-a-real-key
+EMAIL_FROM=Pulse Local <noreply@everybenefits.demo>
+EOF
+  echo "Created apps/functions/.secret.local (email stubs for the emulator)"
+fi
 
 LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
 if [[ -n "${LAN_IP}" ]]; then

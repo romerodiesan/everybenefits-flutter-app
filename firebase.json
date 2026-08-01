@@ -23,7 +23,7 @@
   "apphosting": [
     {
       "backendId": "pulse-web-app",
-      "rootDir": "webapp",
+      "rootDir": "apps/web",
       "ignore": [
         "node_modules",
         ".git",
@@ -36,7 +36,7 @@
     },
     {
       "backendId": "studio-web-app",
-      "rootDir": "studio",
+      "rootDir": "apps/studio",
       "ignore": [
         "node_modules",
         ".git",
@@ -45,11 +45,24 @@
         "**/.*",
         "**/*.local"
       ]
+    },
+    {
+      "backendId": "admin-web-app",
+      "rootDir": "apps/admin",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "**/.*",
+        "**/*.local"
+      ],
+      "alwaysDeployFromSource": true
     }
   ],
   "functions": [
     {
-      "source": "functions",
+      "source": "apps/functions",
       "codebase": "default",
       "runtime": "nodejs22",
       "ignore": [
@@ -60,8 +73,7 @@
         "*.local"
       ],
       "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run sync:shared",
-        "npm --prefix \"$RESOURCE_DIR\" run build"
+        "pnpm --prefix \"$RESOURCE_DIR\" run build"
       ]
     }
   ],
