@@ -1,15 +1,16 @@
 {
   "name": "every-benefits-functions",
-  "description": "Trusted callables for votes and role changes",
+  "description": "Trusted callables for votes, roles, academy, org, and SSO",
   "engines": {
     "node": "22"
   },
   "main": "lib/index.js",
   "scripts": {
     "sync:shared": "node ./scripts/sync-pulse-shared.mjs",
-    "build": "tsc",
+    "build": "pnpm run sync:shared && tsc",
     "build:watch": "tsc --watch",
-    "serve": "npm run build && firebase emulators:start --only functions",
+    "test": "vitest run --config vitest.config.mts",
+    "serve": "pnpm run build && firebase emulators:start --only functions",
     "deploy": "firebase deploy --only functions"
   },
   "dependencies": {
@@ -18,7 +19,8 @@
     "firebase-functions": "^7.3.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.10"
   },
   "private": true
 }

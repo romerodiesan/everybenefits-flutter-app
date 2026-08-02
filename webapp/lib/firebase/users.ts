@@ -13,60 +13,25 @@ import {
   uploadBytes,
 } from "firebase/storage";
 import { updateProfile, type User } from "firebase/auth";
+import { mapUserProfile, toDate } from "@pulse/firebase-web";
 import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
 import { listPublicProfiles, searchDirectory as searchDirectoryFn } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
-import { composeUsAddress, headlineName, parseRole, parseApprovalStatus } from "../roles";
-
-function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === "string") {
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  if (typeof value === "object" && value !== null && "toDate" in value) {
-    const fn = (value as { toDate: () => Date }).toDate;
-    if (typeof fn === "function") return fn.call(value);
-  }
-  return null;
-}
+import { composeUsAddress, headlineName, parseApprovalStatus } from "../roles";
 
 export function profileFromData(
   uid: string,
   data: Record<string, unknown>,
 ): UserProfile {
+  const mapped = mapUserProfile(uid, data);
   return {
-    uid: (data.uid as string) ?? uid,
-    email: (data.email as string) ?? null,
-    displayName: (data.displayName as string) ?? null,
-    photoUrl: (data.photoUrl as string) ?? null,
-    role: parseRole(data.role),
-    isAnonymous: Boolean(data.isAnonymous),
-    profileCompleted: (data.profileCompleted as boolean) ?? true,
+    ...mapped,
     productTourVersion:
       typeof data.productTourVersion === "number"
         ? data.productTourVersion
         : Number(data.productTourVersion) || 0,
-    phoneCountryCode: (data.phoneCountryCode as string) ?? null,
-    phoneNumber: (data.phoneNumber as string) ?? null,
     phoneVerified: Boolean(data.phoneVerified),
-    npn: (data.npn as string) ?? null,
-    address: (data.address as string) ?? null,
-    addressStreet: (data.addressStreet as string) ?? null,
-    addressApt: (data.addressApt as string) ?? null,
-    addressCity: (data.addressCity as string) ?? null,
-    addressState: (data.addressState as string) ?? null,
-    addressZip: (data.addressZip as string) ?? null,
-    agency: (data.agency as string) ?? null,
-    createdAt: toDate(data.createdAt),
-    updatedAt: toDate(data.updatedAt),
-    accountStatus:
-      data.accountStatus === "deactivated" ||
-      data.accountStatus === "pendingDeletion"
-        ? data.accountStatus
-        : "active",
     deletionScheduledAt: toDate(data.deletionScheduledAt),
     approvalStatus: parseApprovalStatus(data.approvalStatus) ?? undefined,
     appearance: appearanceFrom(data.appearance),

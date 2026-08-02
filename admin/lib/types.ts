@@ -22,7 +22,8 @@ export {
 
 export const DEFAULT_AGENCY = "Every Benefits";
 
-export type AccountStatus = "active" | "deactivated" | "pendingDeletion";
+export type AccountStatus = import("@pulse/shared").AccountStatus;
+export type AdminOrgNode = import("@pulse/shared").OrgNode;
 
 export type UserProfile = {
   uid: string;
@@ -52,17 +53,6 @@ export type UserProfile = {
     theme: "system" | "light" | "dark";
     accent: string;
   } | null;
-};
-
-export type AdminOrgNode = {
-  id: string;
-  name: string;
-  type: OrgNodeType;
-  depth: OrgDepth;
-  parentId: string | null;
-  path: string[];
-  managerUids: string[];
-  active: boolean;
 };
 
 export type AdminInsights = {

@@ -1,4 +1,6 @@
 export type UserRole = import("@pulse/shared").UserRole;
+export type AccountStatus = import("@pulse/shared").AccountStatus;
+export type ApprovalStatus = import("@pulse/shared").ApprovalStatus;
 
 export const DEFAULT_AGENCY = "Every Benefits";
 
@@ -24,6 +26,8 @@ export type UserProfile = {
   addressState: string | null;
   addressZip: string | null;
   agency: string | null;
+  /** Org hierarchy node; managed by Admin / Functions. */
+  orgNodeId?: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
   /** Account lifecycle; absent/"active" means normal. Server-managed. */
@@ -39,9 +43,6 @@ export type UserProfile = {
     accent: string;
   } | null;
 };
-
-export type AccountStatus = "active" | "deactivated" | "pendingDeletion";
-export type ApprovalStatus = "pending" | "approved" | "rejected";
 
 export type ForumThread = {
   id: string;

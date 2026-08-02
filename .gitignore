@@ -134,6 +134,15 @@ webapp/.env*.local
 # Studio Next.js app
 studio/node_modules/
 studio/.next/
+studio/.env*.local
+
+# Admin Next.js app
+admin/node_modules/
+admin/.next/
+admin/.env*.local
 
 # Shared packages
 packages/*/node_modules/
+node_modules
+.turbo
+.pnpm-store/

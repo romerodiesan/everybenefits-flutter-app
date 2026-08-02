@@ -1,0 +1,564 @@
+import * as admin from "firebase-admin";
+import { onCall } from "firebase-functions/v2/https";
+import { onDocumentWritten } from "firebase-functions/v2/firestore";
+import { onValueWritten } from "firebase-functions/v2/database";
+import { HttpsError } from "firebase-functions/v2/https";
+import {
+  GROUP_CREATOR_ROLES,
+  GROUP_SEED_ROLES,
+  belongsInDefaultAgentGroup,
+  canConfigureGroupAutoJoin,
+  parseRole,
+  type UserRole,
+} from "@pulse/shared";
+import { db, rtdb, callableOpts } from "./init";
+import {
+  DEFAULT_AGENT_GROUP_ID,
+  MAX_GROUP_MEMBERS,
+  MAX_ROLE_SEED_MEMBERS,
+  MAX_SUPPORT_MESSAGE_CHARS,
+  SUPPORT_AI_UID,
+} from "./constants";
+import {
+  headlineName,
+  isUserApprovedForJoin,
+  requireCaller,
+} from "./auth";
+import { notifyUser } from "./notifications";
+
+export function chatInboxRow(
+  chatId: string,
+  chat: Record<string, unknown>,
+  uid: string,
+) {
+  const members = Object.keys((chat.members ?? {}) as Record<string, unknown>)
+    .filter((memberId) => memberId !== SUPPORT_AI_UID);
+  const unreadCounts =
+    (chat.unreadCounts ?? {}) as Record<string, unknown>;
+  const pinnedBy = (chat.pinnedBy ?? {}) as Record<string, unknown>;
+  const autoJoinRoles =
+    (chat.autoJoinRoles ?? {}) as Record<string, unknown>;
+  return {
+    chatId,
+    memberIds: members,
+    memberNames: (chat.memberNames ?? {}) as Record<string, unknown>,
+    isGroup: chat.isGroup === true,
+    title: chat.title ?? null,
+    dmKey: chat.dmKey ?? null,
+    lastMessage: String(chat.lastMessage ?? "").slice(0, 4000),
+    lastMessageAt: Number(chat.lastMessageAt ?? 0),
+    lastMessageSenderId: chat.lastMessageSenderId ?? null,
+    unreadCount: Number(unreadCounts[uid] ?? 0),
+    pinned: pinnedBy[uid] === true,
+    createdAt: Number(chat.createdAt ?? 0),
+    createdBy: String(chat.createdBy ?? ""),
+    isDefaultAgentGroup: chat.isDefaultAgentGroup === true,
+    isSupportChat: chat.isSupportChat === true,
+    autoJoinRoles,
+  };
+}
+
+export async function addMemberToChat(
+  chatId: string,
+  uid: string,
+  displayName: string,
+) {
+  const chatRef = rtdb.ref(`chats/${chatId}`);
+  let joinedChat: Record<string, unknown> | null = null;
+  await chatRef.transaction((current) => {
+    if (current === null || typeof current !== "object") {
+      return; // abort — chat gone
+    }
+    const members =
+      current.members && typeof current.members === "object"
+        ? { ...current.members }
+        : {};
+    if (members[uid] === true) {
+      joinedChat = current as Record<string, unknown>;
+      return; // abort — already a member
+    }
+    members[uid] = true;
+    const memberNames =
+      current.memberNames && typeof current.memberNames === "object"
+        ? { ...current.memberNames, [uid]: displayName }
+        : { [uid]: displayName };
+    const unreadCounts =
+      current.unreadCounts && typeof current.unreadCounts === "object"
+        ? { ...current.unreadCounts, [uid]: 0 }
+        : { [uid]: 0 };
+    joinedChat = {
+      ...current,
+      members,
+      memberCount: Object.keys(members).length,
+      memberNames,
+      unreadCounts,
+    };
+    return joinedChat;
+  });
+  if (!joinedChat) {
+    const snap = await chatRef.get();
+    joinedChat = (snap.val() as Record<string, unknown> | null) ?? null;
+  }
+  if (joinedChat?.members &&
+      (joinedChat.members as Record<string, unknown>)[uid] === true) {
+    await rtdb
+      .ref(`userChats/${uid}/${chatId}`)
+      .set(chatInboxRow(chatId, joinedChat, uid));
+  }
+}
+
+export async function ensureAutoJoinMemberships(
+  uid: string,
+  role: UserRole,
+  approvalStatus: string,
+  displayName: string,
+  isAnonymous: boolean,
+) {
+  if (isAnonymous || role === "guest") return;
+  if (approvalStatus !== "approved") return;
+  const indexSnap = await rtdb.ref(`autoJoinGroups/${role}`).get();
+  const chatIds = Object.keys(
+    (indexSnap.val() ?? {}) as Record<string, unknown>,
+  ).filter((chatId) => chatId && chatId !== DEFAULT_AGENT_GROUP_ID);
+  await Promise.all(
+    chatIds.map((chatId) => addMemberToChat(chatId, uid, displayName)),
+  );
+}
+
+export async function collectUsersByRoles(
+  roles: UserRole[],
+  cap: number,
+): Promise<Map<string, admin.firestore.DocumentData>> {
+  const byUid = new Map<string, admin.firestore.DocumentData>();
+  if (!roles.length) return byUid;
+  // Query per role (avoids composite index); filter approval in memory.
+  await Promise.all(
+    roles.map(async (role) => {
+      const snap = await db
+        .collection("users")
+        .where("role", "==", role)
+        .limit(cap)
+        .get();
+      for (const doc of snap.docs) {
+        if (byUid.size >= cap) break;
+        const data = doc.data();
+        if (!isUserApprovedForJoin(data)) continue;
+        if (parseRole(data.role) === "guest") continue;
+        byUid.set(doc.id, data);
+      }
+    }),
+  );
+  return byUid;
+}
+
+export async function addAgentToDefaultGroup(uid: string, displayName: string) {
+  const chatRef = rtdb.ref(`chats/${DEFAULT_AGENT_GROUP_ID}`);
+  const now = Date.now();
+
+  await chatRef.transaction((current) => {
+    if (current === null) {
+      return {
+        members: { [uid]: true },
+        memberCount: 1,
+        memberNames: { [uid]: displayName },
+        isGroup: true,
+        isDefaultAgentGroup: true,
+        title: "Team",
+        dmKey: null,
+        lastMessage: "",
+        lastMessageAt: now,
+        lastMessageSenderId: null,
+        unreadCounts: { [uid]: 0 },
+        pinnedBy: {},
+        createdAt: now,
+        createdBy: "system",
+      };
+    }
+
+    const members =
+      current.members && typeof current.members === "object"
+        ? { ...current.members }
+        : {};
+    if (members[uid] === true) {
+      return; // abort — already a member
+    }
+    members[uid] = true;
+    const memberNames =
+      current.memberNames && typeof current.memberNames === "object"
+        ? { ...current.memberNames, [uid]: displayName }
+        : { [uid]: displayName };
+    const unreadCounts =
+      current.unreadCounts && typeof current.unreadCounts === "object"
+        ? { ...current.unreadCounts, [uid]: 0 }
+        : { [uid]: 0 };
+
+    return {
+      ...current,
+      members,
+      memberCount: Object.keys(members).length,
+      memberNames,
+      unreadCounts,
+      isGroup: true,
+      isDefaultAgentGroup: true,
+      // Keep existing custom title; migrate legacy "Agents" label.
+      title:
+        current.title === "Agents" || current.title == null
+          ? "Team"
+          : current.title,
+      createdBy: current.createdBy ?? "system",
+    };
+  });
+
+  await rtdb.ref(`userChats/${uid}/${DEFAULT_AGENT_GROUP_ID}`).set({
+    lastMessageAt: now,
+  });
+}
+
+/** Join auto-join groups when role or approvalStatus changes. */
+export const syncUserAutoJoinGroups = onDocumentWritten(
+  "users/{uid}",
+  async (event) => {
+    const uid = event.params.uid;
+    const before = event.data?.before;
+    const after = event.data?.after;
+    if (!after?.exists) return;
+    const beforeData = before?.exists ? before.data() : undefined;
+    const afterData = after.data() ?? {};
+    const beforeRole = beforeData ? parseRole(beforeData.role) : null;
+    const afterRole = parseRole(afterData.role);
+    const beforeApproval = String(beforeData?.approvalStatus ?? "approved");
+    const afterApproval = String(afterData.approvalStatus ?? "approved");
+    if (
+      before?.exists &&
+      beforeRole === afterRole &&
+      beforeApproval === afterApproval
+    ) {
+      return;
+    }
+    await ensureAutoJoinMemberships(
+      uid,
+      afterRole,
+      afterApproval,
+      headlineName(afterData),
+      afterData.isAnonymous === true,
+    );
+  },
+);
+
+export const syncChatInbox = onValueWritten(
+  { ref: "/chats/{chatId}", region: "us-central1" },
+  async (event) => {
+    const chatId = event.params.chatId;
+    const before = (event.data.before.val() ?? {}) as Record<string, unknown>;
+    const after = (event.data.after.val() ?? {}) as Record<string, unknown>;
+    const beforeMembers = Object.keys(
+      (before.members ?? {}) as Record<string, unknown>,
+    );
+    const members = Object.keys((after.members ?? {}) as Record<string, unknown>)
+      .filter((uid) => uid !== SUPPORT_AI_UID);
+    const removed = beforeMembers.filter(
+      (uid) => uid !== SUPPORT_AI_UID && !members.includes(uid),
+    );
+    const updates: Record<string, unknown> = {};
+
+    for (const uid of removed) updates[`userChats/${uid}/${chatId}`] = null;
+    if (event.data.after.exists()) {
+      for (const uid of members) {
+        updates[`userChats/${uid}/${chatId}`] = chatInboxRow(chatId, after, uid);
+      }
+    }
+    if (Object.keys(updates).length) await rtdb.ref().update(updates);
+
+    // Push + inbox when a new message bumps unread for recipients.
+    const beforeAt = Number(before.lastMessageAt ?? 0);
+    const afterAt = Number(after.lastMessageAt ?? 0);
+    const senderId = String(after.lastMessageSenderId ?? "");
+    if (!event.data.after.exists() || afterAt <= beforeAt || !senderId) {
+      return;
+    }
+    const preview = String(after.lastMessage ?? "").slice(0, 120);
+    const isSupport = after.isSupportChat === true;
+    const beforeUnread =
+      (before.unreadCounts ?? {}) as Record<string, unknown>;
+    const afterUnread =
+      (after.unreadCounts ?? {}) as Record<string, unknown>;
+    const memberNames =
+      (after.memberNames ?? {}) as Record<string, unknown>;
+    const senderName = String(memberNames[senderId] ?? "").trim() || "Someone";
+
+    await Promise.all(
+      members.map(async (uid) => {
+        if (uid === senderId) return;
+        const prev = Number(beforeUnread[uid] ?? 0);
+        const next = Number(afterUnread[uid] ?? 0);
+        if (next <= prev) return;
+        await notifyUser(
+          uid,
+          {
+            type: isSupport ? "support_message" : "chat_message",
+            title: isSupport ? "Support" : "New message",
+            body: preview || "You have a new message",
+            href: `/chats/${chatId}`,
+            deepLink: `pulse://chats/${chatId}`,
+            ref: { chatId },
+            actorId: senderId,
+            actorName: senderName,
+          },
+          { chatIdForDebounce: chatId },
+        );
+      }),
+    );
+  },
+);
+
+export const rebuildChatInbox = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "rebuildChatInbox");
+  const index = await rtdb.ref(`userChats/${uid}`).get();
+  const chatIds = Object.keys((index.val() ?? {}) as Record<string, unknown>);
+  const updates: Record<string, unknown> = {};
+  await Promise.all(
+    chatIds.slice(0, 100).map(async (chatId) => {
+      const chat = await rtdb.ref(`chats/${chatId}`).get();
+      const value = chat.val() as Record<string, unknown> | null;
+      if (value?.members &&
+          (value.members as Record<string, unknown>)[uid] === true) {
+        updates[`userChats/${uid}/${chatId}`] = chatInboxRow(chatId, value, uid);
+      }
+    }),
+  );
+  if (Object.keys(updates).length) await rtdb.ref().update(updates);
+  return { ok: true };
+});
+
+export const createGroupChat = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "createGroupChat");
+  const title = String(request.data?.title ?? "").trim();
+  const requested = Array.isArray(request.data?.memberIds)
+    ? request.data.memberIds.map(String)
+    : [];
+  const rawSeedRoles = Array.isArray(request.data?.seedRoles)
+    ? request.data.seedRoles.map(String)
+    : [];
+  const wantAutoJoin = request.data?.autoJoin === true;
+
+  const seedRoles = [
+    ...new Set(
+      rawSeedRoles
+        .map((role: string) => parseRole(role))
+        .filter((role: UserRole) =>
+          (GROUP_SEED_ROLES as readonly string[]).includes(role),
+        ),
+    ),
+  ] as UserRole[];
+
+  if (!title || title.length > 120) {
+    throw new HttpsError("invalid-argument", "Valid group title required.");
+  }
+
+  const creator = await db.doc(`users/${uid}`).get();
+  const creatorRole = parseRole(creator.data()?.role);
+  if (!(GROUP_CREATOR_ROLES as readonly string[]).includes(creatorRole)) {
+    throw new HttpsError("permission-denied", "Not allowed to create groups.");
+  }
+
+  const persistAutoJoin =
+    wantAutoJoin &&
+    seedRoles.length > 0 &&
+    canConfigureGroupAutoJoin(creatorRole);
+  if (wantAutoJoin && seedRoles.length > 0 && !persistAutoJoin) {
+    throw new HttpsError(
+      "permission-denied",
+      "Only admins and managers can enable auto-join.",
+    );
+  }
+
+  const explicitIds = [...new Set([uid, ...requested])]
+    .filter((id) => id && id !== SUPPORT_AI_UID);
+
+  const roleUsers = await collectUsersByRoles(seedRoles, MAX_ROLE_SEED_MEMBERS);
+  const truncated =
+    seedRoles.length > 0 && roleUsers.size >= MAX_ROLE_SEED_MEMBERS;
+
+  const memberIdSet = new Set<string>(explicitIds);
+  for (const memberId of roleUsers.keys()) {
+    if (memberIdSet.size >= MAX_ROLE_SEED_MEMBERS) {
+      break;
+    }
+    memberIdSet.add(memberId);
+  }
+  const memberIds = [...memberIdSet];
+
+  const maxAllowed =
+    seedRoles.length > 0 ? MAX_ROLE_SEED_MEMBERS : MAX_GROUP_MEMBERS;
+  if (memberIds.length < 2) {
+    throw new HttpsError(
+      "invalid-argument",
+      "Group must include the creator and at least one other member or matching role.",
+    );
+  }
+  if (memberIds.length > maxAllowed) {
+    throw new HttpsError(
+      "invalid-argument",
+      `Group cannot exceed ${maxAllowed} members.`,
+    );
+  }
+
+  // Fetch any explicit members not already loaded via role query.
+  const missing = memberIds.filter((id) => !roleUsers.has(id));
+  const fetched =
+    missing.length > 0
+      ? await db.getAll(...missing.map((id) => db.doc(`users/${id}`)))
+      : [];
+  if (fetched.some((profile) => !profile.exists)) {
+    throw new HttpsError("failed-precondition", "Unknown group member.");
+  }
+  for (const profile of fetched) {
+    roleUsers.set(profile.id, profile.data() ?? {});
+  }
+
+  const memberNames = Object.fromEntries(
+    memberIds.map((id) => [id, headlineName(roleUsers.get(id))]),
+  );
+  const autoJoinRolesMap = persistAutoJoin
+    ? Object.fromEntries(seedRoles.map((role) => [role, true]))
+    : {};
+
+  const now = Date.now();
+  const chatRef = rtdb.ref("chats").push();
+  const chatId = chatRef.key!;
+  const chat = {
+    members: Object.fromEntries(memberIds.map((id) => [id, true])),
+    memberCount: memberIds.length,
+    memberNames,
+    isGroup: true,
+    title,
+    dmKey: null,
+    lastMessage: "",
+    lastMessageAt: now,
+    lastMessageSenderId: null,
+    unreadCounts: Object.fromEntries(memberIds.map((id) => [id, 0])),
+    pinnedBy: {},
+    createdAt: now,
+    createdBy: uid,
+    isDefaultAgentGroup: false,
+    isSupportChat: false,
+    autoJoinRoles: autoJoinRolesMap,
+  };
+
+  const updates: Record<string, unknown> = {
+    [`chats/${chatId}`]: chat,
+  };
+  for (const memberId of memberIds) {
+    updates[`userChats/${memberId}/${chatId}`] = chatInboxRow(
+      chatId,
+      chat,
+      memberId,
+    );
+  }
+  if (persistAutoJoin) {
+    for (const role of seedRoles) {
+      updates[`autoJoinGroups/${role}/${chatId}`] = true;
+    }
+  }
+  await rtdb.ref().update(updates);
+  return {
+    chatId,
+    createdAt: now,
+    memberCount: memberIds.length,
+    truncated,
+    autoJoinRoles: persistAutoJoin ? seedRoles : [],
+  };
+});
+
+/**
+ * Ensures the caller (staff) is a member of the default community RTDB chat.
+ */
+export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
+  const callerUid = await requireCaller(request, "ensureDefaultAgentGroup");
+  const targetUid = String(request.data?.uid ?? callerUid);
+
+  const caller = await db.doc(`users/${callerUid}`).get();
+  const callerRole = String(caller.data()?.role ?? "");
+  if (targetUid !== callerUid && callerRole !== "admin") {
+    throw new HttpsError("permission-denied", "Admins only for other users.");
+  }
+
+  const target = await db.doc(`users/${targetUid}`).get();
+  if (!target.exists) {
+    throw new HttpsError("not-found", "User not found.");
+  }
+  const targetRole = String(target.data()?.role ?? "");
+  if (!belongsInDefaultAgentGroup(parseRole(targetRole))) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Agents, instructors, managers, and admins only.",
+    );
+  }
+
+  await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
+  return { ok: true, uid: targetUid, chatId: DEFAULT_AGENT_GROUP_ID };
+});
+
+/**
+ * Writes an automated reply from the support bot.
+ *
+ * RTDB rules deny clients any write whose `senderId` is not their own uid, so
+ * this callable is the only path that can post as `support-ai`. A caller may
+ * only trigger it inside their own support thread.
+ */
+export const postSupportAiMessage = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "postSupportAiMessage");
+  const chatId = String(request.data?.chatId ?? "");
+  const body = String(request.data?.body ?? "").trim();
+  const senderName = "Pulse Support";
+
+  if (chatId !== `support_${uid}`) {
+    throw new HttpsError("permission-denied", "Not your support chat.");
+  }
+  if (!body) {
+    throw new HttpsError("invalid-argument", "Message body is required.");
+  }
+  if (body.length > MAX_SUPPORT_MESSAGE_CHARS) {
+    throw new HttpsError("invalid-argument", "Message is too long.");
+  }
+
+  const chatRef = rtdb.ref(`chats/${chatId}`);
+  const chatSnap = await chatRef.get();
+  const chat = chatSnap.val();
+  if (!chat || chat.isSupportChat !== true) {
+    throw new HttpsError("not-found", "Support chat not found.");
+  }
+  if (chat.members?.[uid] !== true) {
+    throw new HttpsError("permission-denied", "Not a member of this chat.");
+  }
+
+  const now = Date.now();
+  const messageRef = rtdb.ref(`messages/${chatId}`).push();
+  await messageRef.set({
+    body,
+    senderId: SUPPORT_AI_UID,
+    senderName: senderName || "Support",
+    createdAt: now,
+    sharedPost: null,
+    isAi: true,
+  });
+
+  const unreadCounts: Record<string, number> = {
+    ...(chat.unreadCounts ?? {}),
+  };
+  for (const memberId of Object.keys(chat.members ?? {})) {
+    unreadCounts[memberId] =
+      memberId === SUPPORT_AI_UID ? 0 : (unreadCounts[memberId] ?? 0) + 1;
+  }
+
+  await rtdb.ref().update({
+    [`chats/${chatId}/lastMessage`]: body,
+    [`chats/${chatId}/lastMessageAt`]: now,
+    [`chats/${chatId}/lastMessageSenderId`]: SUPPORT_AI_UID,
+    [`chats/${chatId}/unreadCounts`]: unreadCounts,
+    [`chats/${chatId}/memberNames/${SUPPORT_AI_UID}`]: senderName || "Support",
+    [`userChats/${uid}/${chatId}/lastMessageAt`]: now,
+  });
+
+  return { id: messageRef.key, createdAt: now };
+});

@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@pulse/shared": "file:../packages/pulse-shared",
+    "@pulse/firebase-web": "workspace:*",
+    "@pulse/shared": "workspace:*",
     "firebase": "^12.16.0",
     "firebase-admin": "^14.2.0",
     "motion": "^12.42.2",

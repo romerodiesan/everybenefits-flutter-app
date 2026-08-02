@@ -1,44 +1,22 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
-import {
-  createOrgNode,
-  ensureOrgRoot,
-  listOrgSubtree,
-  updateOrgNode,
-} from "@/lib/firebase/functions";
 import { canManagePlatform } from "@/lib/roles";
 import { useAuth } from "@/lib/providers/auth-provider";
-import {
-  ORG_DEPTH_TYPE,
-  type AdminOrgNode,
-  type OrgNodeType,
-} from "@/lib/types";
+import { useOrgTree } from "@/lib/hooks/use-org-tree";
+import { ORG_DEPTH_TYPE, type OrgNodeType } from "@/lib/types";
 import { Button, Input } from "@/components/ui/primitives";
 
 export function OrganizationsHome() {
   const t = useTranslations();
   const { profile } = useAuth();
   const isAdmin = canManagePlatform(profile?.role ?? "guest");
-  const [nodes, setNodes] = useState<AdminOrgNode[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { nodes, loading, reload, ensureRoot, createNode, updateNode } =
+    useOrgTree();
   const [parentId, setParentId] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
-
-  const reload = async () => {
-    setLoading(true);
-    try {
-      setNodes(await listOrgSubtree(null));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void reload();
-  }, []);
 
   const sorted = useMemo(
     () =>
@@ -73,7 +51,7 @@ export function OrganizationsHome() {
             onClick={async () => {
               setBusy(true);
               try {
-                await ensureOrgRoot();
+                await ensureRoot();
                 await reload();
               } finally {
                 setBusy(false);
@@ -102,7 +80,7 @@ export function OrganizationsHome() {
             onClick={async () => {
               setBusy(true);
               try {
-                await createOrgNode({
+                await createNode({
                   name: name.trim(),
                   type: childType,
                   parentId: parent.id,
@@ -165,7 +143,7 @@ export function OrganizationsHome() {
                   onClick={async () => {
                     setBusy(true);
                     try {
-                      await updateOrgNode({
+                      await updateNode({
                         id: node.id,
                         active: !node.active,
                       });

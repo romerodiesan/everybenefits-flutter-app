@@ -16,24 +16,12 @@ import {
   type QueryConstraint,
   type Unsubscribe,
 } from "firebase/firestore";
+import { mapForumReply, mapForumThread } from "@pulse/firebase-web";
 import { getFirebaseDb } from "./client";
 import { callCloudFunction } from "./call-function";
-import type { ForumReply, ForumThread, UserProfile, UserRole } from "../types";
-import { normalizeForumTags, parseRole } from "../roles";
+import type { ForumReply, ForumThread, UserProfile } from "../types";
+import { normalizeForumTags } from "../roles";
 import { headlineName } from "./users";
-
-function toDate(value: unknown): Date | null {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value === "object" && value !== null && "toDate" in value) {
-    return (value as { toDate: () => Date }).toDate();
-  }
-  if (typeof value === "string") {
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? null : d;
-  }
-  return null;
-}
 
 function threadFrom(id: string, data: Record<string, unknown>): ForumThread {
   let tags: string[] = [];
@@ -42,22 +30,7 @@ function threadFrom(id: string, data: Record<string, unknown>): ForumThread {
   } else if (typeof data.categoryId === "string") {
     tags = normalizeForumTags([data.categoryId]);
   }
-  return {
-    id,
-    tags,
-    title: String(data.title ?? ""),
-    body: String(data.body ?? ""),
-    authorId: String(data.authorId ?? ""),
-    authorName: String(data.authorName ?? ""),
-    authorPhotoUrl: (data.authorPhotoUrl as string) ?? null,
-    authorRole: parseRole(data.authorRole),
-    replyCount: Number(data.replyCount ?? 0),
-    score: Number(data.score ?? 0),
-    acceptedReplyId: (data.acceptedReplyId as string) ?? null,
-    createdAt: toDate(data.createdAt),
-    updatedAt: toDate(data.updatedAt),
-    lastReplyAt: toDate(data.lastReplyAt),
-  };
+  return { ...mapForumThread(id, data), tags };
 }
 
 function replyFrom(
@@ -65,18 +38,7 @@ function replyFrom(
   id: string,
   data: Record<string, unknown>,
 ): ForumReply {
-  return {
-    id,
-    threadId,
-    body: String(data.body ?? ""),
-    authorId: String(data.authorId ?? ""),
-    authorName: String(data.authorName ?? ""),
-    authorPhotoUrl: (data.authorPhotoUrl as string) ?? null,
-    authorRole: parseRole(data.authorRole) as UserRole,
-    score: Number(data.score ?? 0),
-    createdAt: toDate(data.createdAt),
-    updatedAt: toDate(data.updatedAt),
-  };
+  return mapForumReply(id, threadId, data);
 }
 
 export async function queryThreads(options: {

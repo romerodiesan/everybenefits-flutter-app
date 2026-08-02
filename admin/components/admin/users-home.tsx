@@ -2,17 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import {
-  adminDeactivateUser,
-  adminReactivateUser,
-  assignUserToOrgNode,
-  listOrgSubtree,
-  listUsersForAdmin,
-  setUserRole,
-} from "@/lib/firebase/functions";
 import { useAuth } from "@/lib/providers/auth-provider";
+import { getAdminRepository } from "@/lib/repositories/admin-repository";
 import { canManagePlatform, headlineName } from "@/lib/roles";
-import { ALL_ROLES, type AdminOrgNode, type UserProfile, type UserRole } from "@/lib/types";
+import {
+  ALL_ROLES,
+  type AdminOrgNode,
+  type UserProfile,
+  type UserRole,
+} from "@/lib/types";
 import { Button, Input } from "@/components/ui/primitives";
 
 const ROLE_KEYS: Record<UserRole, string> = {
@@ -40,18 +38,19 @@ export function UsersHome() {
   const reload = async () => {
     setLoading(true);
     try {
+      const repo = getAdminRepository();
       const [list, org] = await Promise.all([
-        listUsersForAdmin({
+        repo.listUsers({
           query: query.trim() || undefined,
           role: role || undefined,
           approvalStatus: approvalStatus || undefined,
           accountStatus: accountStatus || undefined,
           limit: 150,
         }),
-        listOrgSubtree(null),
+        repo.listOrgSubtree(null),
       ]);
-      setUsers(list);
-      setNodes(org);
+      setUsers(list as UserProfile[]);
+      setNodes(org as AdminOrgNode[]);
     } finally {
       setLoading(false);
     }
@@ -166,7 +165,10 @@ export function UsersHome() {
                           const next = e.target.value as UserRole;
                           setBusyUid(person.uid);
                           try {
-                            await setUserRole(person.uid, next);
+                            await getAdminRepository().setUserRole(
+                              person.uid,
+                              next,
+                            );
                             setUsers((prev) =>
                               prev.map((u) =>
                                 u.uid === person.uid ? { ...u, role: next } : u,
@@ -196,7 +198,10 @@ export function UsersHome() {
                         const next = e.target.value || null;
                         setBusyUid(person.uid);
                         try {
-                          await assignUserToOrgNode(person.uid, next);
+                          await getAdminRepository().assignUserToOrgNode(
+                            person.uid,
+                            next,
+                          );
                           const node = nodes.find((n) => n.id === next);
                           setUsers((prev) =>
                             prev.map((u) =>
@@ -238,7 +243,9 @@ export function UsersHome() {
                           onClick={async () => {
                             setBusyUid(person.uid);
                             try {
-                              await adminReactivateUser(person.uid);
+                              await getAdminRepository().reactivateUser(
+                                person.uid,
+                              );
                               setUsers((prev) =>
                                 prev.map((u) =>
                                   u.uid === person.uid
@@ -264,7 +271,9 @@ export function UsersHome() {
                           onClick={async () => {
                             setBusyUid(person.uid);
                             try {
-                              await adminDeactivateUser(person.uid);
+                              await getAdminRepository().deactivateUser(
+                                person.uid,
+                              );
                               setUsers((prev) =>
                                 prev.map((u) =>
                                   u.uid === person.uid

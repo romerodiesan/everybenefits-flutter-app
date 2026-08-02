@@ -19,3 +19,4 @@ __exportStar(require("./academy"), exports);
 __exportStar(require("./csp"), exports);
 __exportStar(require("./profile"), exports);
 __exportStar(require("./org"), exports);
+__exportStar(require("./schemas/index"), exports);

@@ -16,7 +16,8 @@
   "dependencies": {
     "@ai-sdk/react": "^4.0.40",
     "@lottiefiles/dotlottie-react": "^0.19.12",
-    "@pulse/shared": "file:../packages/pulse-shared",
+    "@pulse/firebase-web": "workspace:*",
+    "@pulse/shared": "workspace:*",
     "ai": "^7.0.37",
     "firebase": "^12.16.0",
     "firebase-admin": "^14.2.0",

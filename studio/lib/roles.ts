@@ -9,6 +9,7 @@ export {
   canParticipateInForums,
   canParticipateInChats,
   canCreateChatGroups,
+  canAccessAdmin,
   ALL_ROLES,
   FORUM_ROLES,
   DEFAULT_GROUP_ROLES,

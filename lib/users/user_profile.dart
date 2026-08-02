@@ -59,6 +59,8 @@ class UserProfile {
     this.addressState,
     this.addressZip,
     this.agency,
+    this.orgNodeId,
+    this.accountStatus = 'active',
     this.approvalStatus,
   });
 
@@ -83,6 +85,10 @@ class UserProfile {
   final String? addressState;
   final String? addressZip;
   final String? agency;
+  /// Firestore `orgNodes/{id}` attachment for Admin hierarchy.
+  final String? orgNodeId;
+  /// `active` | `deactivated` | `pendingDeletion`.
+  final String accountStatus;
   /// `pending` | `approved` | `rejected`. Null = legacy (treated as approved).
   final String? approvalStatus;
   final DateTime createdAt;
@@ -158,12 +164,15 @@ class UserProfile {
     String? addressState,
     String? addressZip,
     String? agency,
+    String? orgNodeId,
+    String? accountStatus,
     String? approvalStatus,
     DateTime? updatedAt,
     bool clearPhotoUrl = false,
     bool clearNpn = false,
     bool clearAddress = false,
     bool clearAgency = false,
+    bool clearOrgNodeId = false,
   }) {
     final nextStreet =
         clearAddress ? null : (addressStreet ?? this.addressStreet);
@@ -203,6 +212,8 @@ class UserProfile {
       addressState: nextState,
       addressZip: nextZip,
       agency: clearAgency ? null : (agency ?? this.agency),
+      orgNodeId: clearOrgNodeId ? null : (orgNodeId ?? this.orgNodeId),
+      accountStatus: accountStatus ?? this.accountStatus,
       approvalStatus: approvalStatus ?? this.approvalStatus,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
@@ -230,6 +241,8 @@ class UserProfile {
       'addressState': addressState,
       'addressZip': addressZip,
       'agency': agency,
+      'orgNodeId': orgNodeId,
+      'accountStatus': accountStatus,
       if (approvalStatus != null) 'approvalStatus': approvalStatus,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
@@ -251,6 +264,11 @@ class UserProfile {
           zip: zip,
         ) ??
         legacy;
+    final status = data['accountStatus'] as String?;
+    final accountStatus =
+        status == 'deactivated' || status == 'pendingDeletion'
+            ? status!
+            : 'active';
 
     return UserProfile(
       uid: data['uid'] as String,
@@ -272,6 +290,8 @@ class UserProfile {
       addressState: state,
       addressZip: zip,
       agency: data['agency'] as String?,
+      orgNodeId: data['orgNodeId'] as String?,
+      accountStatus: accountStatus,
       approvalStatus: data['approvalStatus'] as String?,
       createdAt: _readDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readDate(data['updatedAt']) ?? DateTime.now().toUtc(),

@@ -1,0 +1,10 @@
+{
+  "id": "root",
+  "name": "Every Benefits",
+  "type": "organization",
+  "depth": 1,
+  "parentId": null,
+  "path": ["root"],
+  "managerUids": [],
+  "active": true
+}

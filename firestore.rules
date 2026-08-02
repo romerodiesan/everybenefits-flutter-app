@@ -35,6 +35,12 @@ service cloud.firestore {
         && userDoc(request.auth.uid).data.get('role', '') == 'admin';
     }
 
+    function isManagerOrAdmin() {
+      return isAccountActive()
+        && userDoc(request.auth.uid).data.get('role', '')
+          in ['manager', 'admin'];
+    }
+
     /// Guests / anonymous Auth may bootstrap a profile but cannot browse
     /// forums, academy, or the member directory.
     function isRegisteredMember() {
@@ -528,6 +534,12 @@ service cloud.firestore {
         && request.resource.data.enabled is bool
         && request.resource.data.updatedBy == request.auth.uid;
       allow delete: if isAdmin();
+    }
+
+    // Org tree — clients may read; mutations go through Cloud Functions.
+    match /orgNodes/{nodeId} {
+      allow read: if isSignedIn() && isManagerOrAdmin();
+      allow write: if false;
     }
 
     // Required for collectionGroup('replies') queries (avatar photo sync).

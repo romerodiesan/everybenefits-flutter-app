@@ -1,22 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { getAdminInsights } from "@/lib/firebase/functions";
-import type { AdminInsights } from "@/lib/types";
+import { useAdminInsights } from "@/lib/hooks/use-admin-insights";
 import { headlineName } from "@/lib/roles";
 
 export function OverviewHome() {
   const t = useTranslations();
-  const [insights, setInsights] = useState<AdminInsights | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    getAdminInsights()
-      .then(setInsights)
-      .catch(() => setInsights(null))
-      .finally(() => setLoading(false));
-  }, []);
+  const { insights, loading } = useAdminInsights();
 
   const kpis = [
     { label: t("kpiTotalUsers"), value: insights?.totalUsers },

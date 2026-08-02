@@ -1,0 +1,28 @@
+import { type UserRole } from "@pulse/shared";
+export type MappedUserProfile = {
+    uid: string;
+    email: string | null;
+    displayName: string | null;
+    photoUrl: string | null;
+    role: UserRole;
+    isAnonymous: boolean;
+    profileCompleted: boolean;
+    productTourVersion?: number;
+    phoneCountryCode: string | null;
+    phoneNumber: string | null;
+    phoneVerified?: boolean;
+    npn: string | null;
+    address: string | null;
+    addressStreet: string | null;
+    addressApt: string | null;
+    addressCity: string | null;
+    addressState: string | null;
+    addressZip: string | null;
+    agency: string | null;
+    orgNodeId?: string | null;
+    createdAt: Date | null;
+    updatedAt: Date | null;
+    accountStatus?: "active" | "deactivated" | "pendingDeletion";
+    approvalStatus?: "pending" | "approved" | "rejected";
+};
+export declare function mapUserProfile(id: string, data: Record<string, unknown>): MappedUserProfile;

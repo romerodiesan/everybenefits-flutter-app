@@ -14,6 +14,8 @@ export {
   canCreateChatGroups,
   canConfigureGroupAutoJoin,
   canAccessSupport,
+  canAccessAdmin,
+  canManagePlatform,
   ALL_ROLES,
   FORUM_ROLES,
   DEFAULT_GROUP_ROLES,

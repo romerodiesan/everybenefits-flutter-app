@@ -1,11 +1,7 @@
 import * as admin from "firebase-admin";
 import { FieldValue } from "firebase-admin/firestore";
 import { createHash } from "node:crypto";
-
-/** Lazy — module may load before index.ts calls initializeApp(). */
-function db() {
-  return admin.firestore();
-}
+import { db } from "./init";
 
 export type NotificationType =
   | "chat_message"
@@ -87,7 +83,7 @@ export function readPrefsFromData(
 }
 
 async function readPrefs(uid: string): Promise<NotificationPrefs> {
-  const snap = await db().doc(`users/${uid}/notificationState/default`).get();
+  const snap = await db.doc(`users/${uid}/notificationState/default`).get();
   return readPrefsFromData(
     (snap.data()?.prefs ?? {}) as Record<string, unknown>,
   );
@@ -202,7 +198,7 @@ async function shouldDebouncePush(
   uid: string,
   groupKey: string,
 ): Promise<boolean> {
-  const ref = db().doc(`notificationDebounce/${uid}_${groupKey.replace(/[/]/g, "_")}`);
+  const ref = db.doc(`notificationDebounce/${uid}_${groupKey.replace(/[/]/g, "_")}`);
   const now = Date.now();
   const snap = await ref.get();
   const last = Number(snap.data()?.lastSentAt ?? 0);
@@ -231,8 +227,8 @@ export async function notifyUser(
 
   const actorName = (payload.actorName ?? "").trim().slice(0, 60);
   const actorId = (payload.actorId ?? "").trim();
-  const col = db().collection(`users/${uid}/notifications`);
-  const stateRef = db().doc(`users/${uid}/notificationState/default`);
+  const col = db.collection(`users/${uid}/notifications`);
+  const stateRef = db.doc(`users/${uid}/notificationState/default`);
   const isForum = FORUM_TYPES.has(payload.type);
 
   let notifId = "";
@@ -240,7 +236,7 @@ export async function notifyUser(
   let pushTitle = payload.title;
   let pushBody = payload.body;
 
-  await db().runTransaction(async (tx) => {
+  await db.runTransaction(async (tx) => {
     const stateSnap = await tx.get(stateRef);
     const stateData = stateSnap.data() ?? {};
     const unread = Number(stateData.unreadCount ?? 0);
@@ -359,7 +355,7 @@ export async function notifyUser(
     return;
   }
 
-  const tokensSnap = await db().collection(`users/${uid}/fcmTokens`).limit(20).get();
+  const tokensSnap = await db.collection(`users/${uid}/fcmTokens`).limit(20).get();
   if (tokensSnap.empty) return;
 
   const stateSnap = await stateRef.get();
@@ -407,7 +403,7 @@ export async function notifyUser(
     }
   });
   await Promise.all(
-    stale.map((id) => db().doc(`users/${uid}/fcmTokens/${id}`).delete()),
+    stale.map((id) => db.doc(`users/${uid}/fcmTokens/${id}`).delete()),
   );
 }
 
@@ -415,12 +411,12 @@ export async function markNotificationsRead(
   uid: string,
   notificationIds: string[] | "all",
 ): Promise<{ ok: true }> {
-  const col = db().collection(`users/${uid}/notifications`);
-  const stateRef = db().doc(`users/${uid}/notificationState/default`);
+  const col = db.collection(`users/${uid}/notifications`);
+  const stateRef = db.doc(`users/${uid}/notificationState/default`);
 
   if (notificationIds === "all") {
     const unread = await col.where("read", "==", false).limit(100).get();
-    const batch = db().batch();
+    const batch = db.batch();
     let forumDelta = 0;
     for (const doc of unread.docs) {
       batch.update(doc.ref, { read: true });
@@ -447,7 +443,7 @@ export async function markNotificationsRead(
   const ids = notificationIds.slice(0, 50);
   if (!ids.length) return { ok: true };
 
-  await db().runTransaction(async (tx) => {
+  await db.runTransaction(async (tx) => {
     const snaps = await Promise.all(ids.map((id) => tx.get(col.doc(id))));
     const stateSnap = await tx.get(stateRef);
 
@@ -507,7 +503,7 @@ export async function ensureThreadParticipant(
   uid: string,
 ): Promise<void> {
   if (!threadId || !uid) return;
-  await db().doc(`threads/${threadId}/participants/${uid}`).set(
+  await db.doc(`threads/${threadId}/participants/${uid}`).set(
     { uid, joinedAt: FieldValue.serverTimestamp() },
     { merge: true },
   );
@@ -517,9 +513,9 @@ export async function listThreadNotifyTargets(
   threadId: string,
   excludeUid: string,
 ): Promise<string[]> {
-  const thread = await db().doc(`threads/${threadId}`).get();
+  const thread = await db.doc(`threads/${threadId}`).get();
   const authorId = String(thread.data()?.authorId ?? "");
-  const parts = await db()
+  const parts = await db
     .collection(`threads/${threadId}/participants`)
     .limit(50)
     .get();
