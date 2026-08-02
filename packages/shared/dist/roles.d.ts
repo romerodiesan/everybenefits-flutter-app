@@ -45,3 +45,4 @@ export declare function canAccessSupport(role: UserRole, isAnonymous: boolean): 
 export declare function canAccessAdmin(role: UserRole): role is "manager" | "admin";
 /** Platform-wide ops (role changes, deactivate any user, root org). */
 export declare function canManagePlatform(role: UserRole): role is "admin";
+//# sourceMappingURL=roles.d.ts.map

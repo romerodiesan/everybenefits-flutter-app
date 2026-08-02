@@ -19,9 +19,9 @@ Treat **`.firebaserc` → `every-insurance`** as the active CLI default unless y
 
 | Service | Port |
 |---------|------|
-| webapp | 3000 |
-| studio | 3001 |
-| admin | 3002 |
+| apps/web | 3000 |
+| apps/studio | 3001 |
+| apps/admin | 3002 |
 | Auth emulator | (see `firebase.json`) |
 | Firestore emulator | (see `firebase.json`) |
 | RTDB emulator | (see `firebase.json`) |
@@ -31,8 +31,8 @@ Treat **`.firebaserc` → `every-insurance`** as the active CLI default unless y
 
 Copy:
 
-- `webapp/.env.example` → `webapp/.env.local`
-- `studio/.env.example` → `studio/.env.local`
-- `admin/.env.example` → `admin/.env.local`
+- `apps/web/.env.example` → `apps/web/.env.local`
+- `apps/studio/.env.example` → `apps/studio/.env.local`
+- `apps/admin/.env.example` → `apps/admin/.env.local`
 
 Never commit secrets. AI keys and service accounts are webapp-server only (see `docs/pulse-ai.md`).

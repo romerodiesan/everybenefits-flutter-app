@@ -1,6 +1,6 @@
 # Firebase App Hosting — Studio
 # Project: every-benefits-us
-# Backend rootDir: studio
+# Backend rootDir: apps/studio
 #
 # Secrets:
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us

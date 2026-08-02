@@ -12,23 +12,31 @@ export function useAdminUsers(filters?: {
   orgNodeId?: string;
   query?: string;
 }) {
+  const role = filters?.role;
+  const approvalStatus = filters?.approvalStatus;
+  const accountStatus = filters?.accountStatus;
+  const orgNodeId = filters?.orgNodeId;
+  const query = filters?.query;
+
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async () => {
     setLoading(true);
     try {
-      setUsers(await getAdminRepository().listUsers(filters));
+      setUsers(
+        await getAdminRepository().listUsers({
+          role,
+          approvalStatus,
+          accountStatus,
+          orgNodeId,
+          query,
+        }),
+      );
     } finally {
       setLoading(false);
     }
-  }, [
-    filters?.role,
-    filters?.approvalStatus,
-    filters?.accountStatus,
-    filters?.orgNodeId,
-    filters?.query,
-  ]);
+  }, [role, approvalStatus, accountStatus, orgNodeId, query]);
 
   useEffect(() => {
     void reload();

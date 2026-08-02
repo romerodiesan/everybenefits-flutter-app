@@ -1,0 +1,21 @@
+{
+  "folders": [
+    {
+      "name": "Pulse monorepo",
+      "path": "."
+    },
+    {
+      "name": "mobile (Flutter)",
+      "path": "apps/mobile"
+    }
+  ],
+  "settings": {
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "eslint.workingDirectories": [
+      { "directory": "apps/web", "changeProcessCWD": true },
+      { "directory": "apps/studio", "changeProcessCWD": true },
+      { "directory": "apps/admin", "changeProcessCWD": true },
+      { "directory": "apps/functions", "changeProcessCWD": true }
+    ]
+  }
+}

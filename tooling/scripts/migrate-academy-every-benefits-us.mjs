@@ -30,7 +30,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Prefer firebase-admin from functions/ (already installed).
 const functionsAdminPath = path.resolve(
   __dirname,
-  '../functions/node_modules/firebase-admin',
+  '../apps/functions/node_modules/firebase-admin',
 );
 const admin = fs.existsSync(functionsAdminPath)
   ? require(functionsAdminPath)

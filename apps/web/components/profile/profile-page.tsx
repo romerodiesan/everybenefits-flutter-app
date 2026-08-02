@@ -140,7 +140,6 @@ export function ProfilePage() {
     };
   }, []);
 
-  const isAdmin = profile?.role === "admin";
   const canApprove =
     profile?.role === "admin" || profile?.role === "manager";
   const isAnonymous = profile?.isAnonymous ?? true;

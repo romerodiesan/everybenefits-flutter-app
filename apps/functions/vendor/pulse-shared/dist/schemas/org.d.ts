@@ -27,3 +27,4 @@ export declare const orgNodeFixtureSchema: z.ZodObject<{
     active: z.ZodBoolean;
 }, z.core.$strip>;
 export type OrgNodeFixture = z.infer<typeof orgNodeFixtureSchema>;
+//# sourceMappingURL=org.d.ts.map

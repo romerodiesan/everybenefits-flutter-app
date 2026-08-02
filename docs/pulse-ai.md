@@ -20,7 +20,7 @@ corpus, allowlisted official web search, and the caller's learning context.
 
 ## Environment
 
-Copy from `webapp/.env.example`. Required for a real agent:
+Copy from `apps/web/.env.example`. Required for a real agent:
 
 | Variable | Purpose |
 |----------|---------|
@@ -90,12 +90,12 @@ Rebuild:
 # Manual
 PULSE_AI_ADMIN_TASK_KEY=… node scripts/reindex-ai-knowledge.mjs
 
-# Or hit the route (also wired as a daily Vercel cron in webapp/vercel.json)
+# Or hit the route (also wired as a daily Vercel cron in apps/web/vercel.json)
 curl -H "Authorization: Bearer $CRON_SECRET" https://your-webapp.vercel.app/api/ai/reindex
 ```
 
 Official live search (optional) is limited to allowlisted regulator domains;
-see `webapp/lib/ai/official-sources.ts`.
+see `apps/web/lib/ai/official-sources.ts`.
 
 ## Quotas, retention, observability
 
@@ -139,7 +139,7 @@ flutter analyze lib/features/ai_chat
 flutter test test/features/ai_chat
 ```
 
-Offline evals live in `webapp/lib/ai/evals/` and cover in-scope insurance
+Offline evals live in `apps/web/lib/ai/evals/` and cover in-scope insurance
 questions (EN/ES), off-topic refusals, legal-advice flags, prompt injection,
 citation hallucination and academy deep links. They do not spend model tokens.
 

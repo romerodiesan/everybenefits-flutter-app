@@ -26,3 +26,4 @@ export type MappedUserProfile = {
     approvalStatus?: "pending" | "approved" | "rejected";
 };
 export declare function mapUserProfile(id: string, data: Record<string, unknown>): MappedUserProfile;
+//# sourceMappingURL=users.d.ts.map

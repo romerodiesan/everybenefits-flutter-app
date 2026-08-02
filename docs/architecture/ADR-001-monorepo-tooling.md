@@ -2,22 +2,26 @@
 
 ## Status
 
-Accepted
+Accepted (updated: apps + packages layout)
 
 ## Context
 
-The repo mixed Flutter at the root with three Next.js apps and Cloud Functions. Each TS package used its own `pnpm install` / `file:` dependency on `@pulse/shared`, with no root scripts or CI orchestration. Functions also vendor-copied shared code.
+The repo mixed Flutter at the root with three Next.js apps and Cloud Functions. We first introduced pnpm workspaces + Turborepo in place; this ADR records the full Turborepo layout migration.
 
 ## Decision
 
-- Use **pnpm workspaces** for `webapp`, `studio`, `admin`, `functions`, `packages/*`, and `test/rules`.
-- Use **Turborepo** for `build`, `test`, `lint`, and `typecheck` pipelines with dependency awareness (`@pulse/shared` builds first).
-- Keep Flutter at the repo root (`lib/`, `pubspec.yaml`); do not move into `apps/` in this wave.
-- Prefer `workspace:*` for `@pulse/shared` (and later `@pulse/firebase-web`) instead of `file:` paths.
-- Root scripts: `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm emulators`.
+- Use **pnpm workspaces** for `apps/*`, `packages/*`, and `test/rules`.
+- Use **Turborepo** for `build`, `test`, `lint`, and `typecheck`.
+- Layout:
+  - `apps/web`, `apps/studio`, `apps/admin`, `apps/functions`, `apps/mobile` (Flutter)
+  - `packages/shared`, `packages/firebase-web`, `packages/eslint-config`, `packages/typescript-config`
+  - `tooling/scripts` for seed/migrate/emulator helpers
+- Prefer `workspace:*` for shared packages; Functions still vendor-copy `@pulse/shared` for Firebase deploy.
+- Next.js local `dev` uses Turbopack (`next dev --turbopack`); production builds stay on `next build`.
+- Root scripts: `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm emulators`, `pnpm dev:web|studio|admin`.
 
 ## Consequences
 
 - One `pnpm install` at the root installs all TS packages.
-- Firebase Functions still need a deployable `node_modules` layout; predeploy may sync/bundled shared packages as required by the Firebase toolchain.
-- Flutter remains on `pub` / Melos-free until we extract Dart packages.
+- Flutter commands run from `apps/mobile`.
+- Firebase App Hosting `rootDir` values are `apps/web|studio|admin`; Functions `source` is `apps/functions`.

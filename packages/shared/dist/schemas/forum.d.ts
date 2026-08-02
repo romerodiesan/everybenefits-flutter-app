@@ -43,3 +43,4 @@ export declare const forumReplyFixtureSchema: z.ZodObject<{
 }, z.core.$strip>;
 export type ForumThreadFixture = z.infer<typeof forumThreadFixtureSchema>;
 export type ForumReplyFixture = z.infer<typeof forumReplyFixtureSchema>;
+//# sourceMappingURL=forum.d.ts.map

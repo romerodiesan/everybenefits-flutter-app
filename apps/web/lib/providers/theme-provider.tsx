@@ -3,6 +3,7 @@
 import {
   createContext,
   startTransition,
+  useCallback,
   useContext,
   useEffect,
   useMemo,
@@ -82,6 +83,8 @@ export function ThemeProvider({
   const [mode, setModeState] = useState<ThemeMode>("dark");
   const [accent, setAccentState] = useState<AccentSeed>("green");
   const [resolvedDark, setResolvedDark] = useState(true);
+  const remoteTheme = remoteAppearance?.theme;
+  const remoteAccent = remoteAppearance?.accent;
 
   useEffect(() => {
     startTransition(() => {
@@ -91,20 +94,22 @@ export function ThemeProvider({
   }, []);
 
   useEffect(() => {
-    if (!remoteAppearance) return;
-    const theme = remoteAppearance.theme;
-    const nextAccent = remoteAppearance.accent;
+    if (remoteTheme == null && remoteAccent == null) return;
     startTransition(() => {
-      if (theme === "system" || theme === "light" || theme === "dark") {
-        setModeState(theme);
-        window.localStorage.setItem("pulse-theme", theme);
+      if (
+        remoteTheme === "system" ||
+        remoteTheme === "light" ||
+        remoteTheme === "dark"
+      ) {
+        setModeState(remoteTheme);
+        window.localStorage.setItem("pulse-theme", remoteTheme);
       }
-      if (nextAccent && isAccent(nextAccent)) {
-        setAccentState(nextAccent);
-        window.localStorage.setItem("pulse-accent", nextAccent);
+      if (remoteAccent && isAccent(remoteAccent)) {
+        setAccentState(remoteAccent);
+        window.localStorage.setItem("pulse-accent", remoteAccent);
       }
     });
-  }, [remoteAppearance?.theme, remoteAppearance?.accent]);
+  }, [remoteTheme, remoteAccent]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
@@ -123,21 +128,27 @@ export function ThemeProvider({
     return () => media.removeEventListener("change", apply);
   }, [mode, accent]);
 
-  const setMode = (next: ThemeMode) => {
-    setModeState(next);
-    window.localStorage.setItem("pulse-theme", next);
-    void persistAppearance(next, accent);
-  };
+  const setMode = useCallback(
+    (next: ThemeMode) => {
+      setModeState(next);
+      window.localStorage.setItem("pulse-theme", next);
+      void persistAppearance(next, accent);
+    },
+    [accent],
+  );
 
-  const setAccent = (next: AccentSeed) => {
-    setAccentState(next);
-    window.localStorage.setItem("pulse-accent", next);
-    void persistAppearance(mode, next);
-  };
+  const setAccent = useCallback(
+    (next: AccentSeed) => {
+      setAccentState(next);
+      window.localStorage.setItem("pulse-accent", next);
+      void persistAppearance(mode, next);
+    },
+    [mode],
+  );
 
   const value = useMemo(
     () => ({ mode, accent, setMode, setAccent, resolvedDark }),
-    [mode, accent, resolvedDark],
+    [mode, accent, setMode, setAccent, resolvedDark],
   );
 
   return (

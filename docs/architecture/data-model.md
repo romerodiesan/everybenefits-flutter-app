@@ -1,6 +1,6 @@
 # Data model
 
-Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shared` (Zod). Flutter mirrors critical fields; see fixtures under `packages/pulse-shared/fixtures/`.
+Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shared` (Zod). Flutter mirrors critical fields; see fixtures under `packages/shared/fixtures/`.
 
 ## Firestore
 

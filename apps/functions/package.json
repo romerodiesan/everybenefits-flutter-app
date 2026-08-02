@@ -1,5 +1,5 @@
 {
-  "name": "every-benefits-functions",
+  "name": "@pulse/functions",
   "description": "Trusted callables for votes, roles, academy, org, and SSO",
   "engines": {
     "node": "22"

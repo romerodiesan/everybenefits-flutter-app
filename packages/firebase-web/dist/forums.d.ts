@@ -29,3 +29,4 @@ export type MappedForumReply = {
 };
 export declare function mapForumThread(id: string, data: Record<string, unknown>): MappedForumThread;
 export declare function mapForumReply(id: string, threadId: string, data: Record<string, unknown>): MappedForumReply;
+//# sourceMappingURL=forums.d.ts.map

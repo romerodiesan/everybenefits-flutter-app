@@ -9,3 +9,4 @@ export declare const notificationFixtureSchema: z.ZodObject<{
     createdAt: z.ZodNullable<z.ZodString>;
 }, z.core.$strip>;
 export type NotificationFixture = z.infer<typeof notificationFixtureSchema>;
+//# sourceMappingURL=notification.d.ts.map

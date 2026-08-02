@@ -61,3 +61,4 @@ export declare const userProfileFixtureSchema: z.ZodObject<{
 }, z.core.$strip>;
 export type UserProfileFixture = z.infer<typeof userProfileFixtureSchema>;
 export type AccountStatus = z.infer<typeof accountStatusSchema>;
+//# sourceMappingURL=user.d.ts.map

@@ -13,7 +13,7 @@ Roles, academy, org, and profile helpers lived in `@pulse/shared`, but forums, c
 - Expand **`@pulse/shared`** with **Zod** schemas as the TypeScript source of truth for domain types (users, roles, org, academy, forums, notifications).
 - Infer TypeScript types from Zod; Functions and Next apps import from `@pulse/shared`.
 - Extract shared **client** Firebase I/O into **`@pulse/firebase-web`** (repositories), not into the pure domain package.
-- Flutter keeps Dart models; align field names with shared fixtures under `packages/pulse-shared/fixtures/` and parity tests. No cross-language codegen in this wave.
+- Flutter keeps Dart models; align field names with shared fixtures under `packages/shared/fixtures/` and parity tests. No cross-language codegen in this wave.
 
 ## Consequences
 

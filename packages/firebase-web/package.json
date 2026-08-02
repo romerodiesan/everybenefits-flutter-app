@@ -24,6 +24,7 @@
     "firebase": "^12.0.0"
   },
   "devDependencies": {
+    "@pulse/typescript-config": "workspace:*",
     "firebase": "^12.16.0",
     "typescript": "^5.9.3"
   }

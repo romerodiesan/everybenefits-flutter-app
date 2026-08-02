@@ -24,3 +24,4 @@ export type OrgNode = {
     managerUids: string[];
     active: boolean;
 };
+//# sourceMappingURL=org.d.ts.map

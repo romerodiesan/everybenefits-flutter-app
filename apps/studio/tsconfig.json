@@ -16,7 +16,8 @@
     "plugins": [{ "name": "next" }],
     "paths": {
       "@/*": ["./*"],
-      "@pulse/shared": ["../packages/pulse-shared/src/index.ts"]
+      "@pulse/shared": ["../../packages/shared/src/index.ts"],
+      "@pulse/firebase-web": ["../../packages/firebase-web/src/index.ts"]
     }
   },
   "include": [

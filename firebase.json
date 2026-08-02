@@ -23,7 +23,7 @@
   "apphosting": [
     {
       "backendId": "pulse-web-app",
-      "rootDir": "webapp",
+      "rootDir": "apps/web",
       "ignore": [
         "node_modules",
         ".git",
@@ -36,7 +36,7 @@
     },
     {
       "backendId": "studio-web-app",
-      "rootDir": "studio",
+      "rootDir": "apps/studio",
       "ignore": [
         "node_modules",
         ".git",
@@ -48,7 +48,7 @@
     },
     {
       "backendId": "admin-web-app",
-      "rootDir": "admin",
+      "rootDir": "apps/admin",
       "ignore": [
         "node_modules",
         ".git",
@@ -62,7 +62,7 @@
   ],
   "functions": [
     {
-      "source": "functions",
+      "source": "apps/functions",
       "codebase": "default",
       "runtime": "nodejs22",
       "ignore": [

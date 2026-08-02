@@ -122,24 +122,26 @@ test/rules/node_modules/
 test/rules/package-lock.json
 
 # Cloud Functions
-functions/node_modules/
-functions/lib/
+apps/functions/node_modules/
+apps/functions/lib/
 
-# Next.js web client
-webapp/node_modules/
-webapp/.next/
-webapp/out/
-webapp/.env*.local
+# Next.js apps
+apps/web/node_modules/
+apps/web/.next/
+apps/web/out/
+apps/web/.env*.local
+apps/studio/node_modules/
+apps/studio/.next/
+apps/studio/.env*.local
+apps/admin/node_modules/
+apps/admin/.next/
+apps/admin/.env*.local
 
-# Studio Next.js app
-studio/node_modules/
-studio/.next/
-studio/.env*.local
-
-# Admin Next.js app
-admin/node_modules/
-admin/.next/
-admin/.env*.local
+# Flutter mobile
+apps/mobile/.dart_tool/
+apps/mobile/build/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
 
 # Shared packages
 packages/*/node_modules/

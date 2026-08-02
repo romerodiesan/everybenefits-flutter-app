@@ -24,7 +24,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const functionsAdminPath = path.resolve(
   __dirname,
-  '../functions/node_modules/firebase-admin',
+  '../apps/functions/node_modules/firebase-admin',
 );
 const admin = fs.existsSync(functionsAdminPath)
   ? require(functionsAdminPath)

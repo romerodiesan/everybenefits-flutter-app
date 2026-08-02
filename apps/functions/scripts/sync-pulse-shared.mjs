@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Copies packages/pulse-shared into functions/vendor/pulse-shared so Cloud
+ * Copies packages/shared into apps/functions/vendor/pulse-shared so Cloud
  * Build can resolve file:./vendor/pulse-shared without the monorepo root.
  */
 import fs from "node:fs";
@@ -8,14 +8,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
-const src = path.join(root, "packages/pulse-shared");
-const dest = path.join(root, "functions/vendor/pulse-shared");
+const functionsDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(functionsDir, "../..");
+const src = path.join(root, "packages/shared");
+const dest = path.join(functionsDir, "vendor/pulse-shared");
+const tsc = path.join(root, "node_modules/typescript/bin/tsc");
 
-execSync("node ../../node_modules/typescript/bin/tsc -p tsconfig.json", {
-  cwd: src,
-  stdio: "inherit",
-});
+execSync(`node "${tsc}" -p tsconfig.json`, { cwd: src, stdio: "inherit" });
 
 fs.rmSync(dest, { recursive: true, force: true });
 fs.mkdirSync(dest, { recursive: true });

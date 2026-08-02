@@ -1,4 +1,4 @@
-import type { UserRole, OrgNodeType, OrgDepth } from "@pulse/shared";
+import type { UserRole } from "@pulse/shared";
 
 export type {
   UserRole,

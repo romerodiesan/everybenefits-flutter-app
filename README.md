@@ -2,15 +2,17 @@
 
 Insurance-agent learning and community platform: forums, chats, Academy, Pulse AI, and ops portals — all on Firebase.
 
+Turborepo monorepo (`apps/` + `packages/`) orchestrated with pnpm.
+
 | Surface | Path | Port / host |
 |---------|------|-------------|
-| Flutter mobile | `lib/` | iOS / Android / macOS / Linux |
-| Pulse Web (learners) | `webapp/` | `http://localhost:3000` |
-| Pulse Studio (authors) | `studio/` | `http://localhost:3001` |
-| Pulse Admin (ops) | `admin/` | `http://localhost:3002` |
-| Cloud Functions | `functions/` | Emulator `:5001` |
-| Shared TS contracts | `packages/pulse-shared` | — |
-| Shared web Firebase clients | `packages/pulse-firebase-web` | — |
+| Flutter mobile | `apps/mobile/` | iOS / Android / macOS / Linux |
+| Pulse Web (learners) | `apps/web/` | `http://localhost:3000` |
+| Pulse Studio (authors) | `apps/studio/` | `http://localhost:3001` |
+| Pulse Admin (ops) | `apps/admin/` | `http://localhost:3002` |
+| Cloud Functions | `apps/functions/` | Emulator `:5001` |
+| Shared TS contracts | `packages/shared` | `@pulse/shared` |
+| Shared web Firebase clients | `packages/firebase-web` | `@pulse/firebase-web` |
 
 Architecture docs: [`docs/architecture/`](docs/architecture/). Pulse AI runbook: [`docs/pulse-ai.md`](docs/pulse-ai.md).
 
@@ -27,7 +29,7 @@ Architecture docs: [`docs/architecture/`](docs/architecture/). Pulse AI runbook:
 pnpm install
 
 # Flutter
-flutter pub get
+cd apps/mobile && flutter pub get
 ```
 
 Copy env files from each app’s `.env.example` → `.env.local` (see [`docs/architecture/environments.md`](docs/architecture/environments.md)).
@@ -37,45 +39,44 @@ Copy env files from each app’s `.env.example` → `.env.local` (see [`docs/arc
 ```bash
 # Emulators (Auth, Firestore, RTDB, Storage, Functions)
 pnpm emulators
-# or: ./scripts/start-emulators.sh
 
 # Web apps (from root)
-pnpm --filter webapp dev
-pnpm --filter pulse-studio dev
-pnpm --filter pulse-admin dev
+pnpm dev:web
+pnpm dev:studio
+pnpm dev:admin
 
 # Flutter
-flutter run
+cd apps/mobile && flutter run
 ```
 
 ## Build & test
 
 ```bash
-pnpm build          # turbo: shared → apps + functions
-pnpm test           # turbo tests where defined
+pnpm build
+pnpm test
 pnpm lint
 
-flutter analyze
-flutter test
+cd apps/mobile && flutter analyze && flutter test
 ```
 
 ## Seed / migrate
 
+Scripts live under [`tooling/scripts/`](tooling/scripts/).
+
 | Script | Purpose |
 |--------|---------|
-| `scripts/seed-academy.mjs` | Sample Academy content |
-| `scripts/seed-notifications.mjs` | Notification fixtures |
-| `scripts/migrate-academy-every-benefits-us.mjs` | Academy migration |
-| `scripts/reindex-ai-knowledge.mjs` | Pulse AI knowledge reindex |
-| `scripts/import-manhattanlife-course.mjs` | Course import |
+| `tooling/scripts/seed-academy.mjs` | Sample Academy content |
+| `tooling/scripts/seed-notifications.mjs` | Notification fixtures |
+| `tooling/scripts/migrate-academy-every-benefits-us.mjs` | Academy migration |
+| `tooling/scripts/reindex-ai-knowledge.mjs` | Pulse AI knowledge reindex |
+| `tooling/scripts/import-manhattanlife-course.mjs` | Course import |
 
 ## Deploy
 
-Firebase App Hosting backends: `pulse-web-app`, `studio-web-app`, `admin-web-app` (see `firebase.json`).
+Firebase App Hosting backends: `pulse-web-app`, `studio-web-app`, `admin-web-app` (see `firebase.json` — rootDirs under `apps/`).
 
 ```bash
 firebase deploy --only firestore:rules,firestore:indexes,database,storage,functions
-# App Hosting / Vercel per app as configured in each package
 ```
 
 ## Naming
@@ -84,6 +85,6 @@ firebase deploy --only firestore:rules,firestore:indexes,database,storage,functi
 |------|---------|
 | **Pulse** | Product brand |
 | **Every Benefits** | Company / org root label |
-| `every_benefits` | Flutter package name |
-| `every-insurance` | Default Firebase project (`.firebaserc`) |
-| `every-benefits-us` | App Hosting / production naming (see environments doc) |
+| `every_benefits` | Flutter package name (`apps/mobile`) |
+| `every-insurance` | Local Firebase project (`.firebaserc`) |
+| `every-benefits-us` | App Hosting / production naming |

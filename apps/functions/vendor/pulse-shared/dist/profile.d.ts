@@ -49,3 +49,4 @@ export type ProfileCompletenessInput = {
 };
 /** Temporary remediation: force incomplete / invalid profiles back to the form. */
 export declare function needsProfileCompletion(input: ProfileCompletenessInput): boolean;
+//# sourceMappingURL=profile.d.ts.map

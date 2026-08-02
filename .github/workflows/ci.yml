@@ -23,9 +23,8 @@ jobs:
           node-version: "22"
           cache: pnpm
       - run: pnpm install
-      - run: pnpm exec turbo run build --filter=@pulse/shared --filter=@pulse/firebase-web --filter=every-benefits-functions
-      - run: pnpm --filter every-benefits-functions test
-      - run: pnpm --filter webapp test
+      - run: pnpm exec turbo run build --filter=./apps/* --filter=./packages/*
+      - run: pnpm exec turbo run test --filter=./apps/* --filter=./packages/* --continue
       - name: Firestore rules tests
         working-directory: test/rules
         run: pnpm test
@@ -34,6 +33,9 @@ jobs:
   flutter:
     name: Flutter
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2

@@ -2,7 +2,7 @@
 
 ## Bootstrap
 
-[`lib/main.dart`](../../lib/main.dart) initializes Firebase, App Check / emulators, then constructs repositories and services manually (constructor injection). There is no Riverpod/Bloc in this wave.
+[`apps/mobile/lib/main.dart`](../../apps/mobile/lib/main.dart) initializes Firebase, App Check / emulators, then constructs repositories and services manually (constructor injection). There is no Riverpod/Bloc in this wave.
 
 Typical graph:
 
@@ -19,8 +19,8 @@ Imperative `Navigator` / `MaterialPageRoute` from the shell tabs (Forums, Chats,
 
 ## Domain parity
 
-Field names on `UserProfile` and related models should match `@pulse/shared` fixtures. Prefer adding `orgNodeId` and account lifecycle fields when Admin/Functions expose them.
+Field names on `UserProfile` and related models should match `@pulse/shared` fixtures under `packages/shared/fixtures/`. Prefer adding `orgNodeId` and account lifecycle fields when Admin/Functions expose them.
 
 ## Pulse AI client
 
-[`lib/features/ai_chat/pulse_ai_client.dart`](../../lib/features/ai_chat/pulse_ai_client.dart) calls the webapp SSE endpoint documented in [ADR-004](ADR-004-pulse-ai.md) and `docs/pulse-ai.md`. Configure base URL with `--dart-define=PULSE_AI_BASE_URL=...` for release.
+[`apps/mobile/lib/features/ai_chat/pulse_ai_client.dart`](../../apps/mobile/lib/features/ai_chat/pulse_ai_client.dart) calls the webapp SSE endpoint documented in [ADR-004](ADR-004-pulse-ai.md) and `docs/pulse-ai.md`. Configure base URL with `--dart-define=PULSE_AI_BASE_URL=...` for release.

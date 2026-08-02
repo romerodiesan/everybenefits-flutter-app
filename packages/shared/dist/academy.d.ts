@@ -88,3 +88,4 @@ export type CourseStudent = {
 };
 export declare const LESSON_COMPLETE_THRESHOLD = 0.9;
 export declare const QUIZ_DEFAULT_PASS_PERCENT = 70;
+//# sourceMappingURL=academy.d.ts.map

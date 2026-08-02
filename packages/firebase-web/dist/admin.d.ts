@@ -65,3 +65,4 @@ export type AdminRepository = {
     setUserRole: (uid: string, role: UserRole) => Promise<void>;
 };
 export declare function createAdminRepository(functions: Functions): AdminRepository;
+//# sourceMappingURL=admin.d.ts.map

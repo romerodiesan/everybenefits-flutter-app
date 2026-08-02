@@ -1,6 +1,6 @@
 # Firebase App Hosting — Pulse (webapp)
 # Project: every-benefits-us
-# Backend rootDir: webapp
+# Backend rootDir: apps/web
 #
 # Secrets (create once, then grant to this backend):
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us

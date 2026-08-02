@@ -3,22 +3,23 @@
 # Avoids ADC hitting production and Node engines mismatches.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
+FUNCTIONS_DIR="$ROOT/apps/functions"
 
-# Prefer Node 22 (Cloud Functions Gen2 runtime). Install from functions/.nvmrc.
+# Prefer Node 22 (Cloud Functions Gen2 runtime). Install from apps/functions/.nvmrc.
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
   (
-    cd functions
+    cd "$FUNCTIONS_DIR"
     nvm install >/dev/null
     nvm use >/dev/null
   )
   # shellcheck disable=SC1091
   . "$NVM_DIR/nvm.sh"
-  nvm use "$(cat functions/.nvmrc)" >/dev/null
+  nvm use "$(cat "$FUNCTIONS_DIR/.nvmrc")" >/dev/null
 fi
 
 echo "Node $(node -v) (Functions runtime expects 22.x)"
@@ -39,13 +40,13 @@ export FUNCTIONS_EMULATOR=true
 export GCLOUD_PROJECT="${GCLOUD_PROJECT:-every-insurance}"
 export GOOGLE_CLOUD_PROJECT="$GCLOUD_PROJECT"
 
-npm --prefix functions run build
+pnpm --filter @pulse/functions run build
 
 LAN_IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || true)"
 if [[ -n "${LAN_IP}" ]]; then
   echo ""
   echo "LAN IP for phone / Flutter (IP rotates — refresh if login times out):"
-  echo "  flutter run --dart-define=FIREBASE_EMULATOR_HOST=${LAN_IP}"
+  echo "  cd apps/mobile && flutter run --dart-define=FIREBASE_EMULATOR_HOST=${LAN_IP}"
   echo "  Web from phone: set NEXT_PUBLIC_FIREBASE_EMULATOR_HOST=${LAN_IP} then open http://${LAN_IP}:3000"
   echo "  Browser on this Mac: leave that env unset and use http://localhost:3000"
   echo ""

@@ -7,11 +7,11 @@
     "test": "turbo run test",
     "lint": "turbo run lint --continue",
     "typecheck": "turbo run typecheck",
-    "dev:webapp": "pnpm --filter webapp dev",
-    "dev:studio": "pnpm --filter pulse-studio dev",
-    "dev:admin": "pnpm --filter pulse-admin dev",
-    "emulators": "bash ./scripts/start-emulators.sh",
-    "sync:functions-shared": "pnpm --filter every-benefits-functions run sync:shared"
+    "dev:web": "pnpm --filter @pulse/web dev",
+    "dev:studio": "pnpm --filter @pulse/studio dev",
+    "dev:admin": "pnpm --filter @pulse/admin dev",
+    "emulators": "bash ./tooling/scripts/start-emulators.sh",
+    "sync:functions-shared": "pnpm --filter @pulse/functions run sync:shared"
   },
   "devDependencies": {
     "turbo": "^2.5.4",

@@ -10,7 +10,7 @@ Pulse AI (RAG, streaming, quotas, reindex) lives in the learner **webapp**. Flut
 
 ## Decision
 
-- Keep Pulse AI in **`webapp/lib/ai`** and **`webapp/app/api/ai`**.
+- Keep Pulse AI in **`apps/web/lib/ai`** and **`apps/web/app/api/ai`**.
 - Treat it as a **bounded context**: clear HTTP contracts, documented env, no direct coupling from Studio/Admin.
 - Flutter uses `POST /api/ai/stream` (plain SSE) and history/feedback JSON routes.
 - Full operational detail remains in [`docs/pulse-ai.md`](../pulse-ai.md).

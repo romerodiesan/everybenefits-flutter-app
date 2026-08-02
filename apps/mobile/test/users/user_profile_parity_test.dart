@@ -8,17 +8,17 @@ import 'package:every_benefits/users/user_profile.dart';
 void main() {
   test('UserProfile parses shared fixture fields', () {
     final fixtureFile = File(
-      'packages/pulse-shared/fixtures/user-profile.json',
+      '../../packages/shared/fixtures/user-profile.json',
     );
     expect(fixtureFile.existsSync(), isTrue);
     final json =
         jsonDecode(fixtureFile.readAsStringSync()) as Map<String, dynamic>;
     final profile = UserProfile.fromMap(json);
-    expect(profile.uid, 'fixture-user-1');
+    expect(profile.uid, 'user_agent_001');
     expect(profile.role.wireValue, 'agent');
     expect(profile.orgNodeId, 'root');
     expect(profile.accountStatus, 'active');
     expect(profile.approvalStatus, 'approved');
-    expect(profile.npn, '1234567');
+    expect(profile.npn, '12345678');
   });
 }

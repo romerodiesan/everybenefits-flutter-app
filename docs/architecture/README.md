@@ -2,6 +2,21 @@
 
 Pulse is a multi-client Firebase product: one identity and data plane, four UIs, privileged writes in Cloud Functions, and Pulse AI hosted in the learner webapp.
 
+## Monorepo layout
+
+```text
+apps/web          @pulse/web       learner Next.js + Pulse AI
+apps/studio       @pulse/studio    course authoring
+apps/admin        @pulse/admin     ops portal
+apps/functions    @pulse/functions Cloud Functions
+apps/mobile       every_benefits   Flutter
+packages/shared   @pulse/shared
+packages/firebase-web
+packages/eslint-config
+packages/typescript-config
+tooling/scripts
+```
+
 ## Context (C4)
 
 ```mermaid
@@ -21,7 +36,7 @@ flowchart LR
   Mobile --> Functions
   Studio --> Functions
   Admin --> Functions
-  Mobile --> AI[Pulse AI in webapp]
+  Mobile --> AI[Pulse AI in apps/web]
   PulseWeb --> AI
 ```
 
@@ -29,8 +44,8 @@ flowchart LR
 
 | Container | Tech | Responsibility |
 |-----------|------|----------------|
-| Flutter app | Dart | Mobile forums, chats, Academy, AI, profile |
-| webapp | Next.js 16 | Learner UX + Pulse AI API + SSO bridge |
+| Flutter app | Dart (`apps/mobile`) | Mobile forums, chats, Academy, AI, profile |
+| web | Next.js 16 | Learner UX + Pulse AI API + SSO bridge |
 | studio | Next.js 16 | Course/path authoring and review |
 | admin | Next.js 16 | Approvals, users, org tree, insights |
 | functions | Node 22 | Trusted callables, triggers, schedules |
@@ -39,17 +54,13 @@ flowchart LR
 
 ## Trust boundaries
 
-See [ADR-003](ADR-003-trusted-boundary.md). Summary:
-
-- **Client + security rules** — reads and simple writes the user is allowed to own.
-- **Cloud Functions** — votes, role/approval, org mutations, quiz grading, group create, SSO, account lifecycle, support-AI posts.
-- **Next.js AI routes** — RAG generation with Admin SDK; not a substitute for Functions for privileged community writes.
+See [ADR-003](ADR-003-trusted-boundary.md).
 
 ## ADRs
 
 | ADR | Topic |
 |-----|-------|
-| [ADR-001](ADR-001-monorepo-tooling.md) | pnpm workspaces + Turborepo |
+| [ADR-001](ADR-001-monorepo-tooling.md) | pnpm workspaces + Turborepo (`apps/` + `packages/`) |
 | [ADR-002](ADR-002-shared-domain.md) | Shared domain with Zod |
 | [ADR-003](ADR-003-trusted-boundary.md) | Rules vs Functions vs Next API |
 | [ADR-004](ADR-004-pulse-ai.md) | Pulse AI bounded context |

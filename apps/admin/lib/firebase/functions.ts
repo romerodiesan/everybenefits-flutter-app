@@ -2,7 +2,6 @@ import {
   callCloudFunction,
   FunctionsUnavailableError,
   mapAdminUserRow,
-  mapOrgNode,
   createAdminRepository,
 } from "@pulse/firebase-web";
 import type { OrgNodeType, UserRole } from "@pulse/shared";
