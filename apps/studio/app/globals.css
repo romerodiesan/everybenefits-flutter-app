@@ -4,17 +4,17 @@
 
 :root {
   --brand: #1f6b4a;
-  --ink: #f2f3f5;
-  --muted: #8b919a;
-  --mesh-base: #0a0b0e;
-  --mesh-deep: #12141a;
-  --mesh-blob: #1a1d26;
-  --glass: #161922;
-  --glass-border: rgba(255, 255, 255, 0.09);
-  --surface: #12141a;
+  --ink: #0c0d10;
+  --muted: #5c6570;
+  --mesh-base: #f3f5f7;
+  --mesh-deep: #ffffff;
+  --mesh-blob: #e4e7eb;
+  --glass: #ffffff;
+  --glass-border: rgba(0, 0, 0, 0.08);
+  --surface: #ffffff;
   --on-brand: #ffffff;
-  --rail: #0e1015;
-  --panel: #14161d;
+  --rail: #eef1f4;
+  --panel: #ffffff;
   --danger: #d64545;
   --warn: #d4a017;
   --ok: #3d9a6a;
@@ -26,6 +26,20 @@
   --radius-sheet: 12px;
   --radius-row: 10px;
   --control-h: 36px;
+}
+
+.dark {
+  --ink: #f2f3f5;
+  --muted: #8b919a;
+  --mesh-base: #0a0b0e;
+  --mesh-deep: #12141a;
+  --mesh-blob: #1a1d26;
+  --glass: #161922;
+  --glass-border: rgba(255, 255, 255, 0.09);
+  --surface: #12141a;
+  --on-brand: #ffffff;
+  --rail: #0e1015;
+  --panel: #14161d;
 }
 
 @theme inline {
@@ -73,7 +87,11 @@ h3,
       color-mix(in srgb, var(--brand) 14%, transparent),
       transparent 55%
     ),
-    linear-gradient(180deg, #0c0e13 0%, var(--mesh-base) 40%),
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--mesh-blob) 70%, var(--mesh-base)) 0%,
+      var(--mesh-base) 40%
+    ),
     var(--mesh-base);
 }
 

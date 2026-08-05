@@ -65,8 +65,8 @@ export function SettingsHome() {
           }`}
         >
           <span
-            className={`absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition ${
-              aiEnabled ? "left-[1.35rem]" : "left-0.5"
+            className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ease-out ${
+              aiEnabled ? "translate-x-5" : "translate-x-0"
             }`}
           />
         </button>

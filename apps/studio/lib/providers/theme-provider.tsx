@@ -7,6 +7,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -30,6 +31,8 @@ const ACCENTS: Record<AccentSeed, string> = {
 };
 
 const ACCENT_IDS = new Set<string>(Object.keys(ACCENTS));
+const THEME_KEY = "pulse-theme";
+const ACCENT_KEY = "pulse-accent";
 
 type ThemeContextValue = {
   mode: ThemeMode;
@@ -41,16 +44,48 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function readStored<T extends string>(key: string, fallback: T): T {
-  if (typeof window === "undefined") return fallback;
-  return (window.localStorage.getItem(key) as T) || fallback;
+function isThemeMode(value: string | null | undefined): value is ThemeMode {
+  return value === "system" || value === "light" || value === "dark";
 }
 
-function isAccent(value: string): value is AccentSeed {
-  return ACCENT_IDS.has(value);
+function isAccent(value: string | null | undefined): value is AccentSeed {
+  return typeof value === "string" && ACCENT_IDS.has(value);
 }
 
-/** Studio inherits appearance from Pulse via Firestore `users/{uid}.appearance`. */
+function readStoredMode(): ThemeMode {
+  if (typeof window === "undefined") return "dark";
+  const raw = window.localStorage.getItem(THEME_KEY);
+  return isThemeMode(raw) ? raw : "dark";
+}
+
+function readStoredAccent(): AccentSeed {
+  if (typeof window === "undefined") return "green";
+  const raw = window.localStorage.getItem(ACCENT_KEY);
+  return isAccent(raw) ? raw : "green";
+}
+
+function resolveDark(mode: ThemeMode): boolean {
+  if (mode === "dark") return true;
+  if (mode === "light") return false;
+  if (typeof window === "undefined") return true;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+export function applyDocumentTheme(
+  mode: ThemeMode,
+  accent: AccentSeed,
+): boolean {
+  if (typeof document === "undefined") return mode !== "light";
+  const dark = resolveDark(mode);
+  document.documentElement.classList.toggle("dark", dark);
+  document.documentElement.style.setProperty("--brand", ACCENTS[accent]);
+  return dark;
+}
+
+/**
+ * Studio/Admin inherit appearance from Pulse via shared localStorage keys and
+ * Firestore `users/{uid}.appearance` (read-only here — edits happen in Pulse).
+ */
 export function ThemeProvider({
   children,
   remoteAppearance,
@@ -61,63 +96,90 @@ export function ThemeProvider({
     accent?: string | null;
   } | null;
 }) {
-  const [mode, setModeState] = useState<ThemeMode>("dark");
-  const [accent, setAccentState] = useState<AccentSeed>("green");
-  const [resolvedDark, setResolvedDark] = useState(true);
+  const [mode, setModeState] = useState<ThemeMode>(() =>
+    typeof window === "undefined" ? "dark" : readStoredMode(),
+  );
+  const [accent, setAccentState] = useState<AccentSeed>(() =>
+    typeof window === "undefined" ? "green" : readStoredAccent(),
+  );
+  const [resolvedDark, setResolvedDark] = useState(() => resolveDark(mode));
+  const ignoreRemoteUntil = useRef(0);
+  const modeRef = useRef(mode);
+  const accentRef = useRef(accent);
+  modeRef.current = mode;
+  accentRef.current = accent;
   const remoteTheme = remoteAppearance?.theme;
   const remoteAccent = remoteAppearance?.accent;
 
   useEffect(() => {
     startTransition(() => {
-      setModeState(readStored("pulse-theme", "dark"));
-      setAccentState(readStored("pulse-accent", "green"));
+      const nextMode = readStoredMode();
+      const nextAccent = readStoredAccent();
+      setModeState(nextMode);
+      setAccentState(nextAccent);
+      setResolvedDark(applyDocumentTheme(nextMode, nextAccent));
     });
   }, []);
 
   useEffect(() => {
     if (remoteTheme == null && remoteAccent == null) return;
+    if (Date.now() < ignoreRemoteUntil.current) return;
+
+    const currentMode = modeRef.current;
+    const currentAccent = accentRef.current;
+    let nextMode = currentMode;
+    let nextAccent = currentAccent;
+    let changed = false;
+
+    if (isThemeMode(remoteTheme) && remoteTheme !== currentMode) {
+      nextMode = remoteTheme;
+      window.localStorage.setItem(THEME_KEY, remoteTheme);
+      changed = true;
+    }
+    if (isAccent(remoteAccent) && remoteAccent !== currentAccent) {
+      nextAccent = remoteAccent;
+      window.localStorage.setItem(ACCENT_KEY, remoteAccent);
+      changed = true;
+    }
+    if (!changed) return;
+
     startTransition(() => {
-      if (
-        remoteTheme === "system" ||
-        remoteTheme === "light" ||
-        remoteTheme === "dark"
-      ) {
-        setModeState(remoteTheme);
-        window.localStorage.setItem("pulse-theme", remoteTheme);
-      }
-      if (remoteAccent && isAccent(remoteAccent)) {
-        setAccentState(remoteAccent);
-        window.localStorage.setItem("pulse-accent", remoteAccent);
-      }
+      setModeState(nextMode);
+      setAccentState(nextAccent);
+      setResolvedDark(applyDocumentTheme(nextMode, nextAccent));
     });
   }, [remoteTheme, remoteAccent]);
 
   useEffect(() => {
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    const apply = () => {
-      const dark =
-        mode === "dark" || (mode === "system" && media.matches);
-      setResolvedDark(dark);
-      document.documentElement.classList.toggle("dark", dark);
-      document.documentElement.style.setProperty(
-        "--brand",
-        ACCENTS[accent],
-      );
+    const onChange = () => {
+      if (mode !== "system") return;
+      setResolvedDark(applyDocumentTheme(mode, accent));
     };
-    apply();
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
+    setResolvedDark(applyDocumentTheme(mode, accent));
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
   }, [mode, accent]);
 
-  const setMode = useCallback((next: ThemeMode) => {
-    setModeState(next);
-    window.localStorage.setItem("pulse-theme", next);
-  }, []);
+  const setMode = useCallback(
+    (next: ThemeMode) => {
+      ignoreRemoteUntil.current = Date.now() + 2500;
+      setModeState(next);
+      window.localStorage.setItem(THEME_KEY, next);
+      setResolvedDark(applyDocumentTheme(next, accent));
+    },
+    [accent],
+  );
 
-  const setAccent = useCallback((next: AccentSeed) => {
-    setAccentState(next);
-    window.localStorage.setItem("pulse-accent", next);
-  }, []);
+  const setAccent = useCallback(
+    (next: AccentSeed) => {
+      ignoreRemoteUntil.current = Date.now() + 2500;
+      setAccentState(next);
+      window.localStorage.setItem(ACCENT_KEY, next);
+      setResolvedDark(applyDocumentTheme(mode, next));
+    },
+    [mode],
+  );
 
   const value = useMemo(
     () => ({ mode, accent, setMode, setAccent, resolvedDark }),

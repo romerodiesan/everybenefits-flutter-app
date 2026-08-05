@@ -1,5 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree, Outfit } from "next/font/google";
+import { AuthProvider } from "@/lib/providers/auth-provider";
+import { ThemedApp } from "@/components/chrome/themed-app";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -42,8 +45,19 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} ${figtree.variable} dark`} suppressHydrationWarning>
-      <body className="min-h-screen antialiased">{children}</body>
+    <html
+      lang="en"
+      className={`${outfit.variable} ${figtree.variable}`}
+      suppressHydrationWarning
+    >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} />
+      </head>
+      <body className="min-h-screen antialiased">
+        <AuthProvider>
+          <ThemedApp>{children}</ThemedApp>
+        </AuthProvider>
+      </body>
     </html>
   );
 }

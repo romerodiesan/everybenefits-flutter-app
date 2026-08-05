@@ -201,7 +201,7 @@ function IconMoon(props: SVGProps<SVGSVGElement>) {
 
 function ThemeToggle() {
   const t = useTranslations();
-  const { resolvedDark, setMode } = useThemeSettings();
+  const { mode, resolvedDark, setMode } = useThemeSettings();
 
   return (
     <button
@@ -212,11 +212,14 @@ function ThemeToggle() {
         resolvedDark ? t("profileThemeLight") : t("profileThemeDark")
       }
       title={resolvedDark ? t("profileThemeLight") : t("profileThemeDark")}
-      onClick={() => setMode(resolvedDark ? "light" : "dark")}
+      onClick={() => {
+        // Explicit light/dark — leave "system" only from Appearance settings.
+        setMode(resolvedDark ? "light" : "dark");
+      }}
       className="relative flex h-8 w-[3.75rem] shrink-0 items-center rounded-full bg-ink/[0.06] p-0.5 transition-colors hover:bg-ink/[0.1] dark:bg-white/[0.08] dark:hover:bg-white/[0.12]"
     >
       <span
-        className={`absolute top-0.5 h-7 w-7 rounded-full bg-sheet shadow-[0_1px_3px_rgba(0,0,0,0.12)] transition-transform duration-200 ease-out ${
+        className={`absolute top-0.5 left-0.5 h-7 w-7 rounded-full bg-sheet shadow-[0_1px_3px_rgba(0,0,0,0.12)] transition-transform duration-200 ease-out ${
           resolvedDark ? "translate-x-[1.55rem]" : "translate-x-0"
         }`}
       />
@@ -234,6 +237,7 @@ function ThemeToggle() {
       >
         <IconMoon width={14} height={14} />
       </span>
+      <span className="sr-only">{mode}</span>
     </button>
   );
 }

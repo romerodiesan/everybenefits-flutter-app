@@ -6,6 +6,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { Button } from "@/components/ui/primitives";
 import { useAuth } from "@/lib/providers/auth-provider";
+import { switchLocale } from "@/lib/i18n/switch-locale";
 import { useSafeReducedMotion } from "@/lib/use-safe-reduced-motion";
 import { PhoneMock } from "@/components/landing/phone-mock";
 import { AiScreen } from "@/components/landing/screens/ai-screen";
@@ -85,7 +86,7 @@ export function LandingHero() {
                       ? "bg-brand text-on-brand"
                       : "text-muted hover:text-ink"
                   }`}
-                  onClick={() => router.replace(pathname, { locale: code })}
+                  onClick={() => switchLocale(router, pathname, code)}
                 >
                   {code}
                 </button>

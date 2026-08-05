@@ -1,0 +1,2 @@
+/** Keep in sync with ACCENTS / storage keys in theme-provider.tsx */
+export const THEME_BOOT_SCRIPT = `(function(){try{var m=localStorage.getItem("pulse-theme")||"dark";var a=localStorage.getItem("pulse-accent")||"green";var map={green:"#1F6B4A",amber:"#F5A524",teal:"#0D9488",blue:"#2563EB",violet:"#7C3AED",rose:"#E11D48"};var dark=m==="dark"||(m==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);var r=document.documentElement;r.classList.toggle("dark",dark);r.style.setProperty("--brand",map[a]||map.green);}catch(e){}})();`;
