@@ -42,6 +42,14 @@ export type UserProfile = {
     theme: "system" | "light" | "dark";
     accent: string;
   } | null;
+  privacy?: {
+    discoverableInDirectory: boolean;
+    searchableByEmail: boolean;
+    searchableByNpn: boolean;
+    showEmailInSearch: boolean;
+    showNpnInSearch: boolean;
+    allowDirectMessages: boolean;
+  } | null;
 };
 
 export type ForumThread = {

@@ -11,7 +11,8 @@ import {
   limitToLast,
   type Unsubscribe,
 } from "firebase/database";
-import { getFirebaseRtdb } from "./client";
+import { doc, getDoc } from "firebase/firestore";
+import { getFirebaseDb, getFirebaseRtdb } from "./client";
 import { callCloudFunction } from "./call-function";
 import type {
   ChatConversation,
@@ -345,6 +346,7 @@ async function createChat(chat: ChatConversation): Promise<ChatConversation> {
 
 export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
   if (me.uid === other.uid) throw new Error("Cannot chat with yourself");
+
   const key = dmKeyFor(me.uid, other.uid);
   const db = getFirebaseRtdb();
   const byId = await raceTimeout(
@@ -367,6 +369,20 @@ export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
     );
     if (snap.exists()) return chatFrom(id, asMap(snap.val()));
   }
+
+  // New conversations only — honor the recipient's DM preference.
+  const publicSnap = await getDoc(
+    doc(getFirebaseDb(), "publicProfiles", other.uid),
+  );
+  if (publicSnap.exists()) {
+    const allow = publicSnap.data()?.allowDirectMessages;
+    if (allow === false) {
+      throw new Error("direct-messages-disabled");
+    }
+  } else if (other.privacy?.allowDirectMessages === false) {
+    throw new Error("direct-messages-disabled");
+  }
+
   const now = Date.now();
   return createChat({
     id: key,

@@ -133,16 +133,117 @@ export function SettingsPanelShell({
     >
       <div className="border-b border-glass-border px-4 py-3.5 md:px-5">
         <h2
-          className={`font-display text-base font-bold ${
+          className={`font-display text-base font-bold tracking-tight ${
             danger ? "text-[#D92D20]" : ""
           }`}
         >
           {title}
         </h2>
-        {subtitle && <p className="mt-0.5 text-xs text-muted">{subtitle}</p>}
+        {subtitle && (
+          <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted">
+            {subtitle}
+          </p>
+        )}
       </div>
       <div className="px-4 py-4 md:px-5">{children}</div>
     </section>
+  );
+}
+
+export function SettingsAccordion({
+  title,
+  description,
+  open,
+  onToggle,
+  enabledCount,
+  totalCount,
+  icon,
+  children,
+}: {
+  title: string;
+  description?: string;
+  open: boolean;
+  onToggle: () => void;
+  enabledCount?: number;
+  totalCount?: number;
+  icon?: ReactNode;
+  children: ReactNode;
+}) {
+  const showCount =
+    typeof enabledCount === "number" && typeof totalCount === "number";
+
+  return (
+    <div
+      className={`overflow-hidden rounded-2xl border transition-colors ${
+        open
+          ? "border-brand/25 bg-brand/[0.03]"
+          : "border-glass-border bg-ink/[0.015] dark:bg-white/[0.02]"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition hover:bg-ink/[0.03] dark:hover:bg-white/[0.03]"
+      >
+        {icon && (
+          <span
+            className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl [&>svg]:h-[18px] [&>svg]:w-[18px] ${
+              open
+                ? "bg-brand/15 text-brand"
+                : "bg-ink/[0.06] text-muted dark:bg-white/[0.08]"
+            }`}
+            aria-hidden
+          >
+            {icon}
+          </span>
+        )}
+        <span className="min-w-0 flex-1 pt-0.5">
+          <span className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-ink">{title}</span>
+            {showCount && (
+              <span
+                className={`rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums ${
+                  open
+                    ? "bg-brand/12 text-brand"
+                    : "bg-ink/[0.06] text-muted dark:bg-white/[0.08]"
+                }`}
+              >
+                {enabledCount}/{totalCount}
+              </span>
+            )}
+          </span>
+          {description && (
+            <span className="mt-1 block text-xs leading-relaxed text-muted">
+              {description}
+            </span>
+          )}
+        </span>
+        <svg
+          viewBox="0 0 20 20"
+          width="18"
+          height="18"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          className={`mt-1.5 shrink-0 text-muted transition-transform duration-200 ${
+            open ? "rotate-180" : ""
+          }`}
+          aria-hidden
+        >
+          <path
+            d="M5 7.5 10 12.5 15 7.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </button>
+      {open && (
+        <div className="border-t border-glass-border/80 bg-surface/40 px-4 dark:bg-black/10">
+          <div className="divide-y divide-glass-border">{children}</div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -151,17 +252,23 @@ export function SettingsRow({
   hint,
   children,
 }: {
-  label: string;
+  label: ReactNode;
   hint?: string;
   children: ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between">
-      <div className="min-w-0">
-        <p className="text-sm font-medium text-ink">{label}</p>
-        {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+    <div className="flex flex-col gap-2.5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+      <div className="min-w-0 flex-1">
+        {typeof label === "string" ? (
+          <p className="text-sm font-medium leading-snug text-ink">{label}</p>
+        ) : (
+          label
+        )}
+        {hint && (
+          <p className="mt-1 text-xs leading-relaxed text-muted">{hint}</p>
+        )}
       </div>
-      <div className="shrink-0">{children}</div>
+      <div className="shrink-0 self-end sm:self-center">{children}</div>
     </div>
   );
 }
@@ -207,7 +314,7 @@ export function Toggle({
       aria-label={label}
       disabled={disabled}
       onClick={onChange}
-      className={`inline-flex h-7 w-12 shrink-0 items-center rounded-full border-0 p-0.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 ${
+      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-0 p-0.5 transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand disabled:cursor-not-allowed disabled:opacity-50 ${
         checked
           ? "bg-brand"
           : "bg-ink/15 hover:bg-ink/20 dark:bg-white/15 dark:hover:bg-white/20"
@@ -215,8 +322,8 @@ export function Toggle({
     >
       <span
         aria-hidden
-        className={`block h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.18)] transition-[margin] duration-200 ease-out ${
-          checked ? "ml-auto" : "ml-0"
+        className={`pointer-events-none block h-6 w-6 rounded-full bg-white shadow-[0_1px_3px_rgba(0,0,0,0.18)] transition-transform duration-200 ease-out ${
+          checked ? "translate-x-5" : "translate-x-0"
         }`}
       />
     </button>

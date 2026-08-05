@@ -13,6 +13,7 @@ import {
   type NotificationChannelFilter,
 } from "@/lib/firebase/notifications";
 import { Button } from "@/components/ui/primitives";
+import { PROFILE_SECTION_KEY } from "@/lib/i18n/switch-locale";
 
 function formatWhen(date: Date | null, fallback: string) {
   if (!date) return fallback;
@@ -121,11 +122,19 @@ export function NotificationsHome() {
           >
             {t("notificationsMarkAll")}
           </Button>
-          <Link
-            href="/profile?section=notifications#notifications"
+          <button
+            type="button"
             aria-label={t("notificationsPrefsTitle")}
             title={t("notificationsPrefsTitle")}
-            className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition hover:bg-white/[0.04] hover:text-ink"
+            className="flex h-10 w-10 items-center justify-center rounded-xl text-muted transition hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.04]"
+            onClick={() => {
+              try {
+                sessionStorage.setItem(PROFILE_SECTION_KEY, "notifications");
+              } catch {
+                // ignore
+              }
+              router.push("/profile?section=notifications");
+            }}
           >
             <svg
               viewBox="0 0 24 24"
@@ -142,7 +151,7 @@ export function NotificationsHome() {
                 d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1.11-1.56 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.56-1.03H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.56-1.11 1.7 1.7 0 0 0-.34-1.87l-.06-.06A2 2 0 1 1 7.08 4.1l.06.06a1.7 1.7 0 0 0 1.87.34h.08A1.7 1.7 0 0 0 10.12 3V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v.08c.26.63.87 1.04 1.56 1.03H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.51.88Z"
               />
             </svg>
-          </Link>
+          </button>
         </div>
       </div>
 

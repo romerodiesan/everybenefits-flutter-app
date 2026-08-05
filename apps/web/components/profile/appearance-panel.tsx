@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { usePathname, useRouter } from "@/i18n/navigation";
 import {
@@ -12,6 +13,10 @@ import {
   SettingsPanelShell,
   SettingsRow,
 } from "@/components/profile/settings-nav";
+import {
+  restorePendingLocaleHash,
+  switchLocale,
+} from "@/lib/i18n/switch-locale";
 
 export function AppearancePanel() {
   const t = useTranslations();
@@ -20,18 +25,13 @@ export function AppearancePanel() {
   const router = useRouter();
   const { mode, accent, setMode, setAccent } = useThemeSettings();
 
-  const switchLocale = (code: string) => {
+  useEffect(() => {
+    restorePendingLocaleHash();
+  }, [locale]);
+
+  const onSwitchLocale = (code: string) => {
     if (code === locale) return;
-    const hash =
-      typeof window !== "undefined" ? window.location.hash : "#appearance";
-    router.replace(pathname, { locale: code });
-    // next-intl locale swaps can drop the panel hash — restore appearance.
-    queueMicrotask(() => {
-      const target = hash || "#appearance";
-      if (window.location.hash !== target) {
-        window.history.replaceState(null, "", target);
-      }
-    });
+    switchLocale(router, pathname, code, { hash: "#appearance" });
   };
 
   return (
@@ -97,7 +97,7 @@ export function AppearancePanel() {
               <button
                 key={code}
                 type="button"
-                onClick={() => switchLocale(code)}
+                onClick={() => onSwitchLocale(code)}
                 aria-pressed={locale === code}
                 className={`h-8 rounded-lg px-3 text-xs font-semibold transition ${
                   locale === code

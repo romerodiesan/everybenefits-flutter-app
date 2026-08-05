@@ -60,10 +60,18 @@ export type NotificationPrefs = {
   pushSupport: boolean;
   pushForumVotes: boolean;
   pushForumReplies: boolean;
+  pushForumNewThreads: boolean;
   inAppChats: boolean;
   inAppForums: boolean;
   inAppAcademy: boolean;
   inAppSupport: boolean;
+  emailChats: boolean;
+  emailForumReplies: boolean;
+  emailForumVotes: boolean;
+  emailForumNewThreads: boolean;
+  emailAcademy: boolean;
+  emailSupport: boolean;
+  emailProductUpdates: boolean;
 };
 
 export type NotificationState = {
@@ -80,10 +88,18 @@ export const DEFAULT_PREFS: NotificationPrefs = {
   pushSupport: true,
   pushForumVotes: true,
   pushForumReplies: true,
+  pushForumNewThreads: true,
   inAppChats: true,
   inAppForums: true,
   inAppAcademy: true,
   inAppSupport: true,
+  emailChats: false,
+  emailForumReplies: false,
+  emailForumVotes: false,
+  emailForumNewThreads: false,
+  emailAcademy: false,
+  emailSupport: true,
+  emailProductUpdates: false,
 };
 
 export function channelForType(type: string): NotificationChannelFilter {
@@ -116,10 +132,18 @@ function stateFrom(
       pushSupport: prefsRaw.pushSupport !== false,
       pushForumVotes: prefsRaw.pushForumVotes !== false && pushForums,
       pushForumReplies: prefsRaw.pushForumReplies !== false && pushForums,
+      pushForumNewThreads: prefsRaw.pushForumNewThreads !== false && pushForums,
       inAppChats: prefsRaw.inAppChats !== false,
       inAppForums: prefsRaw.inAppForums !== false,
       inAppAcademy: prefsRaw.inAppAcademy !== false,
       inAppSupport: prefsRaw.inAppSupport !== false,
+      emailChats: prefsRaw.emailChats === true,
+      emailForumReplies: prefsRaw.emailForumReplies === true,
+      emailForumVotes: prefsRaw.emailForumVotes === true,
+      emailForumNewThreads: prefsRaw.emailForumNewThreads === true,
+      emailAcademy: prefsRaw.emailAcademy === true,
+      emailSupport: prefsRaw.emailSupport !== false,
+      emailProductUpdates: prefsRaw.emailProductUpdates === true,
     },
   };
 }

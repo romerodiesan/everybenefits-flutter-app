@@ -22,11 +22,37 @@ import {
   type EnrolledFactor,
   TotpMultiFactorGenerator,
 } from "@/lib/firebase/mfa";
+import { toE164 } from "@/lib/firebase/profile-phone";
 import { Button, Input, Label } from "@/components/ui/primitives";
+import { CountryCodeSelect } from "@/components/ui/country-code-select";
 import {
   SettingsPanelShell,
+  SettingsRow,
   StatusBanner,
 } from "@/components/profile/settings-nav";
+
+function GoogleIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden>
+      <path
+        fill="#EA4335"
+        d="M12 10.2v3.6h5.1c-.2 1.2-.9 2.2-1.9 2.9l3.1 2.4c1.8-1.7 2.8-4.1 2.8-7 0-.7-.1-1.3-.2-1.9H12z"
+      />
+      <path
+        fill="#34A853"
+        d="M6.6 14.3l-.5.4-2.2 1.7C5.5 19.1 8.5 21 12 21c2.7 0 5-.9 6.7-2.4l-3.1-2.4c-.9.6-2 1-3.6 1-2.8 0-5.1-1.9-5.9-4.4z"
+      />
+      <path
+        fill="#4A90E2"
+        d="M4 7.6C3.4 8.8 3 10.3 3 12s.4 3.2 1 4.4l2.7-2.1c-.2-.6-.3-1.2-.3-2.3 0-.8.1-1.5.3-2.2L4 7.6z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M12 5.3c1.5 0 2.8.5 3.8 1.5l2.8-2.8C16.9 2.3 14.7 1.4 12 1.4 8.5 1.4 5.5 3.3 4 6.6l2.7 2.1C7 6.2 9.2 5.3 12 5.3z"
+      />
+    </svg>
+  );
+}
 
 export function SecurityPanel() {
   const t = useTranslations();
@@ -36,6 +62,7 @@ export function SecurityPanel() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<"saved" | "error" | "factor" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [showReauth, setShowReauth] = useState(false);
 
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -45,12 +72,15 @@ export function SecurityPanel() {
   const [totpQr, setTotpQr] = useState<string | null>(null);
   const [totpKey, setTotpKey] = useState<string | null>(null);
   const [totpCode, setTotpCode] = useState("");
+  const [enrollingTotp, setEnrollingTotp] = useState(false);
 
-  const [phone, setPhone] = useState("");
+  const [phoneCountryCode, setPhoneCountryCode] = useState("+1");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneVerificationId, setPhoneVerificationId] = useState<string | null>(
     null,
   );
   const [smsCode, setSmsCode] = useState("");
+  const [enrollingSms, setEnrollingSms] = useState(false);
   const [reauthPassword, setReauthPassword] = useState("");
 
   const refresh = useCallback(async () => {
@@ -69,6 +99,13 @@ export function SecurityPanel() {
   useEffect(() => {
     void refresh();
   }, [refresh]);
+
+  const totpFactor = factors.find(
+    (f) => f.factorId === TotpMultiFactorGenerator.FACTOR_ID,
+  );
+  const smsFactors = factors.filter(
+    (f) => f.factorId !== TotpMultiFactorGenerator.FACTOR_ID,
+  );
 
   async function onSavePassword(e: FormEvent) {
     e.preventDefault();
@@ -101,24 +138,40 @@ export function SecurityPanel() {
 
   async function ensureRecentLogin() {
     if (hasPasswordProvider()) {
-      if (!reauthPassword) throw new Error("password-required");
+      if (!reauthPassword) {
+        setShowReauth(true);
+        throw new Error("password-required");
+      }
       await reauthenticate(reauthPassword);
     } else {
       await reauthenticate();
     }
   }
 
+  function mapSecurityError(err: unknown): string {
+    if (err instanceof Error && err.message === "password-required") {
+      return t("securityReauthRequired");
+    }
+    if (err instanceof Error && err.message === "last-provider") {
+      return t("securityGoogleLastProvider");
+    }
+    return t("errorAuth");
+  }
+
   async function onStartTotp() {
     setBusy(true);
     setError(null);
+    setStatus(null);
     try {
       await ensureRecentLogin();
       const pending = await startTotpEnrollment();
       setTotpSecret(pending.secret);
       setTotpQr(pending.qrCodeUrl);
       setTotpKey(pending.secretKey);
-    } catch {
-      setError(t("errorAuth"));
+      setEnrollingTotp(true);
+    } catch (err) {
+      setError(mapSecurityError(err));
+      setStatus("error");
     } finally {
       setBusy(false);
     }
@@ -135,10 +188,12 @@ export function SecurityPanel() {
       setTotpQr(null);
       setTotpKey(null);
       setTotpCode("");
+      setEnrollingTotp(false);
       setStatus("factor");
       await refresh();
     } catch {
       setError(t("errorAuth"));
+      setStatus("error");
     } finally {
       setBusy(false);
     }
@@ -147,12 +202,15 @@ export function SecurityPanel() {
   async function onStartPhone() {
     setBusy(true);
     setError(null);
+    setStatus(null);
     try {
       await ensureRecentLogin();
-      const id = await startPhoneEnrollment(phone, "security-recaptcha");
+      const e164 = toE164(phoneCountryCode, phoneNumber);
+      const id = await startPhoneEnrollment(e164, "security-recaptcha");
       setPhoneVerificationId(id);
-    } catch {
-      setError(t("errorAuth"));
+    } catch (err) {
+      setError(mapSecurityError(err));
+      setStatus("error");
     } finally {
       setBusy(false);
     }
@@ -165,13 +223,15 @@ export function SecurityPanel() {
     setError(null);
     try {
       await finishPhoneEnrollment(phoneVerificationId, smsCode);
-      setPhone("");
+      setPhoneNumber("");
       setSmsCode("");
       setPhoneVerificationId(null);
+      setEnrollingSms(false);
       setStatus("factor");
       await refresh();
     } catch {
       setError(t("errorAuth"));
+      setStatus("error");
     } finally {
       setBusy(false);
     }
@@ -180,13 +240,15 @@ export function SecurityPanel() {
   async function onRemove(uid: string) {
     setBusy(true);
     setError(null);
+    setStatus(null);
     try {
       await ensureRecentLogin();
       await unenrollFactor(uid);
       setStatus("factor");
       await refresh();
-    } catch {
-      setError(t("errorAuth"));
+    } catch (err) {
+      setError(mapSecurityError(err));
+      setStatus("error");
     } finally {
       setBusy(false);
     }
@@ -244,16 +306,31 @@ export function SecurityPanel() {
         )}
       </form>
 
-      <div className="mt-6 space-y-3 border-t border-glass-border pt-6">
-        <div>
+      <div className="mt-6 border-t border-glass-border pt-6">
+        <div className="mb-3">
           <h3 className="text-sm font-bold">{t("securityGoogleTitle")}</h3>
           <p className="mt-1 text-sm text-muted">{t("securityGoogleHint")}</p>
         </div>
-        {hasGoogle ? (
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="rounded-lg bg-brand/12 px-2.5 py-1 text-xs font-bold text-brand">
-              {t("securityGoogleLinked")}
+        <SettingsRow
+          label={
+            <span className="flex items-center gap-2.5">
+              <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-glass-border bg-sheet">
+                <GoogleIcon className="h-5 w-5" />
+              </span>
+              <span>
+                <span className="block text-sm font-semibold text-ink">
+                  Google
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">
+                  {hasGoogle
+                    ? t("securityGoogleLinked")
+                    : t("securityGoogleNotLinked")}
+                </span>
+              </span>
             </span>
+          }
+        >
+          {hasGoogle ? (
             <Button
               type="button"
               variant="secondary"
@@ -269,11 +346,7 @@ export function SecurityPanel() {
                   setStatus("saved");
                 } catch (err) {
                   setStatus("error");
-                  setError(
-                    err instanceof Error && err.message === "last-provider"
-                      ? t("securityGoogleLastProvider")
-                      : t("errorGeneric"),
-                  );
+                  setError(mapSecurityError(err));
                 } finally {
                   setBusy(false);
                 }
@@ -281,159 +354,314 @@ export function SecurityPanel() {
             >
               {t("securityGoogleUnlink")}
             </Button>
-          </div>
-        ) : (
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              setError(null);
-              setStatus(null);
-              try {
-                await linkGoogleAccount();
-                await refresh();
-                setStatus("saved");
-              } catch {
-                setStatus("error");
-                setError(t("errorGeneric"));
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            {t("securityGoogleLink")}
-          </Button>
-        )}
+          ) : (
+            <Button
+              type="button"
+              className="h-8 px-3 text-xs"
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                setError(null);
+                setStatus(null);
+                try {
+                  await linkGoogleAccount();
+                  await refresh();
+                  setStatus("saved");
+                } catch {
+                  setStatus("error");
+                  setError(t("errorGeneric"));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            >
+              {t("securityGoogleLink")}
+            </Button>
+          )}
+        </SettingsRow>
       </div>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-6 space-y-4 border-t border-glass-border pt-6">
         <div>
           <h3 className="text-sm font-bold">{t("securityMfaTitle")}</h3>
           <p className="mt-1 text-sm text-muted">{t("securityMfaHint")}</p>
         </div>
 
         {hasPassword && (
-          <div className="max-w-sm">
-            <Label>{t("securityReauthHint")}</Label>
-            <Input
-              type="password"
-              value={reauthPassword}
-              onChange={(e) => setReauthPassword(e.target.value)}
-              autoComplete="current-password"
-            />
+          <div className="rounded-xl border border-glass-border p-3">
+            <button
+              type="button"
+              className="flex w-full items-center justify-between gap-2 text-left"
+              onClick={() => setShowReauth((prev) => !prev)}
+              aria-expanded={showReauth}
+            >
+              <span>
+                <span className="block text-sm font-semibold">
+                  {t("securityReauthTitle")}
+                </span>
+                <span className="mt-0.5 block text-xs text-muted">
+                  {t("securityReauthHint")}
+                </span>
+              </span>
+              <svg
+                viewBox="0 0 20 20"
+                className={`h-4 w-4 shrink-0 text-muted transition ${showReauth ? "rotate-180" : ""}`}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                aria-hidden
+              >
+                <path
+                  d="M5 7.5 10 12.5 15 7.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+            </button>
+            {showReauth && (
+              <div className="mt-3 max-w-sm">
+                <Label>{t("securityCurrentPassword")}</Label>
+                <Input
+                  type="password"
+                  value={reauthPassword}
+                  onChange={(e) => setReauthPassword(e.target.value)}
+                  autoComplete="current-password"
+                />
+              </div>
+            )}
           </div>
         )}
 
-        {factors.length === 0 ? (
+        {factors.length > 0 && (
+          <ul className="divide-y divide-glass-border rounded-xl border border-glass-border">
+            {factors.map((factor) => {
+              const isTotp =
+                factor.factorId === TotpMultiFactorGenerator.FACTOR_ID;
+              const label =
+                factor.displayName ||
+                (isTotp
+                  ? t("mfaTotpLabel")
+                  : factor.phoneNumber || t("mfaSmsLabel"));
+              return (
+                <li
+                  key={factor.uid}
+                  className="flex items-center justify-between gap-3 px-3.5 py-3 text-sm"
+                >
+                  <span className="min-w-0">
+                    <span className="block font-semibold">{label}</span>
+                    <span className="mt-0.5 block text-xs text-muted">
+                      {isTotp ? t("mfaTotpLabel") : t("mfaSmsLabel")}
+                    </span>
+                  </span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    className="h-8 shrink-0 px-3 text-xs"
+                    disabled={busy}
+                    onClick={() => void onRemove(factor.uid)}
+                  >
+                    {t("securityFactorRemove")}
+                  </Button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        {factors.length === 0 && !enrollingTotp && !enrollingSms && (
           <p className="text-sm text-muted">{t("securityNoFactors")}</p>
-        ) : (
-          <ul className="space-y-2">
-            {factors.map((factor) => (
-              <li
-                key={factor.uid}
-                className="flex items-center justify-between gap-3 text-sm"
-              >
-                <span>
-                  {factor.displayName ||
-                    (factor.factorId === TotpMultiFactorGenerator.FACTOR_ID
-                      ? t("mfaTotpLabel")
-                      : factor.phoneNumber || t("mfaSmsLabel"))}
-                  <span className="ml-2 text-xs text-muted">{factor.factorId}</span>
-                </span>
+        )}
+
+        <div className="space-y-3">
+          <div className="rounded-xl border border-glass-border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">{t("mfaTotpLabel")}</p>
+                <p className="mt-0.5 text-xs text-muted">
+                  {totpFactor
+                    ? t("securityMethodActive")
+                    : t("securityTotpMethodHint")}
+                </p>
+              </div>
+              {!totpFactor && !enrollingTotp && (
                 <Button
                   type="button"
                   variant="secondary"
                   className="h-8 px-3 text-xs"
                   disabled={busy}
-                  onClick={() => void onRemove(factor.uid)}
+                  onClick={() => void onStartTotp()}
                 >
-                  {t("securityFactorRemove")}
+                  {t("securityEnrollTotp")}
                 </Button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {!totpSecret ? (
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={busy}
-            onClick={() => void onStartTotp()}
-          >
-            {t("securityEnrollTotp")}
-          </Button>
-        ) : (
-          <form onSubmit={onFinishTotp} className="space-y-3 rounded-xl border border-glass-border p-4">
-            <p className="text-sm">{t("securityTotpScan")}</p>
-            {totpQr && (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                alt="TOTP QR"
-                className="h-40 w-40 rounded-lg bg-white p-2"
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(totpQr)}`}
-              />
-            )}
-            {totpKey && (
-              <p className="break-all text-xs text-muted">
-                {t("securityTotpSecret")}: {totpKey}
-              </p>
-            )}
-            <div className="max-w-xs">
-              <Label>{t("mfaCodeLabel")}</Label>
-              <Input
-                value={totpCode}
-                onChange={(e) => setTotpCode(e.target.value)}
-                required
-              />
+              )}
             </div>
-            <Button type="submit" disabled={busy}>
-              {t("mfaVerify")}
-            </Button>
-          </form>
-        )}
-
-        <div className="space-y-3 rounded-xl border border-glass-border p-4">
-          <div className="max-w-sm">
-            <Label>{t("securityPhoneHint")}</Label>
-            <Input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+15551234567"
-            />
+            {enrollingTotp && totpSecret && (
+              <form onSubmit={onFinishTotp} className="mt-4 space-y-3">
+                <p className="text-sm">{t("securityTotpScan")}</p>
+                {totpQr && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    alt=""
+                    className="h-40 w-40 rounded-lg bg-white p-2"
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(totpQr)}`}
+                  />
+                )}
+                {totpKey && (
+                  <p className="break-all text-xs text-muted">
+                    {t("securityTotpSecret")}:{" "}
+                    <code className="rounded bg-ink/[0.06] px-1 py-0.5 dark:bg-white/[0.08]">
+                      {totpKey}
+                    </code>
+                  </p>
+                )}
+                <div className="max-w-xs">
+                  <Label>{t("mfaCodeLabel")}</Label>
+                  <Input
+                    value={totpCode}
+                    onChange={(e) => setTotpCode(e.target.value)}
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    required
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="submit" disabled={busy}>
+                    {t("mfaVerify")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    disabled={busy}
+                    onClick={() => {
+                      setEnrollingTotp(false);
+                      setTotpSecret(null);
+                      setTotpQr(null);
+                      setTotpKey(null);
+                      setTotpCode("");
+                    }}
+                  >
+                    {t("cancel")}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
-          {!phoneVerificationId ? (
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={busy || !phone.trim()}
-              onClick={() => void onStartPhone()}
-            >
-              {t("securityEnrollSms")}
-            </Button>
-          ) : (
-            <form onSubmit={onFinishPhone} className="space-y-3">
-              <div className="max-w-xs">
-                <Label>{t("mfaCodeLabel")}</Label>
-                <Input
-                  value={smsCode}
-                  onChange={(e) => setSmsCode(e.target.value)}
-                  required
-                />
+
+          <div className="rounded-xl border border-glass-border p-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold">{t("mfaSmsLabel")}</p>
+                <p className="mt-0.5 text-xs text-muted">
+                  {smsFactors.length
+                    ? t("securityMethodActive")
+                    : t("securitySmsMethodHint")}
+                </p>
               </div>
-              <Button type="submit" disabled={busy}>
-                {t("mfaVerify")}
-              </Button>
-            </form>
-          )}
+              {!enrollingSms && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="h-8 px-3 text-xs"
+                  disabled={busy}
+                  onClick={() => setEnrollingSms(true)}
+                >
+                  {t("securityEnrollSms")}
+                </Button>
+              )}
+            </div>
+            {enrollingSms && (
+              <div className="mt-4 space-y-3">
+                <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-[9.5rem_1fr]">
+                  <div>
+                    <Label>{t("phoneCountryCode")}</Label>
+                    <CountryCodeSelect
+                      value={phoneCountryCode}
+                      onChange={(code) => {
+                        setPhoneCountryCode(code);
+                        setPhoneVerificationId(null);
+                        setSmsCode("");
+                      }}
+                      disabled={Boolean(phoneVerificationId)}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("fieldPhoneNumber")}</Label>
+                    <Input
+                      value={phoneNumber}
+                      onChange={(e) => {
+                        setPhoneNumber(e.target.value);
+                        setPhoneVerificationId(null);
+                        setSmsCode("");
+                      }}
+                      inputMode="tel"
+                      disabled={Boolean(phoneVerificationId)}
+                    />
+                  </div>
+                </div>
+                {!phoneVerificationId ? (
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      disabled={busy || !phoneNumber.trim()}
+                      onClick={() => void onStartPhone()}
+                    >
+                      {t("mfaSendSms")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      disabled={busy}
+                      onClick={() => {
+                        setEnrollingSms(false);
+                        setPhoneNumber("");
+                        setPhoneVerificationId(null);
+                        setSmsCode("");
+                      }}
+                    >
+                      {t("cancel")}
+                    </Button>
+                  </div>
+                ) : (
+                  <form onSubmit={onFinishPhone} className="space-y-3">
+                    <div className="max-w-xs">
+                      <Label>{t("mfaCodeLabel")}</Label>
+                      <Input
+                        value={smsCode}
+                        onChange={(e) => setSmsCode(e.target.value)}
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        required
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button type="submit" disabled={busy}>
+                        {t("mfaVerify")}
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        disabled={busy}
+                        onClick={() => {
+                          setPhoneVerificationId(null);
+                          setSmsCode("");
+                        }}
+                      >
+                        {t("cancel")}
+                      </Button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {status === "factor" && (
           <StatusBanner kind="success">{t("securityFactorAdded")}</StatusBanner>
         )}
-        {error && <StatusBanner kind="error">{error}</StatusBanner>}
+        {(status === "error" || error) && error && (
+          <StatusBanner kind="error">{error}</StatusBanner>
+        )}
       </div>
     </SettingsPanelShell>
   );

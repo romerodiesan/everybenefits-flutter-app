@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { headlineName } from "@/lib/firebase/users";
@@ -22,6 +23,10 @@ import { PrivacyPanel } from "@/components/profile/privacy-panel";
 import { SecurityPanel } from "@/components/profile/security-panel";
 import { AdminPanel } from "@/components/profile/admin-panel";
 import { DangerPanel } from "@/components/profile/danger-panel";
+import {
+  PROFILE_SECTION_KEY,
+  restorePendingLocaleHash,
+} from "@/lib/i18n/switch-locale";
 
 function roleLabel(
   role: UserProfile["role"],
@@ -37,24 +42,39 @@ function roleLabel(
   }[role];
 }
 
+const KNOWN_SECTIONS: SettingsSection[] = [
+  "account",
+  "appearance",
+  "notifications",
+  "security",
+  "privacy",
+  "admin",
+  "danger",
+];
+
+function isSettingsSection(value: string): value is SettingsSection {
+  return KNOWN_SECTIONS.includes(value as SettingsSection);
+}
+
 function sectionFromLocation(): SettingsSection | null {
   if (typeof window === "undefined") return null;
-  const hash = window.location.hash.replace("#", "");
   const params = new URLSearchParams(window.location.search);
   const fromQuery = params.get("section") ?? "";
-  const candidate = hash || fromQuery;
-  const known: SettingsSection[] = [
-    "account",
-    "appearance",
-    "notifications",
-    "security",
-    "privacy",
-    "admin",
-    "danger",
-  ];
-  return known.includes(candidate as SettingsSection)
-    ? (candidate as SettingsSection)
-    : null;
+  // Prefer ?section= over hash — deep links set the query, while a stale
+  // hash can linger from a previous visit or a premature replaceState.
+  if (isSettingsSection(fromQuery)) return fromQuery;
+  const hash = window.location.hash.replace(/^#/, "");
+  return isSettingsSection(hash) ? hash : null;
+}
+
+function sectionFromSession(): SettingsSection | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = sessionStorage.getItem(PROFILE_SECTION_KEY) ?? "";
+    return isSettingsSection(stored) ? stored : null;
+  } catch {
+    return null;
+  }
 }
 
 const ICONS: Record<SettingsSection, React.ReactNode> = {
@@ -121,15 +141,20 @@ export function ProfilePage() {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile } = useAuth();
-  const [section, setSection] = useState<SettingsSection>(
-    () => sectionFromLocation() ?? "account",
-  );
+  // Always start at account on SSR/hydration; resolve the real section in
+  // an effect so we never overwrite a deep-link hash with a stale default.
+  const [section, setSection] = useState<SettingsSection>("account");
+  const [sectionReady, setSectionReady] = useState(false);
 
   useEffect(() => {
+    restorePendingLocaleHash();
     const sync = () => {
-      const next = sectionFromLocation();
-      if (next) setSection(next);
+      const next =
+        sectionFromLocation() ?? sectionFromSession() ?? "account";
+      setSection(next);
+      setSectionReady(true);
     };
     sync();
     window.addEventListener("hashchange", sync);
@@ -138,7 +163,21 @@ export function ProfilePage() {
       window.removeEventListener("hashchange", sync);
       window.removeEventListener("popstate", sync);
     };
-  }, []);
+  }, [locale, searchParams]);
+
+  useEffect(() => {
+    if (!sectionReady) return;
+    try {
+      sessionStorage.setItem(PROFILE_SECTION_KEY, section);
+    } catch {
+      // ignore
+    }
+    const nextUrl = `${window.location.pathname}${window.location.search}#${section}`;
+    const current = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    if (current !== nextUrl) {
+      window.history.replaceState(null, "", nextUrl);
+    }
+  }, [section, sectionReady]);
 
   const canApprove =
     profile?.role === "admin" || profile?.role === "manager";
@@ -203,8 +242,19 @@ export function ProfilePage() {
 
   const select = (next: SettingsSection) => {
     setSection(next);
-    // Keep the hash shareable without triggering a navigation.
-    window.history.replaceState(null, "", `#${next}`);
+    try {
+      sessionStorage.setItem(PROFILE_SECTION_KEY, next);
+    } catch {
+      // ignore
+    }
+    const url = new URL(window.location.href);
+    url.searchParams.set("section", next);
+    url.hash = next;
+    window.history.replaceState(
+      null,
+      "",
+      `${url.pathname}${url.search}${url.hash}`,
+    );
   };
 
   const available = navItems.some((item) => item.id === section)

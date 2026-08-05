@@ -15,6 +15,7 @@ import {
   toE164,
 } from "@/lib/firebase/profile-phone";
 import { Avatar, Button, Input, Label } from "@/components/ui/primitives";
+import { CountryCodeSelect } from "@/components/ui/country-code-select";
 import {
   SettingsPanelShell,
   StatusBanner,
@@ -180,17 +181,16 @@ export function AccountPanel() {
             onChange={(e) => setDisplayName(e.target.value)}
           />
         </div>
-        <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-[7rem_1fr]">
+        <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-[9.5rem_1fr]">
           <div>
             <Label>{t("phoneCountryCode")}</Label>
-            <Input
+            <CountryCodeSelect
               value={phoneCountryCode}
-              onChange={(e) => {
-                setPhoneCountryCode(e.target.value);
+              onChange={(code) => {
+                setPhoneCountryCode(code);
                 setVerificationId(null);
                 setSmsCode("");
               }}
-              placeholder="+1"
             />
           </div>
           <div>

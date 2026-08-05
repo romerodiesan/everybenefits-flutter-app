@@ -264,7 +264,11 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
     } catch (error) {
       console.error(error);
       setComposerError(
-        error instanceof Error ? error.message : t("errorGeneric"),
+        error instanceof Error && error.message === "direct-messages-disabled"
+          ? t("privacyDmBlocked")
+          : error instanceof Error
+            ? error.message
+            : t("errorGeneric"),
       );
     } finally {
       setComposerBusy(false);

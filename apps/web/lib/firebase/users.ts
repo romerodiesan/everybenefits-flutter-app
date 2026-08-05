@@ -19,6 +19,7 @@ import { listPublicProfiles, searchDirectory as searchDirectoryFn } from "./func
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
 import { composeUsAddress, headlineName, parseApprovalStatus } from "../roles";
+import { readPrivacyPrefs } from "../privacy/prefs";
 
 export function profileFromData(
   uid: string,
@@ -35,6 +36,7 @@ export function profileFromData(
     deletionScheduledAt: toDate(data.deletionScheduledAt),
     approvalStatus: parseApprovalStatus(data.approvalStatus) ?? undefined,
     appearance: appearanceFrom(data.appearance),
+    privacy: readPrivacyPrefs(data.privacy),
   };
 }
 
@@ -45,13 +47,13 @@ function appearanceFrom(
   const data = raw as Record<string, unknown>;
   const theme = data.theme;
   const accent = data.accent;
-  if (
-    (theme === "system" || theme === "light" || theme === "dark") &&
-    typeof accent === "string"
-  ) {
-    return { theme, accent };
+  if (theme !== "system" && theme !== "light" && theme !== "dark") {
+    return null;
   }
-  return null;
+  return {
+    theme,
+    accent: typeof accent === "string" && accent ? accent : "green",
+  };
 }
 
 export async function ensureProfile(user: User): Promise<UserProfile> {
@@ -166,6 +168,7 @@ export async function updateUserProfile(
     addressState: next.addressState,
     addressZip: next.addressZip,
     agency: next.agency,
+    ...(patch.privacy ? { privacy: next.privacy } : {}),
     updatedAt: serverTimestamp(),
   });
 
