@@ -17,7 +17,7 @@ runConfig:
 env:
   # --- Firebase client (every-benefits-us) ---
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyBOrESVcS2kvM1_QSBb0vV1CwdpHtpsF1s
+    value: AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk
     availability:
       - BUILD
       - RUNTIME
@@ -42,7 +42,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:1001601265155:web:6f95f8ad37ec4458d8e836
+    value: 1:1001601265155:web:75ed3d19c67945c3d8e836
     availability:
       - BUILD
       - RUNTIME
@@ -52,7 +52,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-    value: G-QVYHYMYYSC
+    value: G-VG3WH6WXWR
     availability:
       - BUILD
       - RUNTIME

@@ -7,7 +7,7 @@ ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 cd "$ROOT"
 FUNCTIONS_DIR="$ROOT/apps/functions"
 
-# Prefer Node 22 (Cloud Functions Gen2 runtime). Install from apps/functions/.nvmrc.
+# Prefer Node 24 (Cloud Functions Gen2 runtime). Install from apps/functions/.nvmrc.
 export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   # shellcheck disable=SC1091
@@ -22,7 +22,34 @@ if [[ -s "$NVM_DIR/nvm.sh" ]]; then
   nvm use "$(cat "$FUNCTIONS_DIR/.nvmrc")" >/dev/null
 fi
 
-echo "Node $(node -v) (Functions runtime expects 22.x)"
+echo "Node $(node -v) (Functions runtime expects 24.x)"
+
+# Firestore/UI emulators need a real JDK. Homebrew OpenJDK is often installed but
+# not registered with macOS (/usr/bin/java is a stub). Prefer JAVA_HOME if set.
+if [[ -z "${JAVA_HOME:-}" ]]; then
+  for candidate in \
+    /opt/homebrew/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home \
+    /opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home \
+    /opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home \
+    /usr/local/opt/openjdk@25/libexec/openjdk.jdk/Contents/Home \
+    /usr/local/opt/openjdk/libexec/openjdk.jdk/Contents/Home
+  do
+    if [[ -x "${candidate}/bin/java" ]]; then
+      export JAVA_HOME="${candidate}"
+      break
+    fi
+  done
+fi
+if [[ -n "${JAVA_HOME:-}" ]]; then
+  export PATH="${JAVA_HOME}/bin:${PATH}"
+fi
+if ! command -v java >/dev/null 2>&1 || ! java -version >/dev/null 2>&1; then
+  echo "Java runtime not found. Install with: brew install openjdk@25" >&2
+  echo "Then either re-run this script, or register it for macOS:" >&2
+  echo "  sudo ln -sfn \$(brew --prefix openjdk@25)/libexec/openjdk.jdk /Library/Java/JavaVirtualMachines/openjdk-25.jdk" >&2
+  exit 1
+fi
+echo "Java $(java -version 2>&1 | head -1)"
 
 # Don't let laptop gcloud ADC talk to production from the Functions emulator
 # for non-emulated products. Firestore/RTDB/Auth/Storage stay on emulators below.

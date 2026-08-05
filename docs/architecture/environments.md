@@ -9,6 +9,8 @@
 
 Treat **`.firebaserc` → `every-insurance`** as the active CLI default unless you `firebase use` another project. Align client `.env` `NEXT_PUBLIC_FIREBASE_PROJECT_ID` / Flutter Firebase options with the project you actually deploy.
 
+**Local emulators:** `NEXT_PUBLIC_FIREBASE_PROJECT_ID` (and `FIREBASE_PROJECT_ID`) **must** be `every-insurance` — the same ID passed to `firebase emulators:start --project every-insurance`. A mismatch stores Auth and Firestore data under different project keys, so registrations can create an Auth user with no `users/{uid}` document. Keep `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true` on web, studio, and admin while testing locally.
+
 ## Domains (production)
 
 - `pulse.everybenefits.us` — webapp

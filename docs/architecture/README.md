@@ -48,7 +48,7 @@ flowchart LR
 | web | Next.js 16 | Learner UX + Pulse AI API + SSO bridge |
 | studio | Next.js 16 | Course/path authoring and review |
 | admin | Next.js 16 | Approvals, users, org tree, insights |
-| functions | Node 22 | Trusted callables, triggers, schedules |
+| functions | Node 24 | Trusted callables, triggers, schedules |
 | `@pulse/shared` | TypeScript + Zod | Domain contracts shared by TS surfaces |
 | `@pulse/firebase-web` | TypeScript | Shared client Firebase repositories for Next apps |
 

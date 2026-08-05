@@ -11,10 +11,14 @@
     "dev:studio": "pnpm --filter @pulse/studio dev",
     "dev:admin": "pnpm --filter @pulse/admin dev",
     "emulators": "bash ./tooling/scripts/start-emulators.sh",
+    "seed": "node ./tooling/scripts/seed-emulators.mjs",
+    "seed:users": "node ./tooling/scripts/seed-users.mjs",
+    "seed:academy": "node ./tooling/scripts/seed-academy.mjs",
+    "seed:notifications": "node ./tooling/scripts/seed-notifications.mjs",
     "sync:functions-shared": "pnpm --filter @pulse/functions run sync:shared"
   },
   "devDependencies": {
-    "turbo": "^2.5.4",
-    "typescript": "^5.9.3"
+    "turbo": "~2.5.4",
+    "typescript": "~5.9.3"
   }
 }

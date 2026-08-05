@@ -19,7 +19,8 @@ Architecture docs: [`docs/architecture/`](docs/architecture/). Pulse AI runbook:
 ## Prerequisites
 
 - Flutter SDK (Dart `^3.12`)
-- Node 22 + [pnpm](https://pnpm.io) `11.x`
+- Node 24 + [pnpm](https://pnpm.io) `11.x`
+- Java 21+ (Homebrew `openjdk@25`) for Firebase emulators
 - Firebase CLI (`npx firebase-tools`)
 
 ## Install
@@ -65,11 +66,22 @@ Scripts live under [`tooling/scripts/`](tooling/scripts/).
 
 | Script | Purpose |
 |--------|---------|
-| `tooling/scripts/seed-academy.mjs` | Sample Academy content |
-| `tooling/scripts/seed-notifications.mjs` | Notification fixtures |
+| `pnpm seed` | Users + Academy + notifications (agent) into emulators |
+| `pnpm seed:users` | Auth + Firestore demo profiles only |
+| `pnpm seed:academy` | Sample Academy content only |
+| `pnpm seed:notifications -- <uid>` | Notification fixtures for one user |
 | `tooling/scripts/migrate-academy-every-benefits-us.mjs` | Academy migration |
 | `tooling/scripts/reindex-ai-knowledge.mjs` | Pulse AI knowledge reindex |
 | `tooling/scripts/import-manhattanlife-course.mjs` | Course import |
+
+With emulators running (`pnpm emulators`):
+
+```bash
+pnpm seed
+# Demo logins (password PulseSeed1!):
+#   admin@pulse.local | manager@pulse.local | agent@pulse.local
+#   student@pulse.local | instructor@pulse.local | pending@pulse.local
+```
 
 ## Deploy
 
