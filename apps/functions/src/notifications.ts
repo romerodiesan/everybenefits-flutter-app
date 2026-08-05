@@ -52,10 +52,18 @@ export type NotificationPrefs = {
   pushSupport: boolean;
   pushForumVotes: boolean;
   pushForumReplies: boolean;
+  pushForumNewThreads: boolean;
   inAppChats: boolean;
   inAppForums: boolean;
   inAppAcademy: boolean;
   inAppSupport: boolean;
+  emailChats: boolean;
+  emailForumReplies: boolean;
+  emailForumVotes: boolean;
+  emailForumNewThreads: boolean;
+  emailAcademy: boolean;
+  emailSupport: boolean;
+  emailProductUpdates: boolean;
 };
 
 export function tokenDocId(token: string): string {
@@ -72,13 +80,21 @@ export function readPrefsFromData(
     pushForums,
     pushAcademy: p.pushAcademy !== false,
     pushSupport: p.pushSupport !== false,
-    // Inherit channel default when finer keys are missing.
     pushForumVotes: p.pushForumVotes !== false && pushForums,
     pushForumReplies: p.pushForumReplies !== false && pushForums,
+    pushForumNewThreads: p.pushForumNewThreads !== false && pushForums,
     inAppChats: p.inAppChats !== false,
     inAppForums: p.inAppForums !== false,
     inAppAcademy: p.inAppAcademy !== false,
     inAppSupport: p.inAppSupport !== false,
+    // Email defaults off except support (actionable).
+    emailChats: p.emailChats === true,
+    emailForumReplies: p.emailForumReplies === true,
+    emailForumVotes: p.emailForumVotes === true,
+    emailForumNewThreads: p.emailForumNewThreads === true,
+    emailAcademy: p.emailAcademy === true,
+    emailSupport: p.emailSupport !== false,
+    emailProductUpdates: p.emailProductUpdates === true,
   };
 }
 
@@ -111,9 +127,8 @@ function channelAllowsPush(
 ): boolean {
   const channel = TYPE_CHANNEL[type];
   if (type === "forum_vote") return prefs.pushForumVotes;
-  if (type === "forum_reply" || type === "forum_new_thread") {
-    return prefs.pushForumReplies;
-  }
+  if (type === "forum_reply") return prefs.pushForumReplies;
+  if (type === "forum_new_thread") return prefs.pushForumNewThreads;
   switch (channel) {
     case "chats":
       return prefs.pushChats;
@@ -123,6 +138,25 @@ function channelAllowsPush(
       return prefs.pushAcademy;
     case "support":
       return prefs.pushSupport;
+  }
+}
+
+function channelAllowsEmail(
+  prefs: NotificationPrefs,
+  type: NotificationType,
+): boolean {
+  if (type === "forum_vote") return prefs.emailForumVotes;
+  if (type === "forum_reply") return prefs.emailForumReplies;
+  if (type === "forum_new_thread") return prefs.emailForumNewThreads;
+  switch (TYPE_CHANNEL[type]) {
+    case "chats":
+      return prefs.emailChats;
+    case "forums":
+      return prefs.emailForumReplies;
+    case "academy":
+      return prefs.emailAcademy;
+    case "support":
+      return prefs.emailSupport;
   }
 }
 
@@ -339,71 +373,118 @@ export async function notifyUser(
 
   const pushAllowed =
     channelAllowsPush(prefs, payload.type) && !payload.silent;
-  if (!pushAllowed) return;
 
-  // Debounce push for grouped chat/support (inbox already updated).
+  // Debounce noisy chat/support pushes (inbox already updated).
   const debounceKey =
     groupKey ??
     (options?.chatIdForDebounce
       ? `chat:${options.chatIdForDebounce}`
       : null);
-  if (
-    debounceKey &&
-    (payload.type === "chat_message" || payload.type === "support_message") &&
-    (await shouldDebouncePush(uid, debounceKey))
-  ) {
-    return;
+  const shouldSkipPush =
+    !pushAllowed ||
+    (Boolean(debounceKey) &&
+      (payload.type === "chat_message" ||
+        payload.type === "support_message") &&
+      (await shouldDebouncePush(uid, debounceKey!)));
+
+  if (!shouldSkipPush) {
+    const tokensSnap = await db
+      .collection(`users/${uid}/fcmTokens`)
+      .limit(20)
+      .get();
+    if (!tokensSnap.empty) {
+      const stateSnap = await stateRef.get();
+      const badge = Number(stateSnap.data()?.unreadCount ?? 1);
+
+      const response = await admin.messaging().sendEachForMulticast({
+        tokens: tokensSnap.docs.map((doc) => String(doc.data().token)),
+        notification: {
+          title: pushTitle.slice(0, 120),
+          body: pushBody.slice(0, 200),
+        },
+        data: {
+          type: payload.type,
+          href: payload.href,
+          deepLink: payload.deepLink,
+          notificationId: notifId,
+          isNew: isNew ? "1" : "0",
+        },
+        apns: {
+          payload: {
+            aps: {
+              badge,
+              sound: "default",
+            },
+          },
+        },
+        webpush: {
+          fcmOptions: {
+            link: payload.href.startsWith("http") ? payload.href : undefined,
+          },
+        },
+      });
+
+      const stale: string[] = [];
+      response.responses.forEach((result, index) => {
+        if (!result.success) {
+          const code = result.error?.code ?? "";
+          if (
+            code.includes("registration-token-not-registered") ||
+            code.includes("invalid-registration-token") ||
+            code.includes("invalid-argument")
+          ) {
+            stale.push(tokensSnap.docs[index].id);
+          }
+        }
+      });
+      await Promise.all(
+        stale.map((id) => db.doc(`users/${uid}/fcmTokens/${id}`).delete()),
+      );
+    }
   }
 
-  const tokensSnap = await db.collection(`users/${uid}/fcmTokens`).limit(20).get();
-  if (tokensSnap.empty) return;
-
-  const stateSnap = await stateRef.get();
-  const badge = Number(stateSnap.data()?.unreadCount ?? 1);
-
-  const response = await admin.messaging().sendEachForMulticast({
-    tokens: tokensSnap.docs.map((doc) => String(doc.data().token)),
-    notification: {
-      title: pushTitle.slice(0, 120),
-      body: pushBody.slice(0, 200),
-    },
-    data: {
+  if (channelAllowsEmail(prefs, payload.type) && !payload.silent) {
+    await enqueueNotificationEmail(uid, {
       type: payload.type,
+      title: pushTitle,
+      body: pushBody,
       href: payload.href,
-      deepLink: payload.deepLink,
       notificationId: notifId,
-      isNew: isNew ? "1" : "0",
-    },
-    apns: {
-      payload: {
-        aps: {
-          badge,
-          sound: "default",
-        },
-      },
-    },
-    webpush: {
-      fcmOptions: {
-        link: payload.href.startsWith("http") ? payload.href : undefined,
-      },
-    },
-  });
+    });
+  }
+}
 
-  const stale: string[] = [];
-  response.responses.forEach((result, index) => {
-    if (!result.success) {
-      const code = result.error?.code ?? "";
-      if (
-        code.includes("registration-token-not-registered") ||
-        code.includes("invalid-registration-token") ||
-        code.includes("invalid-argument")
-      ) {
-        stale.push(tokensSnap.docs[index].id);
-      }
-    }
-  });
-  await Promise.all(
-    stale.map((id) => db.doc(`users/${uid}/fcmTokens/${id}`).delete()),
+async function enqueueNotificationEmail(
+  uid: string,
+  input: {
+    type: NotificationType;
+    title: string;
+    body: string;
+    href: string;
+    notificationId: string;
+  },
+): Promise<void> {
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const email =
+    typeof userSnap.data()?.email === "string"
+      ? String(userSnap.data()?.email).trim()
+      : "";
+  if (!email || !email.includes("@")) return;
+
+  const id = `${uid}_${input.notificationId}`.slice(0, 120);
+  await db.doc(`mailOutbox/${id}`).set(
+    {
+      uid,
+      to: email,
+      type: input.type,
+      title: input.title.slice(0, 120),
+      body: input.body.slice(0, 500),
+      href: input.href.slice(0, 400),
+      notificationId: input.notificationId,
+      status: "pending",
+      createdAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
   );
 }
 

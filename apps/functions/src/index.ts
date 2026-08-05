@@ -10,6 +10,8 @@ export {
   searchDirectory,
 } from "./profiles";
 
+export { bootstrapUserProfile } from "./bootstrap-user";
+
 export {
   syncUserAutoJoinGroups,
   syncChatInbox,
@@ -45,6 +47,8 @@ export {
   markNotificationRead,
   markAllNotificationsRead,
 } from "./notifications-http";
+
+export { sendMailOutbox } from "./mail";
 
 export {
   deactivateAccount,

@@ -9,6 +9,7 @@ import {
   signUpWithEmail,
   signInWithGoogle,
 } from "@/lib/firebase/auth";
+import { ensureProfile } from "@/lib/firebase/users";
 import { isMultiFactorError, resolverFromError } from "@/lib/firebase/mfa";
 import { MfaChallengeForm } from "@/components/auth/mfa-challenge-form";
 import { useAuth } from "@/lib/providers/auth-provider";
@@ -18,7 +19,7 @@ import type { MultiFactorResolver } from "firebase/auth";
 export function RegisterForm() {
   const t = useTranslations();
   const router = useRouter();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, refreshProfile } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,7 +52,9 @@ export function RegisterForm() {
     setBusy(true);
     setError(null);
     try {
-      await signUpWithEmail(email.trim(), password, displayName);
+      const cred = await signUpWithEmail(email.trim(), password, displayName);
+      await ensureProfile(cred.user);
+      await refreshProfile();
     } catch {
       setError(t("errorAuth"));
     } finally {
@@ -63,7 +66,9 @@ export function RegisterForm() {
     setBusy(true);
     setError(null);
     try {
-      await signInWithGoogle();
+      const cred = await signInWithGoogle();
+      await ensureProfile(cred.user);
+      await refreshProfile();
     } catch (err) {
       if (String(err).includes("cancelled")) {
         setBusy(false);

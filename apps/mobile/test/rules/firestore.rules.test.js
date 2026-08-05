@@ -15,7 +15,7 @@ import {
 } from '@firebase/rules-unit-testing';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const RULES = readFileSync(join(__dirname, '../../firestore.rules'), 'utf8');
+const RULES = readFileSync(join(__dirname, '../../../../firestore.rules'), 'utf8');
 const PROJECT_ID = 'every-insurance-rules-test';
 
 let testEnv;
@@ -82,6 +82,7 @@ describe('users create', () => {
         role: 'guest',
         isAnonymous: true,
         profileCompleted: true,
+        approvalStatus: 'approved',
       }),
     );
   });
@@ -96,7 +97,35 @@ describe('users create', () => {
         profileCompleted: false,
         displayName: 'Ada',
         email: 'u1@example.com',
+        approvalStatus: 'pending',
       }),
+    );
+  });
+
+  it('blocks registered student create without pending approval', async () => {
+    const db = authedDb('u1b', { email: 'u1b@example.com' });
+    await assertFails(
+      db.doc('users/u1b').set({
+        uid: 'u1b',
+        role: 'student',
+        isAnonymous: false,
+        profileCompleted: false,
+        displayName: 'Ada',
+        email: 'u1b@example.com',
+        approvalStatus: 'approved',
+      }),
+    );
+  });
+
+  it('blocks owner from self-approving', async () => {
+    await seedUser('u1c', {
+      role: 'student',
+      profileCompleted: false,
+      approvalStatus: 'pending',
+    });
+    const db = authedDb('u1c');
+    await assertFails(
+      db.doc('users/u1c').update({ approvalStatus: 'approved' }),
     );
   });
 

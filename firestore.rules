@@ -169,11 +169,13 @@ service cloud.firestore {
             isAnonymousAuth()
             && request.resource.data.role == 'guest'
             && request.resource.data.isAnonymous == true
+            && request.resource.data.get('approvalStatus', 'approved') == 'approved'
           )
           || (
             !isAnonymousAuth()
             && request.resource.data.role == 'student'
             && request.resource.data.isAnonymous == false
+            && request.resource.data.approvalStatus == 'pending'
             && !isProtectedRole(request.resource.data.role)
           )
         );
@@ -181,8 +183,8 @@ service cloud.firestore {
       // Owners may edit profile fields. Role is frozen except a one-time
       // student → student|agent transition when completing the profile.
       // Later upgrades and privileged roles require Admin SDK / setUserRole.
-      // Account lifecycle fields are server-managed (deactivate/delete
-      // callables), so clients can never touch them.
+      // Account lifecycle + approval fields are server-managed (callables),
+      // so clients can never touch them.
       allow update: if isOwner(uid)
         && request.resource.data.uid == resource.data.uid
         && request.resource.data.isAnonymous == resource.data.isAnonymous
@@ -192,7 +194,10 @@ service cloud.firestore {
           'deletionRequestedAt',
           'deletionScheduledAt',
           'anonymousLabel',
-          'deletionSnapshot'
+          'deletionSnapshot',
+          'approvalStatus',
+          'approvedBy',
+          'approvedAt'
         ])
         && !isProtectedRole(request.resource.data.role)
         && !isProtectedRole(resource.data.role)
@@ -299,6 +304,11 @@ service cloud.firestore {
     match /publicProfiles/{uid} {
       allow read: if isRegisteredMember();
       allow write: if false;
+    }
+
+    // Server-only outbound email queue (Resend).
+    match /mailOutbox/{id} {
+      allow read, write: if false;
     }
 
     // Chats live in Realtime Database (see database.rules.json).

@@ -8,6 +8,28 @@ import { canParticipateInChats, parseRole } from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import { isUserApprovedForJoin, requireCaller } from "./auth";
 
+type PrivacyPrefs = {
+  discoverableInDirectory: boolean;
+  searchableByEmail: boolean;
+  searchableByNpn: boolean;
+  showEmailInSearch: boolean;
+  showNpnInSearch: boolean;
+  allowDirectMessages: boolean;
+};
+
+function readPrivacy(raw: unknown): PrivacyPrefs {
+  const data =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    discoverableInDirectory: data.discoverableInDirectory !== false,
+    searchableByEmail: data.searchableByEmail !== false,
+    searchableByNpn: data.searchableByNpn !== false,
+    showEmailInSearch: data.showEmailInSearch !== false,
+    showNpnInSearch: data.showNpnInSearch !== false,
+    allowDirectMessages: data.allowDirectMessages !== false,
+  };
+}
+
 export const syncPublicProfile = onDocumentWritten(
   "users/{uid}",
   async (event) => {
@@ -19,6 +41,7 @@ export const syncPublicProfile = onDocumentWritten(
       return;
     }
     const data = after.data() ?? {};
+    const privacy = readPrivacy(data.privacy);
     await ref.set({
       uid,
       displayName:
@@ -27,6 +50,8 @@ export const syncPublicProfile = onDocumentWritten(
       role: String(data.role ?? "student"),
       agency: typeof data.agency === "string" ? data.agency.slice(0, 120) : null,
       isAnonymous: data.isAnonymous === true,
+      discoverableInDirectory: privacy.discoverableInDirectory,
+      allowDirectMessages: privacy.allowDirectMessages,
       updatedAt: FieldValue.serverTimestamp(),
     });
   },
@@ -36,16 +61,22 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "listPublicProfiles");
   const requestedLimit = Math.round(Number(request.data?.limit ?? 80));
   const max = Math.max(1, Math.min(100, requestedLimit));
+  // Oversample so privacy filters still fill the page.
   const snap = await db
     .collection("users")
     .where("isAnonymous", "==", false)
-    .limit(max + 1)
+    .limit(Math.min(300, max * 3 + 10))
     .get();
   const profiles = snap.docs
-    .filter((profile) => profile.id !== uid)
+    .filter((profile) => {
+      if (profile.id === uid) return false;
+      const privacy = readPrivacy(profile.data().privacy);
+      return privacy.discoverableInDirectory;
+    })
     .slice(0, max)
     .map((profile) => {
       const data = profile.data();
+      const privacy = readPrivacy(data.privacy);
       return {
         uid: profile.id,
         displayName:
@@ -55,6 +86,7 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
         agency: typeof data.agency === "string" ? data.agency : null,
         isAnonymous: false,
         profileCompleted: data.profileCompleted !== false,
+        allowDirectMessages: privacy.allowDirectMessages,
       };
     });
   return { profiles };
@@ -62,7 +94,7 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
 
 /**
  * Directory search for chats (name, email, NPN). Returns PII for org members
- * who can participate in chats.
+ * who can participate in chats — respecting each target's privacy prefs.
  */
 export const searchDirectory = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "searchDirectory");
@@ -92,10 +124,13 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
 
   const matched = new Map<string, Record<string, unknown>>();
 
-  const pushDoc = (doc: {
-    id: string;
-    data: () => DocumentData;
-  }) => {
+  const pushDoc = (
+    doc: {
+      id: string;
+      data: () => DocumentData;
+    },
+    matchKind: "email" | "npn" | "general",
+  ) => {
     if (doc.id === uid || matched.has(doc.id)) return;
     if (matched.size >= limit) return;
     const data = doc.data();
@@ -106,6 +141,10 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
       return;
     }
     if (!isUserApprovedForJoin(data)) return;
+    const privacy = readPrivacy(data.privacy);
+    if (!privacy.discoverableInDirectory) return;
+    if (matchKind === "email" && !privacy.searchableByEmail) return;
+    if (matchKind === "npn" && !privacy.searchableByNpn) return;
     matched.set(doc.id, data);
   };
 
@@ -115,7 +154,7 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
       .where("email", "==", q)
       .limit(limit)
       .get();
-    exact.docs.forEach(pushDoc);
+    exact.docs.forEach((doc) => pushDoc(doc, "email"));
   }
 
   if (looksNpn && matched.size < limit) {
@@ -124,7 +163,7 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
       .where("npn", "==", npnDigits)
       .limit(limit)
       .get();
-    exact.docs.forEach(pushDoc);
+    exact.docs.forEach((doc) => pushDoc(doc, "npn"));
   }
 
   if (matched.size < limit) {
@@ -136,31 +175,44 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     for (const doc of pool.docs) {
       if (matched.size >= limit) break;
       const data = doc.data();
+      const privacy = readPrivacy(data.privacy);
       const name = String(data.displayName ?? "").toLowerCase();
       const email = String(data.email ?? "").toLowerCase();
       const npn = String(data.npn ?? "").replace(/\D/g, "");
-      if (
-        name.includes(q) ||
-        email.includes(q) ||
-        (npnDigits.length >= 2 && npn.includes(npnDigits))
-      ) {
-        pushDoc(doc);
+      const nameHit = name.includes(q);
+      const emailHit = privacy.searchableByEmail && email.includes(q);
+      const npnHit =
+        privacy.searchableByNpn &&
+        npnDigits.length >= 2 &&
+        npn.includes(npnDigits);
+      if (nameHit || emailHit || npnHit) {
+        pushDoc(doc, "general");
       }
     }
   }
 
-  const profiles = [...matched.entries()].map(([id, data]) => ({
-    uid: id,
-    displayName:
-      typeof data.displayName === "string" ? data.displayName : null,
-    photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
-    role: String(data.role ?? "student"),
-    agency: typeof data.agency === "string" ? data.agency : null,
-    email: typeof data.email === "string" ? data.email : null,
-    npn: typeof data.npn === "string" ? data.npn : null,
-    isAnonymous: false,
-    profileCompleted: data.profileCompleted !== false,
-  }));
+  const profiles = [...matched.entries()].map(([id, data]) => {
+    const privacy = readPrivacy(data.privacy);
+    return {
+      uid: id,
+      displayName:
+        typeof data.displayName === "string" ? data.displayName : null,
+      photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
+      role: String(data.role ?? "student"),
+      agency: typeof data.agency === "string" ? data.agency : null,
+      email:
+        privacy.showEmailInSearch && typeof data.email === "string"
+          ? data.email
+          : null,
+      npn:
+        privacy.showNpnInSearch && typeof data.npn === "string"
+          ? data.npn
+          : null,
+      isAnonymous: false,
+      profileCompleted: data.profileCompleted !== false,
+      allowDirectMessages: privacy.allowDirectMessages,
+    };
+  });
 
   return { profiles };
 });

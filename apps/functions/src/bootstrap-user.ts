@@ -1,0 +1,61 @@
+import { FieldValue } from "firebase-admin/firestore";
+import type { UserRecord } from "firebase-admin/auth";
+import { auth } from "firebase-functions/v1";
+import { db } from "./init";
+
+const DEFAULT_AGENCY = "Every Benefits";
+
+/** Anonymous Auth users have no linked providers on the UserRecord. */
+function isAnonymousUser(user: UserRecord): boolean {
+  return user.providerData.length === 0;
+}
+
+/**
+ * Create `users/{uid}` as soon as Auth creates the account.
+ * Clients still call ensureProfile as a fallback; this covers cases where the
+ * client write fails (rules, offline, project-id mismatch) so approvals and
+ * gates always see a pending profile.
+ */
+export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
+  const ref = db.doc(`users/${user.uid}`);
+  const existing = await ref.get();
+  if (existing.exists) return;
+
+  const isAnonymous = isAnonymousUser(user);
+  const payload = {
+    uid: user.uid,
+    email: user.email ?? null,
+    displayName: user.displayName ?? null,
+    photoUrl: user.photoURL ?? null,
+    role: isAnonymous ? "guest" : "student",
+    isAnonymous,
+    profileCompleted: isAnonymous,
+    productTourVersion: 0,
+    phoneCountryCode: null,
+    phoneNumber: null,
+    phoneVerified: false,
+    npn: null,
+    address: null,
+    addressStreet: null,
+    addressApt: null,
+    addressCity: null,
+    addressState: null,
+    addressZip: null,
+    agency: isAnonymous ? null : DEFAULT_AGENCY,
+    approvalStatus: isAnonymous ? "approved" : "pending",
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
+  };
+
+  try {
+    await ref.create(payload);
+  } catch (error) {
+    // Client ensureProfile won the race — leave their doc alone.
+    const code =
+      error && typeof error === "object" && "code" in error
+        ? (error as { code: unknown }).code
+        : undefined;
+    if (code === "already-exists" || code === 6) return;
+    throw error;
+  }
+});

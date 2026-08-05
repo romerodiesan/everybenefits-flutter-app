@@ -117,6 +117,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     agency: isAnonymous ? null : DEFAULT_AGENCY,
     createdAt: new Date(),
     updatedAt: new Date(),
+    approvalStatus: isAnonymous ? "approved" : "pending",
   };
 
   await setDoc(refDoc, {
@@ -137,6 +138,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     addressState: null,
     addressZip: null,
     agency: profile.agency,
+    approvalStatus: profile.approvalStatus,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
