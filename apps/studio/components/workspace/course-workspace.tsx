@@ -49,8 +49,10 @@ import {
   useLevelLabels,
 } from "@/components/academy/shared";
 import { LessonContentEditor } from "@/components/studio/lesson-content-editor";
+import { InstructorMultiSelect } from "@/components/studio/instructor-multi-select";
 import { LearnerPreview } from "@/components/workspace/learner-preview";
 import { MediaLibrary } from "@/components/workspace/media-library";
+import { headlineName, listDirectory } from "@/lib/firebase/users";
 
 export function CourseWorkspace({ courseId }: { courseId: string }) {
   const t = useTranslations();
@@ -76,6 +78,10 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [teacherName, setTeacherName] = useState("");
+  const [instructorIds, setInstructorIds] = useState<string[]>([]);
+  const [instructorOptions, setInstructorOptions] = useState<
+    { uid: string; label: string }[]
+  >([]);
   const [level, setLevel] = useState<CourseLevel>("basic");
   const metaSeeded = useRef<string | null>(null);
   const coverRef = useRef<HTMLInputElement | null>(null);
@@ -105,8 +111,29 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
     setTitle(course.title);
     setDescription(course.description);
     setTeacherName(course.teacherName);
+    setInstructorIds(course.instructorIds ?? []);
     setLevel(course.level);
   }, [course]);
+
+  useEffect(() => {
+    let cancelled = false;
+    listDirectory(undefined, 120)
+      .then((profiles) => {
+        if (cancelled) return;
+        setInstructorOptions(
+          profiles.map((profile) => ({
+            uid: profile.uid,
+            label: headlineName(profile),
+          })),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setInstructorOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,11 +170,12 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
       title,
       description,
       teacherName,
+      instructorIds,
       level,
     });
-  }, [course, editable, title, description, teacherName, level]);
+  }, [course, editable, title, description, teacherName, instructorIds, level]);
 
-  const metaSnapshot = `${title}\0${description}\0${teacherName}\0${level}`;
+  const metaSnapshot = `${title}\0${description}\0${teacherName}\0${instructorIds.join(",")}\0${level}`;
   const { status: syncStatus } = useAutosave(
     metaSnapshot,
     saveMeta,
@@ -451,6 +479,9 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
               <LessonTitleEditor
                 courseId={course.id}
                 lesson={selectedLesson}
+                courseInstructorIds={instructorIds}
+                instructorOptions={instructorOptions}
+                editable={Boolean(editable)}
               />
               <div className="mt-4">
                 <LessonContentEditor
@@ -475,11 +506,15 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
             course={course}
             title={title}
             description={description}
-            teacherName={teacherName}
+            instructorIds={instructorIds}
             level={level}
+            editable={Boolean(editable)}
             onTitle={setTitle}
             onDescription={setDescription}
-            onTeacherName={setTeacherName}
+            onInstructors={(ids, name) => {
+              setInstructorIds(ids);
+              setTeacherName(name);
+            }}
             onLevel={setLevel}
             coverRef={coverRef}
             coverProgress={coverProgress}
@@ -510,22 +545,58 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
 function LessonTitleEditor({
   courseId,
   lesson,
+  courseInstructorIds,
+  instructorOptions,
+  editable,
 }: {
   courseId: string;
   lesson: Lesson;
+  courseInstructorIds: string[];
+  instructorOptions: { uid: string; label: string }[];
+  editable: boolean;
 }) {
+  const t = useTranslations();
   const typeLabel = useLessonTypeLabels();
   const [draft, setDraft] = useState(lesson.title);
   const [type, setType] = useState<LessonType>(lesson.type);
+  const [instructorId, setInstructorId] = useState<string>(
+    lesson.instructorId ?? "",
+  );
 
   useEffect(() => {
     setDraft(lesson.title);
     setType(lesson.type);
-  }, [lesson.id, lesson.title, lesson.type]);
+    setInstructorId(lesson.instructorId ?? "");
+  }, [lesson.id, lesson.title, lesson.type, lesson.instructorId]);
 
-  const persist = async (nextTitle: string, nextType: LessonType) => {
+  const lessonInstructorChoices = useMemo(() => {
+    const labels = new Map(
+      instructorOptions.map((option) => [option.uid, option.label]),
+    );
+    const ids = [...courseInstructorIds];
+    if (instructorId && !ids.includes(instructorId)) {
+      ids.push(instructorId);
+    }
+    return ids.map((uid) => ({
+      uid,
+      label: labels.get(uid) ?? uid,
+    }));
+  }, [courseInstructorIds, instructorOptions, instructorId]);
+
+  const persist = async (
+    nextTitle: string,
+    nextType: LessonType,
+    nextInstructorId: string,
+  ) => {
     if (!nextTitle.trim()) return;
-    if (nextTitle === lesson.title && nextType === lesson.type) return;
+    const normalizedInstructor = nextInstructorId.trim() || null;
+    if (
+      nextTitle === lesson.title &&
+      nextType === lesson.type &&
+      normalizedInstructor === (lesson.instructorId ?? null)
+    ) {
+      return;
+    }
     await upsertLesson({
       courseId,
       lessonId: lesson.id,
@@ -533,6 +604,7 @@ function LessonTitleEditor({
       title: nextTitle,
       order: lesson.order,
       type: nextType,
+      instructorId: normalizedInstructor,
     });
   };
 
@@ -542,24 +614,46 @@ function LessonTitleEditor({
         <Label>{typeLabel(lesson.type)}</Label>
         <Input
           value={draft}
+          disabled={!editable}
           onChange={(event) => setDraft(event.target.value)}
-          onBlur={() => void persist(draft, type)}
+          onBlur={() => void persist(draft, type, instructorId)}
         />
       </div>
       <div>
         <Label>&nbsp;</Label>
         <select
           value={type}
+          disabled={!editable}
           onChange={(event) => {
             const next = event.target.value as LessonType;
             setType(next);
-            void persist(draft, next);
+            void persist(draft, next, instructorId);
           }}
-          className="h-10 rounded-xl border border-glass-border bg-sheet px-3 text-sm"
+          className="h-10 rounded-xl border border-glass-border bg-sheet px-3 text-sm disabled:opacity-50"
         >
           {LESSON_TYPES.map((option) => (
             <option key={option} value={option}>
               {typeLabel(option)}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="min-w-[160px] flex-1">
+        <Label>{t("fieldLessonInstructor")}</Label>
+        <select
+          value={instructorId}
+          disabled={!editable}
+          onChange={(event) => {
+            const next = event.target.value;
+            setInstructorId(next);
+            void persist(draft, type, next);
+          }}
+          className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm disabled:opacity-50"
+        >
+          <option value="">{t("instructorNone")}</option>
+          {lessonInstructorChoices.map((option) => (
+            <option key={option.uid} value={option.uid}>
+              {option.label}
             </option>
           ))}
         </select>
@@ -879,11 +973,12 @@ function InspectorPane({
   course,
   title,
   description,
-  teacherName,
+  instructorIds,
   level,
+  editable,
   onTitle,
   onDescription,
-  onTeacherName,
+  onInstructors,
   onLevel,
   coverRef,
   coverProgress,
@@ -893,11 +988,12 @@ function InspectorPane({
   course: Course;
   title: string;
   description: string;
-  teacherName: string;
+  instructorIds: string[];
   level: CourseLevel;
+  editable: boolean;
   onTitle: (value: string) => void;
   onDescription: (value: string) => void;
-  onTeacherName: (value: string) => void;
+  onInstructors: (ids: string[], teacherName: string) => void;
   onLevel: (value: CourseLevel) => void;
   coverRef: RefObject<HTMLInputElement | null>;
   coverProgress: number | null;
@@ -917,21 +1013,27 @@ function InspectorPane({
       <div className="mt-3 space-y-3">
         <div>
           <Label>{t("fieldTitle")}</Label>
-          <Input value={title} onChange={(event) => onTitle(event.target.value)} />
+          <Input
+            value={title}
+            disabled={!editable}
+            onChange={(event) => onTitle(event.target.value)}
+          />
         </div>
         <div>
           <Label>{t("fieldTeacher")}</Label>
-          <Input
-            value={teacherName}
-            onChange={(event) => onTeacherName(event.target.value)}
+          <InstructorMultiSelect
+            value={instructorIds}
+            disabled={!editable}
+            onChange={onInstructors}
           />
         </div>
         <div>
           <Label>{t("fieldLevel")}</Label>
           <select
             value={level}
+            disabled={!editable}
             onChange={(event) => onLevel(event.target.value as CourseLevel)}
-            className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm"
+            className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm disabled:opacity-50"
           >
             {COURSE_LEVELS.map((option) => (
               <option key={option} value={option}>
@@ -944,6 +1046,7 @@ function InspectorPane({
           <Label>{t("fieldDescription")}</Label>
           <TextArea
             value={description}
+            disabled={!editable}
             onChange={(event) => onDescription(event.target.value)}
           />
         </div>
@@ -960,8 +1063,9 @@ function InspectorPane({
           ref={coverRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
+          disabled={!editable}
           onChange={(event) => onCover(event.target.files?.[0])}
-          className="mt-2 w-full text-xs text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand/14 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand"
+          className="mt-2 w-full text-xs text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand/14 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand disabled:opacity-50"
         />
         {coverProgress !== null ? (
           <div className="mt-2">

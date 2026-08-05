@@ -76,6 +76,7 @@ export function courseFrom(id: string, data: Record<string, unknown>): Course {
     title: String(data.title ?? ""),
     description: String(data.description ?? ""),
     teacherName: String(data.teacherName ?? ""),
+    instructorIds: stringList(data.instructorIds),
     level: parseLevel(data.level),
     status: parseStatus(data.status),
     coverPath: (data.coverPath as string) ?? null,
@@ -140,6 +141,7 @@ function attemptsFrom(value: unknown): Record<string, QuizAttempt> {
 }
 
 function lessonFrom(id: string, data: Record<string, unknown>): Lesson {
+  const instructorId = String(data.instructorId ?? "").trim();
   return {
     id,
     moduleId: String(data.moduleId ?? ""),
@@ -152,6 +154,7 @@ function lessonFrom(id: string, data: Record<string, unknown>): Lesson {
     bodyMarkdown: (data.bodyMarkdown as string) ?? null,
     questions: questionsFrom(data.questions),
     passPercent: Number(data.passPercent ?? QUIZ_DEFAULT_PASS_PERCENT),
+    instructorId: instructorId || null,
   };
 }
 
@@ -438,6 +441,7 @@ export async function createPath(input: {
   description: string;
   level: CourseLevel;
   createdBy: string;
+  courseIds?: string[];
 }) {
   const db = getFirebaseDb();
   const pathRef = doc(collection(db, "paths"));
@@ -446,7 +450,7 @@ export async function createPath(input: {
     description: input.description.trim(),
     level: input.level,
     status: "draft",
-    courseIds: [],
+    courseIds: (input.courseIds ?? []).filter((id) => id.trim().length > 0),
     order: Date.now(),
     createdBy: input.createdBy,
     createdAt: serverTimestamp(),
@@ -476,6 +480,20 @@ export async function setPathCourseIds(pathId: string, courseIds: string[]) {
     courseIds: courseIds.filter((id) => id.trim().length > 0),
     updatedAt: serverTimestamp(),
   });
+}
+
+/** Appends a course to a path if it is not already a member. */
+export async function appendCourseToPath(pathId: string, courseId: string) {
+  const pathRef = doc(getFirebaseDb(), "paths", pathId);
+  const snap = await getDoc(pathRef);
+  if (!snap.exists()) {
+    throw new Error("Path not found");
+  }
+  const existing = stringList(
+    (snap.data() as Record<string, unknown>).courseIds,
+  );
+  if (existing.includes(courseId)) return;
+  await setPathCourseIds(pathId, [...existing, courseId]);
 }
 
 export async function setPathStatus(pathId: string, status: CourseStatus) {
@@ -847,15 +865,18 @@ export async function createCourse(input: {
   title: string;
   description: string;
   teacherName: string;
+  instructorIds?: string[];
   level: CourseLevel;
   createdBy: string;
 }) {
   const db = getFirebaseDb();
   const courseRef = doc(collection(db, "courses"));
+  const instructorIds = (input.instructorIds ?? []).filter((id) => id.trim());
   await setDoc(courseRef, {
     title: input.title.trim(),
     description: input.description.trim(),
     teacherName: input.teacherName.trim(),
+    instructorIds,
     level: input.level,
     // Everything starts as a draft; admins publish from the review queue.
     status: "draft",
@@ -877,12 +898,14 @@ export async function updateCourseMeta(input: {
   title: string;
   description: string;
   teacherName: string;
+  instructorIds: string[];
   level: CourseLevel;
 }) {
   await updateDoc(doc(getFirebaseDb(), "courses", input.courseId), {
     title: input.title.trim(),
     description: input.description.trim(),
     teacherName: input.teacherName.trim(),
+    instructorIds: input.instructorIds.filter((id) => id.trim()),
     level: input.level,
     updatedAt: serverTimestamp(),
   });
@@ -995,11 +1018,31 @@ export async function upsertLesson(input: {
   order: number;
   durationSeconds?: number;
   type?: LessonType;
+  instructorId?: string | null;
 }) {
   const db = getFirebaseDb();
   const lessonRef = input.lessonId
     ? doc(db, "courses", input.courseId, "lessons", input.lessonId)
     : doc(collection(db, "courses", input.courseId, "lessons"));
+
+  let defaultInstructorId: string | null = null;
+  if (!input.lessonId && input.instructorId === undefined) {
+    const courseSnap = await getDoc(doc(db, "courses", input.courseId));
+    const ids = courseSnap.exists()
+      ? stringList(
+          (courseSnap.data() as Record<string, unknown>).instructorIds,
+        )
+      : [];
+    defaultInstructorId = ids[0] ?? null;
+  }
+
+  const instructorId =
+    input.instructorId === undefined
+      ? defaultInstructorId
+      : input.instructorId
+        ? input.instructorId.trim() || null
+        : null;
+
   await setDoc(
     lessonRef,
     {
@@ -1011,6 +1054,9 @@ export async function upsertLesson(input: {
       ...(input.durationSeconds === undefined
         ? {}
         : { durationSeconds: Math.round(input.durationSeconds) }),
+      ...(input.instructorId !== undefined || !input.lessonId
+        ? { instructorId }
+        : {}),
       ...(input.lessonId
         ? {}
         : {

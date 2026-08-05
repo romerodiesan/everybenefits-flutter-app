@@ -51,6 +51,7 @@ export type UserProfile = {
   createdAt: Date | null;
   updatedAt: Date | null;
   accountStatus?: AccountStatus;
+  approvalStatus?: import("@pulse/shared").ApprovalStatus;
   deletionScheduledAt?: Date | null;
   appearance?: {
     theme: "system" | "light" | "dark";

@@ -6,7 +6,10 @@ export type Course = {
     id: string;
     title: string;
     description: string;
+    /** Display label derived from selected instructors (comma-separated names). */
     teacherName: string;
+    /** Auth uids of course instructors (stable order). */
+    instructorIds: string[];
     level: CourseLevel;
     status: CourseStatus;
     coverPath: string | null;
@@ -45,6 +48,8 @@ export type Lesson = {
     bodyMarkdown: string | null;
     questions: QuizQuestion[];
     passPercent: number;
+    /** One of the course `instructorIds`, or null when unset/legacy. */
+    instructorId: string | null;
 };
 export type QuizAnswerKey = Record<string, number[]>;
 export type QuizAttemptResult = {

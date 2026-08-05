@@ -6,6 +6,7 @@ import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { canManageCourses } from "@/lib/roles";
 import {
+  appendCourseToPath,
   createCourse,
   createPath,
   watchAuthoredCourses,
@@ -22,10 +23,22 @@ import {
 } from "@/lib/types";
 import { Button, Input, Label, TextArea } from "@/components/ui/primitives";
 import { CourseCover, StatusChip, useLevelLabels } from "@/components/academy/shared";
+import { InstructorMultiSelect } from "@/components/studio/instructor-multi-select";
 
 type Tab = "courses" | "paths";
 type CreateKind = "course" | "path" | null;
 type StatusFilter = "all" | CourseStatus;
+type PathChoice = "none" | "new" | string;
+
+const emptyForm = {
+  title: "",
+  description: "",
+  instructorIds: [] as string[],
+  teacherName: "",
+  level: "basic" as CourseLevel,
+  pathChoice: "none" as PathChoice,
+  pathTitle: "",
+};
 
 export function LibraryHome() {
   const t = useTranslations();
@@ -41,12 +54,7 @@ export function LibraryHome() {
   const [listReady, setListReady] = useState(false);
   const [creating, setCreating] = useState<CreateKind>(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState({
-    title: "",
-    description: "",
-    teacherName: "",
-    level: "basic" as CourseLevel,
-  });
+  const [form, setForm] = useState(emptyForm);
 
   const uid = profile?.uid ?? "";
   const isAdmin = canManageCourses(profile?.role ?? "guest");
@@ -120,22 +128,54 @@ export function LibraryHome() {
     };
   }, [tab, courses, paths]);
 
+  const pathOptions = useMemo(
+    () => [...paths].sort((a, b) => a.title.localeCompare(b.title)),
+    [paths],
+  );
+
+  const createDisabled =
+    busy ||
+    !form.title.trim() ||
+    (creating === "course" &&
+      form.pathChoice === "new" &&
+      !form.pathTitle.trim());
+
   const create = async () => {
     if (!profile || !form.title.trim()) return;
+    if (
+      creating === "course" &&
+      form.pathChoice === "new" &&
+      !form.pathTitle.trim()
+    ) {
+      return;
+    }
     setBusy(true);
     try {
       if (creating === "course") {
+        const teacherName =
+          form.teacherName.trim() ||
+          profile.displayName ||
+          profile.email ||
+          "Instructor";
         const id = await createCourse({
           title: form.title.trim(),
           description: form.description.trim(),
-          teacherName:
-            form.teacherName.trim() ||
-            profile.displayName ||
-            profile.email ||
-            "Instructor",
+          teacherName,
+          instructorIds: form.instructorIds,
           level: form.level,
           createdBy: profile.uid,
         });
+        if (form.pathChoice === "new") {
+          await createPath({
+            title: form.pathTitle.trim(),
+            description: "",
+            level: form.level,
+            createdBy: profile.uid,
+            courseIds: [id],
+          });
+        } else if (form.pathChoice !== "none") {
+          await appendCourseToPath(form.pathChoice, id);
+        }
         router.push(`/courses/${id}`);
       } else if (creating === "path") {
         const id = await createPath({
@@ -149,12 +189,7 @@ export function LibraryHome() {
     } finally {
       setBusy(false);
       setCreating(null);
-      setForm({
-        title: "",
-        description: "",
-        teacherName: "",
-        level: "basic",
-      });
+      setForm(emptyForm);
     }
   };
 
@@ -313,7 +348,7 @@ export function LibraryHome() {
 
       {creating ? (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
-          <div className="studio-panel w-full max-w-md p-6">
+          <div className="studio-panel max-h-[90vh] w-full max-w-md overflow-y-auto p-6">
             <h2 className="font-display text-xl">
               {creating === "course"
                 ? t("createCourseTitle")
@@ -339,15 +374,57 @@ export function LibraryHome() {
                 />
               </div>
               {creating === "course" ? (
-                <div>
-                  <Label>{t("fieldTeacher")}</Label>
-                  <Input
-                    value={form.teacherName}
-                    onChange={(e) =>
-                      setForm((f) => ({ ...f, teacherName: e.target.value }))
-                    }
-                  />
-                </div>
+                <>
+                  <div>
+                    <Label>{t("fieldTeacher")}</Label>
+                    <InstructorMultiSelect
+                      value={form.instructorIds}
+                      disabled={busy}
+                      onChange={(instructorIds, teacherName) =>
+                        setForm((f) => ({
+                          ...f,
+                          instructorIds,
+                          teacherName,
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("fieldPath")}</Label>
+                    <select
+                      className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm"
+                      value={form.pathChoice}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          pathChoice: e.target.value as PathChoice,
+                        }))
+                      }
+                    >
+                      <option value="none">{t("pathNone")}</option>
+                      <option value="new">{t("pathCreateNew")}</option>
+                      {pathOptions.map((path) => (
+                        <option key={path.id} value={path.id}>
+                          {path.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {form.pathChoice === "new" ? (
+                    <div>
+                      <Label>{t("fieldPathTitle")}</Label>
+                      <Input
+                        value={form.pathTitle}
+                        onChange={(e) =>
+                          setForm((f) => ({
+                            ...f,
+                            pathTitle: e.target.value,
+                          }))
+                        }
+                      />
+                    </div>
+                  ) : null}
+                </>
               ) : null}
               <div>
                 <Label>{t("fieldLevel")}</Label>
@@ -372,12 +449,15 @@ export function LibraryHome() {
             <div className="mt-6 flex justify-end gap-2">
               <Button
                 variant="ghost"
-                onClick={() => setCreating(null)}
+                onClick={() => {
+                  setCreating(null);
+                  setForm(emptyForm);
+                }}
                 disabled={busy}
               >
                 {t("actionCancel")}
               </Button>
-              <Button onClick={create} disabled={busy || !form.title.trim()}>
+              <Button onClick={create} disabled={createDisabled}>
                 {t("actionCreate")}
               </Button>
             </div>
