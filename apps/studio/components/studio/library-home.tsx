@@ -1,63 +1,85 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { canManageCourses } from "@/lib/roles";
 import {
-  appendCourseToPath,
-  createCourse,
   createPath,
   watchAuthoredCourses,
   watchAuthoredPaths,
   watchCoursesInStatuses,
   watchPathsInStatuses,
 } from "@/lib/firebase/courses";
+import { fetchAuthorDashboardStats } from "@/lib/firebase/analytics";
 import {
   COURSE_LEVELS,
   type Course,
+  type CourseAnalyticsSummary,
   type CourseLevel,
   type CourseStatus,
   type LearningPath,
 } from "@/lib/types";
 import { Button, Input, Label, TextArea } from "@/components/ui/primitives";
-import { CourseCover, StatusChip, useLevelLabels } from "@/components/academy/shared";
-import { InstructorMultiSelect } from "@/components/studio/instructor-multi-select";
+import {
+  CourseCover,
+  StatusChip,
+  useLevelLabels,
+} from "@/components/academy/shared";
+import { CreateCoursesWizard } from "@/components/studio/create-courses-wizard";
 
 type Tab = "courses" | "paths";
 type CreateKind = "course" | "path" | null;
 type StatusFilter = "all" | CourseStatus;
-type PathChoice = "none" | "new" | string;
+type SortKey = "updated" | "title" | "students" | "views";
 
-const emptyForm = {
+const emptyPathForm = {
   title: "",
   description: "",
-  instructorIds: [] as string[],
-  teacherName: "",
   level: "basic" as CourseLevel,
-  pathChoice: "none" as PathChoice,
-  pathTitle: "",
 };
+
+function formatDate(value: Date | null): string {
+  if (!value) return "—";
+  return value.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export function LibraryHome() {
   const t = useTranslations();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { profile } = useAuth();
   const levelLabel = useLevelLabels();
 
   const [tab, setTab] = useState<Tab>("courses");
   const [filter, setFilter] = useState<StatusFilter>("all");
   const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<SortKey>("updated");
   const [courses, setCourses] = useState<Course[]>([]);
   const [paths, setPaths] = useState<LearningPath[]>([]);
+  const [statsByCourse, setStatsByCourse] = useState<
+    Record<string, CourseAnalyticsSummary>
+  >({});
   const [listReady, setListReady] = useState(false);
   const [creating, setCreating] = useState<CreateKind>(null);
   const [busy, setBusy] = useState(false);
-  const [form, setForm] = useState(emptyForm);
+  const [pathForm, setPathForm] = useState(emptyPathForm);
 
   const uid = profile?.uid ?? "";
   const isAdmin = canManageCourses(profile?.role ?? "guest");
+
+  useEffect(() => {
+    const create = searchParams.get("create");
+    if (create === "course" || create === "path") {
+      setCreating(create);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (!uid) return;
@@ -97,9 +119,27 @@ export function LibraryHome() {
     return () => stops.forEach((s) => s());
   }, [uid, isAdmin]);
 
+  useEffect(() => {
+    if (courses.length === 0) {
+      setStatsByCourse({});
+      return;
+    }
+    let cancelled = false;
+    fetchAuthorDashboardStats(courses.map((c) => c.id))
+      .then((stats) => {
+        if (!cancelled) setStatsByCourse(stats.byCourse);
+      })
+      .catch(() => {
+        if (!cancelled) setStatsByCourse({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [courses]);
+
   const filteredCourses = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return courses.filter((c) => {
+    const list = courses.filter((c) => {
       if (filter !== "all" && c.status !== filter) return false;
       if (!q) return true;
       return (
@@ -107,7 +147,19 @@ export function LibraryHome() {
         c.teacherName.toLowerCase().includes(q)
       );
     });
-  }, [courses, filter, query]);
+    return list.sort((a, b) => {
+      if (sort === "title") return a.title.localeCompare(b.title);
+      if (sort === "students") return b.studentCount - a.studentCount;
+      if (sort === "views") {
+        return (
+          (statsByCourse[b.id]?.views ?? 0) - (statsByCourse[a.id]?.views ?? 0)
+        );
+      }
+      const aTime = a.updatedAt?.getTime() ?? 0;
+      const bTime = b.updatedAt?.getTime() ?? 0;
+      return bTime - aTime;
+    });
+  }, [courses, filter, query, sort, statsByCourse]);
 
   const filteredPaths = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -128,68 +180,23 @@ export function LibraryHome() {
     };
   }, [tab, courses, paths]);
 
-  const pathOptions = useMemo(
-    () => [...paths].sort((a, b) => a.title.localeCompare(b.title)),
-    [paths],
-  );
+  const createPathDisabled = busy || !pathForm.title.trim();
 
-  const createDisabled =
-    busy ||
-    !form.title.trim() ||
-    (creating === "course" &&
-      form.pathChoice === "new" &&
-      !form.pathTitle.trim());
-
-  const create = async () => {
-    if (!profile || !form.title.trim()) return;
-    if (
-      creating === "course" &&
-      form.pathChoice === "new" &&
-      !form.pathTitle.trim()
-    ) {
-      return;
-    }
+  const createPathOnly = async () => {
+    if (!profile || !pathForm.title.trim()) return;
     setBusy(true);
     try {
-      if (creating === "course") {
-        const teacherName =
-          form.teacherName.trim() ||
-          profile.displayName ||
-          profile.email ||
-          "Instructor";
-        const id = await createCourse({
-          title: form.title.trim(),
-          description: form.description.trim(),
-          teacherName,
-          instructorIds: form.instructorIds,
-          level: form.level,
-          createdBy: profile.uid,
-        });
-        if (form.pathChoice === "new") {
-          await createPath({
-            title: form.pathTitle.trim(),
-            description: "",
-            level: form.level,
-            createdBy: profile.uid,
-            courseIds: [id],
-          });
-        } else if (form.pathChoice !== "none") {
-          await appendCourseToPath(form.pathChoice, id);
-        }
-        router.push(`/courses/${id}`);
-      } else if (creating === "path") {
-        const id = await createPath({
-          title: form.title.trim(),
-          description: form.description.trim(),
-          level: form.level,
-          createdBy: profile.uid,
-        });
-        router.push(`/paths/${id}`);
-      }
+      const id = await createPath({
+        title: pathForm.title.trim(),
+        description: pathForm.description.trim(),
+        level: pathForm.level,
+        createdBy: profile.uid,
+      });
+      setCreating(null);
+      setPathForm(emptyPathForm);
+      router.push(`/paths/${id}`);
     } finally {
       setBusy(false);
-      setCreating(null);
-      setForm(emptyForm);
     }
   };
 
@@ -201,17 +208,16 @@ export function LibraryHome() {
   ];
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-8">
+    <div className="mx-auto max-w-6xl px-4 py-6 md:px-6">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <h1 className="font-display text-3xl">{t("libraryTitle")}</h1>
-          <p className="mt-1 text-sm text-muted">{t("librarySubtitle")}</p>
+          <h1 className="font-display text-2xl md:text-3xl">
+            {t("contentTitle")}
+          </h1>
+          <p className="mt-1 text-sm text-muted">{t("contentSubtitle")}</p>
         </div>
         <div className="flex gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => setCreating("path")}
-          >
+          <Button variant="secondary" onClick={() => setCreating("path")}>
             {t("libraryNewPath")}
           </Button>
           <Button onClick={() => setCreating("course")}>
@@ -220,7 +226,7 @@ export function LibraryHome() {
         </div>
       </header>
 
-      <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
           [t("kpiDrafts"), kpis.drafts],
           [t("kpiPending"), kpis.pending],
@@ -236,7 +242,7 @@ export function LibraryHome() {
         ))}
       </div>
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3">
         <div className="flex rounded-xl border border-glass-border p-0.5">
           {(["courses", "paths"] as Tab[]).map((id) => (
             <button
@@ -244,7 +250,7 @@ export function LibraryHome() {
               type="button"
               onClick={() => setTab(id)}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium ${
-                tab === id ? "bg-brand/20 text-brand" : "text-muted"
+                tab === id ? "bg-brand/15 text-brand" : "text-muted"
               }`}
             >
               {id === "courses" ? t("tabCourses") : t("tabPaths")}
@@ -265,7 +271,7 @@ export function LibraryHome() {
               onClick={() => setFilter(f.id)}
               className={`rounded-full px-3 py-1 text-xs font-medium ${
                 filter === f.id
-                  ? "bg-white/10 text-ink"
+                  ? "bg-ink/10 text-ink dark:bg-white/10"
                   : "text-muted hover:text-ink"
               }`}
             >
@@ -273,52 +279,140 @@ export function LibraryHome() {
             </button>
           ))}
         </div>
+        {tab === "courses" ? (
+          <label className="ml-auto flex items-center gap-2 text-xs text-muted">
+            {t("contentSort")}
+            <select
+              className="h-8 rounded-lg border border-glass-border bg-sheet px-2 text-xs text-ink"
+              value={sort}
+              onChange={(e) => setSort(e.target.value as SortKey)}
+            >
+              <option value="updated">{t("contentSortUpdated")}</option>
+              <option value="title">{t("contentSortTitle")}</option>
+              <option value="students">{t("contentSortStudents")}</option>
+              <option value="views">{t("contentSortViews")}</option>
+            </select>
+          </label>
+        ) : null}
       </div>
 
       {tab === "courses" ? (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-5 overflow-hidden rounded-xl border border-glass-border bg-panel">
           {!listReady ? (
-            Array.from({ length: 6 }).map((_, i) => (
-              <div
-                key={i}
-                className="aspect-[16/10] animate-pulse rounded-xl bg-white/[0.05]"
-              />
-            ))
+            <div className="space-y-2 p-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="h-14 animate-pulse rounded-lg bg-ink/[0.04]"
+                />
+              ))}
+            </div>
           ) : filteredCourses.length === 0 ? (
-            <p className="col-span-full text-sm text-muted">
+            <p className="px-4 py-10 text-center text-sm text-muted">
               {t("libraryEmpty")}
             </p>
           ) : (
-            filteredCourses.map((course) => (
-              <Link
-                key={course.id}
-                href={`/courses/${course.id}`}
-                className="studio-panel group overflow-hidden transition hover:border-brand/40"
-              >
-                <div className="aspect-[16/9] overflow-hidden bg-mesh">
-                  <CourseCover course={course} className="h-full w-full object-cover" />
-                </div>
-                <div className="p-4">
-                  <div className="flex items-start justify-between gap-2">
-                    <h2 className="font-display text-lg leading-snug group-hover:text-brand">
-                      {course.title}
-                    </h2>
-                    <StatusChip status={course.status} />
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-xs text-muted">
-                    {course.description || course.teacherName}
-                  </p>
-                  <p className="mt-3 text-[11px] text-muted">
-                    {levelLabel(course.level)} · {course.lessonCount} lessons ·{" "}
-                    {course.studentCount} students
-                  </p>
-                </div>
-              </Link>
-            ))
+            <div className="overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <caption className="sr-only">{t("contentTitle")}</caption>
+                <thead className="border-b border-glass-border bg-rail/60 text-[11px] uppercase tracking-wide text-muted">
+                  <tr>
+                    <th className="px-3 py-2.5 font-semibold">
+                      {t("contentColVideo")}
+                    </th>
+                    <th className="px-3 py-2.5 font-semibold">
+                      {t("contentColVisibility")}
+                    </th>
+                    <th className="hidden px-3 py-2.5 font-semibold md:table-cell">
+                      {t("contentColDate")}
+                    </th>
+                    <th className="px-3 py-2.5 font-semibold tabular-nums">
+                      {t("kpiStudents")}
+                    </th>
+                    <th className="hidden px-3 py-2.5 font-semibold tabular-nums lg:table-cell">
+                      {t("analyticsViews")}
+                    </th>
+                    <th className="hidden px-3 py-2.5 font-semibold tabular-nums lg:table-cell">
+                      {t("insightsCompletion")}
+                    </th>
+                    <th className="px-3 py-2.5 font-semibold">
+                      {t("contentColActions")}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-glass-border">
+                  {filteredCourses.map((course) => {
+                    const stats = statsByCourse[course.id];
+                    return (
+                      <tr
+                        key={course.id}
+                        className="hover:bg-ink/[0.025] dark:hover:bg-white/[0.025]"
+                      >
+                        <td className="px-3 py-2.5">
+                          <Link
+                            href={`/courses/${course.id}`}
+                            className="flex items-center gap-3"
+                          >
+                            <CourseCover
+                              course={course}
+                              className="h-12 w-[5.25rem] shrink-0 rounded-md"
+                              showLevel={false}
+                            />
+                            <div className="min-w-0">
+                              <p className="truncate font-semibold">
+                                {course.title}
+                              </p>
+                              <p className="truncate text-[11px] text-muted">
+                                {course.teacherName || levelLabel(course.level)}
+                                {" · "}
+                                {t("academyLessonsCount", {
+                                  count: course.lessonCount,
+                                })}
+                              </p>
+                            </div>
+                          </Link>
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <StatusChip status={course.status} />
+                        </td>
+                        <td className="hidden px-3 py-2.5 text-xs text-muted md:table-cell">
+                          {formatDate(course.updatedAt)}
+                        </td>
+                        <td className="px-3 py-2.5 tabular-nums">
+                          {course.studentCount}
+                        </td>
+                        <td className="hidden px-3 py-2.5 tabular-nums lg:table-cell">
+                          {(stats?.views ?? 0).toLocaleString()}
+                        </td>
+                        <td className="hidden px-3 py-2.5 tabular-nums lg:table-cell">
+                          {Math.round((stats?.completionRate ?? 0) * 100)}%
+                        </td>
+                        <td className="px-3 py-2.5">
+                          <div className="flex flex-wrap gap-2">
+                            <Link
+                              href={`/courses/${course.id}`}
+                              className="text-xs font-semibold text-brand"
+                            >
+                              {t("contentEdit")}
+                            </Link>
+                            <Link
+                              href={`/analytics/${course.id}`}
+                              className="text-xs font-semibold text-muted hover:text-ink"
+                            >
+                              {t("navAnalytics")}
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       ) : (
-        <div className="mt-6 grid gap-3 sm:grid-cols-2">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {filteredPaths.length === 0 ? (
             <p className="col-span-full text-sm text-muted">
               {t("libraryEmptyPaths")}
@@ -331,14 +425,16 @@ export function LibraryHome() {
                 className="studio-panel p-4 transition hover:border-brand/40"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <h2 className="font-display text-lg">{path.title}</h2>
+                  <h2 className="font-display text-base font-bold">
+                    {path.title}
+                  </h2>
                   <StatusChip status={path.status} />
                 </div>
-                <p className="mt-1 line-clamp-2 text-xs text-muted">
-                  {path.description}
+                <p className="mt-2 line-clamp-2 text-sm text-muted">
+                  {path.description || t("pathEmpty")}
                 </p>
-                <p className="mt-3 text-[11px] text-muted">
-                  {levelLabel(path.level)} · {path.courseIds.length} courses
+                <p className="mt-3 text-[11px] font-medium text-muted">
+                  {t("pathCourses")}: {path.courseIds.length}
                 </p>
               </Link>
             ))
@@ -346,93 +442,53 @@ export function LibraryHome() {
         </div>
       )}
 
-      {creating ? (
-        <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4">
-          <div className="studio-panel max-h-[90vh] w-full max-w-md overflow-y-auto p-6">
-            <h2 className="font-display text-xl">
-              {creating === "course"
-                ? t("createCourseTitle")
-                : t("createPathTitle")}
-            </h2>
+      {creating === "course" && profile ? (
+        <CreateCoursesWizard
+          paths={paths}
+          createdBy={profile.uid}
+          defaultTeacherName={
+            profile.displayName || profile.email || "Instructor"
+          }
+          onClose={() => setCreating(null)}
+        />
+      ) : null}
+
+      {creating === "path" ? (
+        <div
+          className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 p-4 sm:items-center"
+          onClick={() => !busy && setCreating(null)}
+        >
+          <div
+            className="studio-panel w-full max-w-lg p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="font-display text-xl">{t("createPathTitle")}</h2>
             <div className="mt-4 space-y-3">
               <div>
                 <Label>{t("fieldTitle")}</Label>
                 <Input
-                  value={form.title}
+                  value={pathForm.title}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, title: e.target.value }))
+                    setPathForm((f) => ({ ...f, title: e.target.value }))
                   }
                 />
               </div>
               <div>
                 <Label>{t("fieldDescription")}</Label>
                 <TextArea
-                  value={form.description}
+                  value={pathForm.description}
                   onChange={(e) =>
-                    setForm((f) => ({ ...f, description: e.target.value }))
+                    setPathForm((f) => ({ ...f, description: e.target.value }))
                   }
                 />
               </div>
-              {creating === "course" ? (
-                <>
-                  <div>
-                    <Label>{t("fieldTeacher")}</Label>
-                    <InstructorMultiSelect
-                      value={form.instructorIds}
-                      disabled={busy}
-                      onChange={(instructorIds, teacherName) =>
-                        setForm((f) => ({
-                          ...f,
-                          instructorIds,
-                          teacherName,
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>{t("fieldPath")}</Label>
-                    <select
-                      className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm"
-                      value={form.pathChoice}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          pathChoice: e.target.value as PathChoice,
-                        }))
-                      }
-                    >
-                      <option value="none">{t("pathNone")}</option>
-                      <option value="new">{t("pathCreateNew")}</option>
-                      {pathOptions.map((path) => (
-                        <option key={path.id} value={path.id}>
-                          {path.title}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  {form.pathChoice === "new" ? (
-                    <div>
-                      <Label>{t("fieldPathTitle")}</Label>
-                      <Input
-                        value={form.pathTitle}
-                        onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            pathTitle: e.target.value,
-                          }))
-                        }
-                      />
-                    </div>
-                  ) : null}
-                </>
-              ) : null}
               <div>
                 <Label>{t("fieldLevel")}</Label>
                 <select
                   className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm"
-                  value={form.level}
+                  value={pathForm.level}
                   onChange={(e) =>
-                    setForm((f) => ({
+                    setPathForm((f) => ({
                       ...f,
                       level: e.target.value as CourseLevel,
                     }))
@@ -446,18 +502,18 @@ export function LibraryHome() {
                 </select>
               </div>
             </div>
-            <div className="mt-6 flex justify-end gap-2">
+            <div className="mt-5 flex justify-end gap-2">
               <Button
                 variant="ghost"
-                onClick={() => {
-                  setCreating(null);
-                  setForm(emptyForm);
-                }}
                 disabled={busy}
+                onClick={() => setCreating(null)}
               >
                 {t("actionCancel")}
               </Button>
-              <Button onClick={create} disabled={createDisabled}>
+              <Button
+                disabled={createPathDisabled}
+                onClick={() => void createPathOnly()}
+              >
                 {t("actionCreate")}
               </Button>
             </div>

@@ -151,6 +151,7 @@ function lessonFrom(id: string, data: Record<string, unknown>): Lesson {
     type: parseLessonType(data.type),
     videoPath: (data.videoPath as string) ?? null,
     videoUrl: (data.videoUrl as string) ?? null,
+    videoFileName: (data.videoFileName as string) ?? null,
     bodyMarkdown: (data.bodyMarkdown as string) ?? null,
     questions: questionsFrom(data.questions),
     passPercent: Number(data.passPercent ?? QUIZ_DEFAULT_PASS_PERCENT),
@@ -668,12 +669,22 @@ function uploadWithProgress(
   path: string,
   file: File,
   onProgress?: (fraction: number) => void,
+  signal?: AbortSignal,
 ) {
   const storageRef = ref(getFirebaseStorage(), path);
   const task = uploadBytesResumable(storageRef, file, {
     contentType: file.type,
   });
   return new Promise<string>((resolve, reject) => {
+    const onAbort = () => {
+      task.cancel();
+      reject(new DOMException("Upload cancelled", "AbortError"));
+    };
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+    signal?.addEventListener("abort", onAbort, { once: true });
     task.on(
       "state_changed",
       (snap) => {
@@ -681,8 +692,14 @@ function uploadWithProgress(
           onProgress?.(snap.bytesTransferred / snap.totalBytes);
         }
       },
-      reject,
-      () => resolve(path),
+      (error) => {
+        signal?.removeEventListener("abort", onAbort);
+        reject(error);
+      },
+      () => {
+        signal?.removeEventListener("abort", onAbort);
+        resolve(path);
+      },
     );
   });
 }
@@ -737,6 +754,7 @@ export async function uploadLessonVideo(input: {
   file: File;
   durationSeconds?: number;
   onProgress?: (fraction: number) => void;
+  signal?: AbortSignal;
 }) {
   if (input.file.size > MAX_VIDEO_BYTES) {
     throw new Error("Video must be under 2GB");
@@ -752,12 +770,29 @@ export async function uploadLessonVideo(input: {
     | string
     | null
     | undefined;
+  const generation = Date.now();
   const extension = input.file.name.split(".").pop()?.toLowerCase() ?? "mp4";
-  const path = `courses/${input.courseId}/lessons/${input.lessonId}-${Date.now()}.${extension}`;
-  await uploadWithProgress(path, input.file, input.onProgress);
+  const path = `courses/${input.courseId}/lessons/${input.lessonId}-${generation}.${extension}`;
+  await uploadWithProgress(path, input.file, input.onProgress, input.signal);
+
+  const latest = await getDoc(lessonRef);
+  const latestGen = Number(
+    (latest.data() as Record<string, unknown> | undefined)
+      ?.videoUploadGeneration ?? 0,
+  );
+  if (latestGen > generation) {
+    // A newer upload already claimed this lesson — drop our orphan object.
+    void deleteStoragePathIfPresent(path);
+    return String(
+      (latest.data() as Record<string, unknown> | undefined)?.videoPath ?? path,
+    );
+  }
+
   await updateDoc(lessonRef, {
     videoPath: path,
     videoUrl: null,
+    videoFileName: input.file.name,
+    videoUploadGeneration: generation,
     ...(input.durationSeconds
       ? { durationSeconds: Math.round(input.durationSeconds) }
       : {}),
@@ -768,6 +803,45 @@ export async function uploadLessonVideo(input: {
   }
   scheduleRecomputeCourseTotals(input.courseId);
   return path;
+}
+
+/** Removes the lesson video from Storage and clears lesson media fields. */
+export async function clearLessonVideo(courseId: string, lessonId: string) {
+  const lessonRef = doc(getFirebaseDb(), "courses", courseId, "lessons", lessonId);
+  const snap = await getDoc(lessonRef);
+  if (!snap.exists()) return;
+  const data = snap.data() as Record<string, unknown>;
+  const previous = (data.videoPath as string | null | undefined) ?? null;
+  await updateDoc(lessonRef, {
+    videoPath: null,
+    videoUrl: null,
+    videoFileName: null,
+    durationSeconds: 0,
+    videoUploadGeneration: Date.now(),
+    updatedAt: serverTimestamp(),
+  });
+  if (previous) {
+    void deleteStoragePathIfPresent(previous);
+  }
+  scheduleRecomputeCourseTotals(courseId);
+}
+
+/** Display label for an assigned lesson video. */
+export function lessonVideoLabel(lesson: Lesson): string | null {
+  if (lesson.videoFileName?.trim()) return lesson.videoFileName.trim();
+  if (lesson.videoUrl?.trim()) return lesson.videoUrl.trim();
+  if (lesson.videoPath?.trim()) {
+    const base = lesson.videoPath.split("/").pop()?.trim();
+    return base || lesson.videoPath;
+  }
+  return null;
+}
+
+/** Default lesson title from a video filename (no extension). */
+export function titleFromVideoFile(file: File): string {
+  const base = file.name.replace(/\.[^.]+$/, "").trim();
+  const cleaned = base.replace(/[_-]+/g, " ").replace(/\s+/g, " ").trim();
+  return cleaned || file.name;
 }
 
 /** Reads a local video file's duration without uploading it first. */
@@ -796,22 +870,56 @@ export function watchAuthoredCourses(
   onChange: (courses: Course[]) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
-  const q = query(
-    collection(getFirebaseDb(), "courses"),
+  const db = getFirebaseDb();
+  const owned = query(
+    collection(db, "courses"),
     where("createdBy", "==", uid),
     orderBy("updatedAt", "desc"),
   );
-  return onSnapshot(
-    q,
+  const instructed = query(
+    collection(db, "courses"),
+    where("instructorIds", "array-contains", uid),
+    orderBy("updatedAt", "desc"),
+  );
+
+  let ownedRows: Course[] = [];
+  let instructedRows: Course[] = [];
+  const emit = () => {
+    const map = new Map<string, Course>();
+    for (const course of [...ownedRows, ...instructedRows]) {
+      map.set(course.id, course);
+    }
+    onChange(
+      [...map.values()].sort(
+        (a, b) => (b.updatedAt?.getTime() ?? 0) - (a.updatedAt?.getTime() ?? 0),
+      ),
+    );
+  };
+
+  const stopOwned = onSnapshot(
+    owned,
     (snap) => {
-      onChange(
-        snap.docs.map((d) =>
-          courseFrom(d.id, d.data() as Record<string, unknown>),
-        ),
+      ownedRows = snap.docs.map((d) =>
+        courseFrom(d.id, d.data() as Record<string, unknown>),
       );
+      emit();
     },
     (error) => onError?.(error),
   );
+  const stopInstructed = onSnapshot(
+    instructed,
+    (snap) => {
+      instructedRows = snap.docs.map((d) =>
+        courseFrom(d.id, d.data() as Record<string, unknown>),
+      );
+      emit();
+    },
+    (error) => onError?.(error),
+  );
+  return () => {
+    stopOwned();
+    stopInstructed();
+  };
 }
 
 export function watchCoursesByStatus(
@@ -1064,6 +1172,7 @@ export async function upsertLesson(input: {
             durationSeconds: Math.round(input.durationSeconds ?? 0),
             videoPath: null,
             videoUrl: null,
+            videoFileName: null,
             bodyMarkdown: null,
             questions: [],
             passPercent: QUIZ_DEFAULT_PASS_PERCENT,
@@ -1094,6 +1203,7 @@ export async function saveLessonReading(input: {
       durationSeconds: Math.max(0, Math.round(input.durationSeconds)),
       videoPath: null,
       videoUrl: null,
+      videoFileName: null,
       updatedAt: serverTimestamp(),
     },
   );
@@ -1133,6 +1243,7 @@ export async function saveLessonQuiz(input: {
     durationSeconds: Math.max(0, Math.round(input.durationSeconds)),
     videoPath: null,
     videoUrl: null,
+    videoFileName: null,
     updatedAt: serverTimestamp(),
   });
   batch.set(doc(lessonRef, "secure", "answerKey"), {

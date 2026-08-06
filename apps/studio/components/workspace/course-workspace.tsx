@@ -19,15 +19,16 @@ import {
   deleteLesson,
   deleteModule,
   fetchCourseStudents,
-  progressOf,
   reorderLessons,
   setCourseStatus,
+  titleFromVideoFile,
   updateCourseMeta,
   uploadCourseCover,
   upsertLesson,
   upsertModule,
   watchCourse,
   watchCourseContent,
+  lessonVideoLabel,
 } from "@/lib/firebase/courses";
 import { COURSE_LEVELS, LESSON_TYPES } from "@/lib/types";
 import type {
@@ -52,9 +53,22 @@ import { LessonContentEditor } from "@/components/studio/lesson-content-editor";
 import { InstructorMultiSelect } from "@/components/studio/instructor-multi-select";
 import { LearnerPreview } from "@/components/workspace/learner-preview";
 import { MediaLibrary } from "@/components/workspace/media-library";
+import { UploadQueueStrip } from "@/components/workspace/upload-queue-strip";
+import {
+  LessonUploadQueueProvider,
+  useLessonUploadQueue,
+} from "@/lib/uploads/lesson-upload-queue";
 import { headlineName, listDirectory } from "@/lib/firebase/users";
 
 export function CourseWorkspace({ courseId }: { courseId: string }) {
+  return (
+    <LessonUploadQueueProvider>
+      <CourseWorkspaceInner courseId={courseId} />
+    </LessonUploadQueueProvider>
+  );
+}
+
+function CourseWorkspaceInner({ courseId }: { courseId: string }) {
   const t = useTranslations();
   const router = useRouter();
   const { profile, loading: authLoading } = useAuth();
@@ -70,10 +84,12 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [mediaOpen, setMediaOpen] = useState(false);
-  const [mobilePane, setMobilePane] = useState<"syllabus" | "edit" | "details">(
-    "edit",
-  );
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [mobilePane, setMobilePane] = useState<"syllabus" | "edit">("edit");
   const [students, setStudents] = useState<CourseStudent[]>([]);
+  const [importing, setImporting] = useState(false);
+  const importRef = useRef<HTMLInputElement | null>(null);
+  const { activeCount, enqueue, setExpandQueue } = useLessonUploadQueue();
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -230,21 +246,71 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
       if (!target) return;
       setBusy(true);
       try {
+        const nextOrder =
+          content.lessons.reduce((max, lesson) => Math.max(max, lesson.order), -1) +
+          1;
         const id = await upsertLesson({
           courseId: course.id,
           moduleId: target,
           title: `Lesson ${content.lessons.length + 1}`,
-          order: content.lessons.length,
+          order: nextOrder,
           type: "video",
         });
         setSelectedModuleId(target);
         setSelectedLessonId(id);
+        setMobilePane("edit");
       } finally {
         setBusy(false);
       }
     },
-    [course, editable, activeModuleId, content.lessons.length],
+    [course, editable, activeModuleId, content.lessons],
   );
+
+  const importVideos = async (files: FileList | null) => {
+    if (!files?.length || !course || !editable) return;
+    let moduleId = activeModuleId;
+    if (!moduleId) {
+      moduleId = await upsertModule({
+        courseId: course.id,
+        title: `Module ${content.modules.length + 1}`,
+        order: content.modules.length,
+      });
+      setSelectedModuleId(moduleId);
+    }
+    const videoFiles = [...files].filter((file) =>
+      file.type.startsWith("video/"),
+    );
+    if (videoFiles.length === 0) return;
+
+    setImporting(true);
+    try {
+      let order =
+        content.lessons.reduce((max, lesson) => Math.max(max, lesson.order), -1) +
+        1;
+      let firstId: string | null = null;
+      for (const file of videoFiles) {
+        const id = await upsertLesson({
+          courseId: course.id,
+          moduleId,
+          title: titleFromVideoFile(file),
+          order,
+          type: "video",
+        });
+        order += 1;
+        if (!firstId) firstId = id;
+        enqueue({ courseId: course.id, lessonId: id, file });
+      }
+      if (firstId) {
+        setSelectedLessonId(firstId);
+        setSelectedModuleId(moduleId);
+        setMobilePane("edit");
+      }
+      setExpandQueue(true);
+    } finally {
+      setImporting(false);
+      if (importRef.current) importRef.current.value = "";
+    }
+  };
 
   useEffect(() => {
     const onPreview = () => setPreviewOpen((value) => !value);
@@ -295,8 +361,8 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
       <div className="mx-auto max-w-lg px-6 py-16">
         <EmptyState message={t("libraryEmpty")} />
         <div className="mt-4 text-center">
-          <Link href="/" className="text-sm font-semibold text-brand">
-            {t("navLibrary")}
+          <Link href="/content" className="text-sm font-semibold text-brand">
+            {t("navContent")}
           </Link>
         </div>
       </div>
@@ -308,8 +374,8 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
       <div className="mx-auto max-w-lg px-6 py-16">
         <EmptyState message={t("noAccessBody")} />
         <div className="mt-4 text-center">
-          <Link href="/" className="text-sm font-semibold text-brand">
-            {t("navLibrary")}
+          <Link href="/content" className="text-sm font-semibold text-brand">
+            {t("navContent")}
           </Link>
         </div>
       </div>
@@ -340,10 +406,10 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <Link
-              href="/"
+              href="/content"
               className="text-[11px] font-semibold text-muted hover:text-ink"
             >
-              ← {t("navLibrary")}
+              ← {t("navContent")}
             </Link>
             <span
               className={`inline-block h-2 w-2 rounded-full ${syncDot}`}
@@ -354,11 +420,30 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
             ) : null}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <h1 className="truncate font-display text-lg sm:text-xl">{course.title}</h1>
+            <h1 className="truncate font-display text-lg sm:text-xl">
+              {course.title}
+            </h1>
             <StatusChip status={course.status} />
           </div>
         </div>
         <div className="flex max-w-full flex-wrap items-center gap-2">
+          <Button
+            variant="ghost"
+            className="h-9 px-3 text-xs"
+            onClick={() => {
+              setExpandQueue(true);
+            }}
+          >
+            {t("workspaceUploads")}
+            {activeCount > 0 ? ` (${activeCount})` : ""}
+          </Button>
+          <Button
+            variant="ghost"
+            className="h-9 px-3 text-xs"
+            onClick={() => setSettingsOpen(true)}
+          >
+            {t("workspaceSettings")}
+          </Button>
           <Button
             variant="ghost"
             className="h-9 px-3 text-xs"
@@ -427,7 +512,6 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
           [
             ["syllabus", t("workspaceModules")],
             ["edit", t("workspaceEdit")],
-            ["details", t("workspaceInspector")],
           ] as const
         ).map(([id, label]) => (
           <button
@@ -445,9 +529,9 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
         ))}
       </div>
 
-      <div className="grid min-h-0 flex-1 lg:grid-cols-[260px_minmax(0,1fr)_300px]">
+      <div className="grid min-h-0 flex-1 lg:grid-cols-[280px_minmax(0,1fr)]">
         <div
-          className={`min-h-0 overflow-hidden ${
+          className={`min-h-0 overflow-hidden border-r border-glass-border ${
             mobilePane === "syllabus" ? "block" : "hidden"
           } lg:block`}
         >
@@ -456,7 +540,11 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
             content={content}
             selectedLessonId={selectedLessonId}
             selectedModuleId={activeModuleId}
-            busy={busy}
+            busy={busy || importing}
+            editable={Boolean(editable)}
+            importing={importing}
+            importRef={importRef}
+            onImportVideos={(files) => void importVideos(files)}
             onSelectLesson={(lesson) => {
               setSelectedLessonId(lesson.id);
               setSelectedModuleId(lesson.moduleId);
@@ -470,59 +558,88 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
         </div>
 
         <section
-          className={`min-h-0 overflow-y-auto border-x border-glass-border p-3 sm:p-4 ${
-            mobilePane === "edit" ? "block" : "hidden"
-          } lg:block`}
+          className={`flex min-h-0 flex-col overflow-hidden ${
+            mobilePane === "edit" ? "flex" : "hidden"
+          } lg:flex`}
         >
-          {selectedLesson ? (
-            <div>
-              <LessonTitleEditor
-                courseId={course.id}
-                lesson={selectedLesson}
-                courseInstructorIds={instructorIds}
-                instructorOptions={instructorOptions}
-                editable={Boolean(editable)}
-              />
-              <div className="mt-4">
-                <LessonContentEditor
+          <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+            {selectedLesson ? (
+              <div className="mx-auto max-w-3xl">
+                <LessonTitleEditor
                   courseId={course.id}
                   lesson={selectedLesson}
+                  courseInstructorIds={instructorIds}
+                  instructorOptions={instructorOptions}
+                  editable={Boolean(editable)}
                 />
+                <div className="mt-5">
+                  <LessonContentEditor
+                    courseId={course.id}
+                    lesson={selectedLesson}
+                  />
+                </div>
               </div>
-            </div>
-          ) : (
-            <p className="py-16 text-center text-sm text-muted">
-              {t("workspaceNoLesson")}
-            </p>
-          )}
+            ) : (
+              <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-16 text-center">
+                <p className="text-sm text-muted">{t("workspaceNoLesson")}</p>
+                {editable && activeModuleId ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => void addLesson(activeModuleId)}
+                  >
+                    {t("workspaceAddLesson")}
+                  </Button>
+                ) : null}
+              </div>
+            )}
+          </div>
+          <UploadQueueStrip />
         </section>
-
-        <div
-          className={`min-h-0 overflow-hidden ${
-            mobilePane === "details" ? "block" : "hidden"
-          } lg:block`}
-        >
-          <InspectorPane
-            course={course}
-            title={title}
-            description={description}
-            instructorIds={instructorIds}
-            level={level}
-            editable={Boolean(editable)}
-            onTitle={setTitle}
-            onDescription={setDescription}
-            onInstructors={(ids, name) => {
-              setInstructorIds(ids);
-              setTeacherName(name);
-            }}
-            onLevel={setLevel}
-            coverRef={coverRef}
-            coverProgress={coverProgress}
-            onCover={(file) => void pickCover(file)}
-            students={students}
-          />
-        </div>
       </div>
+
+      {settingsOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex justify-end bg-ink/40"
+          onClick={() => setSettingsOpen(false)}
+        >
+          <div
+            className="flex h-full w-full max-w-md flex-col border-l border-glass-border bg-sheet shadow-2xl"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-glass-border px-4 py-3">
+              <h2 className="font-display text-lg">{t("workspaceSettings")}</h2>
+              <button
+                type="button"
+                className="text-sm text-muted hover:text-ink"
+                onClick={() => setSettingsOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              <InspectorPane
+                course={course}
+                title={title}
+                description={description}
+                instructorIds={instructorIds}
+                level={level}
+                editable={Boolean(editable)}
+                onTitle={setTitle}
+                onDescription={setDescription}
+                onInstructors={(ids, name) => {
+                  setInstructorIds(ids);
+                  setTeacherName(name);
+                }}
+                onLevel={setLevel}
+                coverRef={coverRef}
+                coverProgress={coverProgress}
+                onCover={(file) => void pickCover(file)}
+                students={students}
+              />
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {previewOpen ? (
         <LearnerPreview
@@ -668,6 +785,10 @@ function SyllabusPane({
   selectedLessonId,
   selectedModuleId,
   busy,
+  editable,
+  importing,
+  importRef,
+  onImportVideos,
   onSelectLesson,
   onSelectModule,
   onAddModule,
@@ -679,6 +800,10 @@ function SyllabusPane({
   selectedLessonId: string | null;
   selectedModuleId: string | null;
   busy: boolean;
+  editable: boolean;
+  importing: boolean;
+  importRef: RefObject<HTMLInputElement | null>;
+  onImportVideos: (files: FileList | null) => void;
   onSelectLesson: (lesson: Lesson) => void;
   onSelectModule: (moduleId: string) => void;
   onAddModule: () => void;
@@ -723,25 +848,47 @@ function SyllabusPane({
   };
 
   return (
-    <aside className="flex min-h-0 flex-col overflow-hidden">
-      <div className="flex items-center justify-between gap-2 border-b border-glass-border px-3 py-2">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-          {t("workspaceModules")}
-        </p>
-        <button
-          type="button"
-          className="text-[11px] font-semibold text-brand hover:underline"
-          disabled={busy}
-          onClick={onAddModule}
-        >
-          {t("workspaceAddModule")}
-        </button>
+    <aside className="flex min-h-0 flex-col overflow-hidden bg-rail/20">
+      <div className="border-b border-glass-border px-3 py-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+            {t("workspaceModules")}
+          </p>
+          <button
+            type="button"
+            className="text-[11px] font-semibold text-brand hover:underline disabled:opacity-50"
+            disabled={busy || !editable}
+            onClick={onAddModule}
+          >
+            {t("workspaceAddModule")}
+          </button>
+        </div>
+        {editable ? (
+          <div className="mt-2">
+            <input
+              ref={importRef}
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm"
+              multiple
+              className="hidden"
+              onChange={(event) => onImportVideos(event.target.files)}
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => importRef.current?.click()}
+              className="w-full rounded-lg border border-dashed border-glass-border px-2 py-2 text-[11px] font-semibold text-muted transition hover:border-brand/40 hover:text-brand disabled:opacity-50"
+            >
+              {importing ? t("workspaceImporting") : t("workspaceImportVideos")}
+            </button>
+          </div>
+        ) : null}
       </div>
       <div className="flex-1 overflow-y-auto p-2">
         {content.modules.length === 0 ? (
-          <p className="px-2 py-8 text-center text-xs text-muted">
-            {t("workspaceAddModule")}
-          </p>
+          <div className="px-2 py-10 text-center">
+            <p className="text-xs text-muted">{t("workspaceAddModule")}</p>
+          </div>
         ) : (
           content.modules.map((module) => (
             <ModuleTree
@@ -914,6 +1061,10 @@ function LessonTreeRow({
   onBusy: (value: boolean) => void;
 }) {
   const t = useTranslations();
+  const hasVideo =
+    lesson.type === "video" && Boolean(lesson.videoPath || lesson.videoUrl);
+  const videoLabel =
+    lesson.type === "video" ? lessonVideoLabel(lesson) : null;
 
   const onDragOver = (event: DragEvent) => {
     event.preventDefault();
@@ -954,7 +1105,20 @@ function LessonTreeRow({
           onClick={onSelect}
         >
           <LessonTypeIcon type={lesson.type} />
-          <span className="truncate text-xs">{lesson.title}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-xs">{lesson.title}</span>
+            {lesson.type === "video" ? (
+              <span
+                className={`block truncate text-[10px] ${
+                  hasVideo ? "text-muted" : "text-warn"
+                }`}
+              >
+                {hasVideo
+                  ? (videoLabel ?? t("studioVideoReady"))
+                  : t("studioNoVideo")}
+              </span>
+            ) : null}
+          </span>
         </button>
         <button
           type="button"
@@ -1007,7 +1171,7 @@ function InspectorPane({
   return (
     <aside className="min-h-0 overflow-y-auto p-3">
       <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-        {t("workspaceInspector")}
+        {t("workspaceSettings")}
       </p>
 
       <div className="mt-3 space-y-3">
@@ -1093,19 +1257,12 @@ function InspectorPane({
             <p className="font-display text-xl">{completed}</p>
           </div>
         </div>
-        <ul className="mt-3 max-h-48 space-y-1 overflow-y-auto">
-          {students.slice(0, 20).map((row) => (
-            <li
-              key={row.uid}
-              className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs"
-            >
-              <span className="truncate text-muted">{row.uid.slice(0, 10)}…</span>
-              <span>
-                {Math.round(progressOf(row.enrollment, course.lessonCount) * 100)}%
-              </span>
-            </li>
-          ))}
-        </ul>
+        <Link
+          href={`/analytics/${course.id}`}
+          className="mt-3 inline-flex text-xs font-semibold text-brand"
+        >
+          {t("navAnalytics")} →
+        </Link>
       </div>
     </aside>
   );

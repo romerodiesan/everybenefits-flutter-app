@@ -1,21 +1,23 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useTranslations } from "next-intl";
 import {
+  clearLessonVideo,
   estimateQuizSeconds,
   estimateReadingSeconds,
   getLessonAnswerKey,
-  readVideoDuration,
+  lessonVideoLabel,
+  resolveVideoUrl,
   saveLessonQuiz,
   saveLessonReading,
-  uploadLessonVideo,
 } from "@/lib/firebase/courses";
 import { QUIZ_DEFAULT_PASS_PERCENT } from "@/lib/types";
 import type { Lesson, QuizQuestion, QuizSelectionMode } from "@/lib/types";
 import { Button, Input, Label, TextArea } from "@/components/ui/primitives";
 import { ProgressBar } from "@/components/academy/shared";
 import { Markdown } from "@/components/academy/markdown";
+import { useLessonUploadQueueOptional } from "@/lib/uploads/lesson-upload-queue";
 
 const MIN_OPTIONS = 2;
 const MAX_OPTIONS = 6;
@@ -46,45 +48,145 @@ function VideoEditor({
 }) {
   const t = useTranslations();
   const fileRef = useRef<HTMLInputElement | null>(null);
-  const [progress, setProgress] = useState<number | null>(null);
+  const queue = useLessonUploadQueueOptional();
+  const [dragOver, setDragOver] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [removing, setRemoving] = useState(false);
   const hasVideo = Boolean(lesson.videoPath || lesson.videoUrl);
+  const videoLabel = lessonVideoLabel(lesson);
 
-  const upload = async (file: File | undefined) => {
-    if (!file) return;
-    setProgress(0);
-    try {
-      const durationSeconds = await readVideoDuration(file);
-      await uploadLessonVideo({
-        courseId,
-        lessonId: lesson.id,
-        file,
-        durationSeconds,
-        onProgress: setProgress,
+  const activeJob = queue?.jobs.find(
+    (job) =>
+      job.lessonId === lesson.id &&
+      (job.status === "queued" || job.status === "uploading"),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    setPreviewUrl(null);
+    if (!hasVideo) return;
+    resolveVideoUrl(lesson)
+      .then((url) => {
+        if (!cancelled) setPreviewUrl(url);
+      })
+      .catch(() => {
+        if (!cancelled) setPreviewUrl(null);
       });
+    return () => {
+      cancelled = true;
+    };
+  }, [lesson.id, lesson.videoPath, lesson.videoUrl, hasVideo]);
+
+  const enqueueFile = (file: File | undefined) => {
+    if (!file || !queue) return;
+    queue.enqueue({ courseId, lessonId: lesson.id, file });
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
+  const onDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setDragOver(false);
+    const file = event.dataTransfer.files?.[0];
+    if (file && file.type.startsWith("video/")) {
+      enqueueFile(file);
+    }
+  };
+
+  const removeVideo = async () => {
+    if (!hasVideo) return;
+    if (!window.confirm(t("studioRemoveVideoConfirm"))) return;
+    setRemoving(true);
+    try {
+      await clearLessonVideo(courseId, lesson.id);
+      setPreviewUrl(null);
     } finally {
-      setProgress(null);
-      if (fileRef.current) fileRef.current.value = "";
+      setRemoving(false);
     }
   };
 
   return (
-    <div>
-      <input
-        ref={fileRef}
-        type="file"
-        accept="video/mp4,video/quicktime,video/webm"
-        onChange={(event) => void upload(event.target.files?.[0])}
-        aria-label={hasVideo ? t("studioReplaceVideo") : t("studioUploadVideo")}
-        className="w-full text-xs text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand/14 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand"
-      />
-      {progress !== null && (
-        <div className="mt-2">
-          <ProgressBar value={progress} />
+    <div className="space-y-4">
+      {hasVideo ? (
+        <div className="studio-panel overflow-hidden">
+          <div className="flex flex-wrap items-start justify-between gap-3 border-b border-glass-border px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                {t("studioAssignedVideo")}
+              </p>
+              <p className="mt-1 truncate text-sm font-medium">
+                {videoLabel ?? t("studioVideoReady")}
+              </p>
+              {lesson.durationSeconds > 0 ? (
+                <p className="mt-0.5 text-[11px] text-muted">
+                  {t("studioVideoDuration", {
+                    minutes: Math.floor(lesson.durationSeconds / 60),
+                    seconds: lesson.durationSeconds % 60,
+                  })}
+                </p>
+              ) : null}
+            </div>
+            <Button
+              type="button"
+              variant="danger"
+              className="h-9 shrink-0 px-3 text-xs"
+              disabled={removing || Boolean(activeJob)}
+              onClick={() => void removeVideo()}
+            >
+              {t("studioRemoveVideo")}
+            </Button>
+          </div>
+          {previewUrl ? (
+            <video
+              key={previewUrl}
+              src={previewUrl}
+              controls
+              className="aspect-video w-full bg-ink/90"
+            />
+          ) : (
+            <p className="px-4 py-8 text-center text-sm text-muted">
+              {t("studioVideoPreviewLoading")}
+            </p>
+          )}
+        </div>
+      ) : null}
+
+      <div
+        onDragOver={(event) => {
+          event.preventDefault();
+          setDragOver(true);
+        }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={onDrop}
+        className={`rounded-2xl border border-dashed px-4 py-10 text-center transition ${
+          dragOver
+            ? "border-brand bg-brand/10"
+            : "border-glass-border bg-rail/30"
+        }`}
+      >
+        <p className="text-sm text-muted">
+          {hasVideo ? t("workspaceReplaceDrop") : t("workspaceDropVideo")}
+        </p>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="video/mp4,video/quicktime,video/webm"
+          onChange={(event) => enqueueFile(event.target.files?.[0])}
+          aria-label={hasVideo ? t("studioReplaceVideo") : t("studioUploadVideo")}
+          className="mx-auto mt-4 block w-full max-w-sm text-xs text-muted file:mr-3 file:rounded-lg file:border-0 file:bg-brand/14 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-brand"
+        />
+      </div>
+      {activeJob ? (
+        <div>
+          <ProgressBar value={activeJob.progress} />
           <p className="mt-1.5 text-[11px] font-semibold text-muted">
-            {t("studioUploading", { percent: Math.round(progress * 100) })}
+            {t("studioUploading", {
+              percent: Math.round(activeJob.progress * 100),
+            })}
+            {" · "}
+            {activeJob.fileName}
           </p>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
