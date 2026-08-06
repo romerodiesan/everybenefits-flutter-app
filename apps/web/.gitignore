@@ -34,6 +34,9 @@ yarn-error.log*
 .env*
 !.env.example
 
+# Generated from NEXT_PUBLIC_FIREBASE_* (see scripts/generate-firebase-messaging-sw.mjs)
+/public/firebase-messaging-sw.js
+
 # vercel
 .vercel
 

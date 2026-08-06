@@ -4,7 +4,10 @@
   "private": true,
   "packageManager": "pnpm@11.15.1",
   "scripts": {
+    "generate:messaging-sw": "node ./scripts/generate-firebase-messaging-sw.mjs",
+    "predev": "pnpm run generate:messaging-sw",
     "dev": "next dev --turbopack",
+    "prebuild": "pnpm run generate:messaging-sw",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",

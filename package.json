@@ -29,7 +29,7 @@
     "deploy:admin": "firebase deploy --only apphosting:admin-web-app"
   },
   "devDependencies": {
-    "turbo": "~2.5.4",
+    "turbo": "^2.10.8",
     "typescript": "~5.9.3"
   }
 }

@@ -10,6 +10,7 @@
 #   pnpm deploy:admin
 #
 # Secrets:
+#   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_WEB_API_KEY --project every-benefits-us
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us
 #
 # Cross-app URLs: pulse.everybenefits.us / studio.everybenefits.us / admin.everybenefits.us
@@ -22,8 +23,10 @@ runConfig:
   concurrency: 80
 
 env:
+  # Client API key lives in App Hosting secrets (not committed).
+  #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_WEB_API_KEY --project every-benefits-us
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk
+    secret: FIREBASE_WEB_API_KEY
     availability:
       - BUILD
       - RUNTIME
