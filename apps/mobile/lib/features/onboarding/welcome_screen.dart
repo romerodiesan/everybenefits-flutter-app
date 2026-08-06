@@ -40,7 +40,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   late final AnimationController _reveal;
 
   int _page = 0;
-  bool _busy = false;
   bool? _completed;
 
   bool get _ready => _completed != null;
@@ -94,19 +93,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
     _ambient.dispose();
     _reveal.dispose();
     super.dispose();
-  }
-
-  Future<void> _run(Future<void> Function() action) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    try {
-      await action();
-    } catch (error, stackTrace) {
-      if (!mounted) return;
-      showAuthError(context, error, stackTrace: stackTrace);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
   }
 
   Future<void> _open(Widget page) {
@@ -200,7 +186,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     _TopBar(
                       showSkip: !_onAuthPage,
                       skipLabel: l10n.onboardingSkip,
-                      onSkip: _busy ? null : () => _goToAuth(),
+                      onSkip: () => _goToAuth(),
                       page: _page.clamp(0, _storyCount),
                       storyCount: _storyCount,
                       onAuth: _onAuthPage,
@@ -243,7 +229,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             active: _page == 3,
                           ),
                           _AuthPage(
-                            busy: _busy,
                             onSignIn: () => _open(
                               LoginScreen(authService: widget.authService),
                             ),
@@ -262,7 +247,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                         nextLabel: _page >= _storyCount - 1
                             ? l10n.onboardingGetStarted
                             : l10n.onboardingNext,
-                        onNext: _busy ? null : _next,
+                        onNext: _next,
                       ),
                   ],
                 ),
@@ -470,13 +455,11 @@ class _StoryPage extends StatelessWidget {
 
 class _AuthPage extends StatelessWidget {
   const _AuthPage({
-    required this.busy,
     required this.onSignIn,
     required this.onRegister,
     required this.onPhone,
   });
 
-  final bool busy;
   final VoidCallback onSignIn;
   final VoidCallback onRegister;
   final VoidCallback onPhone;
@@ -548,12 +531,12 @@ class _AuthPage extends StatelessWidget {
                 ),
                 SizedBox(height: constraints.maxHeight * 0.06),
                 FilledButton(
-                  onPressed: busy ? null : onSignIn,
+                  onPressed: onSignIn,
                   child: Text(l10n.welcomeEnter),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 TextButton(
-                  onPressed: busy ? null : onRegister,
+                  onPressed: onRegister,
                   child: Text(
                     l10n.welcomeCreateAccount,
                     style: theme.textTheme.labelLarge?.copyWith(
@@ -562,7 +545,7 @@ class _AuthPage extends StatelessWidget {
                   ),
                 ),
                 TextButton(
-                  onPressed: busy ? null : onPhone,
+                  onPressed: onPhone,
                   child: Text(
                     l10n.welcomePhone,
                     style: theme.textTheme.labelLarge?.copyWith(

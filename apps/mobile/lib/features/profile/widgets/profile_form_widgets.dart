@@ -319,7 +319,6 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
                     return l10n.validationNpn;
                   }
                   return null;
-                  return null;
                 },
               ),
             const SizedBox(height: AppSpacing.md),
