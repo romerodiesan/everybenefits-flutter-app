@@ -28,7 +28,7 @@ Copy values from `.env.example`. They match the Firebase web app already registe
 
 Optional:
 
-- `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` — reCAPTCHA v3 site key for App Check
+- `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` — reCAPTCHA Enterprise site key (Google Cloud Fraud Defense) for App Check
 - `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true` — point Auth / Firestore / RTDB / Storage / Functions at local emulators
 
 ### Firebase Console checklist
@@ -38,7 +38,7 @@ Optional:
    `https://every-insurance-default-rtdb.firebaseio.com` (create via Console or
    `firebase database:instances:create` / Management API), then
    `firebase deploy --only database`.
-3. **App Check** (optional): register the web app with reCAPTCHA v3 and set the site key in env.
+3. **App Check**: register each web app in Firebase Console with **reCAPTCHA Enterprise** (same Fraud Defense site key), set `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY`, and store it as App Hosting secret `FIREBASE_APPCHECK_SITE_KEY`.
 4. Google sign-in provider must remain enabled (same as mobile).
 
 > Flutter debug defaults to **emulators**. Web `pnpm dev` talks to **production**

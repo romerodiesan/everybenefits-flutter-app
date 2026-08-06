@@ -85,9 +85,11 @@ env:
   #   value: REPLACE_ME
   #   availability: [BUILD, RUNTIME]
 
-  # App Check (reCAPTCHA v3). RTDB App Check is ENFORCED — required in prod.
+  # App Check — reCAPTCHA Enterprise (Google Cloud Fraud Defense site key).
+  # Same key for pulse / studio / admin web apps.
+  #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_APPCHECK_SITE_KEY --project every-benefits-us
   - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
-    value: 6Lc1OiAsAAAAADabSgXEcqU2G17BFdxZ3qZnYVx6
+    secret: FIREBASE_APPCHECK_SITE_KEY
     availability:
       - BUILD
       - RUNTIME

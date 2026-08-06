@@ -77,11 +77,15 @@ env:
       - BUILD
       - RUNTIME
 
-  # Optional App Check (reCAPTCHA v3). When set, also set Cloud Functions
-  # env FUNCTIONS_ENFORCE_APP_CHECK=true so callables require tokens.
-  # - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
-  #   value: REPLACE_ME
-  #   availability: [BUILD, RUNTIME]
+  # App Check — reCAPTCHA Enterprise (Google Cloud Fraud Defense site key).
+  # Same secret as pulse-web-app / admin-web-app.
+  #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_APPCHECK_SITE_KEY --project every-benefits-us
+  - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
+    secret: FIREBASE_APPCHECK_SITE_KEY
+    availability:
+      - BUILD
+      - RUNTIME
+  # SSO requires App Check whenever this site key is present (sso-server.ts).
 
   # --- Admin (SSO exchange) ---
   - variable: FIREBASE_PROJECT_ID

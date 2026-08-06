@@ -34,7 +34,7 @@ Pulse (`:3000`) and Studio (`:3001`) are different origins, so Firebase sessions
 3. Dest `/api/auth/exchange-sso` consumes the one-time code and mints a custom token
 4. `/auth/bridge` — if you already have a session here, complete a handoff for the sibling app
 
-Callables `createSsoHandoff` / `exchangeSsoToken` mirror the same flow. Rate limits and optional App Check apply on the Next routes.
+Callables `createSsoHandoff` / `exchangeSsoToken` mirror the same flow. Rate limits apply; App Check (reCAPTCHA Enterprise / Fraud Defense site key) is required when `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` is set.
 
 Studio also tries a silent bridge to Pulse once when you arrive signed out.
 

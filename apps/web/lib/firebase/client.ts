@@ -18,7 +18,7 @@ import {
 } from "firebase/functions";
 import {
   initializeAppCheck,
-  ReCaptchaV3Provider,
+  ReCaptchaEnterpriseProvider,
   type AppCheck,
 } from "firebase/app-check";
 
@@ -112,13 +112,14 @@ export function initFirebaseClient() {
     emulatorsConnected = true;
   }
 
+  // App Check via reCAPTCHA Enterprise (Google Cloud Fraud Defense site key).
   // RTDB App Check can be ENFORCED in production — initialize before any
   // database listeners. Skip on emulators (debug tokens are opt-in).
   const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim();
   if (siteKey && !useEmulators && !appCheck) {
     try {
       appCheck = initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(siteKey),
+        provider: new ReCaptchaEnterpriseProvider(siteKey),
         isTokenAutoRefreshEnabled: true,
       });
     } catch (error) {

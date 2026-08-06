@@ -76,6 +76,14 @@ env:
       - BUILD
       - RUNTIME
 
+  # App Check — reCAPTCHA Enterprise (Google Cloud Fraud Defense site key).
+  #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_APPCHECK_SITE_KEY --project every-benefits-us
+  - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
+    secret: FIREBASE_APPCHECK_SITE_KEY
+    availability:
+      - BUILD
+      - RUNTIME
+
   - variable: FIREBASE_PROJECT_ID
     value: every-benefits-us
     availability:

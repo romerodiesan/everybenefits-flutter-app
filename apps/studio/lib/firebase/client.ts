@@ -18,7 +18,7 @@ import {
 } from "firebase/functions";
 import {
   initializeAppCheck,
-  ReCaptchaV3Provider,
+  ReCaptchaEnterpriseProvider,
   type AppCheck,
 } from "firebase/app-check";
 
@@ -112,11 +112,13 @@ export function initFirebaseClient() {
     emulatorsConnected = true;
   }
 
-  const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY;
-  if (siteKey && !appCheck) {
+  // App Check via reCAPTCHA Enterprise (same Fraud Defense site key as Pulse).
+  // Skip on emulators — use debug tokens if you need App Check against prod APIs.
+  const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim();
+  if (siteKey && !useEmulators && !appCheck) {
     try {
       appCheck = initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(siteKey),
+        provider: new ReCaptchaEnterpriseProvider(siteKey),
         isTokenAutoRefreshEnabled: true,
       });
     } catch (error) {
