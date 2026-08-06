@@ -29,6 +29,13 @@ export {
 } from "./academy";
 
 export {
+  recordAcademyAnalytics,
+  backfillCourseAnalytics,
+  refreshAcademyAnalyticsRealtime,
+  aggregateAcademyAnalyticsFromBigQuery,
+} from "./analytics";
+
+export {
   castForumVote,
   addForumReply,
   deleteForumReply,

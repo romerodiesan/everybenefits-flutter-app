@@ -52,6 +52,8 @@ export const enrollInCourse = onCall(callableOpts, async (request) => {
       completedLessonIds: [],
       lastLessonId: null,
       lastPositionSeconds: 0,
+      maxPositionSeconds: 0,
+      watchSeconds: 0,
       quizAttempts: {},
       enrolledAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
@@ -62,6 +64,20 @@ export const enrollInCourse = onCall(callableOpts, async (request) => {
       updatedAt: FieldValue.serverTimestamp(),
     });
   });
+  // Best-effort rollup bump for Studio dashboards.
+  await db
+    .doc(`courses/${courseId}/analytics/summary`)
+    .set(
+      {
+        schemaVersion: 1,
+        enrolled: FieldValue.increment(1),
+        "window28d.enrolled": FieldValue.increment(1),
+        "window7d.enrolled": FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      },
+      { merge: true },
+    )
+    .catch(() => undefined);
   return { ok: true };
 });
 
@@ -102,12 +118,27 @@ export const saveCourseProgress = onCall(callableOpts, async (request) => {
     const lessonCount = Number(course.data()?.lessonCount ?? 0);
     const allDone =
       lessonCount > 0 && completedLessonIds.length >= lessonCount;
+    const prevMax = Math.max(0, Number(data.maxPositionSeconds ?? 0));
+    const maxPositionSeconds = Math.max(prevMax, positionSeconds);
+    // Approximate incremental watch when the playhead advances forward.
+    const prevPos =
+      data.lastLessonId === lessonId
+        ? Math.max(0, Number(data.lastPositionSeconds ?? 0))
+        : 0;
+    const delta =
+      positionSeconds > prevPos
+        ? Math.min(120, positionSeconds - prevPos)
+        : 0;
+    const watchSeconds =
+      Math.max(0, Number(data.watchSeconds ?? 0)) + delta;
     tx.set(
       enrollmentRef,
       {
         completedLessonIds,
         lastLessonId: lessonId,
         lastPositionSeconds: positionSeconds,
+        maxPositionSeconds,
+        watchSeconds,
         completedAt: allDone
           ? (data.completedAt ?? FieldValue.serverTimestamp())
           : null,

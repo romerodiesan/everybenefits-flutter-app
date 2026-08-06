@@ -20,6 +20,12 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `threads/{threadId}/votes/{uid}` | Thread votes |
 | `threads/{threadId}/participants/{uid}` | Notify targets |
 | `courses/{courseId}` | Academy courses (+ `modules`, `lessons`, `secure`) |
+| `courses/{courseId}/analytics/{summary\|realtime\|audience\|traffic}` | Aggregate creator analytics (Functions-written) |
+| `courses/{courseId}/analyticsDays/{yyyy-mm-dd}` | Daily series for Studio charts |
+| `courses/{courseId}/lessonAnalytics/{lessonId}` | Per-lesson retention / quiz rollups |
+| `courses/{courseId}/analyticsSessions/{sessionId}` | Ephemeral realtime presence (Functions-only) |
+| `analyticsDedupe/{id}` | Client event idempotency (Functions-only) |
+| `analyticsViewerDays/{id}` | Approximate unique viewers (Functions-only) |
 | `paths/{pathId}` | Learning paths |
 | `orgNodes/{id}` | Org hierarchy (Admin); mutations via Functions |
 | `aiKnowledgeChunks/{id}` | RAG vectors (backend-only) |

@@ -124,6 +124,35 @@
         { "fieldPath": "surface", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "courses",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "instructorIds", "arrayConfig": "CONTAINS" },
+        { "fieldPath": "updatedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "enrollments",
+      "queryScope": "COLLECTION_GROUP",
+      "fields": [
+        { "fieldPath": "courseId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "analyticsSessions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lastSeenAt", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "analyticsDays",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "day", "order": "ASCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

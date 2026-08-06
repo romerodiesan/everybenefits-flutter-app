@@ -121,6 +121,7 @@ async function main() {
   }
 
   await run("tooling/scripts/seed-academy.mjs");
+  await run("tooling/scripts/seed-analytics.mjs");
 
   if (uid) {
     await run("tooling/scripts/seed-notifications.mjs", [uid]);

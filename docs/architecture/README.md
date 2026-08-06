@@ -66,4 +66,4 @@ See [ADR-003](ADR-003-trusted-boundary.md).
 | [ADR-004](ADR-004-pulse-ai.md) | Pulse AI bounded context |
 | [ADR-005](ADR-005-security-ops.md) | App Check, CORS, ops checklist |
 
-Also: [data-model.md](data-model.md), [environments.md](environments.md), [flutter-di.md](flutter-di.md).
+Also: [data-model.md](data-model.md), [creator-analytics.md](creator-analytics.md), [environments.md](environments.md), [flutter-di.md](flutter-di.md).

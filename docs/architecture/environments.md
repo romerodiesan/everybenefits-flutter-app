@@ -38,3 +38,13 @@ Copy:
 - `apps/admin/.env.example` → `apps/admin/.env.local`
 
 Never commit secrets. AI keys and service accounts are webapp-server only (see `docs/pulse-ai.md`).
+
+## Creator analytics (Studio)
+
+Production audience geo/device requires:
+
+1. Firebase **Blaze** billing
+2. GA4 → BigQuery export enabled
+3. Functions env `BIGQUERY_ANALYTICS_DATASET` (see `docs/architecture/creator-analytics.md`)
+
+Local emulators: leave the dataset unset and run `pnpm seed` (includes `seed-analytics.mjs`) for synthetic rollups.

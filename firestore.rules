@@ -76,13 +76,27 @@ service cloud.firestore {
       return courseData(courseId).get('createdBy', '') == request.auth.uid;
     }
 
+    function instructsCourse(courseId) {
+      return courseExists(courseId)
+        && request.auth.uid in courseData(courseId).get('instructorIds', []);
+    }
+
+    function canReadCourseAnalytics(courseId) {
+      return isAdmin()
+        || (
+          isCourseAuthor()
+          && courseExists(courseId)
+          && (ownsCourse(courseId) || instructsCourse(courseId))
+        );
+    }
+
     function courseReadable(courseId) {
       return courseExists(courseId)
         && (
           (courseData(courseId).get('status', 'draft') == 'published'
             && isRegisteredMember())
           || isAdmin()
-          || (isCourseAuthor() && ownsCourse(courseId))
+          || (isCourseAuthor() && (ownsCourse(courseId) || instructsCourse(courseId)))
         );
     }
 
@@ -402,7 +416,10 @@ service cloud.firestore {
         || isAdmin()
         || (
           isAccountActive()
-          && resource.data.get('createdBy', '') == request.auth.uid
+          && (
+            resource.data.get('createdBy', '') == request.auth.uid
+            || request.auth.uid in resource.data.get('instructorIds', [])
+          )
         );
 
       allow create: if isCourseAuthor()
@@ -451,9 +468,27 @@ service cloud.firestore {
         // grading happens in the submitQuizAttempt callable (Admin SDK).
         match /secure/{secureId} {
           allow read: if isAdmin()
-            || (isCourseAuthor() && courseExists(courseId) && ownsCourse(courseId));
+            || (isCourseAuthor() && courseExists(courseId)
+              && (ownsCourse(courseId) || instructsCourse(courseId)));
           allow create, update, delete: if canEditCourse(courseId);
         }
+      }
+
+      // Creator analytics rollups — aggregate only; Admin SDK writes.
+      match /analytics/{docId} {
+        allow read: if canReadCourseAnalytics(courseId);
+        allow write: if false;
+      }
+      match /analyticsDays/{dayId} {
+        allow read: if canReadCourseAnalytics(courseId);
+        allow write: if false;
+      }
+      match /lessonAnalytics/{lessonId} {
+        allow read: if canReadCourseAnalytics(courseId);
+        allow write: if false;
+      }
+      match /analyticsSessions/{sessionId} {
+        allow read, write: if false;
       }
     }
 
@@ -503,13 +538,26 @@ service cloud.firestore {
     }
 
     // Studio metrics read enrollments across users via collectionGroup.
+    // Prefer aggregate rollups under courses/{id}/analytics; this remains for
+    // admin tools / backfill verification — never expose raw UIDs in Studio UI.
     match /{path=**}/enrollments/{enrollmentId} {
       allow read: if isAdmin()
         || (
           isCourseAuthor()
           && courseExists(resource.data.courseId)
-          && ownsCourse(resource.data.courseId)
+          && (
+            ownsCourse(resource.data.courseId)
+            || instructsCourse(resource.data.courseId)
+          )
         );
+    }
+
+    // Ephemeral analytics helpers written only by Admin SDK / Functions.
+    match /analyticsDedupe/{id} {
+      allow read, write: if false;
+    }
+    match /analyticsViewerDays/{id} {
+      allow read, write: if false;
     }
 
     // Retrieval index and run metrics are backend-only: the chunks flatten
