@@ -1,12 +1,9 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { StudioShell } from "@/components/chrome/studio-shell";
-import { InsightsHome } from "@/components/studio/insights-home";
+type Props = { params: Promise<{ locale: string }> };
 
-export default function InsightsPage() {
-  return (
-    <StudioShell>
-      <InsightsHome />
-    </StudioShell>
-  );
+/** Legacy Insights route → Analytics. */
+export default async function InsightsRedirect({ params }: Props) {
+  const { locale } = await params;
+  redirect(`/${locale}/analytics`);
 }

@@ -28,9 +28,14 @@ export function CommandPalette({
   const commands = useMemo<Command[]>(
     () => [
       {
-        id: "library",
-        label: t("navLibrary"),
+        id: "dashboard",
+        label: t("navDashboard"),
         run: () => router.push("/"),
+      },
+      {
+        id: "content",
+        label: t("navContent"),
+        run: () => router.push("/content"),
       },
       {
         id: "review",
@@ -38,9 +43,9 @@ export function CommandPalette({
         run: () => router.push("/review"),
       },
       {
-        id: "insights",
-        label: t("navInsights"),
-        run: () => router.push("/insights"),
+        id: "analytics",
+        label: t("navAnalytics"),
+        run: () => router.push("/analytics"),
       },
       {
         id: "preview",

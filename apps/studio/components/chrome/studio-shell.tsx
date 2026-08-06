@@ -38,6 +38,27 @@ const ROLE_KEY: Record<UserRole, string> = {
 
 type IconProps = SVGProps<SVGSVGElement> & { filled?: boolean };
 
+function IconDashboard({ filled, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      {filled ? (
+        <path
+          fill="currentColor"
+          d="M4 4h7v7H4V4Zm9 0h7v4h-7V4ZM4 13h7v7H4v-7Zm9-3h7v10h-7V10Z"
+        />
+      ) : (
+        <path
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M4.5 4.5h6.5v6.5H4.5V4.5Zm8.5 0H19.5v4H13V4.5ZM4.5 13H11v6.5H4.5V13Zm8.5-2.5H19.5V19.5H13V10.5Z"
+        />
+      )}
+    </svg>
+  );
+}
+
 function IconLibrary({ filled, ...props }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
@@ -177,9 +198,25 @@ export function StudioShell({ children }: { children: ReactNode }) {
     () => [
       {
         href: "/",
-        label: t("navLibrary"),
+        label: t("navDashboard"),
         match: (p: string) => p === "/",
+        Icon: IconDashboard,
+      },
+      {
+        href: "/content",
+        label: t("navContent"),
+        match: (p: string) =>
+          p.startsWith("/content") ||
+          p.startsWith("/courses") ||
+          p.startsWith("/paths"),
         Icon: IconLibrary,
+      },
+      {
+        href: "/analytics",
+        label: t("navAnalytics"),
+        match: (p: string) =>
+          p.startsWith("/analytics") || p.startsWith("/insights"),
+        Icon: IconInsights,
       },
       {
         href: "/review",
@@ -187,12 +224,6 @@ export function StudioShell({ children }: { children: ReactNode }) {
         match: (p: string) => p.startsWith("/review"),
         adminOnly: true,
         Icon: IconReview,
-      },
-      {
-        href: "/insights",
-        label: t("navInsights"),
-        match: (p: string) => p.startsWith("/insights"),
-        Icon: IconInsights,
       },
     ],
     [t],
@@ -257,7 +288,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
       ) : null}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex h-full w-[min(18rem,88vw)] shrink-0 flex-col border-r border-glass-border bg-sheet transition-transform duration-200 lg:static lg:z-auto lg:w-72 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex h-full w-[min(16rem,88vw)] shrink-0 flex-col border-r border-glass-border bg-rail transition-transform duration-200 lg:static lg:z-auto lg:w-60 lg:translate-x-0 ${
           navOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
         }`}
       >

@@ -1,18 +1,11 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { use } from "react";
-import { StudioShell } from "@/components/chrome/studio-shell";
-import { InsightsHome } from "@/components/studio/insights-home";
+type Props = {
+  params: Promise<{ locale: string; courseId: string }>;
+};
 
-export default function InsightsCoursePage({
-  params,
-}: {
-  params: Promise<{ courseId: string }>;
-}) {
-  const { courseId } = use(params);
-  return (
-    <StudioShell>
-      <InsightsHome initialCourseId={courseId} />
-    </StudioShell>
-  );
+/** Legacy Insights course route → Analytics. */
+export default async function InsightsCourseRedirect({ params }: Props) {
+  const { locale, courseId } = await params;
+  redirect(`/${locale}/analytics/${courseId}`);
 }

@@ -1,12 +1,12 @@
 "use client";
 
 import { StudioShell } from "@/components/chrome/studio-shell";
-import { DashboardHome } from "@/components/studio/dashboard-home";
+import { AnalyticsHome } from "@/components/studio/analytics-home";
 
-export default function StudioHomePage() {
+export default function AnalyticsPage() {
   return (
     <StudioShell>
-      <DashboardHome />
+      <AnalyticsHome />
     </StudioShell>
   );
 }
