@@ -17,6 +17,17 @@ export type {
   LearningPath,
   Enrollment,
   CourseStudent,
+  AcademyAnalyticsEventName,
+  AcademyAnalyticsSource,
+  AcademyAnalyticsPlatform,
+  AcademyAnalyticsEventInput,
+  CourseAnalyticsSummary,
+  CourseAnalyticsWindow,
+  CourseAnalyticsRealtime,
+  CourseAnalyticsAudience,
+  CourseAnalyticsTraffic,
+  LessonAnalyticsRollup,
+  CourseAnalyticsDay,
 } from "@pulse/shared";
 
 export {
@@ -24,6 +35,15 @@ export {
   LESSON_TYPES,
   LESSON_COMPLETE_THRESHOLD,
   QUIZ_DEFAULT_PASS_PERCENT,
+  ACADEMY_ANALYTICS_SCHEMA_VERSION,
+  ANALYTICS_MIN_COHORT,
+  ANALYTICS_HEARTBEAT_SECONDS,
+  ACADEMY_ANALYTICS_EVENT_NAMES,
+  ACADEMY_ANALYTICS_SOURCES,
+  ACADEMY_ANALYTICS_PLATFORMS,
+  emptyRetentionBuckets,
+  emptyHourHistogram,
+  emptyAnalyticsWindow,
 } from "@pulse/shared";
 
 export const DEFAULT_AGENCY = "Every Benefits";
