@@ -79,7 +79,7 @@ const nextConfig: NextConfig = {
   // Keep Firebase out of the RSC/Turbopack CJS interop path (avoids
   // "require is not defined" when client modules are SSR'd).
   serverExternalPackages: ["firebase", "@firebase/app", "@firebase/auth"],
-  transpilePackages: ["@pulse/shared"],
+  transpilePackages: ["@pulse/shared", "@pulse/firebase-web"],
   images: {
     // Emulator Storage serves http://<lan-ip>:9199/...; skip optimizer locally.
     unoptimized: useEmulators,

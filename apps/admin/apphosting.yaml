@@ -1,6 +1,13 @@
 # Firebase App Hosting — Admin
 # Project: every-benefits-us
-# Backend rootDir: apps/admin
+#
+# Console / GitHub backend settings:
+#   Root directory = apps/admin  (must match firebase.json apphosting.rootDir)
+# App Hosting detects the repo-root turbo.json + pnpm workspace and builds
+# @pulse/admin plus workspace deps (@pulse/shared, @pulse/firebase-web).
+#
+# Local CLI deploy (from repo root):
+#   pnpm deploy:admin
 #
 # Secrets:
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us

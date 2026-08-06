@@ -25,3 +25,5 @@ The repo mixed Flutter at the root with three Next.js apps and Cloud Functions. 
 - One `pnpm install` at the root installs all TS packages.
 - Flutter commands run from `apps/mobile`.
 - Firebase App Hosting `rootDir` values are `apps/web|studio|admin`; Functions `source` is `apps/functions`.
+- App Hosting Console root directories must match those paths. Deploy helpers: `pnpm deploy:web|studio|admin`, `pnpm deploy:functions`, `pnpm deploy:rules`.
+- Do not ignore repo-root `.npmrc` / workspace manifests in App Hosting source uploads — pnpm + Turborepo need them.

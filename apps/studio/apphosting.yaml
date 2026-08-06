@@ -1,6 +1,13 @@
 # Firebase App Hosting — Studio
 # Project: every-benefits-us
-# Backend rootDir: apps/studio
+#
+# Console / GitHub backend settings:
+#   Root directory = apps/studio  (must match firebase.json apphosting.rootDir)
+# App Hosting detects the repo-root turbo.json + pnpm workspace and builds
+# @pulse/studio plus workspace deps (@pulse/shared, @pulse/firebase-web).
+#
+# Local CLI deploy (from repo root):
+#   pnpm deploy:studio
 #
 # Secrets:
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us

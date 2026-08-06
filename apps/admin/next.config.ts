@@ -45,7 +45,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["firebase", "@firebase/app", "@firebase/auth"],
-  transpilePackages: ["@pulse/shared"],
+  transpilePackages: ["@pulse/shared", "@pulse/firebase-web"],
   images: {
     unoptimized: useEmulators,
     remotePatterns: [

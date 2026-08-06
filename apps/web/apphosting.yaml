@@ -1,6 +1,13 @@
 # Firebase App Hosting — Pulse (webapp)
 # Project: every-benefits-us
-# Backend rootDir: apps/web
+#
+# Console / GitHub backend settings:
+#   Root directory = apps/web  (must match firebase.json apphosting.rootDir)
+# App Hosting detects the repo-root turbo.json + pnpm workspace and builds
+# @pulse/web plus workspace deps (@pulse/shared, @pulse/firebase-web).
+#
+# Local CLI deploy (from repo root):
+#   pnpm deploy:web
 #
 # Secrets (create once, then grant to this backend):
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us

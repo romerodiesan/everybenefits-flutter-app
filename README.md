@@ -85,10 +85,27 @@ pnpm seed
 
 ## Deploy
 
-Firebase App Hosting backends: `pulse-web-app`, `studio-web-app`, `admin-web-app` (see `firebase.json` — rootDirs under `apps/`).
+Firebase App Hosting backends (Turborepo monorepo):
+
+| Backend | Console root directory | CLI |
+|---------|------------------------|-----|
+| `pulse-web-app` | `apps/web` | `pnpm deploy:web` |
+| `studio-web-app` | `apps/studio` | `pnpm deploy:studio` |
+| `admin-web-app` | `apps/admin` | `pnpm deploy:admin` |
+
+Keep the Console **Root directory** aligned with `firebase.json` → `apphosting[].rootDir`. App Hosting reads the repo-root `turbo.json` / `pnpm-workspace.yaml` and builds workspace packages before the target Next app.
 
 ```bash
-firebase deploy --only firestore:rules,firestore:indexes,database,storage,functions
+# Rules / indexes / RTDB / Storage
+pnpm deploy:rules
+
+# Cloud Functions (syncs @pulse/shared into vendor first)
+pnpm deploy:functions
+
+# One App Hosting backend (from repo root)
+pnpm deploy:web
+# pnpm deploy:studio
+# pnpm deploy:admin
 ```
 
 ## Naming

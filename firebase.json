@@ -29,8 +29,14 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "**/.*",
-        "**/*.local"
+        "*.local",
+        "apps/mobile",
+        "apps/functions",
+        "apps/studio",
+        "apps/admin",
+        "docs",
+        "tooling",
+        "test"
       ],
       "alwaysDeployFromSource": true
     },
@@ -42,9 +48,16 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "**/.*",
-        "**/*.local"
-      ]
+        "*.local",
+        "apps/mobile",
+        "apps/functions",
+        "apps/web",
+        "apps/admin",
+        "docs",
+        "tooling",
+        "test"
+      ],
+      "alwaysDeployFromSource": true
     },
     {
       "backendId": "admin-web-app",
@@ -54,8 +67,14 @@
         ".git",
         "firebase-debug.log",
         "firebase-debug.*.log",
-        "**/.*",
-        "**/*.local"
+        "*.local",
+        "apps/mobile",
+        "apps/functions",
+        "apps/web",
+        "apps/studio",
+        "docs",
+        "tooling",
+        "test"
       ],
       "alwaysDeployFromSource": true
     }
