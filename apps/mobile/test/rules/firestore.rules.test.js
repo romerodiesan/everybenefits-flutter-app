@@ -1009,3 +1009,59 @@ describe('notifications inbox', () => {
     );
   });
 });
+
+describe('course analytics rollups', () => {
+  beforeEach(async () => {
+    await seedUser('author1', { role: 'instructor' });
+    await seedUser('co1', { role: 'instructor' });
+    await seedUser('other', { role: 'instructor' });
+    await seedUser('learner', { role: 'student' });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('courses/c1').set({
+        title: 'Analytics course',
+        createdBy: 'author1',
+        instructorIds: ['author1', 'co1'],
+        status: 'published',
+        level: 'basic',
+        studentCount: 0,
+      });
+      await ctx.firestore().doc('courses/c1/analytics/summary').set({
+        enrolled: 10,
+        views: 100,
+        watchSeconds: 500,
+      });
+      await ctx.firestore().doc('courses/c1/lessonAnalytics/l1').set({
+        lessonId: 'l1',
+        started: 8,
+        completed: 5,
+      });
+    });
+  });
+
+  it('allows owner and co-instructor to read aggregates', async () => {
+    await assertSucceeds(
+      authedDb('author1').doc('courses/c1/analytics/summary').get(),
+    );
+    await assertSucceeds(
+      authedDb('co1').doc('courses/c1/analytics/summary').get(),
+    );
+    await assertSucceeds(
+      authedDb('author1').doc('courses/c1/lessonAnalytics/l1').get(),
+    );
+  });
+
+  it('denies other instructors, learners, and all client writes', async () => {
+    await assertFails(
+      authedDb('other').doc('courses/c1/analytics/summary').get(),
+    );
+    await assertFails(
+      authedDb('learner').doc('courses/c1/analytics/summary').get(),
+    );
+    await assertFails(
+      authedDb('author1').doc('courses/c1/analytics/summary').set({ views: 1 }),
+    );
+    await assertFails(
+      authedDb('author1').doc('analyticsDedupe/x').get(),
+    );
+  });
+});

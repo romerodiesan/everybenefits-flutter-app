@@ -22,6 +22,13 @@ import type { Course, CourseContent, Enrollment, Lesson } from "@/lib/types";
 import { EmptyState, LessonTypeIcon, ProgressBar } from "./shared";
 import { QuizStage, ReadingStage } from "./lesson-stages";
 import { PlayerSkeleton } from "@/components/ui/skeleton";
+import {
+  ANALYTICS_HEARTBEAT_SECONDS,
+  trackCourseOpen,
+  trackLessonComplete,
+  trackLessonHeartbeat,
+  trackLessonStart,
+} from "@/lib/privacy/academy-analytics";
 
 /** Position writes are throttled so scrubbing doesn't hammer Firestore. */
 const SAVE_INTERVAL_MS = 5000;
@@ -41,6 +48,11 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const lastSavedAt = useRef(0);
+  const lastHeartbeatAt = useRef(0);
+  const lastHeartbeatPos = useRef(0);
+  const startedLessons = useRef(new Set<string>());
+  const completedTracked = useRef(new Set<string>());
+  const openedCourse = useRef(false);
   const enrollmentRef = useRef<Enrollment | null>(null);
   const seekedFor = useRef<string | null>(null);
   const persistRef = useRef<
@@ -83,6 +95,19 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
     );
   }, [uid, courseId]);
 
+  useEffect(() => {
+    if (!course || openedCourse.current) return;
+    openedCourse.current = true;
+    trackCourseOpen({
+      courseId: course.id,
+      source: "direct",
+      locale:
+        typeof document !== "undefined"
+          ? document.documentElement.lang
+          : undefined,
+    });
+  }, [course]);
+
   const lessons = useMemo(() => content?.lessons ?? [], [content]);
   const completed = useMemo(
     () => new Set(enrollment?.completedLessonIds ?? []),
@@ -120,6 +145,20 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
     content && active
       ? lessonAfterAccessible(content, active.id, enrollment)
       : null;
+
+  useEffect(() => {
+    if (!active || !course) return;
+    if (startedLessons.current.has(active.id)) return;
+    startedLessons.current.add(active.id);
+    lastHeartbeatAt.current = Date.now();
+    lastHeartbeatPos.current = 0;
+    trackLessonStart({
+      courseId: course.id,
+      lessonId: active.id,
+      durationSeconds: active.durationSeconds,
+      source: "direct",
+    });
+  }, [active, course]);
 
   const isVideo = active?.type === "video";
   const activeVideoPath = isVideo ? (active?.videoPath ?? null) : null;
@@ -180,7 +219,7 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
 
   const onTimeUpdate = () => {
     const video = videoRef.current;
-    if (!video || !active || !video.duration) return;
+    if (!video || !active || !course || !video.duration) return;
     const ratio = video.currentTime / video.duration;
     const shouldComplete =
       ratio >= LESSON_COMPLETE_THRESHOLD && !completed.has(active.id);
@@ -188,6 +227,35 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
     if (shouldComplete || now - lastSavedAt.current > SAVE_INTERVAL_MS) {
       lastSavedAt.current = now;
       void persist(video.currentTime, shouldComplete);
+    }
+    if (
+      now - lastHeartbeatAt.current >=
+      ANALYTICS_HEARTBEAT_SECONDS * 1000
+    ) {
+      const delta = Math.max(
+        0,
+        Math.min(120, video.currentTime - lastHeartbeatPos.current),
+      );
+      lastHeartbeatAt.current = now;
+      lastHeartbeatPos.current = video.currentTime;
+      if (delta > 0 || shouldComplete) {
+        trackLessonHeartbeat({
+          courseId: course.id,
+          lessonId: active.id,
+          positionSeconds: video.currentTime,
+          durationSeconds: video.duration,
+          watchDeltaSeconds: delta,
+        });
+      }
+    }
+    if (shouldComplete && !completedTracked.current.has(active.id)) {
+      completedTracked.current.add(active.id);
+      trackLessonComplete({
+        courseId: course.id,
+        lessonId: active.id,
+        positionSeconds: video.currentTime,
+        durationSeconds: video.duration,
+      });
     }
   };
 
@@ -203,12 +271,22 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
         : 0;
     if (resumeAt > 1 && resumeAt < video.duration - 5) {
       video.currentTime = resumeAt;
+      lastHeartbeatPos.current = resumeAt;
     }
   };
 
   const onEnded = () => {
     const video = videoRef.current;
     void persist(video?.duration ?? 0, true);
+    if (course && active && !completedTracked.current.has(active.id)) {
+      completedTracked.current.add(active.id);
+      trackLessonComplete({
+        courseId: course.id,
+        lessonId: active.id,
+        positionSeconds: video?.duration ?? 0,
+        durationSeconds: video?.duration ?? active.durationSeconds,
+      });
+    }
     if (next) {
       setActiveId(next.id);
     }
@@ -302,7 +380,17 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
               key={active.id}
               lesson={active}
               completed={completed.has(active.id)}
-              onComplete={() => void persist(0, true)}
+              onComplete={() => {
+                void persist(0, true);
+                if (!completedTracked.current.has(active.id)) {
+                  completedTracked.current.add(active.id);
+                  trackLessonComplete({
+                    courseId: course.id,
+                    lessonId: active.id,
+                    durationSeconds: active.durationSeconds,
+                  });
+                }
+              }}
             />
           ) : active?.type === "quiz" ? (
             <QuizStage key={active.id} courseId={course.id} lesson={active} />

@@ -1,10 +1,11 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { getStorageUrl } from "@/lib/firebase/courses";
+import { trackCourseImpression } from "@/lib/privacy/academy-analytics";
 import type {
   Course,
   CourseLevel,
@@ -242,9 +243,35 @@ export function CourseCard({
 }) {
   const t = useTranslations();
   const duration = useDurationLabel();
+  const rootRef = useRef<HTMLAnchorElement | null>(null);
+  const impressed = useRef(false);
+
+  useEffect(() => {
+    const node = rootRef.current;
+    if (!node || impressed.current) return;
+    if (typeof IntersectionObserver === "undefined") {
+      impressed.current = true;
+      trackCourseImpression({ courseId: course.id, source: "catalog" });
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (impressed.current) return;
+        if (entries.some((entry) => entry.isIntersecting)) {
+          impressed.current = true;
+          trackCourseImpression({ courseId: course.id, source: "catalog" });
+          observer.disconnect();
+        }
+      },
+      { threshold: 0.4 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [course.id]);
 
   return (
     <Link
+      ref={rootRef}
       href={href}
       className="pulse-sheet group flex flex-col overflow-hidden transition hover:border-brand/40"
     >

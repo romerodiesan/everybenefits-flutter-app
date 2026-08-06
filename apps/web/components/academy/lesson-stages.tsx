@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useTranslations } from "next-intl";
 import { submitQuizAttempt } from "@/lib/firebase/courses";
 import type { Lesson, QuizAttemptResult } from "@/lib/types";
+import { trackQuizSubmit } from "@/lib/privacy/academy-analytics";
 import { Markdown } from "./markdown";
 
 /** Reading lesson: Markdown body plus an explicit completion CTA. */
@@ -102,9 +103,18 @@ export function QuizStage({
     setError(null);
     setGrading(true);
     try {
-      setResult(
-        await submitQuizAttempt({ courseId, lessonId: lesson.id, answers }),
-      );
+      const graded = await submitQuizAttempt({
+        courseId,
+        lessonId: lesson.id,
+        answers,
+      });
+      setResult(graded);
+      trackQuizSubmit({
+        courseId,
+        lessonId: lesson.id,
+        passed: graded.passed,
+        score: graded.score,
+      });
     } catch {
       setError(t("quizSubmitError"));
     } finally {

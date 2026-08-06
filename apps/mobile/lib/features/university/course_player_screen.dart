@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -6,6 +8,7 @@ import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../l10n/l10n.dart';
+import '../../privacy/academy_analytics.dart';
 import '../../users/user_profile.dart';
 import 'course_models.dart';
 import 'course_repository.dart';
@@ -52,8 +55,12 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
   bool _controlsVisible = true;
   Object? _error;
   DateTime _lastSaved = DateTime.fromMillisecondsSinceEpoch(0);
+  DateTime _lastHeartbeat = DateTime.fromMillisecondsSinceEpoch(0);
+  int _lastHeartbeatPos = 0;
   bool _saving = false;
   bool _advancing = false;
+  final Set<String> _startedLessons = <String>{};
+  final Set<String> _completedTracked = <String>{};
 
   @override
   void initState() {
@@ -70,6 +77,9 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
                 requested ?? widget.content.lessons.first,
           );
     _open(_lesson, resume: true);
+    unawaited(
+      trackCourseOpen(courseId: widget.course.id, source: 'direct'),
+    );
   }
 
   @override
@@ -116,6 +126,18 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
       _error = null;
       _controlsVisible = true;
     });
+
+    if (_startedLessons.add(lesson.id)) {
+      _lastHeartbeat = DateTime.now();
+      _lastHeartbeatPos = 0;
+      unawaited(
+        trackLessonStart(
+          courseId: widget.course.id,
+          lessonId: lesson.id,
+          durationSeconds: lesson.durationSeconds,
+        ),
+      );
+    }
 
     // Readings and quizzes have no media to fetch; the stage renders directly.
     if (!lesson.isVideo) {
@@ -174,19 +196,60 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
 
     final completed = _reachedCompletion(value);
     final alreadyDone = _enrollment.hasCompleted(_lesson.id);
+    final position = value.position.inSeconds;
+    final duration = value.duration.inSeconds;
 
     if (completed && !alreadyDone) {
-      _persist(positionSeconds: value.position.inSeconds, completed: true);
+      _persist(positionSeconds: position, completed: true);
+      if (_completedTracked.add(_lesson.id)) {
+        unawaited(
+          trackLessonComplete(
+            courseId: widget.course.id,
+            lessonId: _lesson.id,
+            positionSeconds: position,
+            durationSeconds: duration,
+          ),
+        );
+      }
     } else if (value.isPlaying &&
         DateTime.now().difference(_lastSaved) > _saveInterval) {
       _persist(
-        positionSeconds: value.position.inSeconds,
+        positionSeconds: position,
         completed: alreadyDone,
       );
     }
 
+    if (value.isPlaying &&
+        DateTime.now().difference(_lastHeartbeat) >=
+            academyAnalyticsHeartbeat) {
+      final delta = (position - _lastHeartbeatPos).clamp(0, 120);
+      _lastHeartbeat = DateTime.now();
+      _lastHeartbeatPos = position;
+      if (delta > 0) {
+        unawaited(
+          trackLessonHeartbeat(
+            courseId: widget.course.id,
+            lessonId: _lesson.id,
+            positionSeconds: position,
+            durationSeconds: duration <= 0 ? 1 : duration,
+            watchDeltaSeconds: delta,
+          ),
+        );
+      }
+    }
+
     final finished = value.position >= value.duration && !value.isPlaying;
     if (finished && !_advancing) {
+      if (_completedTracked.add(_lesson.id)) {
+        unawaited(
+          trackLessonComplete(
+            courseId: widget.course.id,
+            lessonId: _lesson.id,
+            positionSeconds: position,
+            durationSeconds: duration,
+          ),
+        );
+      }
       _advancing = true;
       _goNext();
     }
@@ -231,6 +294,17 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
   /// The callable already wrote the attempt; mirror it so the UI keeps up.
   void _onQuizGraded(QuizAttemptResult result) {
     final lessonId = _lesson.id;
+    unawaited(
+      trackQuizSubmit(
+        courseId: widget.course.id,
+        lessonId: lessonId,
+        passed: result.passed,
+        score: result.score,
+      ),
+    );
+    if (result.passed) {
+      _completedTracked.add(lessonId);
+    }
     final completedIds = [..._enrollment.completedLessonIds];
     if (result.passed && !completedIds.contains(lessonId)) {
       completedIds.add(lessonId);
@@ -321,8 +395,18 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
                 key: ValueKey('reading-${_lesson.id}'),
                 lesson: _lesson,
                 completed: _enrollment.hasCompleted(_lesson.id),
-                onComplete: () =>
-                    _persist(positionSeconds: 0, completed: true),
+                onComplete: () {
+                  _persist(positionSeconds: 0, completed: true);
+                  if (_completedTracked.add(_lesson.id)) {
+                    unawaited(
+                      trackLessonComplete(
+                        courseId: widget.course.id,
+                        lessonId: _lesson.id,
+                        durationSeconds: _lesson.durationSeconds,
+                      ),
+                    );
+                  }
+                },
               ),
             LessonType.quiz => QuizStage(
                 key: ValueKey('quiz-${_lesson.id}'),
