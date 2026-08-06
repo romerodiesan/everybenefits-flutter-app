@@ -30,6 +30,8 @@ import {
 } from "@/components/academy/shared";
 import { CreateCoursesWizard } from "@/components/studio/create-courses-wizard";
 
+const LIBRARY_PAGE_SIZE = 40;
+
 type Tab = "courses" | "paths";
 type CreateKind = "course" | "path" | null;
 type StatusFilter = "all" | CourseStatus;
@@ -67,6 +69,7 @@ export function LibraryHome() {
     Record<string, CourseAnalyticsSummary>
   >({});
   const [listReady, setListReady] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(LIBRARY_PAGE_SIZE);
   const [creating, setCreating] = useState<CreateKind>(null);
   const [busy, setBusy] = useState(false);
   const [pathForm, setPathForm] = useState(emptyPathForm);
@@ -125,7 +128,7 @@ export function LibraryHome() {
       return;
     }
     let cancelled = false;
-    fetchAuthorDashboardStats(courses.map((c) => c.id))
+    fetchAuthorDashboardStats(courses.map((c) => c.id).slice(0, 24))
       .then((stats) => {
         if (!cancelled) setStatsByCourse(stats.byCourse);
       })
@@ -160,6 +163,8 @@ export function LibraryHome() {
       return bTime - aTime;
     });
   }, [courses, filter, query, sort, statsByCourse]);
+
+  const visibleCourses = filteredCourses.slice(0, visibleCount);
 
   const filteredPaths = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -199,6 +204,10 @@ export function LibraryHome() {
       setBusy(false);
     }
   };
+
+  useEffect(() => {
+    setVisibleCount(LIBRARY_PAGE_SIZE);
+  }, [filter, query, sort, tab]);
 
   const filters: { id: StatusFilter; label: string }[] = [
     { id: "all", label: t("libraryFilterAll") },
@@ -341,7 +350,7 @@ export function LibraryHome() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-glass-border">
-                  {filteredCourses.map((course) => {
+                  {visibleCourses.map((course) => {
                     const stats = statsByCourse[course.id];
                     return (
                       <tr
@@ -410,6 +419,21 @@ export function LibraryHome() {
               </table>
             </div>
           )}
+          {filteredCourses.length > visibleCount ? (
+            <div className="mt-3 flex justify-center">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() =>
+                  setVisibleCount((n) => n + LIBRARY_PAGE_SIZE)
+                }
+              >
+                {t("analyticsShowMore", {
+                  remaining: filteredCourses.length - visibleCount,
+                })}
+              </Button>
+            </div>
+          ) : null}
         </div>
       ) : (
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { getStorageUrl } from "@/lib/firebase/courses";
@@ -123,11 +124,13 @@ export function CourseCover({
       }}
     >
       {url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        <Image
           src={url}
           alt=""
-          className="absolute inset-0 h-full w-full object-cover"
+          fill
+          sizes="(max-width: 768px) 100vw, 320px"
+          className="object-cover"
+          unoptimized={url.includes("127.0.0.1") || url.includes("localhost")}
         />
       )}
       {showLevel && (

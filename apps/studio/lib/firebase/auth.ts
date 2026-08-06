@@ -119,6 +119,7 @@ import {
   clearSsoAttempt,
   logoutCascadeUrl,
   markSsoAttempted,
+  safeInternalPath,
   siblingApp,
   appBaseUrl,
 } from "@/lib/sso";
@@ -145,7 +146,7 @@ export async function signOutEverywhere(opts: {
   markSsoAttempted();
 
   const returnPath = opts.returnPath ?? "/login";
-  const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
+  const path = safeInternalPath(returnPath, "/login");
   const finalUrl = `${appBaseUrl(opts.current)}/${opts.locale}${path}`;
   window.location.replace(
     logoutCascadeUrl(siblingApp(opts.current), opts.locale, finalUrl),

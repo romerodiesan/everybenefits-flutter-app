@@ -724,7 +724,7 @@ describe('academy catalog', () => {
     );
   });
 
-  it('exposes enrollment metrics to the course author and admins', async () => {
+  it('limits enrollment collectionGroup reads to admins', async () => {
     await seedCourse('metrics', { status: 'published', createdBy: 'manager1' });
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc('users/student1/enrollments/metrics').set({
@@ -738,7 +738,7 @@ describe('academy catalog', () => {
     const query = (db) =>
       db.collectionGroup('enrollments').where('courseId', '==', 'metrics');
 
-    await assertSucceeds(query(authedDb('manager1')).get());
+    await assertFails(query(authedDb('manager1')).get());
     await assertSucceeds(query(authedDb('admin1')).get());
     await assertFails(query(authedDb('manager2')).get());
     await assertFails(query(authedDb('student1')).get());

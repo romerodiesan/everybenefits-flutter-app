@@ -206,24 +206,50 @@ const emptyBundle = (): CourseAnalyticsBundle => ({
   lessons: [],
 });
 
+export type FetchCourseAnalyticsOptions = {
+  /** Inclusive day window (default 90). */
+  dayLimit?: number;
+  includeAudience?: boolean;
+  includeTraffic?: boolean;
+  includeLessons?: boolean;
+};
+
 export async function fetchCourseAnalytics(
   courseId: string,
+  options: FetchCourseAnalyticsOptions = {},
 ): Promise<CourseAnalyticsBundle> {
+  const {
+    dayLimit = 90,
+    includeAudience = true,
+    includeTraffic = true,
+    includeLessons = true,
+  } = options;
   const db = getFirebaseDb();
   const [summary, realtime, audience, traffic, daysSnap, lessonsSnap] =
     await Promise.all([
       getDoc(doc(db, "courses", courseId, "analytics", "summary")),
       getDoc(doc(db, "courses", courseId, "analytics", "realtime")),
-      getDoc(doc(db, "courses", courseId, "analytics", "audience")),
-      getDoc(doc(db, "courses", courseId, "analytics", "traffic")),
+      includeAudience
+        ? getDoc(doc(db, "courses", courseId, "analytics", "audience"))
+        : Promise.resolve(null),
+      includeTraffic
+        ? getDoc(doc(db, "courses", courseId, "analytics", "traffic"))
+        : Promise.resolve(null),
       getDocs(
         query(
           collection(db, "courses", courseId, "analyticsDays"),
           orderBy("day", "asc"),
-          limit(90),
+          limit(dayLimit),
         ),
       ),
-      getDocs(collection(db, "courses", courseId, "lessonAnalytics")),
+      includeLessons
+        ? getDocs(
+            query(
+              collection(db, "courses", courseId, "lessonAnalytics"),
+              limit(100),
+            ),
+          )
+        : Promise.resolve(null),
     ]);
 
   const bundle = {
@@ -232,15 +258,19 @@ export async function fetchCourseAnalytics(
       realtime.data() as Record<string, unknown> | undefined,
     ),
     audience: parseAudience(
-      audience.data() as Record<string, unknown> | undefined,
+      audience?.data() as Record<string, unknown> | undefined,
     ),
-    traffic: parseTraffic(traffic.data() as Record<string, unknown> | undefined),
+    traffic: parseTraffic(
+      traffic?.data() as Record<string, unknown> | undefined,
+    ),
     days: daysSnap.docs.map((d) =>
       parseDay(d.id, d.data() as Record<string, unknown>),
     ),
-    lessons: lessonsSnap.docs.map((d) =>
-      parseLessonRollup(d.id, d.data() as Record<string, unknown>),
-    ),
+    lessons: lessonsSnap
+      ? lessonsSnap.docs.map((d) =>
+          parseLessonRollup(d.id, d.data() as Record<string, unknown>),
+        )
+      : [],
   };
   if (!bundle.summary.avgViewDurationSeconds && bundle.summary.views > 0) {
     bundle.summary.avgViewDurationSeconds =
@@ -284,18 +314,23 @@ export async function fetchAuthorDashboardStats(
 }> {
   const byCourse: Record<string, CourseAnalyticsSummary> = {};
   let realtimeActive = 0;
-  await Promise.all(
-    courseIds.slice(0, 40).map(async (id) => {
-      const [summarySnap, rtSnap] = await Promise.all([
-        getDoc(doc(getFirebaseDb(), "courses", id, "analytics", "summary")),
-        getDoc(doc(getFirebaseDb(), "courses", id, "analytics", "realtime")),
-      ]);
-      byCourse[id] = parseSummary(
-        summarySnap.data() as Record<string, unknown> | undefined,
-      );
-      realtimeActive += num(rtSnap.data()?.activeSessions);
-    }),
-  );
+  const ids = courseIds.slice(0, 24);
+  const concurrency = 6;
+  for (let i = 0; i < ids.length; i += concurrency) {
+    const chunk = ids.slice(i, i + concurrency);
+    await Promise.all(
+      chunk.map(async (id) => {
+        const [summarySnap, rtSnap] = await Promise.all([
+          getDoc(doc(getFirebaseDb(), "courses", id, "analytics", "summary")),
+          getDoc(doc(getFirebaseDb(), "courses", id, "analytics", "realtime")),
+        ]);
+        byCourse[id] = parseSummary(
+          summarySnap.data() as Record<string, unknown> | undefined,
+        );
+        realtimeActive += num(rtSnap.data()?.activeSessions);
+      }),
+    );
+  }
 
   const totals = parseSummary(undefined);
   for (const s of Object.values(byCourse)) {
@@ -320,6 +355,19 @@ export async function fetchAuthorDashboardStats(
     totals.views > 0 ? totals.watchSeconds / totals.views : 0;
 
   return { totals, realtimeActive, byCourse };
+}
+
+/** Enrolled/completed from analytics rollup — no learner UIDs. */
+export async function fetchCourseStudentCounts(
+  courseId: string,
+): Promise<{ enrolled: number; completed: number }> {
+  const snap = await getDoc(
+    doc(getFirebaseDb(), "courses", courseId, "analytics", "summary"),
+  );
+  const summary = parseSummary(
+    snap.data() as Record<string, unknown> | undefined,
+  );
+  return { enrolled: summary.enrolled, completed: summary.completed };
 }
 
 export { emptyBundle };

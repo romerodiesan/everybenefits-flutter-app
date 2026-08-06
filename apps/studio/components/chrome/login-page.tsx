@@ -15,6 +15,7 @@ import { BrandMark } from "@/components/chrome/brand-mark";
 import {
   hasSsoAttempted,
   markSsoAttempted,
+  safeInternalPath,
   ssoBridgeUrl,
   ssoConsumeUrl,
 } from "@/lib/sso";
@@ -31,14 +32,10 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [checkingSso, setCheckingSso] = useState(true);
 
-  const nextParam = params.get("next");
+  const nextParam = safeInternalPath(params.get("next"));
 
   const finish = () => {
-    if (nextParam?.startsWith("/")) {
-      router.replace(nextParam);
-      return;
-    }
-    router.replace("/");
+    router.replace(nextParam);
   };
 
   useEffect(() => {
@@ -52,8 +49,7 @@ export function LoginPage() {
       return;
     }
     markSsoAttempted();
-    const next = nextParam?.startsWith("/") ? nextParam : "/";
-    const consume = ssoConsumeUrl("studio", locale, next);
+    const consume = ssoConsumeUrl("studio", locale, nextParam);
     window.location.replace(ssoBridgeUrl("pulse", locale, consume));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- finish uses nextParam/locale
   }, [loading, user, locale, nextParam]);
@@ -76,8 +72,7 @@ export function LoginPage() {
   }
 
   const continueFromPulse = () => {
-    const next = nextParam?.startsWith("/") ? nextParam : "/";
-    const consume = ssoConsumeUrl("studio", locale, next);
+    const consume = ssoConsumeUrl("studio", locale, nextParam);
     try {
       sessionStorage.removeItem("pulse_sso_attempt");
     } catch {

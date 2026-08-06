@@ -418,11 +418,13 @@ export function watchPathsInStatuses(
   statuses: CourseStatus[],
   onChange: (paths: LearningPath[]) => void,
   onError?: (error: Error) => void,
+  maxDocs = 200,
 ): Unsubscribe {
   const q = query(
     collection(getFirebaseDb(), "paths"),
     where("status", "in", statuses),
     orderBy("updatedAt", "desc"),
+    limit(maxDocs),
   );
   return onSnapshot(
     q,
@@ -950,11 +952,13 @@ export function watchCoursesInStatuses(
   statuses: CourseStatus[],
   onChange: (courses: Course[]) => void,
   onError?: (error: Error) => void,
+  maxDocs = 200,
 ): Unsubscribe {
   const q = query(
     collection(getFirebaseDb(), "courses"),
     where("status", "in", statuses),
     orderBy("updatedAt", "desc"),
+    limit(maxDocs),
   );
   return onSnapshot(
     q,
@@ -979,7 +983,9 @@ export async function createCourse(input: {
 }) {
   const db = getFirebaseDb();
   const courseRef = doc(collection(db, "courses"));
-  const instructorIds = (input.instructorIds ?? []).filter((id) => id.trim());
+  const instructorIds = (input.instructorIds ?? [])
+    .filter((id) => id.trim())
+    .slice(0, 20);
   await setDoc(courseRef, {
     title: input.title.trim(),
     description: input.description.trim(),
@@ -1013,7 +1019,7 @@ export async function updateCourseMeta(input: {
     title: input.title.trim(),
     description: input.description.trim(),
     teacherName: input.teacherName.trim(),
-    instructorIds: input.instructorIds.filter((id) => id.trim()),
+    instructorIds: input.instructorIds.filter((id) => id.trim()).slice(0, 20),
     level: input.level,
     updatedAt: serverTimestamp(),
   });
@@ -1341,7 +1347,7 @@ export async function recomputeCourseTotals(courseId: string) {
   });
 }
 
-/** Studio metrics: every enrollment for a course, across all users. */
+/** @deprecated Prefer fetchCourseStudentCounts — exposes learner UIDs. Admin only now. */
 export async function fetchCourseStudents(
   courseId: string,
 ): Promise<CourseStudent[]> {

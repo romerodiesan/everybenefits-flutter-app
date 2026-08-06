@@ -133,6 +133,43 @@ service cloud.firestore {
       return value is string && value.size() > 0 && value.size() <= maxLen;
     }
 
+    function optionalBoundedString(value, maxLen) {
+      return value == null
+        || (value is string && value.size() <= maxLen);
+    }
+
+    /// Co-instructors list: cap size to limit blast radius of mistaken grants.
+    function validInstructorIds(ids) {
+      return ids is list && ids.size() <= 20;
+    }
+
+    function courseAuthorUpdateKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys()
+        .hasOnly([
+          'title', 'description', 'teacherName', 'instructorIds', 'level',
+          'status', 'coverPath', 'coverUrl', 'lessonCount', 'durationMinutes',
+          'updatedAt', 'publishedAt'
+        ]);
+    }
+
+    function moduleWriteKeys() {
+      return request.resource.data.keys()
+        .hasOnly(['title', 'order', 'updatedAt', 'createdAt']);
+    }
+
+    function lessonWriteKeys() {
+      return request.resource.data.keys()
+        .hasOnly([
+          'moduleId', 'title', 'order', 'type', 'durationSeconds',
+          'instructorId', 'videoPath', 'videoUrl', 'videoFileName',
+          'bodyMarkdown', 'questions', 'passPercent', 'updatedAt', 'createdAt'
+        ]);
+    }
+
+    function lessonTypeValid(type) {
+      return type in ['video', 'reading', 'quiz'];
+    }
+
     function validTags(tags) {
       return tags is list
         && tags.size() > 0
@@ -425,7 +462,10 @@ service cloud.firestore {
       allow create: if isCourseAuthor()
         && request.resource.data.createdBy == request.auth.uid
         && boundedString(request.resource.data.title, 200)
+        && optionalBoundedString(request.resource.data.get('description', ''), 5000)
+        && optionalBoundedString(request.resource.data.get('teacherName', ''), 200)
         && validCourseLevel(request.resource.data.level)
+        && validInstructorIds(request.resource.data.get('instructorIds', []))
         && request.resource.data.studentCount is int
         && request.resource.data.studentCount == 0
         && (
@@ -434,8 +474,11 @@ service cloud.firestore {
         );
 
       allow update: if
-          // Admins may edit and publish anything.
-          isAdmin()
+          // Admins may edit and publish anything (still bound instructor list).
+          (
+            isAdmin()
+            && validInstructorIds(request.resource.data.get('instructorIds', []))
+          )
           // Authors iterate on their own course and can request review.
           || (
             isCourseAuthor()
@@ -445,7 +488,11 @@ service cloud.firestore {
             && request.resource.data.studentCount == resource.data.studentCount
             && request.resource.data.status in ['draft', 'pending']
             && boundedString(request.resource.data.title, 200)
+            && optionalBoundedString(request.resource.data.get('description', ''), 5000)
+            && optionalBoundedString(request.resource.data.get('teacherName', ''), 200)
             && validCourseLevel(request.resource.data.level)
+            && validInstructorIds(request.resource.data.get('instructorIds', []))
+            && courseAuthorUpdateKeys()
           );
 
       allow delete: if isAdmin()
@@ -457,12 +504,36 @@ service cloud.firestore {
 
       match /modules/{moduleId} {
         allow read: if courseReadable(courseId);
-        allow create, update, delete: if canEditCourse(courseId);
+        allow create, update: if canEditCourse(courseId)
+          && moduleWriteKeys()
+          && boundedString(request.resource.data.title, 200)
+          && request.resource.data.order is int;
+        allow delete: if canEditCourse(courseId);
       }
 
       match /lessons/{lessonId} {
         allow read: if courseReadable(courseId);
-        allow create, update, delete: if canEditCourse(courseId);
+        allow create, update: if canEditCourse(courseId)
+          && lessonWriteKeys()
+          && boundedString(request.resource.data.title, 200)
+          && request.resource.data.moduleId is string
+          && request.resource.data.order is int
+          && lessonTypeValid(request.resource.data.get('type', 'video'))
+          && request.resource.data.get('questions', []) is list
+          && request.resource.data.get('questions', []).size() <= 50
+          && optionalBoundedString(request.resource.data.get('bodyMarkdown', ''), 100000)
+          && optionalBoundedString(request.resource.data.get('videoUrl', ''), 2000)
+          && optionalBoundedString(request.resource.data.get('videoPath', ''), 500)
+          && optionalBoundedString(request.resource.data.get('videoFileName', ''), 300)
+          && (
+            !('instructorId' in request.resource.data)
+            || request.resource.data.instructorId == null
+            || (
+              request.resource.data.instructorId is string
+              && request.resource.data.instructorId.size() <= 128
+            )
+          );
+        allow delete: if canEditCourse(courseId);
 
         // Quiz answer keys: authors and admins only. Learners never read them;
         // grading happens in the submitQuizAttempt callable (Admin SDK).
@@ -470,7 +541,9 @@ service cloud.firestore {
           allow read: if isAdmin()
             || (isCourseAuthor() && courseExists(courseId)
               && (ownsCourse(courseId) || instructsCourse(courseId)));
-          allow create, update, delete: if canEditCourse(courseId);
+          allow create, update: if canEditCourse(courseId)
+            && request.resource.data.keys().hasOnly(['answers', 'updatedAt']);
+          allow delete: if canEditCourse(courseId);
         }
       }
 
@@ -537,19 +610,10 @@ service cloud.firestore {
         );
     }
 
-    // Studio metrics read enrollments across users via collectionGroup.
-    // Prefer aggregate rollups under courses/{id}/analytics; this remains for
-    // admin tools / backfill verification — never expose raw UIDs in Studio UI.
+    // Cross-user enrollment scans are admin-only. Studio authors use
+    // courses/{id}/analytics rollups for enrolled/completed counts.
     match /{path=**}/enrollments/{enrollmentId} {
-      allow read: if isAdmin()
-        || (
-          isCourseAuthor()
-          && courseExists(resource.data.courseId)
-          && (
-            ownsCourse(resource.data.courseId)
-            || instructsCourse(resource.data.courseId)
-          )
-        );
+      allow read: if isAdmin();
     }
 
     // Ephemeral analytics helpers written only by Admin SDK / Functions.

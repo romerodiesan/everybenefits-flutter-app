@@ -11,7 +11,7 @@ import {
   getFirebaseAuth,
   initFirebaseClient,
 } from "@/lib/firebase/client";
-import { clearSsoAttempt, takeHandoffCode } from "@/lib/sso";
+import { clearSsoAttempt, safeInternalPath, takeHandoffCode } from "@/lib/sso";
 import { StudioShellSkeleton } from "@/components/chrome/studio-shell-skeleton";
 
 const SSO_CUSTOM_TOKEN_KEY = "pulse_sso_ct";
@@ -171,8 +171,7 @@ export function SsoConsumePage({ homePath = "/" }: { homePath?: string }) {
         }
         if (!alive) return;
         setStep("open");
-        const nextRaw = params.get("next") || homePath;
-        const next = nextRaw.startsWith("/") ? nextRaw : `/${nextRaw}`;
+        const next = safeInternalPath(params.get("next") || homePath, homePath);
         const dest = next === "/" ? `/${locale}` : `/${locale}${next}`;
         window.location.replace(dest);
       } catch (err) {

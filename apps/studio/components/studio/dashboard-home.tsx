@@ -76,7 +76,7 @@ export function DashboardHome() {
     }
     let cancelled = false;
     setLoadingStats(true);
-    fetchAuthorDashboardStats(courses.map((c) => c.id))
+    fetchAuthorDashboardStats(courses.map((c) => c.id).slice(0, 24))
       .then((stats) => {
         if (cancelled) return;
         setTotals(stats.totals);

@@ -61,9 +61,7 @@ export function ssoConsumeUrl(
   locale: string,
   nextPath = "/",
 ) {
-  const next = encodeURIComponent(
-    nextPath.startsWith("/") ? nextPath : `/${nextPath}`,
-  );
+  const next = encodeURIComponent(safeInternalPath(nextPath));
   return `${appBaseUrl(app)}/${locale}/auth/sso?next=${next}`;
 }
 
@@ -211,7 +209,7 @@ export function logoutCascadeUrl(app: PulseAppId, locale: string, nextUrl: strin
 /** Only Pulse/Studio origins (or same-origin relative paths) may be logout `next` targets. */
 export function isAllowedLogoutNext(url: string): boolean {
   try {
-    if (url.startsWith("/") && !url.startsWith("//")) return true;
+    if (isSafeInternalPath(url)) return true;
     const parsed = new URL(url);
     const allowed = new Set([
       new URL(pulseWebUrl()).origin,
@@ -222,4 +220,25 @@ export function isAllowedLogoutNext(url: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * Same-origin relative path only. Rejects protocol-relative (`//evil`),
+ * backslashes, and schemes — blocks open redirects via `?next=`.
+ */
+export function isSafeInternalPath(path: string | null | undefined): path is string {
+  if (!path) return false;
+  if (!path.startsWith("/")) return false;
+  if (path.startsWith("//")) return false;
+  if (path.includes("\\")) return false;
+  if (path.includes("://")) return false;
+  return true;
+}
+
+/** Returns a safe internal path or `fallback` (default `/`). */
+export function safeInternalPath(
+  path: string | null | undefined,
+  fallback = "/",
+): string {
+  return isSafeInternalPath(path) ? path : fallback;
 }

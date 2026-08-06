@@ -348,22 +348,25 @@ function AnalyticsLanding({
     }
     let cancelled = false;
     setLoadingStats(true);
-    const seed = [...filtered]
-      .sort((a, b) => b.studentCount - a.studentCount)
-      .slice(0, 40)
-      .map((c) => c.id);
-    fetchAuthorDashboardStats(seed)
-      .then((stats) => {
-        if (!cancelled) setByCourse(stats.byCourse);
-      })
-      .catch(() => {
-        if (!cancelled) setByCourse({});
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingStats(false);
-      });
+    const handle = window.setTimeout(() => {
+      const seed = [...filtered]
+        .sort((a, b) => b.studentCount - a.studentCount)
+        .slice(0, 24)
+        .map((c) => c.id);
+      fetchAuthorDashboardStats(seed)
+        .then((stats) => {
+          if (!cancelled) setByCourse(stats.byCourse);
+        })
+        .catch(() => {
+          if (!cancelled) setByCourse({});
+        })
+        .finally(() => {
+          if (!cancelled) setLoadingStats(false);
+        });
+    }, 250);
     return () => {
       cancelled = true;
+      window.clearTimeout(handle);
     };
   }, [filtered]);
 
@@ -645,16 +648,32 @@ function AnalyticsCourseDetail({
   useEffect(() => {
     setLoading(true);
     let cancelled = false;
-    fetchCourseAnalytics(courseId)
-      .then((next) => {
-        if (!cancelled) setBundle(next);
-      })
-      .catch(() => {
-        if (!cancelled) setBundle(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+    const load = async () => {
+      try {
+        const overview = await fetchCourseAnalytics(courseId, {
+          dayLimit: 90,
+          includeAudience: false,
+          includeTraffic: false,
+          includeLessons: false,
+        });
+        if (cancelled) return;
+        setBundle(overview);
+        setLoading(false);
+        const full = await fetchCourseAnalytics(courseId, {
+          dayLimit: 90,
+          includeAudience: true,
+          includeTraffic: true,
+          includeLessons: true,
+        });
+        if (!cancelled) setBundle(full);
+      } catch {
+        if (!cancelled) {
+          setBundle(null);
+          setLoading(false);
+        }
+      }
+    };
+    void load();
     const stop = watchCourseContent(
       courseId,
       setContent,

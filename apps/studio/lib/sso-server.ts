@@ -35,10 +35,8 @@ function requireAppCheckEnabled(): boolean {
   if (usingEmulators()) return false;
   if (process.env.PULSE_SSO_REQUIRE_APP_CHECK === "false") return false;
   if (process.env.PULSE_SSO_REQUIRE_APP_CHECK === "true") return true;
-  return (
-    process.env.NODE_ENV === "production" &&
-    Boolean(process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim())
-  );
+  // Production: require App Check whenever a site key is configured.
+  return Boolean(process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim());
 }
 
 export async function verifySsoAppCheck(request: Request): Promise<void> {

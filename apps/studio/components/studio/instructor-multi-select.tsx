@@ -102,15 +102,17 @@ export function InstructorMultiSelect({ value, onChange, disabled }: Props) {
         : t("instructorSelectCount", { count: selectedLabels.length });
 
   const emit = (next: string[]) => {
-    const names = next.map((id) => {
+    const capped = next.slice(0, 20);
+    const names = capped.map((id) => {
       const profile = byId.get(id);
       return profile ? headlineName(profile) : id;
     });
-    onChange(next, names.join(", "));
+    onChange(capped, names.join(", "));
   };
 
   const toggle = (uid: string) => {
     if (disabled) return;
+    if (!value.includes(uid) && value.length >= 20) return;
     emit(
       value.includes(uid)
         ? value.filter((id) => id !== uid)

@@ -18,7 +18,6 @@ import {
   deleteCourse,
   deleteLesson,
   deleteModule,
-  fetchCourseStudents,
   reorderLessons,
   setCourseStatus,
   titleFromVideoFile,
@@ -30,12 +29,12 @@ import {
   watchCourseContent,
   lessonVideoLabel,
 } from "@/lib/firebase/courses";
+import { fetchCourseStudentCounts } from "@/lib/firebase/analytics";
 import { COURSE_LEVELS, LESSON_TYPES } from "@/lib/types";
 import type {
   Course,
   CourseContent,
   CourseLevel,
-  CourseStudent,
   Lesson,
   LessonType,
 } from "@/lib/types";
@@ -86,7 +85,10 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
   const [mediaOpen, setMediaOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [mobilePane, setMobilePane] = useState<"syllabus" | "edit">("edit");
-  const [students, setStudents] = useState<CourseStudent[]>([]);
+  const [studentCounts, setStudentCounts] = useState({
+    enrolled: 0,
+    completed: 0,
+  });
   const [importing, setImporting] = useState(false);
   const importRef = useRef<HTMLInputElement | null>(null);
   const { activeCount, enqueue, setExpandQueue } = useLessonUploadQueue();
@@ -153,12 +155,17 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetchCourseStudents(courseId)
-      .then((rows) => {
-        if (!cancelled) setStudents(rows);
+    fetchCourseStudentCounts(courseId)
+      .then((counts) => {
+        if (!cancelled) setStudentCounts(counts);
       })
       .catch(() => {
-        if (!cancelled) setStudents([]);
+        if (!cancelled) {
+          setStudentCounts({
+            enrolled: 0,
+            completed: 0,
+          });
+        }
       });
     return () => {
       cancelled = true;
@@ -634,7 +641,7 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
                 coverRef={coverRef}
                 coverProgress={coverProgress}
                 onCover={(file) => void pickCover(file)}
-                students={students}
+                students={studentCounts}
               />
             </div>
           </div>
@@ -1162,11 +1169,11 @@ function InspectorPane({
   coverRef: RefObject<HTMLInputElement | null>;
   coverProgress: number | null;
   onCover: (file: File | undefined) => void;
-  students: CourseStudent[];
+  students: { enrolled: number; completed: number };
 }) {
   const t = useTranslations();
   const levelLabel = useLevelLabels();
-  const completed = students.filter((row) => row.enrollment.completedAt).length;
+  const enrolled = Math.max(students.enrolled, course.studentCount);
 
   return (
     <aside className="min-h-0 overflow-y-auto p-3">
@@ -1250,11 +1257,11 @@ function InspectorPane({
         <div className="mt-2 grid grid-cols-2 gap-2">
           <div className="studio-panel px-3 py-2">
             <p className="text-[10px] uppercase text-muted">{t("insightsEnrolled")}</p>
-            <p className="font-display text-xl">{students.length}</p>
+            <p className="font-display text-xl">{enrolled}</p>
           </div>
           <div className="studio-panel px-3 py-2">
             <p className="text-[10px] uppercase text-muted">{t("insightsCompleted")}</p>
-            <p className="font-display text-xl">{completed}</p>
+            <p className="font-display text-xl">{students.completed}</p>
           </div>
         </div>
         <Link

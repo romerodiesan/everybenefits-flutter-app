@@ -29,6 +29,7 @@ export type UploadJob = {
   status: UploadJobStatus;
   progress: number;
   error?: string;
+  attempts?: number;
 };
 
 type EnqueueInput = {
@@ -50,14 +51,20 @@ type UploadQueueContextValue = {
 const UploadQueueContext = createContext<UploadQueueContextValue | null>(null);
 
 const MAX_CONCURRENCY = 2;
+const MAX_ATTEMPTS = 3;
 
 type InternalJob = UploadJob & {
-  file: File;
+  file: File | null;
   abort?: AbortController;
+  attempts: number;
 };
 
 function newJobId() {
   return `upl_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export function LessonUploadQueueProvider({
@@ -80,12 +87,13 @@ export function LessonUploadQueueProvider({
         status: job.status,
         progress: job.progress,
         error: job.error,
+        attempts: job.attempts,
       })),
     );
   }, []);
 
   const patch = useCallback(
-    (id: string, patchJob: Partial<UploadJob>) => {
+    (id: string, patchJob: Partial<InternalJob>) => {
       const current = internals.current.get(id);
       if (!current) return;
       internals.current.set(id, { ...current, ...patchJob });
@@ -93,6 +101,12 @@ export function LessonUploadQueueProvider({
     },
     [publish],
   );
+
+  const releaseFile = useCallback((id: string) => {
+    const current = internals.current.get(id);
+    if (!current) return;
+    internals.current.set(id, { ...current, file: null, abort: undefined });
+  }, []);
 
   const pump = useCallback(() => {
     const queued = [...internals.current.values()].filter(
@@ -106,26 +120,35 @@ export function LessonUploadQueueProvider({
 
     async function runJob(id: string) {
       const job = internals.current.get(id);
-      if (!job || job.status !== "queued") return;
+      if (!job || job.status !== "queued" || !job.file) return;
       if (running.current.has(id)) return;
       running.current.add(id);
 
       const abort = new AbortController();
-      internals.current.set(id, { ...job, abort, status: "uploading", progress: 0 });
+      const attempt = job.attempts + 1;
+      internals.current.set(id, {
+        ...job,
+        abort,
+        attempts: attempt,
+        status: "uploading",
+        progress: 0,
+        error: undefined,
+      });
       publish();
 
       try {
-        const durationSeconds = await readVideoDuration(job.file);
+        const file = job.file;
+        const durationSeconds = await readVideoDuration(file);
         if (abort.signal.aborted) throw new DOMException("Aborted", "AbortError");
         await uploadLessonVideo({
           courseId: job.courseId,
           lessonId: job.lessonId,
-          file: job.file,
+          file,
           durationSeconds,
           signal: abort.signal,
           onProgress: (fraction) => patch(id, { progress: fraction }),
         });
-        patch(id, { status: "done", progress: 1 });
+        patch(id, { status: "done", progress: 1, file: null, abort: undefined });
       } catch (error) {
         const aborted =
           (error instanceof DOMException && error.name === "AbortError") ||
@@ -134,30 +157,39 @@ export function LessonUploadQueueProvider({
             "code" in error &&
             String((error as { code: unknown }).code).includes("canceled"));
         if (aborted) {
-          patch(id, { status: "cancelled", progress: 0 });
+          patch(id, {
+            status: "cancelled",
+            progress: 0,
+            file: null,
+            abort: undefined,
+          });
+        } else if (attempt < MAX_ATTEMPTS) {
+          const backoffMs = 500 * 2 ** (attempt - 1);
+          await sleep(backoffMs);
+          const current = internals.current.get(id);
+          if (current && current.status === "uploading" && current.file) {
+            patch(id, { status: "queued", progress: 0, abort: undefined });
+          } else {
+            releaseFile(id);
+          }
         } else {
           patch(id, {
             status: "error",
-            error:
-              error instanceof Error ? error.message : "Upload failed",
+            error: error instanceof Error ? error.message : "Upload failed",
+            file: null,
+            abort: undefined,
           });
         }
       } finally {
-        const current = internals.current.get(id);
-        if (current) {
-          internals.current.set(id, { ...current, abort: undefined });
-        }
         running.current.delete(id);
         publish();
-        // Drain more work.
         queueMicrotask(() => pump());
       }
     }
-  }, [patch, publish]);
+  }, [patch, publish, releaseFile]);
 
   const enqueue = useCallback(
     (input: EnqueueInput) => {
-      // Same lesson: cancel any queued/uploading job so the new file wins.
       for (const [id, job] of internals.current) {
         if (job.lessonId !== input.lessonId) continue;
         if (job.status === "queued") {
@@ -165,6 +197,7 @@ export function LessonUploadQueueProvider({
             ...job,
             status: "cancelled",
             progress: 0,
+            file: null,
           });
         } else if (job.status === "uploading") {
           job.abort?.abort();
@@ -180,6 +213,7 @@ export function LessonUploadQueueProvider({
         file: input.file,
         status: "queued",
         progress: 0,
+        attempts: 0,
       };
       internals.current.set(id, job);
       publish();
@@ -195,7 +229,7 @@ export function LessonUploadQueueProvider({
       const job = internals.current.get(jobId);
       if (!job) return;
       if (job.status === "queued") {
-        patch(jobId, { status: "cancelled" });
+        patch(jobId, { status: "cancelled", file: null });
         return;
       }
       if (job.status === "uploading") {
@@ -235,14 +269,7 @@ export function LessonUploadQueueProvider({
       expandQueue,
       setExpandQueue,
     }),
-    [
-      jobs,
-      activeCount,
-      enqueue,
-      cancel,
-      clearFinished,
-      expandQueue,
-    ],
+    [jobs, activeCount, enqueue, cancel, clearFinished, expandQueue],
   );
 
   return (
