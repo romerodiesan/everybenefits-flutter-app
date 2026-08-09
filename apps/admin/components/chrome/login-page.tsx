@@ -1,45 +1,46 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
-import {
-  signInWithEmail,
-  signInWithGoogle,
-} from "@/lib/firebase/auth";
 import { useAuth } from "@/lib/providers/auth-provider";
-import { Button, Input, Label } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/primitives";
 import { AdminShellSkeleton } from "@/components/chrome/admin-shell-skeleton";
 import { BrandMark } from "@/components/chrome/brand-mark";
 import {
   hasSsoAttempted,
   markSsoAttempted,
+  pulseHubLoginUrl,
+  safeInternalPath,
   ssoBridgeUrl,
   ssoConsumeUrl,
 } from "@/lib/sso";
 
+/**
+ * Admin does not host rich auth — Pulse is the hub (ADR-006).
+ * Flow: silent bridge → if none, CTA to Pulse login / retry bridge.
+ */
 export function LoginPage() {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
   const params = useSearchParams();
   const { user, loading } = useAuth();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [checkingSso, setCheckingSso] = useState(true);
 
-  const nextParam = params.get("next");
+  const nextParam = safeInternalPath(params.get("next"));
 
   const finish = () => {
-    if (nextParam?.startsWith("/")) {
+    if (nextParam) {
       router.replace(nextParam);
       return;
     }
     router.replace("/");
   };
+
+  const consumeUrl = () =>
+    ssoConsumeUrl("admin", locale, nextParam || "/");
 
   useEffect(() => {
     if (loading) return;
@@ -52,39 +53,31 @@ export function LoginPage() {
       return;
     }
     markSsoAttempted();
-    const next = nextParam?.startsWith("/") ? nextParam : "/";
-    const consume = ssoConsumeUrl("admin", locale, next);
-    window.location.replace(ssoBridgeUrl("pulse", locale, consume));
+    window.location.replace(ssoBridgeUrl("pulse", locale, consumeUrl()));
     // eslint-disable-next-line react-hooks/exhaustive-deps -- finish uses nextParam/locale
   }, [loading, user, locale, nextParam]);
-
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await signInWithEmail(email.trim(), password);
-      finish();
-    } catch {
-      setError(t("loginError"));
-      setBusy(false);
-    }
-  };
 
   if (loading || checkingSso) {
     return <AdminShellSkeleton hint={t("ssoChecking")} />;
   }
 
-  const continueFromPulse = () => {
-    const next = nextParam?.startsWith("/") ? nextParam : "/";
-    const consume = ssoConsumeUrl("admin", locale, next);
+  const retryBridge = () => {
     try {
       sessionStorage.removeItem("pulse_sso_attempt");
     } catch {
       // ignore
     }
     markSsoAttempted();
-    window.location.assign(ssoBridgeUrl("pulse", locale, consume));
+    window.location.assign(ssoBridgeUrl("pulse", locale, consumeUrl()));
+  };
+
+  const signInOnPulse = () => {
+    try {
+      sessionStorage.removeItem("pulse_sso_attempt");
+    } catch {
+      // ignore
+    }
+    window.location.assign(pulseHubLoginUrl(locale, consumeUrl()));
   };
 
   return (
@@ -95,75 +88,23 @@ export function LoginPage() {
           {t("brand")}
         </p>
         <h1 className="mt-2 font-display text-3xl">{t("loginTitle")}</h1>
-        <p className="mt-2 text-sm text-muted">{t("loginSubtitle")}</p>
+        <p className="mt-2 text-sm text-muted">{t("loginHubHint")}</p>
 
         <Button
           type="button"
-          variant="secondary"
           className="mt-6 w-full"
-          disabled={busy}
-          onClick={continueFromPulse}
+          onClick={signInOnPulse}
         >
-          {t("ssoContinuePulse")}
+          {t("ssoSignInPulse")}
         </Button>
-
-        <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-wide text-muted">
-          <span className="h-px flex-1 bg-glass-border" />
-          {t("ssoOr")}
-          <span className="h-px flex-1 bg-glass-border" />
-        </div>
-
-        <form className="space-y-4" onSubmit={onSubmit}>
-          <div>
-            <Label>{t("loginEmail")}</Label>
-            <Input
-              type="email"
-              autoComplete="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </div>
-          <div>
-            <Label>{t("loginPassword")}</Label>
-            <Input
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </div>
-          {error ? (
-            <p className="text-sm text-danger">{error}</p>
-          ) : null}
-          <Button type="submit" className="w-full" disabled={busy}>
-            {t("loginSubmit")}
-          </Button>
-        </form>
 
         <Button
           type="button"
           variant="secondary"
           className="mt-3 w-full"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            setError(null);
-            try {
-              await signInWithGoogle();
-              finish();
-            } catch (err) {
-              if (err instanceof Error && err.message === "cancelled") {
-                setBusy(false);
-                return;
-              }
-              setError(t("loginError"));
-              setBusy(false);
-            }
-          }}
+          onClick={retryBridge}
         >
-          {t("loginGoogle")}
+          {t("ssoContinuePulse")}
         </Button>
       </div>
     </div>

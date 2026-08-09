@@ -116,11 +116,9 @@ export async function completeMagicLink(href: string) {
 }
 
 import {
+  buildLogoutCascadeUrl,
   clearSsoAttempt,
-  logoutCascadeUrl,
   markSsoAttempted,
-  appBaseUrl,
-  otherApps,
 } from "@/lib/sso";
 import { clearCachedProfile } from "@/lib/profile-cache";
 
@@ -129,29 +127,27 @@ export async function signOutUser() {
 }
 
 /**
- * Sign out on this origin, then cascade through the other Pulse apps so
- * all origin sessions are cleared (Firebase Auth is per-origin).
+ * Sign out on this origin, then cascade through sibling apps so Pulse/Studio
+ * sessions clear too. Lands on `returnPath` on the current origin.
  */
-export async function signOutEverywhere(opts: {
+export async function signOutAndRedirect(opts: {
   current: "pulse" | "studio" | "admin";
   locale: string;
-  /** Path on the current app after all sessions are cleared. */
+  /** Path on the current app after the cascade finishes. */
   returnPath?: string;
 }) {
   await signOut(getFirebaseAuth());
   clearCachedProfile();
   clearSsoAttempt();
+  // Avoid auto-SSO bounce on login right after an intentional logout.
   markSsoAttempted();
 
   const returnPath = opts.returnPath ?? "/login";
   const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
-  const finalUrl = `${appBaseUrl(opts.current)}/${opts.locale}${path}`;
-  const chain = otherApps(opts.current);
-  let next = finalUrl;
-  for (let i = chain.length - 1; i >= 0; i--) {
-    next = logoutCascadeUrl(chain[i]!, opts.locale, next);
-  }
-  window.location.replace(next);
+  const finalUrl = `${window.location.origin}/${opts.locale}${path}`;
+  window.location.replace(
+    buildLogoutCascadeUrl(opts.current, opts.locale, finalUrl),
+  );
 }
 
 /** True when the current user signed in with email + password. */

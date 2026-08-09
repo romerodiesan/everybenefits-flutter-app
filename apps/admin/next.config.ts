@@ -21,10 +21,12 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
     nodeEnv: process.env.NODE_ENV,
   }),
   emulatorHosts: emulatorHost,
-  // Studio has no DotLottie / GA runtime, but keep Analytics hosts for parity
+  // Admin has no DotLottie / GA runtime, but keep Analytics hosts for parity
   // with shared Firebase project tooling and avoid drift with Pulse CSP.
   includeLottie: false,
   includeAnalytics: true,
+  // Dev/HMR may need eval; production keeps it off.
+  allowUnsafeEval: process.env.NODE_ENV !== "production",
 });
 
 const securityHeaders = [
@@ -45,7 +47,7 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   serverExternalPackages: ["firebase", "@firebase/app", "@firebase/auth"],
-  transpilePackages: ["@pulse/shared", "@pulse/firebase-web"],
+  transpilePackages: ["@pulse/shared", "@pulse/firebase-web", "@pulse/chrome", "@pulse/sso"],
   images: {
     unoptimized: useEmulators,
     remotePatterns: [

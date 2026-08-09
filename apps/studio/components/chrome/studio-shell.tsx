@@ -11,7 +11,7 @@ import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { canAuthorCourses, headlineName } from "@/lib/roles";
-import { signOutEverywhere } from "@/lib/firebase/auth";
+import { signOutAndRedirect } from "@/lib/firebase/auth";
 import { CommandPalette } from "@/components/chrome/command-palette";
 import { AppSwitcher } from "@/components/chrome/app-switcher";
 import { StudioShellSkeleton } from "@/components/chrome/studio-shell-skeleton";
@@ -20,9 +20,12 @@ import type { UserRole } from "@/lib/types";
 import {
   hasSsoAttempted,
   markSsoAttempted,
+  PULSE_ACCOUNT_PATH,
+  resolveSwitchUrl,
   ssoBridgeUrl,
   ssoConsumeUrl,
 } from "@/lib/sso";
+import { getFirebaseAuth } from "@/lib/firebase/client";
 
 const PULSE_URL =
   process.env.NEXT_PUBLIC_PULSE_WEB_URL ?? "http://localhost:3000";
@@ -386,11 +389,42 @@ export function StudioShell({ children }: { children: ReactNode }) {
             </kbd>
           </button>
 
+          <button
+            type="button"
+            onClick={() => {
+              setNavOpen(false);
+              void (async () => {
+                try {
+                  const url = await resolveSwitchUrl({
+                    target: "pulse",
+                    homePath: PULSE_ACCOUNT_PATH,
+                    locale,
+                    getIdToken: async () => {
+                      const user = getFirebaseAuth().currentUser;
+                      if (!user) return null;
+                      return user.getIdToken();
+                    },
+                  });
+                  window.location.assign(url);
+                } catch {
+                  window.location.assign(
+                    `${PULSE_URL}/${locale}${PULSE_ACCOUNT_PATH}`,
+                  );
+                }
+              })();
+            }}
+            className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-muted transition hover:bg-ink/[0.04] hover:text-ink dark:hover:bg-white/[0.05]"
+          >
+            <span className="min-w-0 flex-1 truncate text-left">
+              {t("navAccount")}
+            </span>
+          </button>
+
           <Button
             variant="ghost"
             className="w-full justify-start"
             onClick={() =>
-              void signOutEverywhere({
+              void signOutAndRedirect({
                 current: "studio",
                 locale,
                 returnPath: "/login",
