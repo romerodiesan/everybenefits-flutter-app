@@ -103,6 +103,8 @@ env:
   # Env var cannot start with FIREBASE_ (reserved). Secret name can.
   - variable: SERVICE_ACCOUNT_KEY
     secret: FIREBASE_SERVICE_ACCOUNT_KEY
+    availability:
+      - RUNTIME
 
   # --- Cross-app URLs ---
   - variable: NEXT_PUBLIC_PULSE_WEB_URL
@@ -115,7 +117,6 @@ env:
     availability:
       - BUILD
       - RUNTIME
-
   - variable: NEXT_PUBLIC_ADMIN_URL
     value: https://admin.everybenefits.us
     availability:
@@ -123,22 +124,18 @@ env:
       - RUNTIME
 
   # --- Pulse AI (server) ---
-  # Uncomment after:
+  # Uncomment after secrets are set + granted to this backend:
   #   npx -y firebase-tools@latest apphosting:secrets:set AI_GATEWAY_API_KEY --project every-benefits-us
-  #   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_WEB_SEARCH_API_KEY --project every-benefits-us
-  #   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_ADMIN_TASK_KEY --project every-benefits-us
-  # - variable: AI_GATEWAY_API_KEY
-  #   secret: AI_GATEWAY_API_KEY
   - variable: PULSE_AI_MODEL
-    value: anthropic/claude-sonnet-5
+    value: "anthropic/claude-sonnet-5"
     availability:
       - RUNTIME
   - variable: PULSE_AI_FAST_MODEL
-    value: google/gemini-3.6-flash
+    value: "google/gemini-3.6-flash"
     availability:
       - RUNTIME
   - variable: PULSE_AI_EMBEDDING_MODEL
-    value: google/gemini-embedding-001
+    value: "google/gemini-embedding-001"
     availability:
       - RUNTIME
   - variable: PULSE_AI_EMBEDDING_DIMENSIONS
@@ -170,10 +167,6 @@ env:
     availability:
       - RUNTIME
   - variable: PULSE_AI_WEB_SEARCH_PROVIDER
-    value: none
+    value: "none"
     availability:
       - RUNTIME
-  # - variable: PULSE_AI_WEB_SEARCH_API_KEY
-  #   secret: PULSE_AI_WEB_SEARCH_API_KEY
-  # - variable: PULSE_AI_ADMIN_TASK_KEY
-  #   secret: PULSE_AI_ADMIN_TASK_KEY

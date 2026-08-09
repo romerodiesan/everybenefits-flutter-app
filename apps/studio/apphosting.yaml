@@ -96,6 +96,8 @@ env:
   # Env var cannot start with FIREBASE_ (reserved). Secret name can.
   - variable: SERVICE_ACCOUNT_KEY
     secret: FIREBASE_SERVICE_ACCOUNT_KEY
+    availability:
+      - RUNTIME
 
   # --- Cross-app URLs ---
   - variable: NEXT_PUBLIC_PULSE_WEB_URL

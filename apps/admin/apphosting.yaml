@@ -91,6 +91,8 @@ env:
       - RUNTIME
   - variable: SERVICE_ACCOUNT_KEY
     secret: FIREBASE_SERVICE_ACCOUNT_KEY
+    availability:
+      - RUNTIME
 
   - variable: NEXT_PUBLIC_PULSE_WEB_URL
     value: https://pulse.everybenefits.us
