@@ -64,7 +64,8 @@ export FIREBASE_AUTH_EMULATOR_HOST="${FIREBASE_AUTH_EMULATOR_HOST:-127.0.0.1:909
 export FIREBASE_DATABASE_EMULATOR_HOST="${FIREBASE_DATABASE_EMULATOR_HOST:-127.0.0.1:9000}"
 export FIREBASE_STORAGE_EMULATOR_HOST="${FIREBASE_STORAGE_EMULATOR_HOST:-127.0.0.1:9199}"
 export FUNCTIONS_EMULATOR=true
-export GCLOUD_PROJECT="${GCLOUD_PROJECT:-every-insurance}"
+# Must match NEXT_PUBLIC_FIREBASE_PROJECT_ID in apps/*/.env.local
+export GCLOUD_PROJECT="${GCLOUD_PROJECT:-every-benefits-us}"
 export GOOGLE_CLOUD_PROJECT="$GCLOUD_PROJECT"
 
 pnpm --filter @pulse/functions run build
@@ -81,4 +82,4 @@ fi
 
 exec npx -y firebase-tools@latest emulators:start \
   --only auth,firestore,database,storage,functions,ui \
-  --project every-insurance
+  --project "${GCLOUD_PROJECT}"
