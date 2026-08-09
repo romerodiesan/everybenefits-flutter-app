@@ -15,6 +15,9 @@ function isAnonymousUser(user: UserRecord): boolean {
  * Clients still call ensureProfile as a fallback; this covers cases where the
  * client write fails (rules, offline, project-id mismatch) so approvals and
  * gates always see a pending profile.
+ *
+ * Gen1 Auth triggers only — no Gen2 equivalent yet. That caps this codebase
+ * runtime at nodejs20 (nodejs24 is Gen2/Cloud Run only).
  */
 export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
   // Mega-seed creates Auth users at *@pulse.local and writes full profiles

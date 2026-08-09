@@ -5,7 +5,9 @@
   "targets": {
     "every-benefits-us": {
       "hosting": {
-        "legal": ["pulse-legal"]
+        "legal": [
+          "pulse-legal"
+        ]
       }
     }
   },
