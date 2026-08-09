@@ -32,6 +32,8 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
 const securityHeaders = [
   // origin-when-cross-origin keeps OAuth/Auth iframe relay working better than no-referrer.
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  // Allow Google/Firebase auth popups to close themselves without COOP blocking.
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "X-Frame-Options", value: "DENY" },
   {
