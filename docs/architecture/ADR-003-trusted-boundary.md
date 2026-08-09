@@ -19,7 +19,7 @@ Clients talk directly to Firestore and RTDB under security rules, and call Cloud
 | Org tree mutations (`orgNodes`) | Cloud Functions only; clients read via callables or rules |
 | Quiz grading / enrollment progress trusted fields | Cloud Functions |
 | Group create / default agent group / support-AI bot messages | Cloud Functions |
-| SSO handoff create/exchange | Cloud Functions (+ thin Next bridge routes) |
+| SSO handoff create/exchange | Cloud Functions (+ thin Next `/api/auth/*`); Pulse is the auth hub (see ADR-006) |
 | Account deactivate / deletion schedule | Cloud Functions |
 | AI generation, RAG, quotas | Next.js `webapp` `/api/ai/*` with Admin SDK |
 | FCM fan-out helpers | Functions (`notifications` module) |

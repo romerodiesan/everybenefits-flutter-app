@@ -16,6 +16,7 @@ Treat **`.firebaserc` → `every-insurance`** as the active CLI default unless y
 - `pulse.everybenefits.us` — webapp
 - `studio.everybenefits.us` — studio
 - `admin.everybenefits.us` — admin
+- `legal.everybenefits.us` — legal center (Privacy, Data Use, Cookies, Terms; SvelteKit static)
 
 ## Local ports
 
@@ -24,6 +25,7 @@ Treat **`.firebaserc` → `every-insurance`** as the active CLI default unless y
 | apps/web | 3000 |
 | apps/studio | 3001 |
 | apps/admin | 3002 |
+| apps/legal | 3003 |
 | Auth emulator | (see `firebase.json`) |
 | Firestore emulator | (see `firebase.json`) |
 | RTDB emulator | (see `firebase.json`) |
@@ -36,6 +38,17 @@ Copy:
 - `apps/web/.env.example` → `apps/web/.env.local`
 - `apps/studio/.env.example` → `apps/studio/.env.local`
 - `apps/admin/.env.example` → `apps/admin/.env.local`
+- `apps/legal/.env.example` → `apps/legal/.env`
+
+Pulse links to the legal app via `NEXT_PUBLIC_LEGAL_ORIGIN` (dev: `http://localhost:3003`, prod: `https://legal.everybenefits.us`).
+
+Deploy legal static site after `pnpm build:legal`:
+
+```bash
+firebase deploy --only hosting:legal
+```
+
+Map the Hosting site `pulse-legal` to `legal.everybenefits.us` in Firebase Console (DNS / custom domain). The `.firebaserc` target name is `legal`.
 
 Never commit secrets. AI keys and service accounts are webapp-server only (see `docs/pulse-ai.md`).
 
@@ -47,4 +60,4 @@ Production audience geo/device requires:
 2. GA4 → BigQuery export enabled
 3. Functions env `BIGQUERY_ANALYTICS_DATASET` (see `docs/architecture/creator-analytics.md`)
 
-Local emulators: leave the dataset unset and run `pnpm seed` (includes `seed-analytics.mjs`) for synthetic rollups.
+Local emulators: leave the dataset unset and run `pnpm seed` (or `pnpm seed:quick`) for synthetic rollups and volume data.

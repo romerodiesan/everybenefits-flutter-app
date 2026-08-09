@@ -45,7 +45,7 @@ flowchart LR
 | Container | Tech | Responsibility |
 |-----------|------|----------------|
 | Flutter app | Dart (`apps/mobile`) | Mobile forums, chats, Academy, AI, profile |
-| web | Next.js 16 | Learner UX + Pulse AI API + SSO bridge |
+| web | Next.js 16 | Learner UX + Pulse AI API + **auth hub** (login/account + SSO bridge) |
 | studio | Next.js 16 | Course/path authoring and review |
 | admin | Next.js 16 | Approvals, users, org tree, insights |
 | functions | Node 24 | Trusted callables, triggers, schedules |
@@ -65,5 +65,6 @@ See [ADR-003](ADR-003-trusted-boundary.md).
 | [ADR-003](ADR-003-trusted-boundary.md) | Rules vs Functions vs Next API |
 | [ADR-004](ADR-004-pulse-ai.md) | Pulse AI bounded context |
 | [ADR-005](ADR-005-security-ops.md) | App Check, CORS, ops checklist |
+| [ADR-006](ADR-006-auth-hub.md) | Pulse auth hub; Firebase IdP; `@pulse/sso` protocol |
 
 Also: [data-model.md](data-model.md), [creator-analytics.md](creator-analytics.md), [environments.md](environments.md), [flutter-di.md](flutter-di.md).

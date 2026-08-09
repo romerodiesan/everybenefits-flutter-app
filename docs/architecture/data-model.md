@@ -31,8 +31,8 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `aiKnowledgeChunks/{id}` | RAG vectors (backend-only) |
 | `aiRuns/{id}` | AI run telemetry (backend-only) |
 | `functionUsage/{id}` | Callable rate / usage counters |
-| `ssoHandoffs/{code}` | Cross-app SSO codes |
-| `ssoRateLimit/{id}` | SSO abuse counters |
+| `ssoHandoffs/{code}` | Cross-app SSO codes (60s TTL; configure Firestore TTL on `expiresAt`) |
+| `ssoRateLimit/{id}` | SSO abuse counters (configure Firestore TTL on `expiresAt`) |
 | `platformConfig/{id}` | Platform settings |
 
 Legacy note: some chat-related docs may appear under Firestore `chats/**` rules; **live chat traffic is RTDB** (below).
