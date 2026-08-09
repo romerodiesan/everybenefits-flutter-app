@@ -48,6 +48,12 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   serverExternalPackages: ["firebase", "@firebase/app", "@firebase/auth"],
   transpilePackages: ["@pulse/shared", "@pulse/firebase-web", "@pulse/chrome", "@pulse/sso"],
+  experimental: {
+    // Turbopack scope-hoisting TDZ with Zod 4 (z.string().datetime() →
+    // "Cannot access 'h' before initialization"). Keep off until fixed upstream.
+    // https://github.com/vercel/next.js/issues/82723
+    turbopackScopeHoisting: false,
+  },
   images: {
     unoptimized: useEmulators,
     remotePatterns: [
