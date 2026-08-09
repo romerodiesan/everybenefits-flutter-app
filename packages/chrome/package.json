@@ -1,0 +1,34 @@
+{
+  "name": "@pulse/chrome",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "require": "./dist/index.js",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "prepare": "pnpm run build"
+  },
+  "dependencies": {
+    "@pulse/shared": "workspace:*"
+  },
+  "peerDependencies": {
+    "next-intl": "^4.0.0",
+    "react": "^19.0.0"
+  },
+  "devDependencies": {
+    "@pulse/typescript-config": "workspace:*",
+    "@types/react": "^19.2.2",
+    "next-intl": "~4.13.4",
+    "react": "19.2.8",
+    "typescript": "^5.9.3"
+  }
+}

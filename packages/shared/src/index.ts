@@ -1,4 +1,5 @@
 export * from "./roles";
+export * from "./apps";
 export * from "./academy";
 export * from "./csp";
 export * from "./profile";

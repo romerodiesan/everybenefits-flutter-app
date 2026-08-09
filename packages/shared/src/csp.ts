@@ -19,6 +19,18 @@ export type CspBuildOptions = {
   includeLottie?: boolean;
   /** GA4 / GTM script+connect+img (consent-gated Analytics). Default true. */
   includeAnalytics?: boolean;
+  /** Google Maps Platform (Place Autocomplete). Default false. */
+  includeMaps?: boolean;
+  /**
+   * Allow `script-src 'unsafe-eval'` (HMR / some emulator tooling).
+   * Default false — production should keep eval off.
+   */
+  allowUnsafeEval?: boolean;
+  /**
+   * When set, emits `script-src 'nonce-…'` instead of `'unsafe-inline'`.
+   * Host apps must stamp the same nonce on every inline script.
+   */
+  scriptNonce?: string;
 };
 
 function join(...parts: Array<string | false | null | undefined>): string {
@@ -62,6 +74,7 @@ export function buildContentSecurityPolicy(
   const includeEmulators = options.includeEmulators ?? false;
   const includeLottie = options.includeLottie ?? true;
   const includeAnalytics = options.includeAnalytics ?? true;
+  const includeMaps = options.includeMaps ?? false;
   const hosts = normalizeEmulatorHosts(options.emulatorHosts);
 
   // Auth 9099, Firestore 8080, RTDB 9000, Storage 9199, Functions 5001, Emulator UI 4000
@@ -120,11 +133,31 @@ export function buildContentSecurityPolicy(
     ? join("https://lottie.host", "https://*.lottiefiles.com")
     : "";
 
+  const mapsScript = includeMaps
+    ? join("https://maps.googleapis.com", "https://maps.gstatic.com")
+    : "";
+  const mapsImg = includeMaps
+    ? join("https://maps.gstatic.com", "https://maps.googleapis.com", "data:")
+    : "";
+  const mapsConnect = includeMaps
+    ? join(
+        "https://maps.googleapis.com",
+        "https://places.googleapis.com",
+        "https://addressvalidation.googleapis.com",
+      )
+    : "";
+
   const scriptSrc = join(
     "script-src",
     "'self'",
-    "'unsafe-inline'",
-    "'unsafe-eval'",
+    // Next.js still injects inline bootstraps; prefer nonces when the host
+    // framework supports them end-to-end (see buildContentSecurityPolicy opts).
+    options.scriptNonce
+      ? `'nonce-${options.scriptNonce}'`
+      : "'unsafe-inline'",
+    // eval is required by some emulator / HMR tooling; omit in production
+    // unless explicitly re-enabled.
+    options.allowUnsafeEval === true ? "'unsafe-eval'" : null,
     "'wasm-unsafe-eval'",
     "blob:",
     // Google Sign-In / Firebase helpers / reCAPTCHA
@@ -134,6 +167,7 @@ export function buildContentSecurityPolicy(
     "https://www.recaptcha.net",
     "https://apis.google.com",
     "https://accounts.google.com",
+    mapsScript,
     // RTDB long-poll JSONP (production + emulator)
     "https://*.firebaseio.com",
     emulatorRtdbScriptFrame,
@@ -160,6 +194,7 @@ export function buildContentSecurityPolicy(
     // Auth / reCAPTCHA pixel (cleardot.gif)
     "https://www.google.com",
     "https://www.recaptcha.net",
+    mapsImg,
     emulatorStorageMedia,
     analyticsImg,
   );
@@ -222,6 +257,7 @@ export function buildContentSecurityPolicy(
     "https://www.recaptcha.net",
     analyticsConnect,
     lottieConnect,
+    mapsConnect,
     emulatorConnect,
   );
 
