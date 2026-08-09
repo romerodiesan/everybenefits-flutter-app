@@ -13,6 +13,9 @@
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_WEB_API_KEY --project every-benefits-us
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us
 #
+# Do NOT set NEXT_PUBLIC_FIREBASE_* via Console overrideEnv — stale overrides
+# previously forced the Maps API key + a deleted web appId and broke App Check.
+#
 # Cross-app URLs: pulse.everybenefits.us / studio.everybenefits.us (build-time).
 
 runConfig:
