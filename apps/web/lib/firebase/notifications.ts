@@ -337,6 +337,9 @@ const WEB_PUSH_TOKEN_KEY = "pulse_web_fcm_token";
 export async function registerWebPushToken(
   uid: string,
 ): Promise<string | null> {
+  // FCM registration hits production Google APIs — skip while Auth/Firestore
+  // are on emulators to avoid noisy 401s with emulator ID tokens.
+  if (process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true") return null;
   const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY?.trim();
   if (!vapidKey || !uid) return null;
   const msg = await getWebMessaging();

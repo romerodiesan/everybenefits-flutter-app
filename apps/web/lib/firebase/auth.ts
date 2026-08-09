@@ -31,8 +31,54 @@ import { clearStoredWebPushToken } from "@/lib/firebase/notifications";
 
 const googleProvider = new GoogleAuthProvider();
 
-function usingAuthEmulator() {
+export function usingFirebaseEmulators() {
   return process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
+}
+
+function usingAuthEmulator() {
+  return usingFirebaseEmulators();
+}
+
+/** Map Firebase Auth errors to i18n keys used by Security / Danger panels. */
+export function securityAuthErrorKey(err: unknown): string {
+  if (err instanceof Error) {
+    if (err.message === "password-required") return "securityReauthRequired";
+    if (err.message === "last-provider") return "securityGoogleLastProvider";
+    if (err.message === "weak-password") return "setPasswordWeak";
+  }
+  const code =
+    typeof err === "object" &&
+    err !== null &&
+    "code" in err &&
+    typeof (err as { code: unknown }).code === "string"
+      ? (err as { code: string }).code
+      : "";
+  switch (code) {
+    case "auth/wrong-password":
+    case "auth/invalid-credential":
+    case "auth/invalid-login-credentials":
+    case "auth/user-mismatch":
+      return "securityWrongPassword";
+    case "auth/requires-recent-login":
+      return "securityRequiresRecentLogin";
+    case "auth/credential-already-in-use":
+    case "auth/email-already-in-use":
+    case "auth/account-exists-with-different-credential":
+      return "securityCredentialInUse";
+    case "auth/unverified-email":
+      return "securityEmailNotVerified";
+    case "auth/operation-not-allowed":
+    case "auth/unsupported-first-factor":
+    case "auth/maximum-second-factor-count-exceeded":
+      return "securityMfaUnavailable";
+    case "auth/invalid-verification-code":
+    case "auth/code-expired":
+      return "mfaInvalidCode";
+    case "auth/too-many-requests":
+      return "errorRateLimited";
+    default:
+      return "errorAuth";
+  }
 }
 
 /** Fake Google ID token the Auth Emulator accepts (no real OAuth popup). */

@@ -5,13 +5,17 @@ import { useTranslations } from "next-intl";
 import type { TotpSecret } from "firebase/auth";
 import {
   changePassword,
+  currentUser,
   hasGoogleProvider,
   hasPasswordProvider,
   linkGoogleAccount,
   linkPassword,
   reauthenticate,
+  securityAuthErrorKey,
   unlinkGoogleAccount,
+  usingFirebaseEmulators,
 } from "@/lib/firebase/auth";
+import { reload } from "firebase/auth";
 import {
   finishPhoneEnrollment,
   finishTotpEnrollment,
@@ -82,6 +86,7 @@ export function SecurityPanel() {
   const [smsCode, setSmsCode] = useState("");
   const [enrollingSms, setEnrollingSms] = useState(false);
   const [reauthPassword, setReauthPassword] = useState("");
+  const onEmulator = usingFirebaseEmulators();
 
   const refresh = useCallback(async () => {
     try {
@@ -128,15 +133,23 @@ export function SecurityPanel() {
       setConfirmPassword("");
       setStatus("saved");
       await refresh();
-    } catch {
+    } catch (err) {
       setStatus("error");
-      setError(t("errorAuth"));
+      setError(t(securityAuthErrorKey(err)));
     } finally {
       setBusy(false);
     }
   }
 
   async function ensureRecentLogin() {
+    const user = currentUser();
+    if (user) {
+      try {
+        await reload(user);
+      } catch {
+        // ignore — reauth will surface a clearer error
+      }
+    }
     if (hasPasswordProvider()) {
       if (!reauthPassword) {
         setShowReauth(true);
@@ -149,16 +162,15 @@ export function SecurityPanel() {
   }
 
   function mapSecurityError(err: unknown): string {
-    if (err instanceof Error && err.message === "password-required") {
-      return t("securityReauthRequired");
-    }
-    if (err instanceof Error && err.message === "last-provider") {
-      return t("securityGoogleLastProvider");
-    }
-    return t("errorAuth");
+    return t(securityAuthErrorKey(err));
   }
 
   async function onStartTotp() {
+    if (onEmulator) {
+      setError(t("securityTotpEmulatorUnsupported"));
+      setStatus("error");
+      return;
+    }
     setBusy(true);
     setError(null);
     setStatus(null);
@@ -191,8 +203,8 @@ export function SecurityPanel() {
       setEnrollingTotp(false);
       setStatus("factor");
       await refresh();
-    } catch {
-      setError(t("errorAuth"));
+    } catch (err) {
+      setError(mapSecurityError(err));
       setStatus("error");
     } finally {
       setBusy(false);
@@ -229,8 +241,8 @@ export function SecurityPanel() {
       setEnrollingSms(false);
       setStatus("factor");
       await refresh();
-    } catch {
-      setError(t("errorAuth"));
+    } catch (err) {
+      setError(mapSecurityError(err));
       setStatus("error");
     } finally {
       setBusy(false);
@@ -367,9 +379,9 @@ export function SecurityPanel() {
                   await linkGoogleAccount();
                   await refresh();
                   setStatus("saved");
-                } catch {
+                } catch (err) {
                   setStatus("error");
-                  setError(t("errorGeneric"));
+                  setError(mapSecurityError(err));
                 } finally {
                   setBusy(false);
                 }
@@ -385,6 +397,9 @@ export function SecurityPanel() {
         <div>
           <h3 className="text-sm font-bold">{t("securityMfaTitle")}</h3>
           <p className="mt-1 text-sm text-muted">{t("securityMfaHint")}</p>
+          {onEmulator && (
+            <p className="mt-2 text-xs text-muted">{t("securityMfaEmulatorNote")}</p>
+          )}
         </div>
 
         {hasPassword && (
@@ -488,13 +503,21 @@ export function SecurityPanel() {
                   type="button"
                   variant="secondary"
                   className="h-8 px-3 text-xs"
-                  disabled={busy}
+                  disabled={busy || onEmulator}
+                  title={
+                    onEmulator ? t("securityTotpEmulatorUnsupported") : undefined
+                  }
                   onClick={() => void onStartTotp()}
                 >
                   {t("securityEnrollTotp")}
                 </Button>
               )}
             </div>
+            {onEmulator && !totpFactor && (
+              <p className="mt-2 text-xs text-muted">
+                {t("securityTotpEmulatorUnsupported")}
+              </p>
+            )}
             {enrollingTotp && totpSecret && (
               <form onSubmit={onFinishTotp} className="mt-4 space-y-3">
                 <p className="text-sm">{t("securityTotpScan")}</p>
@@ -623,6 +646,11 @@ export function SecurityPanel() {
                   </div>
                 ) : (
                   <form onSubmit={onFinishPhone} className="space-y-3">
+                    {onEmulator && (
+                      <p className="text-xs text-muted">
+                        {t("securitySmsEmulatorHint")}
+                      </p>
+                    )}
                     <div className="max-w-xs">
                       <Label>{t("mfaCodeLabel")}</Label>
                       <Input

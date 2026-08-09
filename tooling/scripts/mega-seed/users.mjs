@@ -1,5 +1,5 @@
 import { config, FIXTURE_USERS, LICENSE_ROLES } from "./config.mjs";
-import { commitInBatches, db, log, mapPool } from "./admin.mjs";
+import { auth, commitInBatches, db, log, mapPool } from "./admin.mjs";
 
 const FIRST = [
   "Alex", "Sam", "Jordan", "Casey", "Riley", "Morgan", "Taylor", "Quinn",
@@ -213,6 +213,18 @@ export async function seedUsers(org) {
     config.authConcurrency,
     async (def) => {
       const { uid, created } = await ensureAuthUser(def.email, def.displayName);
+      // MFA enrollment (SMS) requires a verified email in Firebase Auth.
+      try {
+        await auth().updateUser(uid, {
+          emailVerified: true,
+          displayName: def.displayName,
+        });
+      } catch (err) {
+        log(
+          "users",
+          `warn: could not mark ${def.email} verified — ${err instanceof Error ? err.message : err}`,
+        );
+      }
       authDone += 1;
       if (authDone === 1 || authDone % 100 === 0 || authDone === defs.length) {
         const secs = ((Date.now() - authStarted) / 1000).toFixed(1);

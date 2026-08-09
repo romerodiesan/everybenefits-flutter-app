@@ -9,6 +9,7 @@ const requireFromFunctions = createRequire(
 );
 
 const { initializeApp } = requireFromFunctions("firebase-admin/app");
+const { getAuth } = requireFromFunctions("firebase-admin/auth");
 const { getFirestore, FieldValue, Timestamp } =
   requireFromFunctions("firebase-admin/firestore");
 const { getDatabase } = requireFromFunctions("firebase-admin/database");
@@ -35,6 +36,11 @@ export function initAdmin() {
 export function db() {
   initAdmin();
   return getFirestore();
+}
+
+export function auth() {
+  initAdmin();
+  return getAuth();
 }
 
 export function rtdb() {

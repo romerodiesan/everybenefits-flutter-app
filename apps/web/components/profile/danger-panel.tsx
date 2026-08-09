@@ -6,6 +6,7 @@ import {
   reauthenticate,
   signOutAndRedirect,
   hasPasswordProvider,
+  securityAuthErrorKey,
 } from "@/lib/firebase/auth";
 import {
   deactivateAccount,
@@ -51,8 +52,9 @@ export function DangerPanel() {
     setError(null);
     try {
       await reauthenticate(needsPassword ? password : undefined);
-    } catch {
-      setError(t("dangerReauthFailed"));
+    } catch (err) {
+      const key = securityAuthErrorKey(err);
+      setError(key === "errorAuth" ? t("dangerReauthFailed") : t(key));
       setBusy(false);
       return;
     }

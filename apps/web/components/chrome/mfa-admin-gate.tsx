@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import { multiFactor } from "firebase/auth";
 import { usePathname } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
+import { usingFirebaseEmulators } from "@/lib/firebase/auth";
 import { canAccessAdmin } from "@/lib/roles";
 import { Link } from "@/i18n/navigation";
 import { Panel } from "@/components/ui/primitives";
@@ -13,6 +14,7 @@ import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
 /**
  * Managers/admins must enroll at least one MFA factor before using the shell.
  * Account → Security stays reachable so they can enroll.
+ * Skipped on Auth emulator: TOTP is unsupported and SMS is awkward locally.
  */
 export function MfaAdminGate({ children }: { children: React.ReactNode }) {
   const t = useTranslations();
@@ -20,13 +22,18 @@ export function MfaAdminGate({ children }: { children: React.ReactNode }) {
   const { user, profile, loading, profileLoading } = useAuth();
   const [ready, setReady] = useState(false);
   const [needsMfa, setNeedsMfa] = useState(false);
+  const emulators = usingFirebaseEmulators();
 
   useEffect(() => {
     if (loading || profileLoading || !user || !profile) {
       setReady(false);
       return;
     }
-    if (!canAccessAdmin(profile.role) || profile.isAnonymous) {
+    if (
+      emulators ||
+      !canAccessAdmin(profile.role) ||
+      profile.isAnonymous
+    ) {
       setNeedsMfa(false);
       setReady(true);
       return;
@@ -34,7 +41,7 @@ export function MfaAdminGate({ children }: { children: React.ReactNode }) {
     const factors = multiFactor(user).enrolledFactors;
     setNeedsMfa(factors.length === 0);
     setReady(true);
-  }, [loading, profileLoading, user, profile]);
+  }, [loading, profileLoading, user, profile, emulators]);
 
   if (loading || profileLoading || !ready) {
     return <AppShellSkeleton />;
