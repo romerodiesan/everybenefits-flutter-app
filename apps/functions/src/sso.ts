@@ -1,14 +1,15 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { admin, db, callableOpts } from "./init";
 import { consumeFunctionQuota, requireCaller } from "./auth";
 
 /**
- * Cross-app SSO for Pulse ↔ Studio (different origins / ports).
+ * Cross-app SSO for Pulse ↔ Studio ↔ Admin (different origins).
  *
- * Preferred: createSsoHandoff (authenticated) → opaque code → exchangeSsoToken({ code }).
- * Direct idToken exchange is rejected to avoid JWT-in-URL style misuse of this API.
+ * Preferred client path is Next `/api/auth/*` via `@pulse/sso`.
+ * These callables mirror the same Firestore protocol (60s TTL, single-use,
+ * account gate, rate-limit before consume).
  */
 export const createSsoHandoff = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "createSsoHandoff");
@@ -31,6 +32,10 @@ export const exchangeSsoToken = onCall(callableOpts, async (request) => {
       "Opaque handoff code required. Use createSsoHandoff first.",
     );
   }
+
+  // Rate-limit before consume so failed quota never burns the code.
+  const codeKey = createHash("sha256").update(code).digest("hex").slice(0, 32);
+  await consumeFunctionQuota(codeKey, "exchangeSsoToken");
 
   const ref = db.collection("ssoHandoffs").doc(code);
   const uid = await db.runTransaction(async (tx) => {
@@ -59,7 +64,16 @@ export const exchangeSsoToken = onCall(callableOpts, async (request) => {
     return handoffUid;
   });
 
-  await consumeFunctionQuota(uid, "exchangeSsoToken");
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const status = String(userSnap.data()?.accountStatus ?? "active");
+  if (status === "deactivated" || status === "pendingDeletion") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Account is deactivated or pending deletion.",
+    );
+  }
+
+  await consumeFunctionQuota(uid, "exchangeSsoTokenUid");
   const customToken = await admin.auth().createCustomToken(uid, { sso: true });
   void ref.delete().catch(() => undefined);
   return { customToken, uid };

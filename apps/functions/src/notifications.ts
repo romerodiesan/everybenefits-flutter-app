@@ -1,7 +1,6 @@
-import * as admin from "firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { FieldValue, type DocumentReference } from "firebase-admin/firestore";
 import { createHash } from "node:crypto";
-import { db } from "./init";
+import { admin, db } from "./init";
 
 export type NotificationType =
   | "chat_message"
@@ -279,7 +278,7 @@ export async function notifyUser(
       ...((stateData.openGroups ?? {}) as Record<string, string>),
     };
 
-    let existingRef: admin.firestore.DocumentReference | null = null;
+    let existingRef: DocumentReference | null = null;
     if (groupKey && openGroups[groupKey]) {
       existingRef = col.doc(openGroups[groupKey]);
     }

@@ -205,3 +205,30 @@ export const assignUserToOrgNode = onCall(callableOpts, async (request) => {
   });
   return { ok: true, uid, orgNodeId };
 });
+
+/**
+ * Public-to-signed-in list of active agencies for profile completion.
+ * Returns id + name only (no managers / path).
+ */
+export const listAgenciesForProfile = onCall(callableOpts, async (request) => {
+  await requireCaller(request, "listAgenciesForProfile");
+
+  const snap = await db
+    .collection("orgNodes")
+    .where("type", "==", "agency")
+    .limit(2000)
+    .get();
+
+  const agencies = snap.docs
+    .map((doc) => {
+      const data = doc.data();
+      if (data.active === false) return null;
+      const name = String(data.name ?? "").trim();
+      if (!name) return null;
+      return { id: doc.id, name };
+    })
+    .filter((row): row is { id: string; name: string } => row !== null)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
+  return { agencies };
+});

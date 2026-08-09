@@ -15,6 +15,8 @@ export { bootstrapUserProfile } from "./bootstrap-user";
 export {
   syncUserAutoJoinGroups,
   syncChatInbox,
+  syncChatMetadataOnMessage,
+  createDm,
   rebuildChatInbox,
   createGroupChat,
   ensureDefaultAgentGroup,
@@ -74,10 +76,13 @@ export {
   getAdminInsights,
 } from "./admin";
 
+export { validateUsAddress } from "./address";
+
 export {
   ensureOrgRoot,
   listOrgSubtree,
   createOrgNode,
   updateOrgNode,
   assignUserToOrgNode,
+  listAgenciesForProfile,
 } from "./org";

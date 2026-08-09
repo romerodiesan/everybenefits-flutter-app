@@ -82,7 +82,8 @@ service firebase.storage {
       // Own-avatar writes only need Auth + path ownership. Avoid Firestore
       // cross-service lookups here — a failed get() fails closed as 403 and
       // blocks profile photo uploads for otherwise valid members.
-      allow read: if isSignedIn();
+      // Reads: registered (non-guest) members, or the owner of the file.
+      allow read: if isOwnerFile(fileName) || isRegisteredMember();
       allow write: if isSignedIn()
         && isOwnerFile(fileName)
         && request.resource.size < 5 * 1024 * 1024

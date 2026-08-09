@@ -12,51 +12,45 @@
           || data.child('members').child(auth.uid).val() === true
         )",
 
-        // Create only (Admin SDK bypasses for agents-default).
+        // Client may only create their own support thread.
+        // DMs and groups are created via Admin SDK callables.
         ".write": "auth != null
           && !data.exists()
           && newData.child('createdBy').val() === auth.uid
           && newData.child('members').child(auth.uid).val() === true
           && newData.child('isDefaultAgentGroup').val() !== true
-          && (
-            (
-              newData.child('isSupportChat').val() === true
-              && newData.child('isGroup').val() === true
-              && $chatId === ('support_' + auth.uid)
-              && newData.child('members').child('support-ai').val() === true
-            )
-            || (
-              newData.child('isSupportChat').val() !== true
-              && (
-                (newData.child('isGroup').val() === false
-                  && newData.child('dmKey').val() === $chatId
-                  && newData.child('memberCount').val() === 2
-                  && newData.child('members').child(auth.uid).val() === true
-                  && !newData.child('members').child('support-ai').exists())
-              )
-            )
-          )",
+          && newData.child('isSupportChat').val() === true
+          && newData.child('isGroup').val() === true
+          && $chatId === ('support_' + auth.uid)
+          && newData.child('members').child('support-ai').val() === true",
 
-        "lastMessage": {
-          ".write": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
-        },
-        "lastMessageAt": {
-          ".write": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
-        },
-        "lastMessageSenderId": {
-          ".write": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
-        },
+        // lastMessage* — Admin SDK only (syncChatMetadataOnMessage / callables).
         "unreadCounts": {
-          ".write": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
+          "$uid": {
+            ".write": "auth != null
+              && auth.uid === $uid
+              && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
+          }
         },
         "pinnedBy": {
-          ".write": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
+          "$uid": {
+            ".write": "auth != null
+              && auth.uid === $uid
+              && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
+          }
         },
         "memberNames": {
-          ".write": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
+          "$uid": {
+            // Members may only set/clear their own display name entry.
+            ".write": "auth != null
+              && auth.uid === $uid
+              && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
+              && (!newData.exists() || newData.isString())"
+          }
         },
+        // Group titles are set by Admin SDK callables only.
         "title": {
-          ".write": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
+          ".write": false
         }
       }
     },
@@ -98,23 +92,38 @@
         ".read": "auth != null && auth.uid === $uid",
         ".indexOn": ["lastMessageAt"],
         "$chatId": {
-          ".write": "auth != null && auth.uid === $uid"
+          // Membership required to create/update; delete allowed after leaving.
+          ".write": "auth != null && auth.uid === $uid && (!newData.exists() || root.child('chats').child($chatId).child('members').child(auth.uid).val() === true)"
         }
       }
     },
 
     "dmIndex": {
       "$dmKey": {
-        ".read": "auth != null",
+        // Only the two participants can resolve a DM key (uidA_uidB).
+        ".read": "auth != null && ($dmKey.beginsWith(auth.uid + '_') || $dmKey.endsWith('_' + auth.uid))",
         ".write": false
       }
     },
 
     "presence": {
-      ".read": "auth != null",
+      // Non-anonymous Auth only. Use auth.provider (RTDB classic) — more
+      // reliable on the Auth emulator than token.firebase.sign_in_provider.
+      ".read": "auth != null && auth.provider != 'anonymous'",
+      "$uid": {
+        "$clientId": {
+          ".write": "auth != null && auth.uid === $uid",
+          ".validate": "newData.hasChildren(['at']) && (newData.child('at').isNumber() || newData.child('at').val() === now)"
+        }
+      }
+    },
+
+    // Shallow online index for cheap headcount (one node per uid).
+    "online": {
+      ".read": "auth != null && auth.provider != 'anonymous'",
       "$uid": {
         ".write": "auth != null && auth.uid === $uid",
-        ".validate": "newData.hasChildren(['online']) && newData.child('online').val() === true"
+        ".validate": "!newData.exists() || newData.val() === true"
       }
     },
 

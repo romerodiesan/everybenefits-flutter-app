@@ -12,7 +12,7 @@ exports.COURSE_LEVELS = [
 exports.LESSON_TYPES = ["video", "reading", "quiz"];
 exports.LESSON_COMPLETE_THRESHOLD = 0.9;
 exports.QUIZ_DEFAULT_PASS_PERCENT = 70;
-// --- Creator analytics (YouTube-Studio-like, aggregate-only in Studio) ---
+// --- Creator analytics (aggregate-only in Studio) ---
 /** Bump when event payload or rollup shape changes incompatibly. */
 exports.ACADEMY_ANALYTICS_SCHEMA_VERSION = 1;
 /** Minimum cohort size before audience breakdowns are shown (privacy). */

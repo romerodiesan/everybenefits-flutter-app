@@ -17,6 +17,17 @@ function isAnonymousUser(user: UserRecord): boolean {
  * gates always see a pending profile.
  */
 export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
+  // Mega-seed creates Auth users at *@pulse.local and writes full profiles
+  // itself. Skipping the onCreate trigger avoids flooding the Functions +
+  // Firestore emulators (10k × multi-second bootstraps).
+  if (
+    process.env.FUNCTIONS_EMULATOR === "true" &&
+    typeof user.email === "string" &&
+    user.email.toLowerCase().endsWith("@pulse.local")
+  ) {
+    return;
+  }
+
   const ref = db.doc(`users/${user.uid}`);
   const existing = await ref.get();
   if (existing.exists) return;

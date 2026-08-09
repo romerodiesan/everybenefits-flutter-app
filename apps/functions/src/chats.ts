@@ -1,8 +1,8 @@
-import * as admin from "firebase-admin";
 import { onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { onValueWritten } from "firebase-functions/v2/database";
+import { onValueCreated, onValueWritten } from "firebase-functions/v2/database";
 import { HttpsError } from "firebase-functions/v2/https";
+import type { DocumentData } from "firebase-admin/firestore";
 import {
   GROUP_CREATOR_ROLES,
   GROUP_SEED_ROLES,
@@ -128,8 +128,8 @@ export async function ensureAutoJoinMemberships(
 export async function collectUsersByRoles(
   roles: UserRole[],
   cap: number,
-): Promise<Map<string, admin.firestore.DocumentData>> {
-  const byUid = new Map<string, admin.firestore.DocumentData>();
+): Promise<Map<string, DocumentData>> {
+  const byUid = new Map<string, DocumentData>();
   if (!roles.length) return byUid;
   // Query per role (avoids composite index); filter approval in memory.
   await Promise.all(
@@ -310,6 +310,152 @@ export const syncChatInbox = onValueWritten(
     );
   },
 );
+
+/**
+ * When a message is created, only the Admin SDK may bump chat summary fields
+ * (clients cannot forge lastMessage / unreadCounts for push spam).
+ */
+export const syncChatMetadataOnMessage = onValueCreated(
+  { ref: "/messages/{chatId}/{messageId}", region: "us-central1" },
+  async (event) => {
+    const chatId = event.params.chatId;
+    const msg = (event.data.val() ?? {}) as Record<string, unknown>;
+    const senderId = String(msg.senderId ?? "");
+    if (!senderId) return;
+
+    const createdAt = Number(msg.createdAt ?? Date.now());
+    const shared = msg.sharedPost as { title?: string } | null | undefined;
+    const body = String(msg.body ?? "").trim();
+    const preview = shared?.title
+      ? `Question: ${String(shared.title).slice(0, 200)}`
+      : body.slice(0, 4000);
+    if (!preview) return;
+
+    const chatRef = rtdb.ref(`chats/${chatId}`);
+    const chatSnap = await chatRef.get();
+    const chat = chatSnap.val() as Record<string, unknown> | null;
+    if (!chat?.members || typeof chat.members !== "object") return;
+    const members = chat.members as Record<string, unknown>;
+    if (members[senderId] !== true && senderId !== SUPPORT_AI_UID) return;
+
+    const unreadCounts: Record<string, number> = {
+      ...((chat.unreadCounts ?? {}) as Record<string, number>),
+    };
+    for (const memberId of Object.keys(members)) {
+      if (memberId === SUPPORT_AI_UID) {
+        unreadCounts[memberId] = 0;
+        continue;
+      }
+      unreadCounts[memberId] =
+        memberId === senderId ? 0 : (unreadCounts[memberId] ?? 0) + 1;
+    }
+
+    await rtdb.ref().update({
+      [`chats/${chatId}/lastMessage`]: preview,
+      [`chats/${chatId}/lastMessageAt`]: createdAt,
+      [`chats/${chatId}/lastMessageSenderId`]: senderId,
+      [`chats/${chatId}/unreadCounts`]: unreadCounts,
+    });
+  },
+);
+
+/**
+ * Create (or return) a 1:1 DM. Enforces privacy.allowDirectMessages server-side.
+ */
+export const createDm = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "createDm");
+  const otherUid = String(request.data?.otherUid ?? "").trim();
+  if (!otherUid || otherUid === uid || otherUid === SUPPORT_AI_UID) {
+    throw new HttpsError("invalid-argument", "Valid recipient required.");
+  }
+
+  const [meSnap, otherSnap, publicSnap] = await Promise.all([
+    db.doc(`users/${uid}`).get(),
+    db.doc(`users/${otherUid}`).get(),
+    db.doc(`publicProfiles/${otherUid}`).get(),
+  ]);
+  if (!meSnap.exists || !otherSnap.exists) {
+    throw new HttpsError("not-found", "User not found.");
+  }
+  const meData = meSnap.data() ?? {};
+  const otherData = otherSnap.data() ?? {};
+  if (meData.isAnonymous === true || otherData.isAnonymous === true) {
+    throw new HttpsError("permission-denied", "Anonymous users cannot DM.");
+  }
+  if (!isUserApprovedForJoin(meData) || !isUserApprovedForJoin(otherData)) {
+    throw new HttpsError("permission-denied", "Both users must be approved.");
+  }
+
+  const allowDirect =
+    publicSnap.exists
+      ? publicSnap.data()?.allowDirectMessages !== false
+      : (otherData.privacy as { allowDirectMessages?: boolean } | undefined)
+          ?.allowDirectMessages !== false;
+  if (!allowDirect) {
+    throw new HttpsError(
+      "failed-precondition",
+      "direct-messages-disabled",
+    );
+  }
+
+  const memberIds = [uid, otherUid].sort();
+  const dmKey = memberIds.join("_");
+  const existing = await rtdb.ref(`chats/${dmKey}`).get();
+  if (existing.exists()) {
+    const chat = existing.val() as Record<string, unknown>;
+    return {
+      chatId: dmKey,
+      createdAt: Number(chat.createdAt ?? Date.now()),
+      existing: true,
+      memberIds,
+      memberNames: (chat.memberNames ?? {}) as Record<string, string>,
+    };
+  }
+
+  const memberNames = {
+    [uid]: headlineName(meData),
+    [otherUid]: headlineName(otherData),
+  };
+  const now = Date.now();
+  const chat = {
+    members: Object.fromEntries(memberIds.map((id) => [id, true])),
+    memberCount: 2,
+    memberNames,
+    isGroup: false,
+    title: null,
+    dmKey,
+    lastMessage: "",
+    lastMessageAt: now,
+    lastMessageSenderId: null,
+    unreadCounts: Object.fromEntries(memberIds.map((id) => [id, 0])),
+    pinnedBy: {},
+    createdAt: now,
+    createdBy: uid,
+    isDefaultAgentGroup: false,
+    isSupportChat: false,
+    autoJoinRoles: {},
+  };
+
+  const updates: Record<string, unknown> = {
+    [`chats/${dmKey}`]: chat,
+    [`dmIndex/${dmKey}`]: dmKey,
+  };
+  for (const memberId of memberIds) {
+    updates[`userChats/${memberId}/${dmKey}`] = chatInboxRow(
+      dmKey,
+      chat,
+      memberId,
+    );
+  }
+  await rtdb.ref().update(updates);
+  return {
+    chatId: dmKey,
+    createdAt: now,
+    existing: false,
+    memberIds,
+    memberNames,
+  };
+});
 
 export const rebuildChatInbox = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "rebuildChatInbox");
@@ -542,23 +688,6 @@ export const postSupportAiMessage = onCall(callableOpts, async (request) => {
     sharedPost: null,
     isAi: true,
   });
-
-  const unreadCounts: Record<string, number> = {
-    ...(chat.unreadCounts ?? {}),
-  };
-  for (const memberId of Object.keys(chat.members ?? {})) {
-    unreadCounts[memberId] =
-      memberId === SUPPORT_AI_UID ? 0 : (unreadCounts[memberId] ?? 0) + 1;
-  }
-
-  await rtdb.ref().update({
-    [`chats/${chatId}/lastMessage`]: body,
-    [`chats/${chatId}/lastMessageAt`]: now,
-    [`chats/${chatId}/lastMessageSenderId`]: SUPPORT_AI_UID,
-    [`chats/${chatId}/unreadCounts`]: unreadCounts,
-    [`chats/${chatId}/memberNames/${SUPPORT_AI_UID}`]: senderName || "Support",
-    [`userChats/${uid}/${chatId}/lastMessageAt`]: now,
-  });
-
+  // Chat summary + unreadCounts: syncChatMetadataOnMessage (Admin).
   return { id: messageRef.key, createdAt: now };
 });

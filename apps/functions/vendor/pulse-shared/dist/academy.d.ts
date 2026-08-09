@@ -45,6 +45,8 @@ export type Lesson = {
     type: LessonType;
     videoPath: string | null;
     videoUrl: string | null;
+    /** Original upload filename when known (Studio display). */
+    videoFileName: string | null;
     bodyMarkdown: string | null;
     questions: QuizQuestion[];
     passPercent: number;

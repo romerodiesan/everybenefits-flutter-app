@@ -18,6 +18,18 @@ export type CspBuildOptions = {
     includeLottie?: boolean;
     /** GA4 / GTM script+connect+img (consent-gated Analytics). Default true. */
     includeAnalytics?: boolean;
+    /** Google Maps Platform (Place Autocomplete). Default false. */
+    includeMaps?: boolean;
+    /**
+     * Allow `script-src 'unsafe-eval'` (HMR / some emulator tooling).
+     * Default false — production should keep eval off.
+     */
+    allowUnsafeEval?: boolean;
+    /**
+     * When set, emits `script-src 'nonce-…'` instead of `'unsafe-inline'`.
+     * Host apps must stamp the same nonce on every inline script.
+     */
+    scriptNonce?: string;
 };
 /**
  * Builds a single Content-Security-Policy header value.

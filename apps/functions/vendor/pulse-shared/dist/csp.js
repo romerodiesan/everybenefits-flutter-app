@@ -45,6 +45,7 @@ function buildContentSecurityPolicy(options = {}) {
     const includeEmulators = options.includeEmulators ?? false;
     const includeLottie = options.includeLottie ?? true;
     const includeAnalytics = options.includeAnalytics ?? true;
+    const includeMaps = options.includeMaps ?? false;
     const hosts = normalizeEmulatorHosts(options.emulatorHosts);
     // Auth 9099, Firestore 8080, RTDB 9000, Storage 9199, Functions 5001, Emulator UI 4000
     const emulatorConnect = includeEmulators
@@ -74,15 +75,32 @@ function buildContentSecurityPolicy(options = {}) {
     const lottieConnect = includeLottie
         ? join("https://lottie.host", "https://*.lottiefiles.com")
         : "";
-    const scriptSrc = join("script-src", "'self'", "'unsafe-inline'", "'unsafe-eval'", "'wasm-unsafe-eval'", "blob:", 
+    const mapsScript = includeMaps
+        ? join("https://maps.googleapis.com", "https://maps.gstatic.com")
+        : "";
+    const mapsImg = includeMaps
+        ? join("https://maps.gstatic.com", "https://maps.googleapis.com", "data:")
+        : "";
+    const mapsConnect = includeMaps
+        ? join("https://maps.googleapis.com", "https://places.googleapis.com", "https://addressvalidation.googleapis.com")
+        : "";
+    const scriptSrc = join("script-src", "'self'", 
+    // Next.js still injects inline bootstraps; prefer nonces when the host
+    // framework supports them end-to-end (see buildContentSecurityPolicy opts).
+    options.scriptNonce
+        ? `'nonce-${options.scriptNonce}'`
+        : "'unsafe-inline'", 
+    // eval is required by some emulator / HMR tooling; omit in production
+    // unless explicitly re-enabled.
+    options.allowUnsafeEval === true ? "'unsafe-eval'" : null, "'wasm-unsafe-eval'", "blob:", 
     // Google Sign-In / Firebase helpers / reCAPTCHA
-    "https://www.gstatic.com", "https://ssl.gstatic.com", "https://www.google.com", "https://www.recaptcha.net", "https://apis.google.com", "https://accounts.google.com", 
+    "https://www.gstatic.com", "https://ssl.gstatic.com", "https://www.google.com", "https://www.recaptcha.net", "https://apis.google.com", "https://accounts.google.com", mapsScript, 
     // RTDB long-poll JSONP (production + emulator)
     "https://*.firebaseio.com", emulatorRtdbScriptFrame, analyticsScript);
     const styleSrc = join("style-src", "'self'", "'unsafe-inline'", "https://fonts.googleapis.com", "https://www.gstatic.com");
     const imgSrc = join("img-src", "'self'", "data:", "blob:", "https://firebasestorage.googleapis.com", "https://lh3.googleusercontent.com", "https://www.gstatic.com", "https://ssl.gstatic.com", 
     // Auth / reCAPTCHA pixel (cleardot.gif)
-    "https://www.google.com", "https://www.recaptcha.net", emulatorStorageMedia, analyticsImg);
+    "https://www.google.com", "https://www.recaptcha.net", mapsImg, emulatorStorageMedia, analyticsImg);
     const fontSrc = join("font-src", "'self'", "data:", "https://fonts.gstatic.com", "https://www.gstatic.com");
     const mediaSrc = join("media-src", "'self'", "blob:", "https://firebasestorage.googleapis.com", emulatorStorageMedia);
     // FCM messaging SW importScripts from gstatic.
@@ -92,7 +110,7 @@ function buildContentSecurityPolicy(options = {}) {
     "https://*.firebaseio.com", emulatorRtdbScriptFrame, emulatorAuthFrame);
     const childSrc = join("child-src", "'self'", "blob:", frameExtras);
     const frameSrc = join("frame-src", "'self'", frameExtras);
-    const connectSrc = join("connect-src", "'self'", "https://*.googleapis.com", "https://*.firebaseio.com", "wss://*.firebaseio.com", "https://*.cloudfunctions.net", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://firebaseinstallations.googleapis.com", "https://content-firebaseappcheck.googleapis.com", "https://www.google.com", "https://accounts.google.com", "https://apis.google.com", "https://www.recaptcha.net", analyticsConnect, lottieConnect, emulatorConnect);
+    const connectSrc = join("connect-src", "'self'", "https://*.googleapis.com", "https://*.firebaseio.com", "wss://*.firebaseio.com", "https://*.cloudfunctions.net", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://firebaseinstallations.googleapis.com", "https://content-firebaseappcheck.googleapis.com", "https://www.google.com", "https://accounts.google.com", "https://apis.google.com", "https://www.recaptcha.net", analyticsConnect, lottieConnect, mapsConnect, emulatorConnect);
     return [
         "default-src 'self'",
         "base-uri 'self'",

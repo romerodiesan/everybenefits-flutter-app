@@ -15,6 +15,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 __exportStar(require("./roles"), exports);
+__exportStar(require("./apps"), exports);
 __exportStar(require("./academy"), exports);
 __exportStar(require("./csp"), exports);
 __exportStar(require("./profile"), exports);

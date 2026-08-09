@@ -1,10 +1,9 @@
-import * as admin from "firebase-admin";
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type DocumentData } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { db } from "./init";
 import { MAX_FUNCTION_CALLS_PER_MINUTE } from "./constants";
 
-export function headlineName(data: admin.firestore.DocumentData | undefined): string {
+export function headlineName(data: DocumentData | undefined): string {
   const display =
     typeof data?.displayName === "string" ? data.displayName.trim() : "";
   if (display) return display;
@@ -61,7 +60,7 @@ export async function requireCaller(
   return uid;
 }
 
-export function isUserApprovedForJoin(data: admin.firestore.DocumentData | undefined) {
+export function isUserApprovedForJoin(data: DocumentData | undefined) {
   if (!data || data.isAnonymous === true) return false;
   const status = String(data.approvalStatus ?? "approved");
   return status === "approved";

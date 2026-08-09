@@ -1,19 +1,36 @@
-import * as admin from "firebase-admin";
+import { getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
+import { getDatabase } from "firebase-admin/database";
+import { getFirestore } from "firebase-admin/firestore";
+import { getMessaging } from "firebase-admin/messaging";
+import { getStorage } from "firebase-admin/storage";
 import { setGlobalOptions } from "firebase-functions/v2";
 
-admin.initializeApp({
-  databaseURL:
-    process.env.FIREBASE_DATABASE_URL ||
-    "https://every-insurance-default-rtdb.firebaseio.com",
-});
+function resolveDatabaseUrl(): string | undefined {
+  const fromEnv = process.env.FIREBASE_DATABASE_URL?.trim();
+  if (fromEnv) return fromEnv;
+  const project =
+    process.env.GCLOUD_PROJECT?.trim() ||
+    process.env.GOOGLE_CLOUD_PROJECT?.trim();
+  if (!project) return undefined;
+  // Emulator + local Admin SDK need an explicit URL; the host redirect comes
+  // from FIREBASE_DATABASE_EMULATOR_HOST set by the emulator suite.
+  return `https://${project}-default-rtdb.firebaseio.com`;
+}
+
+if (getApps().length === 0) {
+  initializeApp({
+    databaseURL: resolveDatabaseUrl(),
+  });
+}
 setGlobalOptions({ region: "us-central1", maxInstances: 20 });
 
 /** Gen2 callables need explicit CORS for browser (e.g. localhost webapp). */
 const usingFunctionsEmulator = process.env.FUNCTIONS_EMULATOR === "true";
-/** Opt-in: set FUNCTIONS_ENFORCE_APP_CHECK=true once Pulse/Studio site keys are live. */
+/** Opt-out: set FUNCTIONS_ENFORCE_APP_CHECK=false only for emergency. Prod defaults on. */
 const enforceAppCheck =
   !usingFunctionsEmulator &&
-  process.env.FUNCTIONS_ENFORCE_APP_CHECK === "true";
+  process.env.FUNCTIONS_ENFORCE_APP_CHECK !== "false";
 
 export const callableOpts = {
   // Emulator Gen2 often drops Access-Control headers on preflight when cors is
@@ -40,14 +57,28 @@ export const callableOpts = {
           .map((origin) => origin.trim())
           .filter(Boolean),
       ],
-  // Emulator clients skip App Check. Production stays off until site keys are
-  // configured on pulse.everybenefits.us / studio.everybenefits.us / admin.everybenefits.us, then set
-  // FUNCTIONS_ENFORCE_APP_CHECK=true.
+  // Emulator clients skip App Check. Production enforces unless
+  // FUNCTIONS_ENFORCE_APP_CHECK=false (emergency only).
   enforceAppCheck,
   // Auth is enforced inside the handler; Cloud Run must allow the OPTIONS preflight.
   invoker: "public" as const,
 };
 
-export const db = admin.firestore();
-export const rtdb = admin.database();
-export { admin };
+export const db = getFirestore();
+export const rtdb = getDatabase();
+
+/**
+ * Compatibility facade for call sites that used `import * as admin from "firebase-admin"`.
+ * Prefer modular `getAuth()` / `getMessaging()` in new code.
+ */
+export const admin = {
+  auth: getAuth,
+  messaging: getMessaging,
+  storage: getStorage,
+  firestore: Object.assign(getFirestore, {
+    // Namespace-style access used as `admin.firestore.DocumentData` in older files
+    // is replaced by modular DocumentData imports; keep runtime shape only.
+  }),
+  database: getDatabase,
+  apps: getApps(),
+};
