@@ -130,16 +130,19 @@ function tooltipPlacement(rect: Rect): {
 
 export function ProductTour({
   profile,
+  profileReady = true,
   pulseAiEnabled,
   onCompleted,
 }: {
   profile: UserProfile;
+  /** False while Firestore profile is still hydrating — keep tour closed. */
+  profileReady?: boolean;
   pulseAiEnabled: boolean;
   onCompleted?: (next: UserProfile) => void;
 }) {
   const t = useTranslations();
   const titleId = useId();
-  const [open, setOpen] = useState(() => shouldShowProductTour(profile));
+  const [open, setOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
@@ -161,8 +164,12 @@ export function ProductTour({
   );
 
   useEffect(() => {
+    if (!profileReady) {
+      setOpen(false);
+      return;
+    }
     setOpen(shouldShowProductTour(profile));
-  }, [profile]);
+  }, [profile, profileReady]);
 
   useEffect(() => {
     if (step >= steps.length) setStep(Math.max(0, steps.length - 1));

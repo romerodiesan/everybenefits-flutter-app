@@ -19,6 +19,7 @@ import {
 import { useAuth } from "@/lib/providers/auth-provider";
 import { updateUserProfile } from "@/lib/firebase/users";
 import { Skeleton } from "@/components/ui/skeleton";
+import { LegalLinks } from "@/components/chrome/legal-links";
 
 const DIRECTORY_ROWS = [
   ["discoverableInDirectory", "privacyDiscoverable", "privacyDiscoverableHint"],
@@ -217,6 +218,13 @@ export function PrivacyPanel() {
               />
             </SettingsRow>
           </SettingsAccordion>
+
+          <div className="rounded-2xl border border-glass-border/80 bg-ink/[0.015] px-4 py-3.5 dark:bg-white/[0.02]">
+            <p className="text-[11px] leading-relaxed text-muted">
+              {t("legalPoliciesHint")}
+            </p>
+            <LegalLinks className="mt-2.5" />
+          </div>
         </div>
       )}
     </SettingsPanelShell>

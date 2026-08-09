@@ -1,22 +1,40 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { MotionConfig } from "motion/react";
 import { LandingHero } from "@/components/landing/hero";
-import { LandingMarquee } from "@/components/landing/marquee";
-import { LandingManifesto } from "@/components/landing/manifesto";
-import { LandingProductStory } from "@/components/landing/product-story";
-import { LandingSurfaces } from "@/components/landing/surfaces";
-import { LandingCtaFooter } from "@/components/landing/cta-footer";
+
+const LandingTuneChapters = dynamic(
+  () =>
+    import("@/components/landing/tune-chapters").then(
+      (m) => m.LandingTuneChapters,
+    ),
+  { ssr: false },
+);
+const LandingManifesto = dynamic(
+  () =>
+    import("@/components/landing/manifesto").then((m) => m.LandingManifesto),
+  { ssr: false },
+);
+const LandingTopicOrbit = dynamic(
+  () =>
+    import("@/components/landing/topic-orbit").then((m) => m.LandingTopicOrbit),
+  { ssr: false },
+);
+const LandingCtaFooter = dynamic(
+  () =>
+    import("@/components/landing/cta-footer").then((m) => m.LandingCtaFooter),
+  { ssr: false },
+);
 
 export function LandingPage() {
   return (
     <MotionConfig reducedMotion="user">
       <main>
         <LandingHero />
-        <LandingMarquee />
+        <LandingTuneChapters />
         <LandingManifesto />
-        <LandingProductStory />
-        <LandingSurfaces />
+        <LandingTopicOrbit />
         <LandingCtaFooter />
       </main>
     </MotionConfig>

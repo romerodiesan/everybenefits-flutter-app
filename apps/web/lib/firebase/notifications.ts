@@ -323,15 +323,6 @@ export async function countNewFeedThreads(
   }
 }
 
-export async function loadNotificationState(
-  uid: string,
-): Promise<NotificationState> {
-  const snap = await getDoc(
-    doc(getFirebaseDb(), "users", uid, "notificationState", "default"),
-  );
-  return stateFrom(snap.data() as Record<string, unknown> | undefined);
-}
-
 let messaging: Messaging | null = null;
 
 async function getWebMessaging(): Promise<Messaging | null> {
@@ -340,6 +331,8 @@ async function getWebMessaging(): Promise<Messaging | null> {
   if (!messaging) messaging = getMessaging(getFirebaseApp());
   return messaging;
 }
+
+const WEB_PUSH_TOKEN_KEY = "pulse_web_fcm_token";
 
 export async function registerWebPushToken(
   uid: string,
@@ -366,6 +359,11 @@ export async function registerWebPushToken(
     },
     { merge: true },
   );
+  try {
+    sessionStorage.setItem(WEB_PUSH_TOKEN_KEY, token);
+  } catch {
+    // ignore quota / private mode
+  }
   return token;
 }
 
@@ -375,6 +373,23 @@ export async function clearWebPushToken(uid: string, token: string | null) {
   await deleteDoc(
     doc(getFirebaseDb(), "users", uid, "fcmTokens", id),
   ).catch(() => undefined);
+}
+
+/** Clear the last registered web push token for this browser session. */
+export async function clearStoredWebPushToken(uid: string) {
+  if (!uid || typeof window === "undefined") return;
+  let token: string | null = null;
+  try {
+    token = sessionStorage.getItem(WEB_PUSH_TOKEN_KEY);
+  } catch {
+    token = null;
+  }
+  await clearWebPushToken(uid, token);
+  try {
+    sessionStorage.removeItem(WEB_PUSH_TOKEN_KEY);
+  } catch {
+    // ignore
+  }
 }
 
 export async function listenForegroundMessages(

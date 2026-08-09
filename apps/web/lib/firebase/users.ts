@@ -18,7 +18,9 @@ import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
 import { listPublicProfiles, searchDirectory as searchDirectoryFn } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
-import { composeUsAddress, headlineName, parseApprovalStatus } from "../roles";
+import { headlineName } from "../display-name";
+import { composeUsAddress } from "../us-address";
+import { parseApprovalStatus } from "../roles";
 import { readPrivacyPrefs } from "../privacy/prefs";
 
 export function profileFromData(
@@ -135,42 +137,69 @@ export function watchProfile(
   );
 }
 
+const EDITABLE_PROFILE_KEYS = [
+  "displayName",
+  "photoUrl",
+  "profileCompleted",
+  "productTourVersion",
+  "phoneCountryCode",
+  "phoneNumber",
+  "phoneVerified",
+  "npn",
+  "addressStreet",
+  "addressApt",
+  "addressCity",
+  "addressState",
+  "addressZip",
+  "agency",
+  "privacy",
+  "role",
+] as const satisfies readonly (keyof UserProfile)[];
+
+type EditableProfileKey = (typeof EDITABLE_PROFILE_KEYS)[number];
+
+const ADDRESS_PATCH_KEYS = [
+  "addressStreet",
+  "addressApt",
+  "addressCity",
+  "addressState",
+  "addressZip",
+] as const satisfies readonly EditableProfileKey[];
+
 export async function updateUserProfile(
   profile: UserProfile,
   patch: Partial<UserProfile>,
 ): Promise<void> {
-  const next = { ...profile, ...patch };
-  const address =
-    composeUsAddress({
-      street: next.addressStreet,
-      apt: next.addressApt,
-      city: next.addressCity,
-      state: next.addressState,
-      zip: next.addressZip,
-    }) ?? next.address;
-
-  await updateDoc(doc(getFirebaseDb(), "users", profile.uid), {
-    email: next.email,
-    displayName: next.displayName,
-    photoUrl: next.photoUrl,
-    role: next.role,
-    isAnonymous: next.isAnonymous,
-    profileCompleted: next.profileCompleted,
-    productTourVersion: Number(next.productTourVersion ?? 0),
-    phoneCountryCode: next.phoneCountryCode,
-    phoneNumber: next.phoneNumber,
-    phoneVerified: Boolean(next.phoneVerified),
-    npn: next.npn,
-    address,
-    addressStreet: next.addressStreet,
-    addressApt: next.addressApt,
-    addressCity: next.addressCity,
-    addressState: next.addressState,
-    addressZip: next.addressZip,
-    agency: next.agency,
-    ...(patch.privacy ? { privacy: next.privacy } : {}),
+  const data: Record<string, unknown> = {
     updatedAt: serverTimestamp(),
-  });
+  };
+
+  for (const key of EDITABLE_PROFILE_KEYS) {
+    if (!(key in patch)) continue;
+    const value = patch[key];
+    if (key === "productTourVersion") {
+      data[key] = Number(value ?? 0);
+    } else if (key === "phoneVerified") {
+      data[key] = Boolean(value);
+    } else {
+      data[key] = value;
+    }
+  }
+
+  const addressTouched = ADDRESS_PATCH_KEYS.some((key) => key in patch);
+  if (addressTouched) {
+    const next = { ...profile, ...patch };
+    data.address =
+      composeUsAddress({
+        street: next.addressStreet,
+        apt: next.addressApt,
+        city: next.addressCity,
+        state: next.addressState,
+        zip: next.addressZip,
+      }) ?? next.address;
+  }
+
+  await updateDoc(doc(getFirebaseDb(), "users", profile.uid), data);
 
   // Keep Firebase Auth in sync for fields that also live on the Auth user.
   if ("displayName" in patch || "photoUrl" in patch) {
@@ -178,9 +207,9 @@ export async function updateUserProfile(
     if (authUser && authUser.uid === profile.uid) {
       await updateProfile(authUser, {
         ...("displayName" in patch
-          ? { displayName: next.displayName?.trim() || null }
+          ? { displayName: patch.displayName?.trim() || null }
           : {}),
-        ...("photoUrl" in patch ? { photoURL: next.photoUrl || null } : {}),
+        ...("photoUrl" in patch ? { photoURL: patch.photoUrl || null } : {}),
       });
     }
   }

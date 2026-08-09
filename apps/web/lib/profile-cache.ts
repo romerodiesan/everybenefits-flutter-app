@@ -1,10 +1,19 @@
-import type { UserProfile, AccountStatus, UserRole } from "@/lib/types";
-import { needsProfileCompletion } from "@/lib/roles";
+import type {
+  UserProfile,
+  AccountStatus,
+  ApprovalStatus,
+  UserRole,
+} from "@/lib/types";
+import { needsProfileCompletion, parseApprovalStatus } from "@/lib/roles";
 
-/** v3 drops PII from sessionStorage; stores needsCompletion so slim revive
- * cannot false-trigger licensed-role field checks on reload. */
-const CACHE_KEY = "pulse_profile_v3";
-const LEGACY_CACHE_KEYS = ["pulse_profile_v2", "pulse_profile_v1"];
+/** v5 keeps productTourVersion so the tour gate does not flash on refresh. */
+const CACHE_KEY = "pulse_profile_v5";
+const LEGACY_CACHE_KEYS = [
+  "pulse_profile_v4",
+  "pulse_profile_v3",
+  "pulse_profile_v2",
+  "pulse_profile_v1",
+];
 
 type CachedProfile = {
   uid: string;
@@ -18,6 +27,8 @@ type CachedProfile = {
   needsCompletion: boolean;
   agency: string | null;
   accountStatus?: AccountStatus;
+  approvalStatus?: ApprovalStatus;
+  productTourVersion?: number;
 };
 
 function toCached(profile: UserProfile): CachedProfile {
@@ -32,6 +43,8 @@ function toCached(profile: UserProfile): CachedProfile {
     needsCompletion: needsProfileCompletion(profile),
     agency: profile.agency,
     accountStatus: profile.accountStatus,
+    approvalStatus: parseApprovalStatus(profile.approvalStatus) ?? undefined,
+    productTourVersion: profile.productTourVersion ?? 0,
   };
 }
 
@@ -60,8 +73,36 @@ function revive(cached: CachedProfile): UserProfile {
     createdAt: null,
     updatedAt: null,
     accountStatus: cached.accountStatus,
+    approvalStatus: parseApprovalStatus(cached.approvalStatus) ?? undefined,
     deletionScheduledAt: null,
+    productTourVersion: cached.productTourVersion ?? 0,
   };
+}
+
+/** True when session cache is safe to paint the shell without waiting on Firestore. */
+export function isTrustedShellCacheEntry(cached: CachedProfile): boolean {
+  if (cached.isAnonymous || cached.needsCompletion === true) return false;
+  const approval = parseApprovalStatus(cached.approvalStatus);
+  if (approval === "pending") return false;
+  return true;
+}
+
+export function hasTrustedShellCache(uid: string): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return false;
+    const parsed = JSON.parse(raw) as CachedProfile;
+    if (parsed.uid !== uid || !isUserRole(parsed.role)) return false;
+    return isTrustedShellCacheEntry(parsed);
+  } catch {
+    return false;
+  }
+}
+
+export function isTrustedShellCache(profile: UserProfile | null): boolean {
+  if (!profile) return false;
+  return hasTrustedShellCache(profile.uid);
 }
 
 function clearLegacyCaches() {

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { useTranslations } from "next-intl";
 import { FORUM_TAGS } from "@/lib/types";
-import { normalizeForumTags } from "@/lib/roles";
+import { normalizeForumTags } from "@/lib/forum-tags";
 
 /** Quiet single-tag filter for the feed header. */
 export function TagFilterSelect({

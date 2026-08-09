@@ -2,15 +2,17 @@
 
 import { FormEvent, startTransition, useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { Button, Input, Label, Panel } from "@/components/ui/primitives";
 import { ProfileFormSkeleton } from "@/components/ui/skeleton";
+import { UsAddressFields } from "@/components/address/us-address-fields";
+import { AgencySelect } from "@/components/auth/agency-select";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { updateUserProfile } from "@/lib/firebase/users";
-import { ensureDefaultAgentGroup } from "@/lib/firebase/ensure-default-group";
-import { DEFAULT_AGENCY, type UserRole } from "@/lib/types";
+import { validateUsAddress } from "@/lib/firebase/address";
+import { type UserRole } from "@/lib/types";
 import {
-  belongsInDefaultAgentGroup,
   needsProfileCompletion,
   normalizePersonName,
   requiresLicenseProfile,
@@ -19,15 +21,17 @@ import {
   validateUsState,
   validateUsZip,
 } from "@/lib/roles";
+import { postLoginPath, readLoginNext } from "@/lib/auth-redirect";
 
 export function CompleteProfileForm() {
   const t = useTranslations();
   const router = useRouter();
-  const { user, profile, loading, refreshProfile } = useAuth();
+  const params = useSearchParams();
+  const { user, profile, loading, profileLoading, refreshProfile } = useAuth();
   const [role, setRole] = useState<"student" | "agent">("student");
   const [displayName, setDisplayName] = useState("");
   const [npn, setNpn] = useState("");
-  const [agency, setAgency] = useState(DEFAULT_AGENCY);
+  const [agency, setAgency] = useState("");
   const [street, setStreet] = useState("");
   const [apt, setApt] = useState("");
   const [city, setCity] = useState("");
@@ -35,6 +39,12 @@ export function CompleteProfileForm() {
   const [zip, setZip] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const nextParam = readLoginNext(params.get("next"));
+  const afterAuth = postLoginPath(nextParam);
+  const nextQuery = nextParam
+    ? `?next=${encodeURIComponent(nextParam)}`
+    : "";
 
   const lockedRole =
     profile &&
@@ -48,18 +58,18 @@ export function CompleteProfileForm() {
   const canPickRole = !lockedRole && profile?.role !== "agent";
 
   useEffect(() => {
-    if (loading) return;
+    if (loading || profileLoading) return;
     if (!user) {
-      router.replace("/login");
+      router.replace(`/login${nextQuery}`);
       return;
     }
     if (!profile) return;
     if (profile.isAnonymous) {
-      router.replace("/home");
+      router.replace(afterAuth);
       return;
     }
     if (!needsProfileCompletion(profile)) {
-      router.replace("/home");
+      router.replace(afterAuth);
       return;
     }
     startTransition(() => {
@@ -75,7 +85,7 @@ export function CompleteProfileForm() {
       if (profile.addressState) setState(profile.addressState);
       if (profile.addressZip) setZip(profile.addressZip);
     });
-  }, [loading, user, profile, router]);
+  }, [loading, profileLoading, user, profile, router, afterAuth, nextQuery]);
 
   function nameErrorMessage(issue: string) {
     if (issue === "email_as_name") return t("validationNameEmail");
@@ -102,13 +112,15 @@ export function CompleteProfileForm() {
       let nextCity: string | null = null;
       let nextState: string | null = null;
       let nextZip: string | null = null;
-      let nextAgency = DEFAULT_AGENCY;
+      let nextAgency: string | null = null;
 
       if (needsLicense) {
         const npnResult = validateNpn(npn);
         if (!npnResult.ok) {
           setError(
-            npnResult.issue === "empty" ? t("validationNpn") : t("validationNpnLength"),
+            npnResult.issue === "empty"
+              ? t("validationNpn")
+              : t("validationNpnLength"),
           );
           return;
         }
@@ -118,9 +130,40 @@ export function CompleteProfileForm() {
         nextCity = city.trim();
         nextState = validateUsState(state);
         nextZip = validateUsZip(zip);
-        nextAgency = agency.trim() || DEFAULT_AGENCY;
+        nextAgency = agency.trim();
+        if (!nextAgency) {
+          setError(t("validationAgency"));
+          return;
+        }
         if (!nextStreet || !nextCity || !nextState || !nextZip) {
           setError(t("validationAddress"));
+          return;
+        }
+
+        const validated = await validateUsAddress({
+          street: nextStreet,
+          city: nextCity,
+          state: nextState,
+          zip: nextZip,
+          apt: nextApt,
+        });
+        if (!validated.ok && validated.verdict === "fix") {
+          setError(validated.message ?? t("validationAddressInvalid"));
+          return;
+        }
+        if (validated.normalized && !validated.skipped) {
+          nextStreet = validated.normalized.street;
+          nextCity = validated.normalized.city;
+          nextState = validated.normalized.state;
+          nextZip = validateUsZip(validated.normalized.zip) ?? nextZip;
+          setStreet(nextStreet);
+          setCity(nextCity);
+          setState(nextState);
+          setZip(nextZip);
+        }
+        if (!validated.ok && validated.verdict === "confirm") {
+          // Suggested correction applied above — ask user to review and save again.
+          setError(t("validationAddressConfirm"));
           return;
         }
       }
@@ -138,11 +181,8 @@ export function CompleteProfileForm() {
         addressState: nextState,
         addressZip: nextZip,
       });
-      if (belongsInDefaultAgentGroup(nextRole)) {
-        await ensureDefaultAgentGroup().catch(() => undefined);
-      }
       await refreshProfile();
-      router.replace("/home");
+      router.replace(afterAuth);
     } catch {
       setError(t("errorGeneric"));
     } finally {
@@ -150,7 +190,7 @@ export function CompleteProfileForm() {
     }
   }
 
-  if (loading || !profile) {
+  if (loading || profileLoading || !profile) {
     return (
       <div className="mesh-bg flex min-h-[100svh] items-center justify-center px-4 py-10">
         <Panel className="w-full max-w-lg">
@@ -175,9 +215,7 @@ export function CompleteProfileForm() {
             <Input
               value={displayName}
               onChange={(e) => setDisplayName(e.target.value)}
-              onBlur={() =>
-                setDisplayName((v) => normalizePersonName(v))
-              }
+              onBlur={() => setDisplayName((v) => normalizePersonName(v))}
               placeholder={t("displayNamePlaceholder")}
               required
             />
@@ -231,54 +269,23 @@ export function CompleteProfileForm() {
               </div>
               <div>
                 <Label>{t("agency")}</Label>
-                <Input
+                <AgencySelect
                   value={agency}
-                  onChange={(e) => setAgency(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label>{t("addressStreet")}</Label>
-                <Input
-                  value={street}
-                  onChange={(e) => setStreet(e.target.value)}
+                  onChange={(next) => setAgency(next.agency)}
                   required
                 />
               </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>{t("addressApt")}</Label>
-                  <Input value={apt} onChange={(e) => setApt(e.target.value)} />
-                </div>
-                <div>
-                  <Label>{t("addressCity")}</Label>
-                  <Input
-                    value={city}
-                    onChange={(e) => setCity(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>{t("addressState")}</Label>
-                  <Input
-                    value={state}
-                    onChange={(e) =>
-                      setState(e.target.value.toUpperCase().slice(0, 2))
-                    }
-                    maxLength={2}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label>{t("addressZip")}</Label>
-                  <Input
-                    value={zip}
-                    onChange={(e) => setZip(e.target.value)}
-                    required
-                  />
-                </div>
-              </div>
+              <UsAddressFields
+                value={{ street, apt, city, state, zip }}
+                onChange={(next) => {
+                  setStreet(next.street);
+                  setApt(next.apt);
+                  setCity(next.city);
+                  setState(next.state);
+                  setZip(next.zip);
+                }}
+                required
+              />
             </div>
           )}
 

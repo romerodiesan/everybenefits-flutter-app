@@ -2,7 +2,7 @@
 
 import { useLocale, useTranslations } from "next-intl";
 import { motion } from "motion/react";
-import { signOutEverywhere } from "@/lib/firebase/auth";
+import { signOutAndRedirect } from "@/lib/firebase/auth";
 import { Button } from "@/components/ui/primitives";
 import { useSafeReducedMotion } from "@/lib/use-safe-reduced-motion";
 
@@ -50,7 +50,7 @@ export function PendingApprovalGate() {
             variant="secondary"
             className="w-full"
             onClick={() =>
-              void signOutEverywhere({
+              void signOutAndRedirect({
                 current: "pulse",
                 locale,
                 returnPath: "/login",

@@ -1,5 +1,9 @@
-import { AppShell } from "@/components/chrome/app-shell";
+import { AuthenticatedTree } from "@/components/chrome/authenticated-tree";
 import { EnrollmentsProvider } from "@/lib/providers/enrollments-provider";
+import { InboxProvider } from "@/lib/providers/inbox-provider";
+import { AppShell } from "@/components/chrome/app-shell";
+import { MfaAdminGate } from "@/components/chrome/mfa-admin-gate";
+import { ConsentBanner } from "@/components/chrome/consent-banner";
 
 export default function AuthenticatedLayout({
   children,
@@ -7,8 +11,15 @@ export default function AuthenticatedLayout({
   children: React.ReactNode;
 }) {
   return (
-    <EnrollmentsProvider>
-      <AppShell>{children}</AppShell>
-    </EnrollmentsProvider>
+    <AuthenticatedTree>
+      <InboxProvider>
+        <EnrollmentsProvider>
+          <MfaAdminGate>
+            <AppShell>{children}</AppShell>
+            <ConsentBanner />
+          </MfaAdminGate>
+        </EnrollmentsProvider>
+      </InboxProvider>
+    </AuthenticatedTree>
   );
 }

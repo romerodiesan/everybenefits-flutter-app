@@ -11,8 +11,7 @@ import {
   limitToLast,
   type Unsubscribe,
 } from "firebase/database";
-import { doc, getDoc } from "firebase/firestore";
-import { getFirebaseDb, getFirebaseRtdb } from "./client";
+import { getFirebaseRtdb } from "./client";
 import { callCloudFunction } from "./call-function";
 import type {
   ChatConversation,
@@ -22,10 +21,10 @@ import type {
   UserRole,
 } from "../types";
 import { AGENTS_DEFAULT_ID, SUPPORT_AI_UID } from "../types";
+import { dmKeyFor, supportChatIdFor } from "../chat-ids";
+import { headlineName } from "../display-name";
 import {
-  dmKeyFor,
-  headlineName,
-  supportChatIdFor,
+  parseRole,
   canCreateChatGroups,
   canAccessSupport,
 } from "../roles";
@@ -110,9 +109,9 @@ export function chatFrom(id: string, data: Record<string, unknown>): ChatConvers
   const isDefaultAgentGroup =
     Boolean(data.isDefaultAgentGroup) || id === AGENTS_DEFAULT_ID;
   const autoJoinRaw = asMap(data.autoJoinRoles);
-  const autoJoinRoles = Object.keys(autoJoinRaw).filter(
-    (role) => autoJoinRaw[role] === true,
-  ) as ChatConversation["autoJoinRoles"];
+  const autoJoinRoles = Object.keys(autoJoinRaw)
+    .filter((role) => autoJoinRaw[role] === true)
+    .map((role) => parseRole(role));
   return {
     id,
     memberIds: Object.keys(members).sort(),
@@ -346,6 +345,9 @@ async function createChat(chat: ChatConversation): Promise<ChatConversation> {
 
 export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
   if (me.uid === other.uid) throw new Error("Cannot chat with yourself");
+  if (me.isAnonymous || other.isAnonymous) {
+    throw new Error("Anonymous users cannot DM");
+  }
 
   const key = dmKeyFor(me.uid, other.uid);
   const db = getFirebaseRtdb();
@@ -355,56 +357,41 @@ export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
     "Chat lookup timed out",
   );
   if (byId.exists()) return chatFrom(key, asMap(byId.val()));
-  const index = await raceTimeout(
-    get(ref(db, `dmIndex/${key}`)),
-    8_000,
-    "Chat lookup timed out",
-  );
-  if (index.exists()) {
-    const id = String(index.val());
-    const snap = await raceTimeout(
-      get(ref(db, `chats/${id}`)),
-      8_000,
-      "Chat lookup timed out",
-    );
-    if (snap.exists()) return chatFrom(id, asMap(snap.val()));
-  }
 
-  // New conversations only — honor the recipient's DM preference.
-  const publicSnap = await getDoc(
-    doc(getFirebaseDb(), "publicProfiles", other.uid),
-  );
-  if (publicSnap.exists()) {
-    const allow = publicSnap.data()?.allowDirectMessages;
-    if (allow === false) {
-      throw new Error("direct-messages-disabled");
-    }
-  } else if (other.privacy?.allowDirectMessages === false) {
-    throw new Error("direct-messages-disabled");
-  }
+  const result = await callCloudFunction<{
+    chatId?: string;
+    createdAt?: number;
+    existing?: boolean;
+    memberIds?: string[];
+    memberNames?: Record<string, string>;
+  }>("createDm", { otherUid: other.uid }, { timeoutMs: 45_000 });
 
-  const now = Date.now();
-  return createChat({
-    id: key,
-    memberIds: [me.uid, other.uid].sort(),
-    memberNames: {
-      [me.uid]: headlineName(me),
-      [other.uid]: headlineName(other),
-    },
+  const chatId = String(result?.chatId ?? key).trim() || key;
+  const createdAt = Number(result?.createdAt ?? Date.now());
+  const memberIds = (result?.memberIds ?? [me.uid, other.uid]).map(String);
+  const memberNames = result?.memberNames ?? {
+    [me.uid]: headlineName(me),
+    [other.uid]: headlineName(other),
+  };
+
+  return {
+    id: chatId,
+    memberIds: [...memberIds].sort(),
+    memberNames,
     isGroup: false,
     title: null,
     dmKey: key,
     lastMessage: "",
-    lastMessageAt: now,
+    lastMessageAt: createdAt,
     lastMessageSenderId: null,
-    unreadCounts: { [me.uid]: 0, [other.uid]: 0 },
+    unreadCounts: Object.fromEntries(memberIds.map((id) => [id, 0])),
     pinnedBy: {},
-    createdAt: now,
+    createdAt,
     createdBy: me.uid,
     isDefaultAgentGroup: false,
     isSupportChat: false,
     autoJoinRoles: [],
-  });
+  } satisfies ChatConversation;
 }
 
 export async function createGroupChat(input: {
@@ -451,9 +438,9 @@ export async function createGroupChat(input: {
   const chatId = String(result?.chatId ?? "").trim();
   if (!chatId) throw new Error("Group creation failed");
   const createdAt = Number(result?.createdAt ?? Date.now());
-  const autoJoinRoles = (result?.autoJoinRoles ?? []).map(
-    String,
-  ) as UserRole[];
+  const autoJoinRoles = (result?.autoJoinRoles ?? []).map((role) =>
+    parseRole(role),
+  );
   // Do not await an RTDB read here — a stuck client connection hangs the UI
   // forever even after the callable succeeds. Reconstruct from the request.
   const chat: ChatConversation & { truncated?: boolean } = {
@@ -572,11 +559,16 @@ export async function sendMessage(input: {
     throw new Error("Not a chat member");
   }
   const now = Date.now();
+  const preview = input.sharedPost
+    ? `Question: ${input.sharedPost.title}`
+    : text;
+  // RTDB rules require non-empty body; shared-post-only uses the preview.
+  const bodyForStore = text || preview;
   const msgRef = push(ref(db, `messages/${input.chatId}`));
   const message: ChatMessage = {
     id: msgRef.key!,
     chatId: input.chatId,
-    body: text,
+    body: bodyForStore,
     senderId: input.author.uid,
     senderName: headlineName(input.author),
     createdAt: now,
@@ -596,22 +588,7 @@ export async function sendMessage(input: {
     12_000,
     "Send timed out",
   );
-
-  const nextUnread = { ...chat.unreadCounts };
-  for (const memberId of chat.memberIds) {
-    nextUnread[memberId] =
-      memberId === input.author.uid ? 0 : (nextUnread[memberId] ?? 0) + 1;
-  }
-  const preview = input.sharedPost
-    ? `Question: ${input.sharedPost.title}`
-    : text;
-  const updates: Record<string, unknown> = {
-    [`chats/${input.chatId}/lastMessage`]: preview,
-    [`chats/${input.chatId}/lastMessageAt`]: now,
-    [`chats/${input.chatId}/lastMessageSenderId`]: input.author.uid,
-    [`chats/${input.chatId}/unreadCounts`]: nextUnread,
-  };
-  await raceTimeout(update(ref(db), updates), 12_000, "Send timed out");
+  // lastMessage / unreadCounts are applied server-side by syncChatMetadataOnMessage.
   return message;
 }
 

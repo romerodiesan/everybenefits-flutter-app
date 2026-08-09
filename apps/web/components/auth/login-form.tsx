@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useEffect, useEffectEvent, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { Link, useRouter } from "@/i18n/navigation";
@@ -20,16 +20,20 @@ import {
 import { isMultiFactorError, resolverFromError } from "@/lib/firebase/mfa";
 import { MfaChallengeForm } from "@/components/auth/mfa-challenge-form";
 import { useAuth } from "@/lib/providers/auth-provider";
-import { needsProfileCompletion } from "@/lib/roles";
 import type { MultiFactorResolver } from "firebase/auth";
 import { BrandMark } from "@/components/chrome/brand-mark";
+import {
+  nextQuery,
+  readLoginNext,
+  resolvePostAuthDestination,
+} from "@/lib/auth-redirect";
 
 export function LoginForm() {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
   const params = useSearchParams();
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -39,7 +43,19 @@ export function LoginForm() {
     null,
   );
 
-  const nextParam = params.get("next");
+  const nextParam = readLoginNext(params.get("next"));
+  const q = nextQuery(nextParam);
+
+  const routeAfterAuth = useEffectEvent(() => {
+    if (!user) return;
+    const dest = resolvePostAuthDestination({
+      user,
+      profile,
+      next: nextParam,
+      hasPassword: hasPasswordProvider(user),
+    });
+    router.replace(dest.path);
+  });
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -48,27 +64,19 @@ export function LoginForm() {
       window.location.href.includes("oobCode=")
     ) {
       completeMagicLink(window.location.href)
-        .then(() => router.replace("/home"))
-        .catch(() => undefined);
+        .then(() => {
+          // Effect below routes once profile/gates settle.
+        })
+        .catch(() => {
+          setError(t("errorAuth"));
+        });
     }
-  }, [router]);
+  }, [t]);
 
   useEffect(() => {
-    if (loading || !user || mfaResolver) return;
-    if (nextParam?.startsWith("/")) {
-      window.location.assign(`/${locale}${nextParam}`);
-      return;
-    }
-    if (!user.isAnonymous && !hasPasswordProvider() && user.email) {
-      router.replace("/set-password");
-      return;
-    }
-    if (profile && needsProfileCompletion(profile) && !profile.isAnonymous) {
-      router.replace("/complete-profile");
-      return;
-    }
-    router.replace("/home");
-  }, [loading, user, profile, router, nextParam, locale, mfaResolver]);
+    if (loading || profileLoading || !user || mfaResolver) return;
+    routeAfterAuth();
+  }, [loading, profileLoading, user, profile, mfaResolver, routeAfterAuth]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -76,7 +84,7 @@ export function LoginForm() {
     setError(null);
     try {
       await signInWithEmail(email.trim(), password);
-      router.replace("/home");
+      // Navigation via routeAfterAuth effect after profile hydrate.
     } catch (err) {
       if (isMultiFactorError(err)) {
         setMfaResolver(resolverFromError(err));
@@ -92,7 +100,7 @@ export function LoginForm() {
     setError(null);
     try {
       await signInWithGoogle();
-      router.replace("/home");
+      // Navigation via routeAfterAuth effect after profile hydrate.
     } catch (err) {
       if (String(err).includes("cancelled")) {
         setBusy(false);
@@ -123,7 +131,6 @@ export function LoginForm() {
               resolver={mfaResolver}
               onResolved={() => {
                 setMfaResolver(null);
-                router.replace("/home");
               }}
               onCancel={() => setMfaResolver(null)}
             />
@@ -165,7 +172,7 @@ export function LoginForm() {
               </Button>
             </form>
 
-            <div className="my-5 flex items-center gap-3 text-xs uppercase tracking-wider text-muted">
+            <div className="my-5 flex items-center gap-2.5 text-xs uppercase tracking-wider text-muted">
               <div className="h-px flex-1 bg-glass-border" />
               {t("or")}
               <div className="h-px flex-1 bg-glass-border" />
@@ -206,7 +213,10 @@ export function LoginForm() {
               <Link href="/forgot" className="text-muted hover:text-ink">
                 {t("forgotPassword")}
               </Link>
-              <Link href="/register" className="text-brand hover:underline">
+              <Link
+                href={q ? `/register${q}` : "/register"}
+                className="text-brand hover:underline"
+              >
                 {t("ctaRegister")}
               </Link>
             </div>

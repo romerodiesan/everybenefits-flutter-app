@@ -77,7 +77,7 @@ export function CommandPalette({
       {
         id: "profile",
         label: t("navProfile"),
-        run: () => router.push("/profile"),
+        run: () => router.push("/account"),
       },
     );
     return items;

@@ -133,7 +133,7 @@ export function NotificationsHome() {
               } catch {
                 // ignore
               }
-              router.push("/profile?section=notifications");
+              router.push("/account?section=notifications");
             }}
           >
             <svg

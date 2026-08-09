@@ -9,7 +9,6 @@ import {
   reauthenticateWithPopup,
   sendPasswordResetEmail,
   sendSignInLinkToEmail,
-  signInAnonymously,
   signInWithCredential,
   signInWithEmailAndPassword,
   signInWithEmailLink,
@@ -24,12 +23,11 @@ import {
 import { getFirebaseAuth } from "./client";
 import {
   clearSsoAttempt,
-  logoutCascadeUrl,
   markSsoAttempted,
-  siblingApp,
-  appBaseUrl,
+  buildLogoutCascadeUrl,
 } from "@/lib/sso";
 import { clearCachedProfile } from "@/lib/profile-cache";
+import { clearStoredWebPushToken } from "@/lib/firebase/notifications";
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -91,10 +89,6 @@ export async function signInWithGoogle() {
   return signInWithPopup(auth, googleProvider);
 }
 
-export async function signInAsGuest() {
-  return signInAnonymously(getFirebaseAuth());
-}
-
 export async function resetPassword(email: string) {
   return sendPasswordResetEmail(getFirebaseAuth(), email);
 }
@@ -128,19 +122,27 @@ export async function completeMagicLink(href: string) {
 }
 
 export async function signOutUser() {
+  const uid = getFirebaseAuth().currentUser?.uid;
+  if (uid) {
+    await clearStoredWebPushToken(uid).catch(() => undefined);
+  }
   await signOut(getFirebaseAuth());
 }
 
 /**
- * Sign out on this origin, then cascade to the sibling app so both
- * Pulse and Studio sessions are cleared (Firebase Auth is per-origin).
+ * Sign out on this origin, then cascade through sibling apps so Studio/Admin
+ * sessions clear too. Lands on `returnPath` on the current origin.
  */
-export async function signOutEverywhere(opts: {
-  current: "pulse" | "studio";
+export async function signOutAndRedirect(opts: {
+  current: "pulse" | "studio" | "admin";
   locale: string;
-  /** Path on the current app after both sessions are cleared. */
+  /** Path on the current app after the cascade finishes. */
   returnPath?: string;
 }) {
+  const uid = getFirebaseAuth().currentUser?.uid;
+  if (uid) {
+    await clearStoredWebPushToken(uid).catch(() => undefined);
+  }
   await signOut(getFirebaseAuth());
   clearCachedProfile();
   clearSsoAttempt();
@@ -149,9 +151,9 @@ export async function signOutEverywhere(opts: {
 
   const returnPath = opts.returnPath ?? "/login";
   const path = returnPath.startsWith("/") ? returnPath : `/${returnPath}`;
-  const finalUrl = `${appBaseUrl(opts.current)}/${opts.locale}${path}`;
+  const finalUrl = `${window.location.origin}/${opts.locale}${path}`;
   window.location.replace(
-    logoutCascadeUrl(siblingApp(opts.current), opts.locale, finalUrl),
+    buildLogoutCascadeUrl(opts.current, opts.locale, finalUrl),
   );
 }
 
@@ -159,11 +161,6 @@ export async function signOutEverywhere(opts: {
 export function hasPasswordProvider(user?: User | null): boolean {
   const u = user ?? getFirebaseAuth().currentUser;
   return u?.providerData.some((p) => p.providerId === "password") ?? false;
-}
-
-/** @deprecated Prefer [hasPasswordProvider]. */
-export function usesPasswordProvider(): boolean {
-  return hasPasswordProvider();
 }
 
 /** Link a backup password to the signed-in Auth user (Google → password). */

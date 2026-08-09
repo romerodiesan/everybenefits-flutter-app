@@ -7,7 +7,7 @@ import { useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
 import { headlineName } from "@/lib/firebase/users";
 import { getOrCreateSupportChat } from "@/lib/firebase/chats";
-import { signOutEverywhere } from "@/lib/firebase/auth";
+import { signOutAndRedirect } from "@/lib/firebase/auth";
 import { canAccessSupport } from "@/lib/roles";
 import type { UserProfile } from "@/lib/types";
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
@@ -313,7 +313,7 @@ export function ProfilePage() {
                 variant="secondary"
                 className="h-9 w-full text-xs lg:hidden"
                 onClick={() =>
-                  void signOutEverywhere({
+                  void signOutAndRedirect({
                     current: "pulse",
                     locale,
                     returnPath: "/login",

@@ -87,12 +87,6 @@ export type CourseLevel = "basic" | "intermediate" | "advanced";
 /** Publication workflow: authors draft, admins publish. */
 export type CourseStatus = "draft" | "pending" | "published";
 
-export const COURSE_LEVELS: CourseLevel[] = [
-  "basic",
-  "intermediate",
-  "advanced",
-];
-
 export type Course = {
   id: string;
   title: string;
@@ -121,8 +115,6 @@ export type CourseModule = {
 
 /** What a learner does in a lesson: watch, read, or answer a quiz. */
 export type LessonType = "video" | "reading" | "quiz";
-
-export const LESSON_TYPES: LessonType[] = ["video", "reading", "quiz"];
 
 /** One or many correct options, decided per question by the author. */
 export type QuizSelectionMode = "single" | "multi";

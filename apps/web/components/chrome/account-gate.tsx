@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useAuth } from "@/lib/providers/auth-provider";
-import { signOutEverywhere } from "@/lib/firebase/auth";
+import { signOutAndRedirect } from "@/lib/firebase/auth";
 import {
   cancelAccountDeletion,
   reactivateAccount,
@@ -68,7 +68,7 @@ export function AccountGate({ profile }: { profile: UserProfile }) {
             className="w-full"
             disabled={busy}
             onClick={() =>
-              void signOutEverywhere({
+              void signOutAndRedirect({
                 current: "pulse",
                 locale,
                 returnPath: "/login",

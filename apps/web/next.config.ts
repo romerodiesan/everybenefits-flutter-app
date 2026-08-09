@@ -27,6 +27,9 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
   emulatorHosts: emulatorHost,
   includeLottie: true,
   includeAnalytics: true,
+  includeMaps: true,
+  // Dev/HMR may need eval; production keeps it off.
+  allowUnsafeEval: process.env.NODE_ENV !== "production",
 });
 
 const securityHeaders = [
@@ -79,7 +82,10 @@ const nextConfig: NextConfig = {
   // Keep Firebase out of the RSC/Turbopack CJS interop path (avoids
   // "require is not defined" when client modules are SSR'd).
   serverExternalPackages: ["firebase", "@firebase/app", "@firebase/auth"],
-  transpilePackages: ["@pulse/shared", "@pulse/firebase-web"],
+  transpilePackages: ["@pulse/shared", "@pulse/firebase-web", "@pulse/chrome", "@pulse/sso"],
+  experimental: {
+    optimizePackageImports: ["motion"],
+  },
   images: {
     // Emulator Storage serves http://<lan-ip>:9199/...; skip optimizer locally.
     unoptimized: useEmulators,

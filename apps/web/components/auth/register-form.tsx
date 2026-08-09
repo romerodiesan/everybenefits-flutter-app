@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { Button, Input, Label, Panel } from "@/components/ui/primitives";
 import {
@@ -13,13 +13,23 @@ import { ensureProfile } from "@/lib/firebase/users";
 import { isMultiFactorError, resolverFromError } from "@/lib/firebase/mfa";
 import { MfaChallengeForm } from "@/components/auth/mfa-challenge-form";
 import { useAuth } from "@/lib/providers/auth-provider";
-import { needsProfileCompletion } from "@/lib/roles";
+import { legalUrls } from "@/lib/legal-links";
+import {
+  nextQuery,
+  postLoginPath,
+  readLoginNext,
+  resolvePostAuthDestination,
+} from "@/lib/auth-redirect";
 import type { MultiFactorResolver } from "firebase/auth";
+import { useSearchParams } from "next/navigation";
 
 export function RegisterForm() {
   const t = useTranslations();
+  const locale = useLocale();
+  const legal = legalUrls(locale);
   const router = useRouter();
-  const { user, profile, loading, refreshProfile } = useAuth();
+  const { user, profile, loading, profileLoading, refreshProfile } = useAuth();
+  const params = useSearchParams();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,18 +40,28 @@ export function RegisterForm() {
     null,
   );
 
+  const nextParam = readLoginNext(params.get("next"));
+  const q = nextQuery(nextParam);
+  const afterAuth = postLoginPath(nextParam);
+
   useEffect(() => {
-    if (loading || !user || mfaResolver) return;
-    if (!user.isAnonymous && !hasPasswordProvider() && user.email) {
-      router.replace("/set-password");
-      return;
-    }
-    if (profile && needsProfileCompletion(profile) && !profile.isAnonymous) {
-      router.replace("/complete-profile");
-    } else if (user) {
-      router.replace("/home");
-    }
-  }, [loading, user, profile, router, mfaResolver]);
+    if (loading || profileLoading || !user || mfaResolver) return;
+    const dest = resolvePostAuthDestination({
+      user,
+      profile,
+      next: nextParam,
+      hasPassword: hasPasswordProvider(user),
+    });
+    router.replace(dest.path);
+  }, [
+    loading,
+    profileLoading,
+    user,
+    profile,
+    router,
+    mfaResolver,
+    nextParam,
+  ]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -95,7 +115,7 @@ export function RegisterForm() {
               resolver={mfaResolver}
               onResolved={() => {
                 setMfaResolver(null);
-                router.replace("/home");
+                router.replace(afterAuth);
               }}
               onCancel={() => setMfaResolver(null)}
             />
@@ -152,14 +172,14 @@ export function RegisterForm() {
           <p className="text-center text-xs leading-relaxed text-muted">
             {t.rich("registerLegalNotice", {
               terms: (chunks) => (
-                <Link href="/terms" className="text-brand hover:underline">
+                <a href={legal.terms} className="text-brand hover:underline">
                   {chunks}
-                </Link>
+                </a>
               ),
               privacy: (chunks) => (
-                <Link href="/privacy" className="text-brand hover:underline">
+                <a href={legal.privacy} className="text-brand hover:underline">
                   {chunks}
-                </Link>
+                </a>
               ),
             })}
           </p>
@@ -176,7 +196,7 @@ export function RegisterForm() {
         </Button>
 
         <p className="mt-6 text-sm">
-          <Link href="/login" className="text-brand hover:underline">
+          <Link href={q ? `/login${q}` : "/login"} className="text-brand hover:underline">
             {t("backToLogin")}
           </Link>
         </p>

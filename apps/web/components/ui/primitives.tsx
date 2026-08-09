@@ -1,6 +1,11 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from "react";
 
 export function Button({
   variant = "primary",
@@ -19,23 +24,24 @@ export function Button({
   }[variant];
   return (
     <button
-      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition ${styles} ${className}`}
+      className={`inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition disabled:cursor-not-allowed ${styles} ${className}`}
       {...props}
     />
   );
 }
 
-export function Input({
-  className = "",
-  ...props
-}: InputHTMLAttributes<HTMLInputElement>) {
+export const Input = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement>
+>(function Input({ className = "", ...props }, ref) {
   return (
     <input
+      ref={ref}
       className={`h-10 w-full rounded-xl border border-glass-border bg-sheet px-3.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand ${className}`}
       {...props}
     />
   );
-}
+});
 
 export function TextArea({
   className = "",

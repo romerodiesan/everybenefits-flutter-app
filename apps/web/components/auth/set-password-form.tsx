@@ -1,7 +1,8 @@
 "use client";
 
 import { FormEvent, useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
+import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
 import { Button, Input, Label, Panel } from "@/components/ui/primitives";
 import { ProfileFormSkeleton } from "@/components/ui/skeleton";
@@ -9,40 +10,49 @@ import { useAuth } from "@/lib/providers/auth-provider";
 import {
   hasPasswordProvider,
   linkPassword,
-  signOutEverywhere,
+  signOutAndRedirect,
 } from "@/lib/firebase/auth";
-import { needsProfileCompletion } from "@/lib/roles";
-import { useLocale } from "next-intl";
+import {
+  nextQuery,
+  readLoginNext,
+  resolvePostAuthDestination,
+} from "@/lib/auth-redirect";
 
 export function SetPasswordForm() {
   const t = useTranslations();
   const locale = useLocale();
   const router = useRouter();
-  const { user, profile, loading } = useAuth();
+  const params = useSearchParams();
+  const { user, profile, loading, profileLoading } = useAuth();
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const nextParam = readLoginNext(params.get("next"));
+  const q = nextQuery(nextParam);
+
   useEffect(() => {
-    if (loading) return;
+    if (loading || profileLoading) return;
     if (!user) {
-      router.replace("/login");
+      router.replace(`/login${q}`);
       return;
     }
-    if (user.isAnonymous || hasPasswordProvider()) {
-      if (profile && needsProfileCompletion(profile) && !profile.isAnonymous) {
-        router.replace("/complete-profile");
-      } else {
-        router.replace("/home");
-      }
+    if (user.isAnonymous || hasPasswordProvider(user)) {
+      const dest = resolvePostAuthDestination({
+        user,
+        profile,
+        next: nextParam,
+        hasPassword: true,
+      });
+      router.replace(dest.path);
     }
-  }, [loading, user, profile, router]);
+  }, [loading, profileLoading, user, profile, router, nextParam, q]);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     if (password.length < 6) {
-      setError(t("setPasswordMismatch"));
+      setError(t("setPasswordTooShort"));
       return;
     }
     if (password !== confirm) {
@@ -53,11 +63,13 @@ export function SetPasswordForm() {
     setError(null);
     try {
       await linkPassword(password);
-      if (profile && needsProfileCompletion(profile) && !profile.isAnonymous) {
-        router.replace("/complete-profile");
-      } else {
-        router.replace("/home");
-      }
+      const dest = resolvePostAuthDestination({
+        user,
+        profile,
+        next: nextParam,
+        hasPassword: true,
+      });
+      router.replace(dest.path);
     } catch (err) {
       const code =
         err && typeof err === "object" && "code" in err
@@ -123,7 +135,7 @@ export function SetPasswordForm() {
           type="button"
           className="mt-4 text-sm text-muted underline"
           onClick={() =>
-            void signOutEverywhere({ current: "pulse", locale })
+            void signOutAndRedirect({ current: "pulse", locale })
           }
         >
           {t("backToLogin")}

@@ -16,6 +16,7 @@ import { ensureDefaultAgentGroup } from "@/lib/firebase/ensure-default-group";
 import { belongsInDefaultAgentGroup } from "@/lib/roles";
 import {
   clearCachedProfile,
+  hasTrustedShellCache,
   readCachedProfile,
   writeCachedProfile,
 } from "@/lib/profile-cache";
@@ -52,6 +53,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     let unsubProfile: (() => void) | undefined;
     let generation = 0;
+    /** Once per uid — avoid re-firing on every profile snapshot. */
+    let ensuredDefaultGroupForUid: string | null = null;
+
+    const maybeEnsureDefaultAgentGroup = (p: UserProfile) => {
+      if (ensuredDefaultGroupForUid === p.uid) return;
+      if (!belongsInDefaultAgentGroup(p.role) || p.isAnonymous) return;
+      ensuredDefaultGroupForUid = p.uid;
+      ensureDefaultAgentGroup().catch(() => undefined);
+    };
 
     const unsubAuth = onAuthStateChanged(getFirebaseAuth(), (next) => {
       unsubProfile?.();
@@ -61,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
 
       if (!next) {
+        ensuredDefaultGroupForUid = null;
         setProfile(null);
         setProfileLoading(false);
         clearCachedProfile();
@@ -68,9 +79,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const uid = next.uid;
+      if (ensuredDefaultGroupForUid !== uid) {
+        ensuredDefaultGroupForUid = null;
+      }
       const cached = readCachedProfile(uid);
       if (cached) setProfile(cached);
-      setProfileLoading(!cached);
+      // Trusted approved cache paints immediately; gates still wait when untrusted.
+      setProfileLoading(!hasTrustedShellCache(uid));
 
       void (async () => {
         try {
@@ -81,12 +96,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           setProfile(ensured);
           writeCachedProfile(ensured);
-          if (
-            belongsInDefaultAgentGroup(ensured.role) &&
-            !ensured.isAnonymous
-          ) {
-            ensureDefaultAgentGroup().catch(() => undefined);
-          }
+          maybeEnsureDefaultAgentGroup(ensured);
 
           if (getFirebaseAuth().currentUser?.uid !== uid) return;
           unsubProfile = watchProfile(
@@ -97,6 +107,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (p) {
                 setProfile(p);
                 writeCachedProfile(p);
+                maybeEnsureDefaultAgentGroup(p);
               }
             },
             (error) => {

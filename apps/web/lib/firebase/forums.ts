@@ -20,8 +20,8 @@ import { mapForumReply, mapForumThread } from "@pulse/firebase-web";
 import { getFirebaseDb } from "./client";
 import { callCloudFunction } from "./call-function";
 import type { ForumReply, ForumThread, UserProfile } from "../types";
-import { normalizeForumTags } from "../roles";
-import { headlineName } from "./users";
+import { headlineName } from "../display-name";
+import { normalizeForumTags } from "../forum-tags";
 
 function threadFrom(id: string, data: Record<string, unknown>): ForumThread {
   let tags: string[] = [];
@@ -249,17 +249,18 @@ export async function fetchThreadVotes(input: {
   threadIds: string[];
 }) {
   if (!input.threadIds.length) return {} as Record<string, number>;
-  const snap = await getDocs(
-    collection(getFirebaseDb(), "users", input.uid, "forumVotes"),
-  );
-  const wanted = new Set(input.threadIds);
   const out = Object.fromEntries(input.threadIds.map((id) => [id, 0]));
-  for (const vote of snap.docs) {
-    const data = vote.data();
-    if (data.replyId == null && wanted.has(String(data.threadId))) {
-      out[String(data.threadId)] = Number(data.value ?? 0);
-    }
-  }
+  // Vote docs are keyed by threadId (see castForumVote) — point reads, not full scan.
+  await Promise.all(
+    input.threadIds.map(async (threadId) => {
+      const snap = await getDoc(
+        doc(getFirebaseDb(), "users", input.uid, "forumVotes", threadId),
+      );
+      if (snap.exists() && snap.data()?.replyId == null) {
+        out[threadId] = Number(snap.data()?.value ?? 0);
+      }
+    }),
+  );
   return out;
 }
 
@@ -269,17 +270,37 @@ export async function fetchReplyVotes(input: {
   replyIds: string[];
 }) {
   if (!input.replyIds.length) return {} as Record<string, number>;
-  const snap = await getDocs(
-    collection(getFirebaseDb(), "users", input.uid, "forumVotes"),
-  );
-  const wanted = new Set(input.replyIds);
   const out = Object.fromEntries(input.replyIds.map((id) => [id, 0]));
-  for (const vote of snap.docs) {
-    const data = vote.data();
-    const replyId = String(data.replyId ?? "");
-    if (String(data.threadId) === input.threadId && wanted.has(replyId)) {
-      out[replyId] = Number(data.value ?? 0);
+  await Promise.all(
+    input.replyIds.map(async (replyId) => {
+      const voteId = `${input.threadId}_${replyId}`;
+      const snap = await getDoc(
+        doc(getFirebaseDb(), "users", input.uid, "forumVotes", voteId),
+      );
+      if (snap.exists()) {
+        out[replyId] = Number(snap.data()?.value ?? 0);
+      }
+    }),
+  );
+  return out;
+}
+
+/** Batch-get threads by id (chunks of 10 for `in` queries). */
+export async function getThreadsByIds(ids: string[]): Promise<ForumThread[]> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (!unique.length) return [];
+  const db = getFirebaseDb();
+  const threads: ForumThread[] = [];
+  for (let i = 0; i < unique.length; i += 10) {
+    const chunk = unique.slice(i, i + 10);
+    const snap = await getDocs(
+      query(collection(db, "threads"), where("__name__", "in", chunk)),
+    );
+    for (const d of snap.docs) {
+      threads.push(threadFrom(d.id, d.data() as Record<string, unknown>));
     }
   }
-  return out;
+  // Preserve caller order when possible.
+  const byId = new Map(threads.map((t) => [t.id, t]));
+  return unique.map((id) => byId.get(id)).filter(Boolean) as ForumThread[];
 }

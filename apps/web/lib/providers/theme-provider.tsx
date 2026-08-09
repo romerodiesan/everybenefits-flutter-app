@@ -11,8 +11,6 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { doc, setDoc, serverTimestamp } from "firebase/firestore";
-import { getFirebaseAuth, getFirebaseDb } from "@/lib/firebase/client";
 
 export type ThemeMode = "system" | "light" | "dark";
 export type AccentSeed =
@@ -36,12 +34,19 @@ const ACCENT_IDS = new Set<string>(Object.keys(ACCENTS));
 const THEME_KEY = "pulse-theme";
 const ACCENT_KEY = "pulse-accent";
 
+export type RemoteAppearance = {
+  theme?: string | null;
+  accent?: string | null;
+} | null;
+
 type ThemeContextValue = {
   mode: ThemeMode;
   accent: AccentSeed;
   setMode: (mode: ThemeMode) => void;
   setAccent: (accent: AccentSeed) => void;
   resolvedDark: boolean;
+  /** Sync Firestore profile appearance into the single root ThemeProvider. */
+  applyRemoteAppearance: (appearance: RemoteAppearance) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
@@ -83,13 +88,18 @@ export function applyDocumentTheme(mode: ThemeMode, accent: AccentSeed): boolean
 }
 
 /**
- * Inline boot script lives in `@/lib/theme-boot` (server-safe) so the root
- * layout can inject it without importing this client module.
+ * Persist to Firestore only when signed in — lazy-imports Firebase so the
+ * public landing bundle does not load the SDK.
  */
 async function persistAppearance(mode: ThemeMode, accent: AccentSeed) {
-  const uid = getFirebaseAuth().currentUser?.uid;
-  if (!uid) return;
   try {
+    const [{ doc, setDoc, serverTimestamp }, { getFirebaseAuth, getFirebaseDb }] =
+      await Promise.all([
+        import("firebase/firestore"),
+        import("@/lib/firebase/client"),
+      ]);
+    const uid = getFirebaseAuth().currentUser?.uid;
+    if (!uid) return;
     await setDoc(
       doc(getFirebaseDb(), "users", uid),
       {
@@ -99,21 +109,11 @@ async function persistAppearance(mode: ThemeMode, accent: AccentSeed) {
       { merge: true },
     );
   } catch {
-    // Offline / rules — localStorage still applies.
+    // Offline / rules / unsigned — localStorage still applies.
   }
 }
 
-export function ThemeProvider({
-  children,
-  remoteAppearance,
-}: {
-  children: ReactNode;
-  /** When signed in, prefer Firestore appearance from the user profile. */
-  remoteAppearance?: {
-    theme?: string | null;
-    accent?: string | null;
-  } | null;
-}) {
+export function ThemeProvider({ children }: { children: ReactNode }) {
   const [mode, setModeState] = useState<ThemeMode>(() =>
     typeof window === "undefined" ? "dark" : readStoredMode(),
   );
@@ -121,6 +121,8 @@ export function ThemeProvider({
     typeof window === "undefined" ? "green" : readStoredAccent(),
   );
   const [resolvedDark, setResolvedDark] = useState(() => resolveDark(mode));
+  const [remoteAppearance, setRemoteAppearance] =
+    useState<RemoteAppearance>(null);
   /** Ignore stale Firestore snapshots briefly after a local change. */
   const ignoreRemoteUntil = useRef(0);
   const modeRef = useRef(mode);
@@ -129,6 +131,10 @@ export function ThemeProvider({
   accentRef.current = accent;
   const remoteTheme = remoteAppearance?.theme;
   const remoteAccent = remoteAppearance?.accent;
+
+  const applyRemoteAppearance = useCallback((appearance: RemoteAppearance) => {
+    setRemoteAppearance(appearance);
+  }, []);
 
   useEffect(() => {
     // Re-sync from storage once on mount (covers SSR → client).
@@ -204,8 +210,15 @@ export function ThemeProvider({
   );
 
   const value = useMemo(
-    () => ({ mode, accent, setMode, setAccent, resolvedDark }),
-    [mode, accent, setMode, setAccent, resolvedDark],
+    () => ({
+      mode,
+      accent,
+      setMode,
+      setAccent,
+      resolvedDark,
+      applyRemoteAppearance,
+    }),
+    [mode, accent, setMode, setAccent, resolvedDark, applyRemoteAppearance],
   );
 
   return (

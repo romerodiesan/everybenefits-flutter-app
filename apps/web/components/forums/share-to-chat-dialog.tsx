@@ -9,6 +9,7 @@ import {
   sendMessage,
   watchInbox,
 } from "@/lib/firebase/chats";
+import { mapCallableError } from "@/lib/firebase/callable-errors";
 import type { ChatConversation, ForumThread } from "@/lib/types";
 import { Button, Panel } from "@/components/ui/primitives";
 
@@ -68,8 +69,15 @@ export function ShareToChatDialog({
       });
       onClose();
       router.push(`/chats/${chat.id}`);
-    } catch {
-      setError(t("errorGeneric"));
+    } catch (err) {
+      setError(
+        mapCallableError(err, {
+          generic: t("errorGeneric"),
+          auth: t("errorAuth"),
+          permissionDenied: t("errorGeneric"),
+          dmBlocked: t("privacyDmBlocked"),
+        }),
+      );
     } finally {
       setBusyId(null);
     }

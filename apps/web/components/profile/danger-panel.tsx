@@ -4,8 +4,8 @@ import { useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   reauthenticate,
-  signOutEverywhere,
-  usesPasswordProvider,
+  signOutAndRedirect,
+  hasPasswordProvider,
 } from "@/lib/firebase/auth";
 import {
   deactivateAccount,
@@ -28,14 +28,14 @@ export function DangerPanel() {
   const [error, setError] = useState<string | null>(null);
   const [graceLabel, setGraceLabel] = useState("");
 
-  const needsPassword = usesPasswordProvider();
+  const needsPassword = hasPasswordProvider();
 
   const onDeactivate = async () => {
     setBusy(true);
     setError(null);
     try {
       await deactivateAccount();
-      await signOutEverywhere({
+      await signOutAndRedirect({
         current: "pulse",
         locale,
         returnPath: "/login",
@@ -58,7 +58,7 @@ export function DangerPanel() {
     }
     try {
       await requestAccountDeletion();
-      await signOutEverywhere({
+      await signOutAndRedirect({
         current: "pulse",
         locale,
         returnPath: "/login",
