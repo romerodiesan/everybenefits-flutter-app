@@ -20,6 +20,26 @@
   "database": {
     "rules": "database.rules.json"
   },
+  "hosting": [
+    {
+      "target": "legal",
+      "public": "apps/legal/build",
+      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "cleanUrls": true,
+      "trailingSlash": false,
+      "headers": [
+        {
+          "source": "**/*.@(js|css|svg|woff2)",
+          "headers": [
+            {
+              "key": "Cache-Control",
+              "value": "public,max-age=31536000,immutable"
+            }
+          ]
+        }
+      ]
+    }
+  ],
   "apphosting": [
     {
       "backendId": "pulse-web-app",
@@ -34,6 +54,7 @@
         "apps/functions",
         "apps/studio",
         "apps/admin",
+        "apps/legal",
         "docs",
         "tooling",
         "test"
@@ -53,6 +74,7 @@
         "apps/functions",
         "apps/web",
         "apps/admin",
+        "apps/legal",
         "docs",
         "tooling",
         "test"
@@ -72,6 +94,7 @@
         "apps/functions",
         "apps/web",
         "apps/studio",
+        "apps/legal",
         "docs",
         "tooling",
         "test"
@@ -122,5 +145,8 @@
       "port": 4000
     },
     "singleProjectMode": true
+  },
+  "extensions": {
+    "firestore-bigquery-export": "firebase/firestore-bigquery-export@0.1.60"
   }
 }

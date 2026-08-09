@@ -1,7 +1,13 @@
 {
   "projects": {
-    "default": "every-insurance"
+    "default": "every-benefits-us"
   },
-  "targets": {},
+  "targets": {
+    "every-benefits-us": {
+      "hosting": {
+        "legal": ["pulse-legal"]
+      }
+    }
+  },
   "etags": {}
 }
