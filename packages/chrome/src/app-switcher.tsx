@@ -16,7 +16,7 @@ import {
   PULSE_APPS,
   type AppRegistryEntry,
   type PulseAppId,
-  type UserRole,
+  type RoleOrPermissions,
 } from "@pulse/shared";
 import { AppIcon, IconCheck, IconChevron } from "./icons";
 
@@ -29,13 +29,16 @@ export type AppSwitcherHomeLinkProps = {
 
 export type AppSwitcherProps = {
   current: PulseAppId;
-  role?: UserRole;
+  /** Role slug or resolved permission list (prefer permissions for custom roles). */
+  permissions?: RoleOrPermissions;
+  /** @deprecated Use `permissions`. */
+  role?: RoleOrPermissions;
   /** Build final navigation URL (SSO handoff or plain). */
   resolveSwitchUrl: (
     target: PulseAppId,
     homePath: string,
   ) => Promise<string>;
-  /** Slot for product mark in the trigger (e.g. Pulse logo). */
+  /** Optional product mark override for the trigger tile only. */
   renderTriggerIcon?: (meta: AppRegistryEntry) => ReactNode;
   /** Single-app home link — each host passes its i18n Link. */
   HomeLink: ComponentType<AppSwitcherHomeLinkProps>;
@@ -43,6 +46,7 @@ export type AppSwitcherProps = {
 
 export function AppSwitcher({
   current,
+  permissions,
   role,
   resolveSwitchUrl,
   renderTriggerIcon,
@@ -54,8 +58,10 @@ export function AppSwitcher({
   const [busy, setBusy] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
 
-  const apps = useMemo(() => listVisibleApps(role), [role]);
+  const access = permissions ?? role;
+  const apps = useMemo(() => listVisibleApps(access), [access]);
 
   const currentMeta =
     apps.find((a) => a.id === current) ??
@@ -68,7 +74,10 @@ export function AppSwitcher({
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setOpen(false);
+      if (e.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
     };
     document.addEventListener("mousedown", onDoc);
     document.addEventListener("keydown", onKey);
@@ -93,7 +102,6 @@ export function AppSwitcher({
     } catch {
       setSwitchError(t("appSwitchHandoffFailed"));
       setBusy(false);
-      // Keep panel open so the user sees the error.
     }
   };
 
@@ -106,16 +114,22 @@ export function AppSwitcher({
   const brandInner = (
     <>
       <span
-        className={`flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg ${currentMeta.tileClass}`}
+        className={`relative flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg ${currentMeta.tileClass}`}
       >
         {triggerIcon}
+        {busy ? (
+          <span
+            className="absolute inset-0 animate-pulse rounded-lg bg-sheet/50"
+            aria-hidden
+          />
+        ) : null}
       </span>
       <span className="min-w-0">
-        <span className="block truncate font-display text-lg font-bold leading-tight tracking-tight">
+        <span className="block truncate font-display text-lg font-bold leading-tight tracking-tight text-ink">
           {t(currentMeta.labelKey)}
         </span>
         {canSwitch ? (
-          <span className="block text-[10px] font-semibold uppercase tracking-wide text-muted">
+          <span className="block text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
             {t("appSwitchTitle")}
           </span>
         ) : null}
@@ -132,25 +146,33 @@ export function AppSwitcher({
     </>
   );
 
+  const triggerClass =
+    "group inline-flex max-w-full cursor-pointer items-center gap-2 rounded-xl px-1.5 py-1 text-left outline-none transition hover:bg-ink/[0.05] focus-visible:ring-2 focus-visible:ring-brand/30 disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[0.06]";
+
   return (
     <div ref={rootRef} className="relative">
       {canSwitch ? (
         <button
+          ref={triggerRef}
           type="button"
           aria-haspopup="dialog"
           aria-expanded={open}
           aria-controls={open ? panelId : undefined}
           aria-label={t("appSwitchTitle")}
+          aria-busy={busy}
           disabled={busy}
-          onClick={() => setOpen((v) => !v)}
-          className="group inline-flex max-w-full cursor-pointer items-center gap-2 rounded-xl px-1.5 py-1 text-left transition hover:bg-ink/[0.05] disabled:cursor-not-allowed disabled:opacity-60 dark:hover:bg-white/[0.06]"
+          onClick={() => {
+            setSwitchError(null);
+            setOpen((v) => !v);
+          }}
+          className={triggerClass}
         >
           {brandInner}
         </button>
       ) : (
         <HomeLink
           href={currentMeta.homePath}
-          className="inline-flex max-w-full items-center gap-2 rounded-xl px-1.5 py-1 text-left transition hover:bg-ink/[0.05] dark:hover:bg-white/[0.06]"
+          className={triggerClass}
           aria-label={t(currentMeta.labelKey)}
         >
           {brandInner}
@@ -162,17 +184,24 @@ export function AppSwitcher({
           id={panelId}
           role="dialog"
           aria-label={t("appSwitchTitle")}
-          className="absolute left-0 top-full z-50 mt-2 w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-glass-border bg-sheet shadow-xl"
+          className="absolute left-0 top-full z-50 mt-2 w-[min(20.5rem,calc(100vw-1.5rem))] overflow-hidden rounded-2xl border border-glass-border bg-sheet shadow-[0_18px_40px_-18px_rgba(0,0,0,0.45)]"
         >
-          <p className="px-3 pb-1 pt-2.5 text-[10px] font-bold uppercase tracking-wide text-muted">
-            {t("appSwitchTitle")}
-          </p>
+          <div className="flex items-center justify-between gap-2 border-b border-glass-border px-3.5 py-2.5">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+              {t("appSwitchTitle")}
+            </p>
+            <p className="truncate text-[11px] text-muted">
+              {t(currentMeta.labelKey)}
+            </p>
+          </div>
+
           {switchError ? (
-            <p className="mx-1.5 mb-1.5 rounded-lg bg-red-500/10 px-2.5 py-2 text-[11px] leading-snug text-red-500">
+            <p className="mx-2 mt-2 rounded-xl bg-red-500/10 px-2.5 py-2 text-[11px] leading-snug text-red-500">
               {switchError}
             </p>
           ) : null}
-          <ul className="max-h-[min(20rem,50vh)] overflow-y-auto p-1.5">
+
+          <ul className="max-h-[min(22rem,55vh)] space-y-0.5 overflow-y-auto p-2">
             {apps.map((app) => {
               const active = app.id === current;
               return (
@@ -180,22 +209,29 @@ export function AppSwitcher({
                   <button
                     type="button"
                     disabled={busy}
-                    aria-current={active ? "true" : undefined}
+                    aria-current={active ? "page" : undefined}
                     onClick={() => void switchTo(app.id)}
-                    className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2 text-left transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    className={`flex w-full cursor-pointer items-center gap-3 rounded-xl px-2.5 py-2.5 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-brand/30 disabled:cursor-not-allowed disabled:opacity-60 ${
                       active
-                        ? "bg-brand/10"
+                        ? "bg-brand/10 ring-1 ring-brand/20"
                         : "hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"
                     }`}
                   >
                     <span
-                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${app.tileClass}`}
+                      className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${app.tileClass}`}
                     >
                       <AppIcon id={app.id} width={20} height={20} />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-semibold text-ink">
-                        {t(app.labelKey)}
+                      <span className="flex items-center gap-2">
+                        <span className="block truncate text-sm font-semibold text-ink">
+                          {t(app.labelKey)}
+                        </span>
+                        {active ? (
+                          <span className="shrink-0 rounded-full bg-brand/15 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-brand">
+                            {t("appSwitchHere")}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="mt-0.5 block truncate text-[11px] leading-snug text-muted">
                         {t(app.blurbKey)}

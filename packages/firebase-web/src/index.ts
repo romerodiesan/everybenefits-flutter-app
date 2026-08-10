@@ -15,4 +15,13 @@ export {
   type AdminRepository,
   type AdminUserRow,
   type AdminInsights,
+  type AdminUserFilters,
+  type ListUsersResult,
+  type ListAgenciesResult,
+  type ListRolesFilters,
+  type ListRolesResult,
 } from "./admin";
+export {
+  watchRolePermissions,
+  loadPermissionsForRoles,
+} from "./roles";

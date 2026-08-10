@@ -5,6 +5,8 @@ import {
   type OrgDepth,
   type OrgNode,
   type OrgNodeType,
+  type RoleCategory,
+  type RoleDoc,
   type UserRole,
 } from "@pulse/shared";
 
@@ -55,6 +57,7 @@ export type AdminUserRow = {
   orgNodeId: string | null;
   accountStatus: "active" | "deactivated" | "pendingDeletion";
   approvalStatus?: "pending" | "approved" | "rejected";
+  createdAt?: number | null;
 };
 
 export type AdminInsights = {
@@ -65,14 +68,49 @@ export type AdminInsights = {
   deactivated: number;
   pendingDeletion: number;
   orgNodeCount: number;
-  recentRegistrations: Array<{
-    uid: string;
-    displayName: string | null;
-    email: string | null;
-    role: string;
-    createdAt: number | null;
-  }>;
 };
+
+export type ListUsersResult = {
+  users: AdminUserRow[];
+  nextPageToken: string | null;
+};
+
+export type ListAgenciesResult = {
+  agencies: OrgNode[];
+  nextPageToken: string | null;
+};
+
+export type ListRolesFilters = {
+  category?: RoleCategory | "";
+  includeInactive?: boolean;
+  includeSystem?: boolean;
+};
+
+export type ListRolesResult = {
+  roles: RoleDoc[];
+};
+
+function mapRoleDoc(entry: Record<string, unknown>): RoleDoc {
+  const category = String(entry.category ?? "custom");
+  return {
+    id: String(entry.id ?? ""),
+    name: String(entry.name ?? ""),
+    description:
+      typeof entry.description === "string" ? entry.description : undefined,
+    category: (category as RoleCategory) || "custom",
+    permissions: Array.isArray(entry.permissions)
+      ? entry.permissions.map(String)
+      : [],
+    builtIn: entry.builtIn === true,
+    editableBySystemOnly: entry.editableBySystemOnly === true,
+    locked: entry.locked === true,
+    active: entry.active !== false,
+    sortOrder: typeof entry.sortOrder === "number" ? entry.sortOrder : 100,
+    createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
+    updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : null,
+    updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
+  };
+}
 
 export function mapAdminUserRow(entry: Record<string, unknown>): AdminUserRow {
   return {
@@ -97,6 +135,8 @@ export function mapAdminUserRow(entry: Record<string, unknown>): AdminUserRow {
       entry.approvalStatus === "rejected"
         ? entry.approvalStatus
         : undefined,
+    createdAt:
+      typeof entry.createdAt === "number" ? entry.createdAt : null,
   };
 }
 
@@ -117,19 +157,55 @@ export function mapOrgNode(entry: Record<string, unknown>): OrgNode {
   };
 }
 
+export type AdminUserFilters = {
+  role?: UserRole | "";
+  approvalStatus?: string;
+  accountStatus?: string;
+  orgNodeId?: string;
+  query?: string;
+  pageSize?: number;
+  pageToken?: string | null;
+  /** @deprecated use pageSize */
+  limit?: number;
+};
+
 export type AdminRepository = {
-  listUsers: (filters?: {
-    role?: UserRole | "";
-    approvalStatus?: string;
-    accountStatus?: string;
-    orgNodeId?: string;
-    query?: string;
-    limit?: number;
-  }) => Promise<AdminUserRow[]>;
+  listUsers: (filters?: AdminUserFilters) => Promise<ListUsersResult>;
+  createUser: (input: {
+    email: string;
+    password: string;
+    displayName?: string;
+    role?: UserRole | string;
+    orgNodeId?: string | null;
+    npn?: string | null;
+    approvalStatus?: "pending" | "approved" | "rejected";
+  }) => Promise<AdminUserRow | null>;
+  updateUser: (input: {
+    uid: string;
+    email?: string;
+    displayName?: string;
+    role?: UserRole | string;
+    orgNodeId?: string | null;
+    npn?: string | null;
+    approvalStatus?: "pending" | "approved" | "rejected";
+  }) => Promise<AdminUserRow | null>;
   deactivateUser: (uid: string) => Promise<void>;
   reactivateUser: (uid: string) => Promise<void>;
   getInsights: () => Promise<AdminInsights | null>;
-  listOrgSubtree: (parentId?: string | null) => Promise<OrgNode[]>;
+  listOrgSubtree: (
+    parentId?: string | null,
+    opts?: { full?: boolean; includeInactive?: boolean },
+  ) => Promise<OrgNode[]>;
+  listAgencies: (opts?: {
+    pageSize?: number;
+    pageToken?: string | null;
+    query?: string;
+    includeInactive?: boolean;
+  }) => Promise<ListAgenciesResult>;
+  listOrgNodesByType: (
+    type: OrgNodeType,
+    pageSize?: number,
+  ) => Promise<OrgNode[]>;
   ensureOrgRoot: () => Promise<OrgNode | null>;
   createOrgNode: (input: {
     name: string;
@@ -146,21 +222,64 @@ export type AdminRepository = {
     uid: string,
     orgNodeId: string | null,
   ) => Promise<void>;
-  setUserRole: (uid: string, role: UserRole) => Promise<void>;
+  setUserRole: (uid: string, role: UserRole | string) => Promise<void>;
+  listRoles: (filters?: ListRolesFilters) => Promise<ListRolesResult>;
+  createRole: (input: {
+    id: string;
+    name: string;
+    description?: string;
+    category?: RoleCategory;
+    permissions?: string[];
+    sortOrder?: number;
+  }) => Promise<RoleDoc | null>;
+  updateRole: (input: {
+    id: string;
+    name?: string;
+    description?: string;
+    category?: RoleCategory;
+    permissions?: string[];
+    active?: boolean;
+    sortOrder?: number;
+  }) => Promise<RoleDoc | null>;
+  deleteRole: (id: string, hard?: boolean) => Promise<void>;
+  seedSystemRoles: () => Promise<ListRolesResult>;
 };
-
 export function createAdminRepository(functions: Functions): AdminRepository {
   return {
     async listUsers(filters) {
       try {
         const data = await callCloudFunction<{
           users?: Array<Record<string, unknown>>;
-        }>(functions, "listUsersForAdmin", filters ?? {});
-        return (data?.users ?? []).map(mapAdminUserRow).filter((p) => p.uid);
+          nextPageToken?: string | null;
+        }>(functions, "listUsersForAdmin", {
+          ...filters,
+          pageSize: filters?.pageSize ?? filters?.limit ?? 25,
+          pageToken: filters?.pageToken ?? undefined,
+        });
+        return {
+          users: (data?.users ?? [])
+            .map(mapAdminUserRow)
+            .filter((p) => p.uid),
+          nextPageToken: data?.nextPageToken ?? null,
+        };
       } catch (error) {
-        if (error instanceof FunctionsUnavailableError) return [];
+        if (error instanceof FunctionsUnavailableError) {
+          return { users: [], nextPageToken: null };
+        }
         throw error;
       }
+    },
+    async createUser(input) {
+      const data = await callCloudFunction<{
+        user?: Record<string, unknown>;
+      }>(functions, "adminCreateUser", input);
+      return data?.user ? mapAdminUserRow(data.user) : null;
+    },
+    async updateUser(input) {
+      const data = await callCloudFunction<{
+        user?: Record<string, unknown>;
+      }>(functions, "adminUpdateUser", input);
+      return data?.user ? mapAdminUserRow(data.user) : null;
     },
     async deactivateUser(uid) {
       await callCloudFunction(functions, "adminDeactivateUser", { uid });
@@ -180,11 +299,43 @@ export function createAdminRepository(functions: Functions): AdminRepository {
         throw error;
       }
     },
-    async listOrgSubtree(parentId) {
+    async listOrgSubtree(parentId, opts) {
       try {
         const data = await callCloudFunction<{
           nodes?: Array<Record<string, unknown>>;
-        }>(functions, "listOrgSubtree", { parentId: parentId ?? null });
+        }>(functions, "listOrgSubtree", {
+          parentId: parentId ?? null,
+          full: opts?.full === true,
+          includeInactive: opts?.includeInactive === true,
+        });
+        return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
+      } catch (error) {
+        if (error instanceof FunctionsUnavailableError) return [];
+        throw error;
+      }
+    },
+    async listAgencies(opts) {
+      try {
+        const data = await callCloudFunction<{
+          agencies?: Array<Record<string, unknown>>;
+          nextPageToken?: string | null;
+        }>(functions, "listAgenciesForAdmin", opts ?? {});
+        return {
+          agencies: (data?.agencies ?? []).map(mapOrgNode).filter((n) => n.id),
+          nextPageToken: data?.nextPageToken ?? null,
+        };
+      } catch (error) {
+        if (error instanceof FunctionsUnavailableError) {
+          return { agencies: [], nextPageToken: null };
+        }
+        throw error;
+      }
+    },
+    async listOrgNodesByType(type, pageSize = 100) {
+      try {
+        const data = await callCloudFunction<{
+          nodes?: Array<Record<string, unknown>>;
+        }>(functions, "listOrgNodesByType", { type, pageSize });
         return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
       } catch (error) {
         if (error instanceof FunctionsUnavailableError) return [];
@@ -222,6 +373,46 @@ export function createAdminRepository(functions: Functions): AdminRepository {
     },
     async setUserRole(uid, role) {
       await callCloudFunction(functions, "setUserRole", { uid, role });
+    },
+    async listRoles(filters) {
+      try {
+        const data = await callCloudFunction<{
+          roles?: Array<Record<string, unknown>>;
+        }>(functions, "listRoles", filters ?? {});
+        return {
+          roles: (data?.roles ?? [])
+            .map(mapRoleDoc)
+            .filter((r) => r.id),
+        };
+      } catch (error) {
+        if (error instanceof FunctionsUnavailableError) {
+          return { roles: [] };
+        }
+        throw error;
+      }
+    },
+    async createRole(input) {
+      const data = await callCloudFunction<{
+        role?: Record<string, unknown>;
+      }>(functions, "createRole", input);
+      return data?.role ? mapRoleDoc(data.role) : null;
+    },
+    async updateRole(input) {
+      const data = await callCloudFunction<{
+        role?: Record<string, unknown>;
+      }>(functions, "updateRole", input);
+      return data?.role ? mapRoleDoc(data.role) : null;
+    },
+    async deleteRole(id, hard = false) {
+      await callCloudFunction(functions, "deleteRole", { id, hard });
+    },
+    async seedSystemRoles() {
+      const data = await callCloudFunction<{
+        roles?: Array<Record<string, unknown>>;
+      }>(functions, "seedSystemRoles", {});
+      return {
+        roles: (data?.roles ?? []).map(mapRoleDoc).filter((r) => r.id),
+      };
     },
   };
 }

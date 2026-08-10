@@ -32,6 +32,26 @@ async function callCloudFunction(functions, name, data) {
         throw error;
     }
 }
+function mapRoleDoc(entry) {
+    const category = String(entry.category ?? "custom");
+    return {
+        id: String(entry.id ?? ""),
+        name: String(entry.name ?? ""),
+        description: typeof entry.description === "string" ? entry.description : undefined,
+        category: category || "custom",
+        permissions: Array.isArray(entry.permissions)
+            ? entry.permissions.map(String)
+            : [],
+        builtIn: entry.builtIn === true,
+        editableBySystemOnly: entry.editableBySystemOnly === true,
+        locked: entry.locked === true,
+        active: entry.active !== false,
+        sortOrder: typeof entry.sortOrder === "number" ? entry.sortOrder : 100,
+        createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
+        updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : null,
+        updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
+    };
+}
 function mapAdminUserRow(entry) {
     return {
         uid: String(entry.uid ?? ""),
@@ -53,6 +73,7 @@ function mapAdminUserRow(entry) {
             entry.approvalStatus === "rejected"
             ? entry.approvalStatus
             : undefined,
+        createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
     };
 }
 function mapOrgNode(entry) {
@@ -75,14 +96,32 @@ function createAdminRepository(functions) {
     return {
         async listUsers(filters) {
             try {
-                const data = await callCloudFunction(functions, "listUsersForAdmin", filters ?? {});
-                return (data?.users ?? []).map(mapAdminUserRow).filter((p) => p.uid);
+                const data = await callCloudFunction(functions, "listUsersForAdmin", {
+                    ...filters,
+                    pageSize: filters?.pageSize ?? filters?.limit ?? 25,
+                    pageToken: filters?.pageToken ?? undefined,
+                });
+                return {
+                    users: (data?.users ?? [])
+                        .map(mapAdminUserRow)
+                        .filter((p) => p.uid),
+                    nextPageToken: data?.nextPageToken ?? null,
+                };
             }
             catch (error) {
-                if (error instanceof FunctionsUnavailableError)
-                    return [];
+                if (error instanceof FunctionsUnavailableError) {
+                    return { users: [], nextPageToken: null };
+                }
                 throw error;
             }
+        },
+        async createUser(input) {
+            const data = await callCloudFunction(functions, "adminCreateUser", input);
+            return data?.user ? mapAdminUserRow(data.user) : null;
+        },
+        async updateUser(input) {
+            const data = await callCloudFunction(functions, "adminUpdateUser", input);
+            return data?.user ? mapAdminUserRow(data.user) : null;
         },
         async deactivateUser(uid) {
             await callCloudFunction(functions, "adminDeactivateUser", { uid });
@@ -100,9 +139,39 @@ function createAdminRepository(functions) {
                 throw error;
             }
         },
-        async listOrgSubtree(parentId) {
+        async listOrgSubtree(parentId, opts) {
             try {
-                const data = await callCloudFunction(functions, "listOrgSubtree", { parentId: parentId ?? null });
+                const data = await callCloudFunction(functions, "listOrgSubtree", {
+                    parentId: parentId ?? null,
+                    full: opts?.full === true,
+                    includeInactive: opts?.includeInactive === true,
+                });
+                return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
+            }
+            catch (error) {
+                if (error instanceof FunctionsUnavailableError)
+                    return [];
+                throw error;
+            }
+        },
+        async listAgencies(opts) {
+            try {
+                const data = await callCloudFunction(functions, "listAgenciesForAdmin", opts ?? {});
+                return {
+                    agencies: (data?.agencies ?? []).map(mapOrgNode).filter((n) => n.id),
+                    nextPageToken: data?.nextPageToken ?? null,
+                };
+            }
+            catch (error) {
+                if (error instanceof FunctionsUnavailableError) {
+                    return { agencies: [], nextPageToken: null };
+                }
+                throw error;
+            }
+        },
+        async listOrgNodesByType(type, pageSize = 100) {
+            try {
+                const data = await callCloudFunction(functions, "listOrgNodesByType", { type, pageSize });
                 return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
             }
             catch (error) {
@@ -138,6 +207,39 @@ function createAdminRepository(functions) {
         },
         async setUserRole(uid, role) {
             await callCloudFunction(functions, "setUserRole", { uid, role });
+        },
+        async listRoles(filters) {
+            try {
+                const data = await callCloudFunction(functions, "listRoles", filters ?? {});
+                return {
+                    roles: (data?.roles ?? [])
+                        .map(mapRoleDoc)
+                        .filter((r) => r.id),
+                };
+            }
+            catch (error) {
+                if (error instanceof FunctionsUnavailableError) {
+                    return { roles: [] };
+                }
+                throw error;
+            }
+        },
+        async createRole(input) {
+            const data = await callCloudFunction(functions, "createRole", input);
+            return data?.role ? mapRoleDoc(data.role) : null;
+        },
+        async updateRole(input) {
+            const data = await callCloudFunction(functions, "updateRole", input);
+            return data?.role ? mapRoleDoc(data.role) : null;
+        },
+        async deleteRole(id, hard = false) {
+            await callCloudFunction(functions, "deleteRole", { id, hard });
+        },
+        async seedSystemRoles() {
+            const data = await callCloudFunction(functions, "seedSystemRoles", {});
+            return {
+                roles: (data?.roles ?? []).map(mapRoleDoc).filter((r) => r.id),
+            };
         },
     };
 }

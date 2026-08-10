@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.mapOrgNode = exports.mapAdminUserRow = exports.callCloudFunction = exports.FunctionsUnavailableError = exports.createAdminRepository = exports.mapForumReply = exports.mapForumThread = exports.mapUserProfile = exports.toDate = void 0;
+exports.loadPermissionsForRoles = exports.watchRolePermissions = exports.mapOrgNode = exports.mapAdminUserRow = exports.callCloudFunction = exports.FunctionsUnavailableError = exports.createAdminRepository = exports.mapForumReply = exports.mapForumThread = exports.mapUserProfile = exports.toDate = void 0;
 var dates_1 = require("./dates");
 Object.defineProperty(exports, "toDate", { enumerable: true, get: function () { return dates_1.toDate; } });
 var users_1 = require("./users");
@@ -14,3 +14,6 @@ Object.defineProperty(exports, "FunctionsUnavailableError", { enumerable: true, 
 Object.defineProperty(exports, "callCloudFunction", { enumerable: true, get: function () { return admin_1.callCloudFunction; } });
 Object.defineProperty(exports, "mapAdminUserRow", { enumerable: true, get: function () { return admin_1.mapAdminUserRow; } });
 Object.defineProperty(exports, "mapOrgNode", { enumerable: true, get: function () { return admin_1.mapOrgNode; } });
+var roles_1 = require("./roles");
+Object.defineProperty(exports, "watchRolePermissions", { enumerable: true, get: function () { return roles_1.watchRolePermissions; } });
+Object.defineProperty(exports, "loadPermissionsForRoles", { enumerable: true, get: function () { return roles_1.loadPermissionsForRoles; } });
