@@ -16,6 +16,17 @@ export async function setUserApproval(
   });
 }
 
+export async function bulkSetUserApproval(
+  uids: string[],
+  status: "approved" | "rejected",
+) {
+  return await callCloudFunction<{
+    ok: boolean;
+    succeeded: string[];
+    failed: Array<{ id: string; code: string; message: string }>;
+  }>(getFirebaseFunctions(), "bulkSetUserApproval", { uids, status });
+}
+
 export async function listPendingApprovals(): Promise<UserProfile[]> {
   try {
     const data = await callCloudFunction<{

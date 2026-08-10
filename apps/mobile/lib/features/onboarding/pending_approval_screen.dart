@@ -44,8 +44,8 @@ class PendingApprovalScreen extends StatelessWidget {
                         ? 'Cuenta no aprobada'
                         : 'Account not approved')
                     : (l10n.localeName.startsWith('es')
-                        ? 'Esperando aprobación'
-                        : 'Waiting for approval'),
+                        ? 'Esperando aprobación del equipo admin'
+                        : 'Waiting for admin approval'),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -58,8 +58,8 @@ class PendingApprovalScreen extends StatelessWidget {
                         ? 'Un administrador rechazó el acceso. Contacta soporte si crees que es un error.'
                         : 'An administrator declined access. Contact support if you think this is a mistake.')
                     : (l10n.localeName.startsWith('es')
-                        ? 'Gracias por unirte a Pulse. Un admin o manager revisará tu cuenta pronto.'
-                        : 'Thanks for joining Pulse. An admin or manager will review your account shortly.'),
+                        ? 'Gracias por unirte a Pulse. Un admin o manager con permiso de aprobación debe aprobar tu cuenta antes de que puedas usar la app.'
+                        : 'Thanks for joining Pulse. An admin or manager with approval permission must approve your account before you can use the app.'),
                 textAlign: TextAlign.center,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: colors.muted,

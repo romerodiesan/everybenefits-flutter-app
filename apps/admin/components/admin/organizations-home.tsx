@@ -3,10 +3,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
-import type { ColumnDef } from "@tanstack/react-table";
+import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import type { OrgNode } from "@pulse/shared";
 import { canManagePlatform } from "@/lib/roles";
-import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import {
+  BULK_MAX_SELECTED,
+  clampSelection,
+  formatBulkOutcome,
+  selectedIdsFromState,
+} from "@/lib/bulk-selection";
+import { useAccess } from "@/lib/providers/auth-provider";
 import { getAdminRepository } from "@/lib/repositories/admin-repository";
 import { ORG_DEPTH_TYPE, type OrgNodeType } from "@/lib/types";
 import { Button, Input, Label, SearchInput } from "@/components/ui/primitives";
@@ -25,7 +31,6 @@ import {
   useOrgNodesByTypeQuery,
   useOrgRootsQuery,
 } from "@/lib/hooks/use-admin-queries";
-
 type TreeNodeState = OrgNode & {
   childrenLoaded?: boolean;
   children?: TreeNodeState[];
@@ -52,7 +57,6 @@ function toTreeNodes(nodes: OrgNode[]): TreeNodeState[] {
 
 export function OrganizationsHome() {
   const t = useTranslations();
-  const { profile } = useAuth();
   const access = useAccess();
   const isAdmin = canManagePlatform(access);
   const [tab, setTab] = useState<"tree" | "agencies">("tree");
@@ -80,6 +84,9 @@ export function OrganizationsHome() {
   const [agencyEdit, setAgencyEdit] = useState<OrgNode | null>(null);
   const [agencyName, setAgencyName] = useState("");
   const [agencyParentId, setAgencyParentId] = useState("");
+  const [agencySelection, setAgencySelection] = useState<RowSelectionState>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
 
   const regionsQuery = useOrgNodesByTypeQuery(
     "region",
@@ -126,7 +133,48 @@ export function OrganizationsHome() {
   useEffect(() => {
     setAgencyToken(null);
     setAgencyStack([null]);
+    setAgencySelection({});
   }, [debouncedAgencyQuery, agencyPageSize, includeInactive]);
+
+  const selectedAgencyIds = selectedIdsFromState(agencySelection);
+
+  const runAgencyBulk = async (active: boolean) => {
+    if (!active) {
+      if (
+        !window.confirm(
+          t("bulkConfirmDeactivateAgencies", {
+            count: selectedAgencyIds.length,
+          }),
+        )
+      ) {
+        return;
+      }
+    }
+    setBulkBusy(true);
+    setBulkMessage(null);
+    try {
+      const result = await repo.bulkSetOrgNodesActive(
+        selectedAgencyIds,
+        active,
+      );
+      setBulkMessage(
+        formatBulkOutcome(result, {
+          success: (count) => t("bulkSuccess", { count }),
+          partial: (failed, total) =>
+            t("bulkPartialFailure", { failed, total }),
+        }),
+      );
+      setAgencySelection({});
+      await Promise.all([
+        invalidate.invalidateAgencies(),
+        invalidate.invalidateInsights(),
+      ]);
+    } catch (err) {
+      setBulkMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
 
   const refreshTree = async () => {
     setTreeUi({});
@@ -353,57 +401,113 @@ export function OrganizationsHome() {
           renderTree(roots)
         )
       ) : (
-        <DataTable
-          columns={agencyColumns}
-          data={agencies}
-          loading={agenciesQuery.isLoading}
-          isFetching={agenciesQuery.isFetching}
-          emptyTitle={t("orgAgenciesEmpty")}
-          getRowId={(row) => row.id}
-          pageSize={agencyPageSize}
-          canPreviousPage={agencyStack.length > 1}
-          canNextPage={Boolean(agencyNext)}
-          onPreviousPage={() => {
-            setAgencyStack((s) => {
-              if (s.length <= 1) return s;
-              const next = s.slice(0, -1);
-              setAgencyToken(next[next.length - 1] ?? null);
-              return next;
-            });
-          }}
-          onNextPage={() => {
-            if (!agencyNext) return;
-            setAgencyStack((s) => [...s, agencyNext]);
-            setAgencyToken(agencyNext);
-          }}
-          onPageSizeChange={setAgencyPageSize}
-          previousLabel={t("usersPrev")}
-          nextLabel={t("usersNext")}
-          rowsLabel={t("tableRows")}
-          toolbar={
-            <>
-              <label className="flex min-w-[16rem] flex-1 flex-col gap-1.5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
-                  {t("usersSearchLabel")}
-                </span>
-                <SearchInput
-                  value={agencyQuery}
-                  onChange={(e) => setAgencyQuery(e.target.value)}
-                  placeholder={t("orgAgencySearch")}
-                  aria-label={t("orgAgencySearch")}
-                />
-              </label>
-              <label className="mb-2.5 flex items-center gap-2 text-sm text-muted">
-                <input
-                  type="checkbox"
-                  checked={includeInactive}
-                  onChange={(e) => setIncludeInactive(e.target.checked)}
-                />
-                {t("orgShowInactive")}
-              </label>
-            </>
-          }
-        />
+        <>
+          {bulkMessage ? (
+            <p className="text-sm text-muted" role="status">
+              {bulkMessage}
+            </p>
+          ) : null}
+          <DataTable
+            columns={agencyColumns}
+            data={agencies}
+            loading={agenciesQuery.isLoading}
+            isFetching={agenciesQuery.isFetching}
+            emptyTitle={t("orgAgenciesEmpty")}
+            getRowId={(row) => row.id}
+            enableRowSelection={isAdmin}
+            rowSelection={agencySelection}
+            onRowSelectionChange={(updater) => {
+              setAgencySelection((prev) => {
+                const next =
+                  typeof updater === "function" ? updater(prev) : updater;
+                return clampSelection(next);
+              });
+            }}
+            bulkBar={
+              isAdmin ? (
+                <>
+                  <span className="text-sm font-semibold text-ink">
+                    {t("bulkSelected", { count: selectedAgencyIds.length })}
+                  </span>
+                  {selectedAgencyIds.length >= BULK_MAX_SELECTED ? (
+                    <span className="text-xs text-muted">
+                      {t("bulkMaxSelected", { max: BULK_MAX_SELECTED })}
+                    </span>
+                  ) : null}
+                  <Button
+                    className="h-8 px-3 text-xs"
+                    disabled={bulkBusy}
+                    onClick={() => void runAgencyBulk(true)}
+                  >
+                    {t("bulkActivate")}
+                  </Button>
+                  <Button
+                    variant="danger"
+                    className="h-8 px-3 text-xs"
+                    disabled={bulkBusy}
+                    onClick={() => void runAgencyBulk(false)}
+                  >
+                    {t("bulkDeactivate")}
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="h-8 px-3 text-xs"
+                    disabled={bulkBusy}
+                    onClick={() => setAgencySelection({})}
+                  >
+                    {t("bulkClear")}
+                  </Button>
+                  {bulkBusy ? (
+                    <span className="text-xs text-muted">{t("bulkBusy")}</span>
+                  ) : null}
+                </>
+              ) : undefined
+            }
+            pageSize={agencyPageSize}
+            canPreviousPage={agencyStack.length > 1}
+            canNextPage={Boolean(agencyNext)}
+            onPreviousPage={() => {
+              setAgencyStack((s) => {
+                if (s.length <= 1) return s;
+                const next = s.slice(0, -1);
+                setAgencyToken(next[next.length - 1] ?? null);
+                return next;
+              });
+            }}
+            onNextPage={() => {
+              if (!agencyNext) return;
+              setAgencyStack((s) => [...s, agencyNext]);
+              setAgencyToken(agencyNext);
+            }}
+            onPageSizeChange={setAgencyPageSize}
+            previousLabel={t("usersPrev")}
+            nextLabel={t("usersNext")}
+            rowsLabel={t("tableRows")}
+            toolbar={
+              <>
+                <label className="flex min-w-[16rem] flex-1 flex-col gap-1.5">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
+                    {t("usersSearchLabel")}
+                  </span>
+                  <SearchInput
+                    value={agencyQuery}
+                    onChange={(e) => setAgencyQuery(e.target.value)}
+                    placeholder={t("orgAgencySearch")}
+                    aria-label={t("orgAgencySearch")}
+                  />
+                </label>
+                <label className="mb-2.5 flex items-center gap-2 text-sm text-muted">
+                  <input
+                    type="checkbox"
+                    checked={includeInactive}
+                    onChange={(e) => setIncludeInactive(e.target.checked)}
+                  />
+                  {t("orgShowInactive")}
+                </label>
+              </>
+            }
+          />
+        </>
       )}
 
       <Drawer

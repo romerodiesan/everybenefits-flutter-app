@@ -96,3 +96,9 @@ export {
   listAgenciesForAdmin,
   listOrgNodesByType,
 } from "./org";
+
+export {
+  bulkSetUserApproval,
+  bulkSetUserAccountStatus,
+  bulkSetOrgNodesActive,
+} from "./bulk";

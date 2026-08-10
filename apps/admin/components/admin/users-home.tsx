@@ -2,11 +2,17 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
-import type { ColumnDef } from "@tanstack/react-table";
-import type { AdminUserRow } from "@pulse/firebase-web";
+import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
+import type { AdminUserRow, BulkResult } from "@pulse/firebase-web";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { getAdminRepository } from "@/lib/repositories/admin-repository";
-import { canManagePlatform, headlineName } from "@/lib/roles";
+import { can, canManagePlatform, headlineName } from "@/lib/roles";
+import {
+  BULK_MAX_SELECTED,
+  clampSelection,
+  formatBulkOutcome,
+  selectedIdsFromState,
+} from "@/lib/bulk-selection";
 import { ALL_ROLES, type UserRole } from "@/lib/types";
 import { Button, SearchInput } from "@/components/ui/primitives";
 import { DataTable } from "@/components/ui/data-table";
@@ -82,6 +88,7 @@ export function UsersHome() {
   const { profile } = useAuth();
   const access = useAccess();
   const isAdmin = canManagePlatform(access);
+  const canDecideApprovals = can(access, "admin.approvals.decide");
   const invalidate = useInvalidateAdminQueries();
 
   const [query, setQuery] = useState("");
@@ -98,6 +105,9 @@ export function UsersHome() {
   const [formBusy, setFormBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
   const [loadAgencies, setLoadAgencies] = useState(false);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMessage, setBulkMessage] = useState<string | null>(null);
 
   const filters = useMemo(
     () => ({
@@ -119,10 +129,13 @@ export function UsersHome() {
   useEffect(() => {
     setPageToken(null);
     setTokenStack([null]);
+    setRowSelection({});
   }, [debouncedQuery, role, approvalStatus, pageSize]);
 
   const users = usersQuery.data?.users ?? [];
   const nextPageToken = usersQuery.data?.nextPageToken ?? null;
+  const selectedIds = selectedIdsFromState(rowSelection);
+  const enableBulk = canDecideApprovals || isAdmin;
 
   const openCreate = () => {
     setLoadAgencies(true);
@@ -175,6 +188,31 @@ export function UsersHome() {
       setFormError(err instanceof Error ? err.message : String(err));
     } finally {
       setFormBusy(false);
+    }
+  };
+
+  const runBulk = async (action: () => Promise<BulkResult>) => {
+    setBulkBusy(true);
+    setBulkMessage(null);
+    try {
+      const result = await action();
+      setBulkMessage(
+        formatBulkOutcome(result, {
+          success: (count) => t("bulkSuccess", { count }),
+          partial: (failed, total) =>
+            t("bulkPartialFailure", { failed, total }),
+        }),
+      );
+      setRowSelection({});
+      await Promise.all([
+        invalidate.invalidateUsers(),
+        invalidate.invalidateApprovals(),
+        invalidate.invalidateInsights(),
+      ]);
+    } catch (err) {
+      setBulkMessage(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBulkBusy(false);
     }
   };
 
@@ -320,6 +358,7 @@ export function UsersHome() {
           value={approvalStatus}
           onChange={(e) => setApprovalStatus(e.target.value)}
           className={FILTER_SELECT_CLASS}
+          title={t("usersApprovalHint")}
         >
           <option value="">{t("usersFilterAll")}</option>
           <option value="pending">{t("approvalStatusPending")}</option>
@@ -335,6 +374,111 @@ export function UsersHome() {
     </>
   );
 
+  const bulkBar = (
+    <>
+      <span className="text-sm font-semibold text-ink">
+        {t("bulkSelected", { count: selectedIds.length })}
+      </span>
+      {selectedIds.length >= BULK_MAX_SELECTED ? (
+        <span className="text-xs text-muted">
+          {t("bulkMaxSelected", { max: BULK_MAX_SELECTED })}
+        </span>
+      ) : null}
+      {canDecideApprovals ? (
+        <>
+          <Button
+            className="h-8 px-3 text-xs"
+            disabled={bulkBusy}
+            onClick={() =>
+              void runBulk(() =>
+                getAdminRepository().bulkSetUserApproval(
+                  selectedIds,
+                  "approved",
+                ),
+              )
+            }
+          >
+            {t("bulkApprove")}
+          </Button>
+          <Button
+            variant="danger"
+            className="h-8 px-3 text-xs"
+            disabled={bulkBusy}
+            onClick={() => {
+              if (
+                !window.confirm(
+                  t("bulkConfirmReject", { count: selectedIds.length }),
+                )
+              ) {
+                return;
+              }
+              void runBulk(() =>
+                getAdminRepository().bulkSetUserApproval(
+                  selectedIds,
+                  "rejected",
+                ),
+              );
+            }}
+          >
+            {t("bulkReject")}
+          </Button>
+        </>
+      ) : null}
+      {isAdmin ? (
+        <>
+          <Button
+            variant="secondary"
+            className="h-8 px-3 text-xs"
+            disabled={bulkBusy}
+            onClick={() =>
+              void runBulk(() =>
+                getAdminRepository().bulkSetUserAccountStatus(
+                  selectedIds,
+                  "active",
+                ),
+              )
+            }
+          >
+            {t("bulkReactivate")}
+          </Button>
+          <Button
+            variant="danger"
+            className="h-8 px-3 text-xs"
+            disabled={bulkBusy}
+            onClick={() => {
+              if (
+                !window.confirm(
+                  t("bulkConfirmDeactivate", { count: selectedIds.length }),
+                )
+              ) {
+                return;
+              }
+              void runBulk(() =>
+                getAdminRepository().bulkSetUserAccountStatus(
+                  selectedIds,
+                  "deactivated",
+                ),
+              );
+            }}
+          >
+            {t("bulkDeactivate")}
+          </Button>
+        </>
+      ) : null}
+      <Button
+        variant="ghost"
+        className="h-8 px-3 text-xs"
+        disabled={bulkBusy}
+        onClick={() => setRowSelection({})}
+      >
+        {t("bulkClear")}
+      </Button>
+      {bulkBusy ? (
+        <span className="text-xs text-muted">{t("bulkBusy")}</span>
+      ) : null}
+    </>
+  );
+
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
       <header>
@@ -342,7 +486,14 @@ export function UsersHome() {
           {t("usersTitle")}
         </h1>
         <p className="mt-1 text-sm text-muted">{t("usersSubtitle")}</p>
+        <p className="mt-1 text-xs text-muted">{t("usersApprovalHint")}</p>
       </header>
+
+      {bulkMessage ? (
+        <p className="text-sm text-muted" role="status">
+          {bulkMessage}
+        </p>
+      ) : null}
 
       <DataTable
         columns={columns}
@@ -352,6 +503,16 @@ export function UsersHome() {
         emptyTitle={t("usersEmpty")}
         emptyHint={t("usersEmptyHint")}
         toolbar={toolbar}
+        enableRowSelection={enableBulk}
+        rowSelection={rowSelection}
+        onRowSelectionChange={(updater) => {
+          setRowSelection((prev) => {
+            const next =
+              typeof updater === "function" ? updater(prev) : updater;
+            return clampSelection(next);
+          });
+        }}
+        bulkBar={enableBulk ? bulkBar : undefined}
         getRowId={(row) => row.uid}
         pageSize={pageSize}
         canPreviousPage={tokenStack.length > 1}

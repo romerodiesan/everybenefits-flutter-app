@@ -90,6 +90,18 @@ export type ListRolesResult = {
   roles: RoleDoc[];
 };
 
+export type BulkFailure = {
+  id: string;
+  code: string;
+  message: string;
+};
+
+export type BulkResult = {
+  ok: boolean;
+  succeeded: string[];
+  failed: BulkFailure[];
+};
+
 function mapRoleDoc(entry: Record<string, unknown>): RoleDoc {
   const category = String(entry.category ?? "custom");
   return {
@@ -191,6 +203,18 @@ export type AdminRepository = {
   }) => Promise<AdminUserRow | null>;
   deactivateUser: (uid: string) => Promise<void>;
   reactivateUser: (uid: string) => Promise<void>;
+  bulkSetUserApproval: (
+    uids: string[],
+    status: "approved" | "rejected",
+  ) => Promise<BulkResult>;
+  bulkSetUserAccountStatus: (
+    uids: string[],
+    status: "active" | "deactivated",
+  ) => Promise<BulkResult>;
+  bulkSetOrgNodesActive: (
+    ids: string[],
+    active: boolean,
+  ) => Promise<BulkResult>;
   getInsights: () => Promise<AdminInsights | null>;
   listOrgSubtree: (
     parentId?: string | null,
@@ -286,6 +310,27 @@ export function createAdminRepository(functions: Functions): AdminRepository {
     },
     async reactivateUser(uid) {
       await callCloudFunction(functions, "adminReactivateUser", { uid });
+    },
+    async bulkSetUserApproval(uids, status) {
+      return await callCloudFunction<BulkResult>(
+        functions,
+        "bulkSetUserApproval",
+        { uids, status },
+      );
+    },
+    async bulkSetUserAccountStatus(uids, status) {
+      return await callCloudFunction<BulkResult>(
+        functions,
+        "bulkSetUserAccountStatus",
+        { uids, status },
+      );
+    },
+    async bulkSetOrgNodesActive(ids, active) {
+      return await callCloudFunction<BulkResult>(
+        functions,
+        "bulkSetOrgNodesActive",
+        { ids, active },
+      );
     },
     async getInsights() {
       try {

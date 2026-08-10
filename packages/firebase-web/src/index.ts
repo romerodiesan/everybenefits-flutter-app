@@ -20,6 +20,8 @@ export {
   type ListAgenciesResult,
   type ListRolesFilters,
   type ListRolesResult,
+  type BulkFailure,
+  type BulkResult,
 } from "./admin";
 export {
   watchRolePermissions,
