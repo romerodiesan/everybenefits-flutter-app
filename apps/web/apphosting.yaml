@@ -87,14 +87,9 @@ env:
   #   value: REPLACE_ME
   #   availability: [BUILD, RUNTIME]
 
-  # App Check — reCAPTCHA Enterprise (Google Cloud Fraud Defense site key).
-  # Same key for pulse / studio / admin web apps.
-  #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_APPCHECK_SITE_KEY --project every-benefits-us
-  - variable: NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY
-    secret: FIREBASE_APPCHECK_SITE_KEY
-    availability:
-      - BUILD
-      - RUNTIME
+  # App Check is disabled for now. Re-enable later with
+  # NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY + PULSE_SSO_REQUIRE_APP_CHECK /
+  # PULSE_AI_REQUIRE_APP_CHECK / FUNCTIONS_ENFORCE_APP_CHECK=true.
 
   # --- Admin ---
   - variable: FIREBASE_PROJECT_ID

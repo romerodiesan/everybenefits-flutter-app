@@ -4,7 +4,9 @@ exports.isSafeInternalPath = isSafeInternalPath;
 exports.safeInternalPath = safeInternalPath;
 /**
  * Same-origin relative path only. Rejects protocol-relative (`//evil`),
- * backslashes, and schemes — blocks open redirects via `?next=`.
+ * backslashes, and schemes in the **pathname** — blocks open redirects via
+ * `?next=`. Absolute URLs may appear in the query (e.g. SSO bridge `return=`)
+ * and are validated by the destination page.
  */
 function isSafeInternalPath(path) {
     if (!path)
@@ -15,7 +17,11 @@ function isSafeInternalPath(path) {
         return false;
     if (path.includes("\\"))
         return false;
-    if (path.includes("://"))
+    const pathname = path.split(/[?#]/, 2)[0] ?? "";
+    if (pathname.includes("://"))
+        return false;
+    // e.g. `/javascript:…` style path segments
+    if (/^\/[a-zA-Z][a-zA-Z0-9+.-]*:/.test(pathname))
         return false;
     return true;
 }

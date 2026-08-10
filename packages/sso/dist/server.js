@@ -35,16 +35,11 @@ function contextFromRequest(request) {
         clientIp: clientIpFromRequest(request),
     };
 }
-/** Unified App Check policy: on in production when site key is set; env overrides. */
+/** App Check for SSO is opt-in only (`PULSE_SSO_REQUIRE_APP_CHECK=true`). */
 function requireAppCheckEnabled(usingEmulators) {
     if (usingEmulators)
         return false;
-    if (process.env.PULSE_SSO_REQUIRE_APP_CHECK === "false")
-        return false;
-    if (process.env.PULSE_SSO_REQUIRE_APP_CHECK === "true")
-        return true;
-    return (process.env.NODE_ENV === "production" &&
-        Boolean(process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim()));
+    return process.env.PULSE_SSO_REQUIRE_APP_CHECK === "true";
 }
 function rateLimitDocId(bucket, identity) {
     const hash = (0, node_crypto_1.createHash)("sha256").update(identity).digest("hex").slice(0, 32);

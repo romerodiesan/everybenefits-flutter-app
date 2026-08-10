@@ -21,7 +21,7 @@ export type SsoRequestContext = {
     skipAppCheck?: boolean;
 };
 export declare function contextFromRequest(request: Request): SsoRequestContext;
-/** Unified App Check policy: on in production when site key is set; env overrides. */
+/** App Check for SSO is opt-in only (`PULSE_SSO_REQUIRE_APP_CHECK=true`). */
 export declare function requireAppCheckEnabled(usingEmulators: boolean): boolean;
 export declare function rateLimitDocId(bucket: string, identity: string): string;
 export declare function createSsoServer(deps: SsoServerDeps): {

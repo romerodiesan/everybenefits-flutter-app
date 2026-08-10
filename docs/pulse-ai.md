@@ -25,7 +25,7 @@ Copy from `apps/web/.env.example`. Required for a real agent:
 | Variable | Purpose |
 |----------|---------|
 | `AI_GATEWAY_API_KEY` | Vercel AI Gateway. On Vercel, OIDC can provision this. |
-| `FIREBASE_SERVICE_ACCOUNT_KEY` | Admin SDK JSON (raw or base64) for Auth, Firestore, App Check. |
+| `FIREBASE_SERVICE_ACCOUNT_KEY` | Admin SDK JSON (raw or base64) for Auth and Firestore. |
 | `FIREBASE_PROJECT_ID` | Defaults to the client project id when unset. |
 | `PULSE_AI_ADMIN_TASK_KEY` | Shared secret for `/api/ai/reindex`. |
 | `CRON_SECRET` | Also accepted by the reindex route (Vercel Cron). |
@@ -40,7 +40,7 @@ Useful knobs:
 | `PULSE_AI_EMBEDDING_DIMENSIONS` | `768` | Must match the Firestore vector index |
 | `PULSE_AI_DAILY_MESSAGE_LIMIT` | `60` | Per UID |
 | `PULSE_AI_PER_MINUTE_MESSAGE_LIMIT` | `8` | Per UID |
-| `PULSE_AI_REQUIRE_APP_CHECK` | on in production | Set `false` to disable |
+| `PULSE_AI_REQUIRE_APP_CHECK` | `false` | Set `true` to require `X-Firebase-AppCheck` |
 | `PULSE_AI_ALLOW_ANONYMOUS` | `false` | Guests blocked by default |
 | `PULSE_AI_WEB_SEARCH_PROVIDER` | `none` | `tavily` \| `brave` \| `none` |
 | `PULSE_AI_PUBLIC_BASE_URL` | site URL | Used when building absolute links |
@@ -64,8 +64,8 @@ Debug builds default to `http://<emulator-host>:3000` (Android emulator → `10.
    `users/{uid}/aiConversations/**` and read their `aiUsage` counters.
 3. **Realtime Database** — clients can no longer write messages as
    `support-ai`. Bot turns go through the `postSupportAiMessage` callable.
-4. **App Check** — enforce for production web and mobile; the agent API
-   verifies `X-Firebase-AppCheck` when required.
+4. **App Check** — currently **off**. Set `PULSE_AI_REQUIRE_APP_CHECK=true`
+   (and client tokens) when re-enabling.
 
 Deploy rules / indexes / functions:
 
@@ -120,7 +120,7 @@ NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true pnpm dev
 flutter run --dart-define=USE_FIREBASE_EMULATORS=true
 ```
 
-App Check is skipped against emulators. Vector search falls back to lexical
+App Check is currently off (tokens optional). Vector search falls back to lexical
 retrieval when the vector index is unavailable locally.
 
 ## Quality gates

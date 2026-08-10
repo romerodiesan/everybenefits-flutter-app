@@ -58,15 +58,10 @@ export function contextFromRequest(request: Request): SsoRequestContext {
   };
 }
 
-/** Unified App Check policy: on in production when site key is set; env overrides. */
+/** App Check for SSO is opt-in only (`PULSE_SSO_REQUIRE_APP_CHECK=true`). */
 export function requireAppCheckEnabled(usingEmulators: boolean): boolean {
   if (usingEmulators) return false;
-  if (process.env.PULSE_SSO_REQUIRE_APP_CHECK === "false") return false;
-  if (process.env.PULSE_SSO_REQUIRE_APP_CHECK === "true") return true;
-  return (
-    process.env.NODE_ENV === "production" &&
-    Boolean(process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim())
-  );
+  return process.env.PULSE_SSO_REQUIRE_APP_CHECK === "true";
 }
 
 export function rateLimitDocId(bucket: string, identity: string): string {

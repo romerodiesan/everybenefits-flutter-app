@@ -28,17 +28,16 @@ Copy values from `.env.example`. They match the Firebase web app already registe
 
 Optional:
 
-- `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` — reCAPTCHA Enterprise site key (Google Cloud Fraud Defense) for App Check
 - `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true` — point Auth / Firestore / RTDB / Storage / Functions at local emulators
+- App Check is **off**; opt-in later with `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` + require flags
 
 ### Firebase Console checklist
 
-1. **Authentication → Settings → Authorized domains**: add `localhost` and your Vercel domain.
+1. **Authentication → Settings → Authorized domains**: add `localhost` and your deploy domains.
 2. **Realtime Database**: project must have the default instance
-   `https://every-insurance-default-rtdb.firebaseio.com` (create via Console or
-   `firebase database:instances:create` / Management API), then
+   `https://every-benefits-us-default-rtdb.firebaseio.com`, then
    `firebase deploy --only database`.
-3. **App Check**: register each web app in Firebase Console with **reCAPTCHA Enterprise** (same Fraud Defense site key), set `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY`, and store it as App Hosting secret `FIREBASE_APPCHECK_SITE_KEY`.
+3. **App Check**: leave products on **Monitor** (not Enforce) while disabled.
 4. Google sign-in provider must remain enabled (same as mobile).
 
 > Flutter debug defaults to **emulators**. Web `pnpm dev` talks to **production**

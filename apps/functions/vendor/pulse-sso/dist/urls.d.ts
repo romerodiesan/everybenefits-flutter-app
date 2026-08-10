@@ -6,6 +6,20 @@ export declare function appBaseUrl(app: PulseAppId): string;
 /** Prefer Pulse as the SSO hub for silent bridges. */
 export declare function siblingApp(app: PulseAppId): PulseAppId;
 export declare function otherApps(current: PulseAppId): PulseAppId[];
+/** Canonical account settings path on the Pulse auth hub. */
+export declare const PULSE_ACCOUNT_PATH = "/account";
+/**
+ * Absolute Pulse login URL that resumes an SSO bridge after credentials.
+ * `returnConsumeUrl` must be an allowed sibling `/auth/sso` URL.
+ */
+export declare function pulseHubLoginUrl(locale: string, returnConsumeUrl: string): string;
+/** Absolute Pulse account URL (optionally with query, e.g. `?section=security`). */
+export declare function pulseAccountUrl(locale: string, accountPath?: string): string;
+/**
+ * Build a multi-hop logout URL that clears every sibling origin, then lands
+ * on `finalUrl` (Firebase Auth sessions are per-origin).
+ */
+export declare function buildLogoutCascadeUrl(current: PulseAppId, locale: string, finalUrl: string): string;
 export declare function allAppOrigins(): Set<string>;
 /** Absolute SSO consume URL on `app`, with optional post-login path. */
 export declare function ssoConsumeUrl(app: PulseAppId, locale: string, nextPath?: string): string;

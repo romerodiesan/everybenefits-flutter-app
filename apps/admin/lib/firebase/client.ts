@@ -16,11 +16,7 @@ import {
   connectFunctionsEmulator,
   type Functions,
 } from "firebase/functions";
-import {
-  initializeAppCheck,
-  ReCaptchaEnterpriseProvider,
-  type AppCheck,
-} from "firebase/app-check";
+import type { AppCheck } from "firebase/app-check";
 
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
@@ -33,7 +29,6 @@ const firebaseConfig = {
   measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
 };
 
-let appCheck: AppCheck | null = null;
 let emulatorsConnected = false;
 
 export function getFirebaseApp(): FirebaseApp {
@@ -71,17 +66,17 @@ export function getFirebaseFunctions(): Functions {
 }
 
 /**
- * The App Check instance, when configured. SDK calls attach tokens on their
- * own; this exists for hand-rolled `fetch` calls to our own API routes.
+ * App Check is currently disabled (opt-in later). Kept so SSO helpers can keep
+ * calling this without special-casing.
  */
 export function getFirebaseAppCheck(): AppCheck | null {
-  return appCheck;
+  return null;
 }
 
 export function initFirebaseClient() {
   if (typeof window === "undefined") return;
 
-  const app = getFirebaseApp();
+  getFirebaseApp();
 
   const useEmulators =
     process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
@@ -110,19 +105,5 @@ export function initFirebaseClient() {
       console.warn("Firebase emulator connect skipped:", error);
     }
     emulatorsConnected = true;
-  }
-
-  // App Check via reCAPTCHA Enterprise (same Fraud Defense site key as Pulse).
-  // Skip on emulators — use debug tokens if you need App Check against prod APIs.
-  const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim();
-  if (siteKey && !useEmulators && !appCheck) {
-    try {
-      appCheck = initializeAppCheck(app, {
-        provider: new ReCaptchaEnterpriseProvider(siteKey),
-        isTokenAutoRefreshEnabled: true,
-      });
-    } catch (error) {
-      console.warn("App Check init skipped:", error);
-    }
   }
 }

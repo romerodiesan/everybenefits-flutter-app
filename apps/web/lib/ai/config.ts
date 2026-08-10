@@ -18,8 +18,6 @@ function boolEnv(name: string, fallback: boolean): boolean {
   return raw === "true" || raw === "1" || raw === "yes";
 }
 
-const isProduction = process.env.NODE_ENV === "production";
-
 export const aiConfig = {
   /** Reasoning model behind the conversation. Routed through AI Gateway. */
   model: env("PULSE_AI_MODEL") ?? "anthropic/claude-sonnet-5",
@@ -47,8 +45,8 @@ export const aiConfig = {
 
   /** Anonymous/guest accounts get no agent access by default. */
   allowAnonymous: boolEnv("PULSE_AI_ALLOW_ANONYMOUS", false),
-  /** App Check is enforced in production unless explicitly disabled. */
-  requireAppCheck: boolEnv("PULSE_AI_REQUIRE_APP_CHECK", isProduction),
+  /** App Check off by default; set PULSE_AI_REQUIRE_APP_CHECK=true to enforce. */
+  requireAppCheck: boolEnv("PULSE_AI_REQUIRE_APP_CHECK", false),
 
   webSearchProvider: (env("PULSE_AI_WEB_SEARCH_PROVIDER") ?? "none").toLowerCase(),
   webSearchApiKey: env("PULSE_AI_WEB_SEARCH_API_KEY"),

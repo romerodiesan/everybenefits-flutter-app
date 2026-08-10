@@ -74,10 +74,7 @@ class PulseAiClient {
           headers['X-Firebase-AppCheck'] = token;
         }
       } catch (_) {
-        throw PulseAiException(
-          'app-check-failed',
-          'Device verification failed. Restart the app and try again.',
-        );
+        // App Check is optional — omit header when attestation fails.
       }
     }
     return headers;

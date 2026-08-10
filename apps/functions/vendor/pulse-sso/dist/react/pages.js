@@ -196,8 +196,6 @@ function SsoBridgePage({ loginPath = "/login", loadingMessageKey = "ssoBridging"
         : (error ?? t(loadingMessageKey));
     return ((0, jsx_runtime_1.jsx)("div", { className: "mesh-bg flex min-h-[100svh] items-center justify-center px-4 text-sm text-muted", children: message }));
 }
-let logoutOnce = null;
-let logoutDone = false;
 function LogoutCascadePage({ LoadingUI, signOutLocal, clearProfileCache, }) {
     const t = (0, next_intl_1.useTranslations)();
     const locale = (0, next_intl_1.useLocale)();
@@ -207,23 +205,15 @@ function LogoutCascadePage({ LoadingUI, signOutLocal, clearProfileCache, }) {
         let alive = true;
         const run = async () => {
             try {
-                if (!logoutDone) {
-                    if (!logoutOnce) {
-                        logoutOnce = (async () => {
-                            await signOutLocal();
-                            clearProfileCache?.();
-                            (0, client_1.clearSsoAttempt)();
-                            (0, client_1.markSsoAttempted)();
-                            logoutDone = true;
-                        })().catch((err) => {
-                            logoutOnce = null;
-                            throw err;
-                        });
-                    }
-                    await logoutOnce;
-                }
+                // Always clear this origin once per page load (no module singleton —
+                // Next soft-nav / Strict Mode must not skip sign-out).
+                await signOutLocal();
+                clearProfileCache?.();
+                (0, client_1.clearSsoAttempt)();
+                (0, client_1.markSsoAttempted)();
                 const next = params.get("next");
                 if (next && (0, urls_1.isAllowedLogoutNext)(next)) {
+                    // Absolute cross-origin cascade URLs must not get a locale prefix.
                     if ((0, paths_1.isSafeInternalPath)(next)) {
                         window.location.replace(`/${locale}${next}`);
                     }
@@ -253,6 +243,4 @@ function LogoutCascadePage({ LoadingUI, signOutLocal, clearProfileCache, }) {
 function __resetSsoUiForTests() {
     ssoConsumePromise = null;
     ssoConsumeDone = false;
-    logoutOnce = null;
-    logoutDone = false;
 }

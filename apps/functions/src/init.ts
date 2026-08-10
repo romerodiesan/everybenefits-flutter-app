@@ -27,10 +27,10 @@ setGlobalOptions({ region: "us-central1", maxInstances: 20 });
 
 /** Gen2 callables need explicit CORS for browser (e.g. localhost webapp). */
 const usingFunctionsEmulator = process.env.FUNCTIONS_EMULATOR === "true";
-/** Opt-out: set FUNCTIONS_ENFORCE_APP_CHECK=false only for emergency. Prod defaults on. */
+/** Opt-in: set FUNCTIONS_ENFORCE_APP_CHECK=true when App Check is ready. */
 const enforceAppCheck =
   !usingFunctionsEmulator &&
-  process.env.FUNCTIONS_ENFORCE_APP_CHECK !== "false";
+  process.env.FUNCTIONS_ENFORCE_APP_CHECK === "true";
 
 export const callableOpts = {
   // Emulator Gen2 often drops Access-Control headers on preflight when cors is

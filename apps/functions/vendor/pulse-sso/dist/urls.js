@@ -1,11 +1,15 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.PULSE_ACCOUNT_PATH = void 0;
 exports.pulseWebUrl = pulseWebUrl;
 exports.studioWebUrl = studioWebUrl;
 exports.adminWebUrl = adminWebUrl;
 exports.appBaseUrl = appBaseUrl;
 exports.siblingApp = siblingApp;
 exports.otherApps = otherApps;
+exports.pulseHubLoginUrl = pulseHubLoginUrl;
+exports.pulseAccountUrl = pulseAccountUrl;
+exports.buildLogoutCascadeUrl = buildLogoutCascadeUrl;
 exports.allAppOrigins = allAppOrigins;
 exports.ssoConsumeUrl = ssoConsumeUrl;
 exports.ssoBridgeUrl = ssoBridgeUrl;
@@ -41,6 +45,33 @@ function siblingApp(app) {
 }
 function otherApps(current) {
     return ["pulse", "studio", "admin"].filter((app) => app !== current);
+}
+/** Canonical account settings path on the Pulse auth hub. */
+exports.PULSE_ACCOUNT_PATH = "/account";
+/**
+ * Absolute Pulse login URL that resumes an SSO bridge after credentials.
+ * `returnConsumeUrl` must be an allowed sibling `/auth/sso` URL.
+ */
+function pulseHubLoginUrl(locale, returnConsumeUrl) {
+    const bridgeNext = `/auth/bridge?return=${encodeURIComponent(returnConsumeUrl)}`;
+    return `${pulseWebUrl()}/${locale}/login?next=${encodeURIComponent(bridgeNext)}`;
+}
+/** Absolute Pulse account URL (optionally with query, e.g. `?section=security`). */
+function pulseAccountUrl(locale, accountPath = exports.PULSE_ACCOUNT_PATH) {
+    const path = (0, paths_1.safeInternalPath)(accountPath, exports.PULSE_ACCOUNT_PATH);
+    return `${pulseWebUrl()}/${locale}${path}`;
+}
+/**
+ * Build a multi-hop logout URL that clears every sibling origin, then lands
+ * on `finalUrl` (Firebase Auth sessions are per-origin).
+ */
+function buildLogoutCascadeUrl(current, locale, finalUrl) {
+    const chain = otherApps(current);
+    let next = finalUrl;
+    for (let i = chain.length - 1; i >= 0; i--) {
+        next = logoutCascadeUrl(chain[i], locale, next);
+    }
+    return next;
 }
 function allAppOrigins() {
     return new Set([

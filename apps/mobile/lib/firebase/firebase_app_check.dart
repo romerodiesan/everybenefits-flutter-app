@@ -4,36 +4,17 @@ import 'package:flutter/foundation.dart';
 
 import 'firebase_emulators.dart';
 
-/// Activates App Check for production/staging builds.
+/// App Check is currently disabled across Pulse.
 ///
-/// Skipped while talking to local emulators — App Check tokens are not needed
-/// (and fail loudly with "App not registered" / attestation errors).
-///
-/// Debug builds against real Firebase need the printed debug token registered
-/// in Firebase Console → App Check → Manage debug tokens.
+/// Kept as a no-op so call sites do not need special-casing. Re-enable later by
+/// activating providers here and setting FUNCTIONS_ENFORCE_APP_CHECK /
+/// PULSE_SSO_REQUIRE_APP_CHECK / PULSE_AI_REQUIRE_APP_CHECK to true.
 Future<void> activateFirebaseAppCheck() async {
-  if (useFirebaseEmulators) {
-    // Prevent leftover DeviceCheck / attestation traffic after hot restart.
-    try {
-      await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);
-    } catch (_) {}
-    debugPrint('App Check skipped (Firebase emulators)');
-    return;
-  }
-
   try {
-    await FirebaseAppCheck.instance.activate(
-      providerApple: kDebugMode
-          ? const AppleDebugProvider()
-          : const AppleAppAttestWithDeviceCheckFallbackProvider(),
-      providerAndroid: kDebugMode
-          ? const AndroidDebugProvider()
-          : const AndroidPlayIntegrityProvider(),
-    );
-  } catch (error, stack) {
-    // Never block app start on App Check; log once for operators.
-    debugPrint('App Check activate failed: $error');
-    debugPrint('$stack');
+    await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);
+  } catch (_) {}
+  if (kDebugMode) {
+    debugPrint('App Check skipped (disabled)');
   }
 }
 
