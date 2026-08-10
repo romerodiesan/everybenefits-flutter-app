@@ -1,35 +1,46 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { ALL_ROLES, belongsInDefaultAgentGroup, parseRole } from "@pulse/shared";
+import {
+  belongsInDefaultAgentGroup,
+  parseRole,
+} from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import { headlineName, requireCaller } from "./auth";
 import {
   addAgentToDefaultGroup,
   ensureAutoJoinMemberships,
 } from "./chats";
+import { assertAssignableRoleId } from "./role-management";
+import { requirePermission } from "./permissions";
 
 /**
  * Admin-only role assignment.
- * Staff roles (agent / instructor / manager / admin) join the default group.
+ * Staff roles with default-group permission join the default group.
+ * The `system` role cannot be assigned via this callable.
  */
 export const setUserRole = onCall(callableOpts, async (request) => {
   const actorUid = await requireCaller(request, "setUserRole");
   const targetUid = String(request.data?.uid ?? "");
-  const role = String(request.data?.role ?? "");
-  if (!targetUid || !(ALL_ROLES as readonly string[]).includes(role)) {
+  const roleRaw = String(request.data?.role ?? "").trim();
+  if (!targetUid || !roleRaw) {
     throw new HttpsError("invalid-argument", "uid and valid role required");
   }
 
-  const actor = await db.doc(`users/${actorUid}`).get();
-  if (actor.data()?.role !== "admin") {
-    throw new HttpsError("permission-denied", "Admins only.");
-  }
+  await requirePermission(actorUid, "platform.manage");
+
+  const role = await assertAssignableRoleId(roleRaw);
 
   const target = await db.doc(`users/${targetUid}`).get();
   if (!target.exists) {
     throw new HttpsError("not-found", "User not found.");
   }
   const currentRole = String(target.data()?.role ?? "");
+  if (currentRole === "system") {
+    throw new HttpsError(
+      "permission-denied",
+      "Cannot change a System user via Admin.",
+    );
+  }
   if (currentRole === "agent" && (role === "student" || role === "guest")) {
     throw new HttpsError(
       "failed-precondition",
@@ -42,7 +53,12 @@ export const setUserRole = onCall(callableOpts, async (request) => {
     updatedAt: FieldValue.serverTimestamp(),
   });
 
-  if (belongsInDefaultAgentGroup(parseRole(role))) {
+  const { bumpUserRoleChange, parseStoredRole } = await import(
+    "./platform-stats"
+  );
+  await bumpUserRoleChange(parseStoredRole(currentRole), parseRole(role));
+
+  if (belongsInDefaultAgentGroup(role)) {
     await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
   }
 
@@ -69,21 +85,23 @@ export const setUserApproval = onCall(callableOpts, async (request) => {
   if (!targetUid || (status !== "approved" && status !== "rejected")) {
     throw new HttpsError("invalid-argument", "uid and status required");
   }
-  const actor = await db.doc(`users/${actorUid}`).get();
-  const actorRole = parseRole(actor.data()?.role);
-  if (actorRole !== "admin" && actorRole !== "manager") {
-    throw new HttpsError("permission-denied", "Admins and managers only.");
-  }
+  await requirePermission(actorUid, "admin.approvals.decide");
   const target = await db.doc(`users/${targetUid}`).get();
   if (!target.exists) {
     throw new HttpsError("not-found", "User not found.");
   }
+  const prevApproval = target.data()?.approvalStatus;
   await db.doc(`users/${targetUid}`).update({
     approvalStatus: status,
     approvedBy: actorUid,
     approvedAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
+  const { bumpApprovalChange } = await import("./platform-stats");
+  await bumpApprovalChange(
+    typeof prevApproval === "string" ? prevApproval : undefined,
+    status as "approved" | "rejected",
+  );
   if (status === "approved") {
     const data = target.data();
     await ensureAutoJoinMemberships(
@@ -100,11 +118,7 @@ export const setUserApproval = onCall(callableOpts, async (request) => {
 /** Admin/manager directory of users awaiting approval. */
 export const listPendingApprovals = onCall(callableOpts, async (request) => {
   const actorUid = await requireCaller(request, "listPendingApprovals");
-  const actor = await db.doc(`users/${actorUid}`).get();
-  const actorRole = parseRole(actor.data()?.role);
-  if (actorRole !== "admin" && actorRole !== "manager") {
-    throw new HttpsError("permission-denied", "Admins and managers only.");
-  }
+  await requirePermission(actorUid, "admin.approvals.read");
   const snap = await db
     .collection("users")
     .where("approvalStatus", "==", "pending")
@@ -135,11 +149,7 @@ export const listPendingApprovals = onCall(callableOpts, async (request) => {
  */
 export const listStudentsForPromotion = onCall(callableOpts, async (request) => {
   const actorUid = await requireCaller(request, "listStudentsForPromotion");
-
-  const actor = await db.doc(`users/${actorUid}`).get();
-  if (actor.data()?.role !== "admin") {
-    throw new HttpsError("permission-denied", "Admins only.");
-  }
+  await requirePermission(actorUid, "admin.users.read");
 
   const snap = await db
     .collection("users")

@@ -1,7 +1,6 @@
 import { FieldValue, type DocumentReference } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { FORUM_ROLES, parseRole } from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import type { VoteValue } from "./constants";
 import { headlineName, requireCaller } from "./auth";
@@ -10,6 +9,11 @@ import {
   listThreadNotifyTargets,
   notifyUser,
 } from "./notifications";
+import {
+  callerHasPermission,
+  hasPermission,
+  loadPermissionsForUid,
+} from "./permissions";
 
 export function parseVote(raw: unknown): VoteValue {
   const n = typeof raw === "number" ? raw : Number(raw);
@@ -36,7 +40,8 @@ export const castForumVote = onCall(callableOpts, async (request) => {
   if (!user || user.isAnonymous === true) {
     throw new HttpsError("permission-denied", "Forum participants only.");
   }
-  if (!(FORUM_ROLES as readonly string[]).includes(String(user.role))) {
+  const { permissions } = await loadPermissionsForUid(uid);
+  if (!hasPermission(permissions, "forums.participate")) {
     throw new HttpsError("permission-denied", "Forum participants only.");
   }
 
@@ -132,11 +137,12 @@ export const addForumReply = onCall(callableOpts, async (request) => {
     db.doc(`threads/${threadId}`).get(),
   ]);
   const profile = user.data();
+  const { permissions } = await loadPermissionsForUid(uid);
   if (
     !thread.exists ||
     !profile ||
     profile.isAnonymous === true ||
-    !(FORUM_ROLES as readonly string[]).includes(String(profile.role))
+    !hasPermission(permissions, "forums.participate")
   ) {
     throw new HttpsError("permission-denied", "Forum participants only.");
   }
@@ -191,15 +197,17 @@ export const deleteForumReply = onCall(callableOpts, async (request) => {
   const replyId = String(request.data?.replyId ?? "");
   const threadRef = db.doc(`threads/${threadId}`);
   const replyRef = db.doc(`threads/${threadId}/replies/${replyId}`);
-  const [actor, thread, reply] = await Promise.all([
-    db.doc(`users/${uid}`).get(),
+  const [thread, reply] = await Promise.all([
     threadRef.get(),
     replyRef.get(),
   ]);
   if (!thread.exists || !reply.exists) {
     throw new HttpsError("not-found", "Reply not found.");
   }
-  if (parseRole(actor.data()?.role) !== "admin" && reply.data()?.authorId !== uid) {
+  if (
+    !(await callerHasPermission(uid, "forums.moderate")) &&
+    reply.data()?.authorId !== uid
+  ) {
     throw new HttpsError("permission-denied", "Not allowed to delete this reply.");
   }
   const remaining = await db
@@ -232,15 +240,12 @@ export const deleteForumThread = onCall(callableOpts, async (request) => {
     throw new HttpsError("invalid-argument", "threadId required");
   }
   const threadRef = db.doc(`threads/${threadId}`);
-  const [actor, thread] = await Promise.all([
-    db.doc(`users/${uid}`).get(),
-    threadRef.get(),
-  ]);
+  const thread = await threadRef.get();
   if (!thread.exists) {
     throw new HttpsError("not-found", "Thread not found.");
   }
-  const isAdmin = parseRole(actor.data()?.role) === "admin";
-  if (!isAdmin && thread.data()?.authorId !== uid) {
+  const canModerate = await callerHasPermission(uid, "forums.moderate");
+  if (!canModerate && thread.data()?.authorId !== uid) {
     throw new HttpsError("permission-denied", "Not allowed to delete this thread.");
   }
 

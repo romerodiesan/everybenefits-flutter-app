@@ -32,13 +32,20 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAccountActive()
-        && userDoc(request.auth.uid).data.get('role', '') == 'admin';
+        && (
+          callerRole() in ['admin', 'system']
+          || hasPermission('platform.manage')
+        );
     }
 
     function isManagerOrAdmin() {
       return isAccountActive()
-        && userDoc(request.auth.uid).data.get('role', '')
-          in ['manager', 'admin'];
+        && (
+          callerRole() in ['manager', 'admin', 'system']
+          || hasPermission('admin.access')
+          || hasPermission('admin.orgs.read')
+          || hasPermission('org.tree.read')
+        );
     }
 
     /// Guests / anonymous Auth may bootstrap a profile but cannot browse
@@ -51,8 +58,11 @@ service cloud.firestore {
 
     function isForumParticipant() {
       return isRegisteredMember()
-        && userDoc(request.auth.uid).data.get('role', '') in
-          ['student', 'agent', 'instructor', 'teacher', 'manager', 'admin'];
+        && (
+          callerRole() in
+            ['student', 'agent', 'instructor', 'teacher', 'manager', 'admin', 'system']
+          || hasPermission('forums.participate')
+        );
     }
 
     // Instructors and managers author courses (published only after admin
@@ -60,8 +70,10 @@ service cloud.firestore {
     // Legacy role "teacher" is an alias of instructor.
     function isCourseAuthor() {
       return isAccountActive()
-        && userDoc(request.auth.uid).data.get('role', '')
-          in ['instructor', 'teacher', 'manager', 'admin'];
+        && (
+          callerRole() in ['instructor', 'teacher', 'manager', 'admin', 'system']
+          || hasPermission('courses.author')
+        );
     }
 
     function courseData(courseId) {
@@ -83,6 +95,7 @@ service cloud.firestore {
 
     function canReadCourseAnalytics(courseId) {
       return isAdmin()
+        || hasPermission('academy.analytics.read')
         || (
           isCourseAuthor()
           && courseExists(courseId)
@@ -105,6 +118,7 @@ service cloud.firestore {
       return courseExists(courseId)
         && (
           isAdmin()
+          || hasPermission('courses.edit.any')
           || (
             isCourseAuthor()
             && ownsCourse(courseId)
@@ -125,8 +139,36 @@ service cloud.firestore {
       return callerProfile().get('role', 'guest');
     }
 
+    function normalizedCallerRole() {
+      let role = callerRole();
+      return role == 'teacher' ? 'instructor' : role;
+    }
+
+    function roleDocPath() {
+      return /databases/$(database)/documents/roles/$(normalizedCallerRole());
+    }
+
+    function roleDocExists() {
+      return exists(roleDocPath());
+    }
+
+    function rolePermissions() {
+      return roleDocExists()
+        ? get(roleDocPath()).data.get('permissions', [])
+        : [];
+    }
+
+    /// Permission check against Firestore `roles/{roleId}` when seeded.
+    function hasPermission(key) {
+      return isAccountActive()
+        && (
+          normalizedCallerRole() == 'system'
+          || key in rolePermissions()
+        );
+    }
+
     function isProtectedRole(role) {
-      return role in ['instructor', 'teacher', 'manager', 'admin'];
+      return role in ['instructor', 'teacher', 'manager', 'admin', 'system'];
     }
 
     function boundedString(value, maxLen) {
@@ -651,11 +693,17 @@ service cloud.firestore {
     // Platform feature flags (e.g. Pulse AI kill switch).
     match /platformConfig/{docId} {
       allow read: if isSignedIn();
-      allow create, update: if isAdmin()
+      allow create, update: if (isAdmin() || hasPermission('platform.settings.write'))
         && request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'updatedBy'])
         && request.resource.data.enabled is bool
         && request.resource.data.updatedBy == request.auth.uid;
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || hasPermission('platform.settings.write');
+    }
+
+    // Role permission documents — clients may read to hydrate Auth; writes via Functions.
+    match /roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if false;
     }
 
     // Org tree — clients may read; mutations go through Cloud Functions.

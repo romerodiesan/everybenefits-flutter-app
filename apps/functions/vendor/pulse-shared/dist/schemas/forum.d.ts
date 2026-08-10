@@ -8,12 +8,13 @@ export declare const forumThreadFixtureSchema: z.ZodObject<{
     authorName: z.ZodString;
     authorPhotoUrl: z.ZodNullable<z.ZodString>;
     authorRole: z.ZodEnum<{
-        guest: "guest";
-        student: "student";
-        agent: "agent";
-        instructor: "instructor";
-        manager: "manager";
         admin: "admin";
+        guest: "guest";
+        system: "system";
+        manager: "manager";
+        agent: "agent";
+        student: "student";
+        instructor: "instructor";
     }>;
     replyCount: z.ZodNumber;
     score: z.ZodNumber;
@@ -30,12 +31,13 @@ export declare const forumReplyFixtureSchema: z.ZodObject<{
     authorName: z.ZodString;
     authorPhotoUrl: z.ZodNullable<z.ZodString>;
     authorRole: z.ZodEnum<{
-        guest: "guest";
-        student: "student";
-        agent: "agent";
-        instructor: "instructor";
-        manager: "manager";
         admin: "admin";
+        guest: "guest";
+        system: "system";
+        manager: "manager";
+        agent: "agent";
+        student: "student";
+        instructor: "instructor";
     }>;
     score: z.ZodNumber;
     createdAt: z.ZodNullable<z.ZodString>;

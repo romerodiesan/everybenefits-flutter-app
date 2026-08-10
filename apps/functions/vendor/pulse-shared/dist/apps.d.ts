@@ -1,4 +1,4 @@
-import { type UserRole } from "./roles";
+import { type RoleOrPermissions, type UserRole } from "./roles";
 /**
  * Pulse product family apps (cross-origin SSO targets).
  *
@@ -18,10 +18,12 @@ export type AppRegistryEntry = {
     homePath: string;
     /** Tailwind token classes for the icon tile. */
     tileClass: string;
-    visible?: (role: UserRole | undefined) => boolean;
+    /** Prefer passing resolved permissions; role slug falls back to defaults. */
+    visible?: (roleOrPermissions: RoleOrPermissions) => boolean;
 };
 /** Registry of Pulse family apps. Add entries here as products launch. */
 export declare const PULSE_APPS: readonly AppRegistryEntry[];
-export declare function listVisibleApps(role?: UserRole): AppRegistryEntry[];
+export declare function listVisibleApps(roleOrPermissions?: RoleOrPermissions): AppRegistryEntry[];
 export declare function getAppEntry(id: PulseAppId): AppRegistryEntry | undefined;
+export type { UserRole };
 //# sourceMappingURL=apps.d.ts.map

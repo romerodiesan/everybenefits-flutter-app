@@ -26,6 +26,7 @@ import {
 } from "@pulse/shared";
 import { callableOpts, db } from "./init";
 import { requireCaller } from "./auth";
+import { requirePermission } from "./permissions";
 
 const MAX_EVENTS_PER_CALL = 20;
 const MAX_WATCH_DELTA = 120;
@@ -416,11 +417,10 @@ export async function recomputeEnrollmentRollup(courseId: string): Promise<void>
 
 export const backfillCourseAnalytics = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "backfillCourseAnalytics");
-  const user = await db.doc(`users/${uid}`).get();
-  const role = String(user.data()?.role ?? "");
-  if (role !== "admin") {
-    throw new HttpsError("permission-denied", "Admin only.");
-  }
+  await requirePermission(uid, [
+    "academy.analytics.read",
+    "platform.manage",
+  ]);
   const courseId = String(request.data?.courseId ?? "").trim();
   if (courseId) {
     await recomputeEnrollmentRollup(courseId);

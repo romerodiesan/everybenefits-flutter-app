@@ -36,10 +36,15 @@ export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
   if (existing.exists) return;
 
   const isAnonymous = isAnonymousUser(user);
+  const email = user.email ?? null;
+  const displayName = user.displayName ?? null;
   const payload = {
     uid: user.uid,
-    email: user.email ?? null,
-    displayName: user.displayName ?? null,
+    email,
+    emailLower: typeof email === "string" ? email.toLowerCase() : null,
+    displayName,
+    displayNameLower:
+      typeof displayName === "string" ? displayName.trim().toLowerCase() || null : null,
     photoUrl: user.photoURL ?? null,
     role: isAnonymous ? "guest" : "student",
     isAnonymous,
@@ -63,6 +68,13 @@ export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
 
   try {
     await ref.create(payload);
+    const { bumpUserCreated, parseStoredRole } = await import(
+      "./platform-stats"
+    );
+    await bumpUserCreated(
+      parseStoredRole(payload.role),
+      payload.approvalStatus === "pending",
+    );
   } catch (error) {
     // Client ensureProfile won the race — leave their doc alone.
     const code =

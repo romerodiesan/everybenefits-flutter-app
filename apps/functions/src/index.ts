@@ -53,6 +53,14 @@ export {
 } from "./roles";
 
 export {
+  listRoles,
+  createRole,
+  updateRole,
+  deleteRole,
+  seedSystemRoles,
+} from "./role-management";
+
+export {
   markNotificationRead,
   markAllNotificationsRead,
 } from "./notifications-http";
@@ -67,12 +75,12 @@ export {
   purgeDeletedAccounts,
 } from "./account";
 
-export { createSsoHandoff, exchangeSsoToken } from "./sso";
-
 export {
   listUsersForAdmin,
   adminDeactivateUser,
   adminReactivateUser,
+  adminCreateUser,
+  adminUpdateUser,
   getAdminInsights,
 } from "./admin";
 
@@ -85,4 +93,6 @@ export {
   updateOrgNode,
   assignUserToOrgNode,
   listAgenciesForProfile,
+  listAgenciesForAdmin,
+  listOrgNodesByType,
 } from "./org";

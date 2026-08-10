@@ -1,9 +1,8 @@
 /**
  * Shared profile field validation / normalization for Pulse clients.
  */
-/** Roles that must provide NPN + US address. */
-export declare const LICENSE_PROFILE_ROLES: readonly ["agent", "instructor", "manager", "admin"];
-export declare function requiresLicenseProfile(role: string): boolean;
+/** True when license profile fields are required for this role/permission set. */
+export declare function requiresLicenseProfile(roleOrPermissions: string | readonly string[] | null | undefined): boolean;
 /** True when the string looks like an email used as a display name. */
 export declare function looksLikeEmailName(value: string): boolean;
 /**
@@ -49,4 +48,18 @@ export type ProfileCompletenessInput = {
 };
 /** Temporary remediation: force incomplete / invalid profiles back to the form. */
 export declare function needsProfileCompletion(input: ProfileCompletenessInput): boolean;
+/** Display name for UI chrome (profile / chats / forums). */
+export declare function headlineName(profile: {
+    displayName: string | null;
+    email: string | null;
+    isAnonymous: boolean;
+}): string;
+/** Compose a US mailing address string from structured fields. */
+export declare function composeUsAddress(parts: {
+    street?: string | null;
+    apt?: string | null;
+    city?: string | null;
+    state?: string | null;
+    zip?: string | null;
+}): string | null;
 //# sourceMappingURL=profile.d.ts.map

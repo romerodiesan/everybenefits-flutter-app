@@ -4,10 +4,10 @@ import { onValueCreated, onValueWritten } from "firebase-functions/v2/database";
 import { HttpsError } from "firebase-functions/v2/https";
 import type { DocumentData } from "firebase-admin/firestore";
 import {
-  GROUP_CREATOR_ROLES,
   GROUP_SEED_ROLES,
   belongsInDefaultAgentGroup,
   canConfigureGroupAutoJoin,
+  canCreateChatGroups,
   parseRole,
   type UserRole,
 } from "@pulse/shared";
@@ -24,6 +24,7 @@ import {
   isUserApprovedForJoin,
   requireCaller,
 } from "./auth";
+import { loadPermissionsForUid, callerHasPermission } from "./permissions";
 import { notifyUser } from "./notifications";
 
 export function chatInboxRow(
@@ -501,20 +502,19 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     throw new HttpsError("invalid-argument", "Valid group title required.");
   }
 
-  const creator = await db.doc(`users/${uid}`).get();
-  const creatorRole = parseRole(creator.data()?.role);
-  if (!(GROUP_CREATOR_ROLES as readonly string[]).includes(creatorRole)) {
+  const { permissions: creatorPerms } = await loadPermissionsForUid(uid);
+  if (!canCreateChatGroups(creatorPerms)) {
     throw new HttpsError("permission-denied", "Not allowed to create groups.");
   }
 
   const persistAutoJoin =
     wantAutoJoin &&
     seedRoles.length > 0 &&
-    canConfigureGroupAutoJoin(creatorRole);
+    canConfigureGroupAutoJoin(creatorPerms);
   if (wantAutoJoin && seedRoles.length > 0 && !persistAutoJoin) {
     throw new HttpsError(
       "permission-denied",
-      "Only admins and managers can enable auto-join.",
+      "Not allowed to enable auto-join.",
     );
   }
 
@@ -623,9 +623,10 @@ export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
   const callerUid = await requireCaller(request, "ensureDefaultAgentGroup");
   const targetUid = String(request.data?.uid ?? callerUid);
 
-  const caller = await db.doc(`users/${callerUid}`).get();
-  const callerRole = String(caller.data()?.role ?? "");
-  if (targetUid !== callerUid && callerRole !== "admin") {
+  if (
+    targetUid !== callerUid &&
+    !(await callerHasPermission(callerUid, "platform.manage"))
+  ) {
     throw new HttpsError("permission-denied", "Admins only for other users.");
   }
 
@@ -634,10 +635,10 @@ export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
     throw new HttpsError("not-found", "User not found.");
   }
   const targetRole = String(target.data()?.role ?? "");
-  if (!belongsInDefaultAgentGroup(parseRole(targetRole))) {
+  if (!belongsInDefaultAgentGroup(targetRole)) {
     throw new HttpsError(
       "failed-precondition",
-      "Agents, instructors, managers, and admins only.",
+      "Role lacks default agent group permission.",
     );
   }
 

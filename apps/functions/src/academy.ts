@@ -1,11 +1,11 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { canAuthorCourses, parseRole } from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import { DEFAULT_QUIZ_PASS_PERCENT, MAX_QUIZ_OPTIONS } from "./constants";
 import { requireCaller } from "./auth";
 import { notifyUser } from "./notifications";
+import { loadPermissionsForUid } from "./permissions";
 
 /** Normalizes a submitted answer into a sorted, deduped list of option indexes. */
 export function parseSelectedOptions(raw: unknown): number[] {
@@ -188,12 +188,15 @@ export const submitQuizAttempt = onCall(callableOpts, async (request) => {
     throw new HttpsError("failed-precondition", "Lesson is not a quiz.");
   }
 
-  // Drafts are only answerable by their author or an admin (Studio preview).
+  // Drafts are only answerable by their author or someone with edit-any.
   if (course.status !== "published") {
-    const actor = await db.doc(`users/${uid}`).get();
-    const role = parseRole(actor.data()?.role);
+    const { permissions } = await loadPermissionsForUid(uid);
     const owns = String(course.createdBy ?? "") === uid;
-    if (role !== "admin" && !(owns && canAuthorCourses(role))) {
+    const { hasPermission } = await import("@pulse/shared");
+    if (
+      !hasPermission(permissions, "courses.edit.any") &&
+      !(owns && hasPermission(permissions, "courses.author"))
+    ) {
       throw new HttpsError("permission-denied", "Course is not published.");
     }
   }

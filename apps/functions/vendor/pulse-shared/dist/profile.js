@@ -3,7 +3,6 @@
  * Shared profile field validation / normalization for Pulse clients.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.LICENSE_PROFILE_ROLES = void 0;
 exports.requiresLicenseProfile = requiresLicenseProfile;
 exports.looksLikeEmailName = looksLikeEmailName;
 exports.normalizePersonName = normalizePersonName;
@@ -14,17 +13,14 @@ exports.validateUsZip = validateUsZip;
 exports.parseApprovalStatus = parseApprovalStatus;
 exports.isUserApproved = isUserApproved;
 exports.needsProfileCompletion = needsProfileCompletion;
+exports.headlineName = headlineName;
+exports.composeUsAddress = composeUsAddress;
+const permissions_1 = require("./permissions");
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 const NPN_DIGITS = /^\d{7,9}$/;
-/** Roles that must provide NPN + US address. */
-exports.LICENSE_PROFILE_ROLES = [
-    "agent",
-    "instructor",
-    "manager",
-    "admin",
-];
-function requiresLicenseProfile(role) {
-    return exports.LICENSE_PROFILE_ROLES.includes(role);
+/** True when license profile fields are required for this role/permission set. */
+function requiresLicenseProfile(roleOrPermissions) {
+    return (0, permissions_1.hasPermission)((0, permissions_1.resolvePermissionSet)(roleOrPermissions), "license.profile.required");
 }
 /** True when the string looks like an email used as a display name. */
 function looksLikeEmailName(value) {
@@ -121,4 +117,30 @@ function needsProfileCompletion(input) {
             return true;
     }
     return input.profileCompleted === false;
+}
+/** Display name for UI chrome (profile / chats / forums). */
+function headlineName(profile) {
+    if (profile.displayName?.trim())
+        return profile.displayName.trim();
+    if (profile.email)
+        return profile.email;
+    return profile.isAnonymous ? "Guest" : "User";
+}
+/** Compose a US mailing address string from structured fields. */
+function composeUsAddress(parts) {
+    const s = parts.street?.trim() ?? "";
+    const a = parts.apt?.trim() ?? "";
+    const c = parts.city?.trim() ?? "";
+    const st = (parts.state?.trim() ?? "").toUpperCase();
+    const z = parts.zip?.trim() ?? "";
+    const line1 = [s, a].filter(Boolean).join(", ");
+    const stateZip = [st, z].filter(Boolean).join(" ");
+    const line2 = [c, stateZip].filter(Boolean).join(", ");
+    if (!line1 && !line2)
+        return null;
+    if (!line1)
+        return line2;
+    if (!line2)
+        return line1;
+    return `${line1}\n${line2}`;
 }

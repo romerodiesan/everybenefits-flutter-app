@@ -7,11 +7,11 @@ import {
   depthForType,
   isValidChildType,
   parseOrgNodeType,
-  parseRole,
 } from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import { requireCaller } from "./auth";
 import { buildOrgNodePath, serializeOrgNode } from "./org-helpers";
+import { loadPermissionsForUid } from "./permissions";
 
 export { buildOrgNodePath, serializeOrgNode } from "./org-helpers";
 
@@ -23,9 +23,8 @@ async function requireOrgAdmin(
   platformOnly = false,
 ) {
   const uid = await requireCaller(request, operation);
-  const snap = await db.doc(`users/${uid}`).get();
-  const role = parseRole(snap.data()?.role);
-  if (platformOnly ? !canManagePlatform(role) : !canAccessAdmin(role)) {
+  const { permissions } = await loadPermissionsForUid(uid);
+  if (platformOnly ? !canManagePlatform(permissions) : !canAccessAdmin(permissions)) {
     throw new HttpsError("permission-denied", "Admin access required.");
   }
   return uid;
@@ -61,30 +60,74 @@ export const ensureOrgRoot = onCall(callableOpts, async (request) => {
 
 export const listOrgSubtree = onCall(callableOpts, async (request) => {
   await requireOrgAdmin(request, "listOrgSubtree");
+  const includeInactive = request.data?.includeInactive === true;
+  const fullTree = request.data?.full === true;
   const parentId =
     request.data?.parentId === undefined || request.data?.parentId === null
       ? null
       : String(request.data.parentId);
 
-  let snap;
-  if (parentId === null) {
-    // Full tree for Admin UI (capped); return all active nodes.
-    snap = await db.collection("orgNodes").limit(500).get();
+  // Escape hatch for rare tooling — hard-capped; prefer lazy parentId loads.
+  if (fullTree) {
+    const snap = await db.collection("orgNodes").limit(500).get();
     const nodes = snap.docs
-      .filter((doc) => doc.data().active !== false)
+      .filter((doc) => includeInactive || doc.data().active !== false)
       .map((doc) => serializeOrgNode(doc.id, doc.data()));
     return { nodes };
   }
 
-  snap = await db
+  // Lazy: null parentId → roots only (parentId == null).
+  const snap = await db
     .collection("orgNodes")
     .where("parentId", "==", parentId)
     .limit(200)
     .get();
   const nodes = snap.docs
-    .filter((doc) => doc.data().active !== false)
+    .filter((doc) => includeInactive || doc.data().active !== false)
     .map((doc) => serializeOrgNode(doc.id, doc.data()));
   return { nodes };
+});
+
+/**
+ * Paginated agencies for Admin (type == agency). Soft-deleted = active:false.
+ */
+export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
+  await requireOrgAdmin(request, "listAgenciesForAdmin");
+  const pageSize = Math.max(
+    1,
+    Math.min(100, Math.round(Number(request.data?.pageSize ?? 25))),
+  );
+  const pageToken = String(request.data?.pageToken ?? "").trim();
+  const includeInactive = request.data?.includeInactive === true;
+  const query = String(request.data?.query ?? "").trim().toLowerCase();
+
+  let q = db
+    .collection("orgNodes")
+    .where("type", "==", "agency")
+    .orderBy("name", "asc");
+
+  if (pageToken) {
+    q = q.startAfter(pageToken);
+  }
+
+  const fetchLimit = query ? Math.min(200, pageSize * 4) : pageSize + 1;
+  const snap = await q.limit(fetchLimit).get();
+  let agencies = snap.docs
+    .map((doc) => serializeOrgNode(doc.id, doc.data()))
+    .filter((node) => includeInactive || node.active);
+
+  if (query) {
+    agencies = agencies.filter((node) =>
+      node.name.toLowerCase().includes(query),
+    );
+  }
+
+  const hasMore = agencies.length > pageSize;
+  const page = agencies.slice(0, pageSize);
+  const last = page[page.length - 1];
+  const nextPageToken = hasMore && last && !query ? last.name : null;
+
+  return { agencies: page, nextPageToken };
 });
 
 export const createOrgNode = onCall(callableOpts, async (request) => {
@@ -134,6 +177,8 @@ export const createOrgNode = onCall(callableOpts, async (request) => {
     updatedAt: FieldValue.serverTimestamp(),
   };
   await ref.set(payload);
+  const { bumpOrgNodeCreated } = await import("./platform-stats");
+  await bumpOrgNodeCreated();
   return {
     node: serializeOrgNode(ref.id, {
       ...payload,
@@ -185,6 +230,7 @@ export const assignUserToOrgNode = onCall(callableOpts, async (request) => {
       : String(orgNodeIdRaw).trim() || null;
   if (!uid) throw new HttpsError("invalid-argument", "uid required");
 
+  let agencyName: string | null = null;
   if (orgNodeId) {
     const node = await db.doc(`orgNodes/${orgNodeId}`).get();
     if (!node.exists) {
@@ -193,17 +239,46 @@ export const assignUserToOrgNode = onCall(callableOpts, async (request) => {
     if (node.data()?.active === false) {
       throw new HttpsError("failed-precondition", "Org node is inactive.");
     }
+    if (typeof node.data()?.name === "string") {
+      agencyName = String(node.data()?.name);
+    }
   }
 
   const userRef = db.doc(`users/${uid}`);
   const userSnap = await userRef.get();
   if (!userSnap.exists) throw new HttpsError("not-found", "User not found.");
 
-  await userRef.update({
+  const updates: Record<string, unknown> = {
     orgNodeId,
     updatedAt: FieldValue.serverTimestamp(),
-  });
+  };
+  if (agencyName) updates.agency = agencyName;
+  await userRef.update(updates);
   return { ok: true, uid, orgNodeId };
+});
+
+/** Flat list by org type (e.g. regions for agency parent picker). */
+export const listOrgNodesByType = onCall(callableOpts, async (request) => {
+  await requireOrgAdmin(request, "listOrgNodesByType");
+  const type = parseOrgNodeType(request.data?.type);
+  if (!type) {
+    throw new HttpsError("invalid-argument", "Valid type required.");
+  }
+  const pageSize = Math.max(
+    1,
+    Math.min(200, Math.round(Number(request.data?.pageSize ?? 100))),
+  );
+  const includeInactive = request.data?.includeInactive === true;
+  const snap = await db
+    .collection("orgNodes")
+    .where("type", "==", type)
+    .orderBy("name", "asc")
+    .limit(pageSize)
+    .get();
+  const nodes = snap.docs
+    .map((doc) => serializeOrgNode(doc.id, doc.data()))
+    .filter((node) => includeInactive || node.active);
+  return { nodes };
 });
 
 /**
