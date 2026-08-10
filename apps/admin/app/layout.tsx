@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Figtree, Outfit } from "next/font/google";
 import { AuthProvider } from "@/lib/providers/auth-provider";
+import { AdminQueryProvider } from "@/lib/providers/query-provider";
 import { ThemedApp } from "@/components/chrome/themed-app";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme-boot";
 import "./globals.css";
@@ -55,7 +56,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen antialiased">
         <AuthProvider>
-          <ThemedApp>{children}</ThemedApp>
+          <AdminQueryProvider>
+            <ThemedApp>{children}</ThemedApp>
+          </AdminQueryProvider>
         </AuthProvider>
       </body>
     </html>

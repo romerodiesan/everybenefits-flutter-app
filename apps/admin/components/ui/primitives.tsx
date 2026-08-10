@@ -1,14 +1,18 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from "react";
 
-export function Button({
-  variant = "primary",
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-}) {
+export const Button = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: "primary" | "secondary" | "ghost" | "danger";
+  }
+>(function Button({ variant = "primary", className = "", ...props }, ref) {
   const styles = {
     primary:
       "bg-brand text-on-brand hover:brightness-110 disabled:opacity-50",
@@ -19,11 +23,12 @@ export function Button({
   }[variant];
   return (
     <button
-      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition ${styles} ${className}`}
+      ref={ref}
+      className={`inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition disabled:cursor-not-allowed ${styles} ${className}`}
       {...props}
     />
   );
-}
+});
 
 export function Input({
   className = "",
@@ -31,21 +36,38 @@ export function Input({
 }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
-      className={`h-10 w-full rounded-xl border border-glass-border bg-sheet px-3.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand ${className}`}
+      className={`h-10 w-full rounded-xl border border-glass-border bg-transparent px-3.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/15 ${className}`}
       {...props}
     />
   );
 }
 
-export function TextArea({
+export function SearchInput({
   className = "",
   ...props
-}: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
+}: InputHTMLAttributes<HTMLInputElement>) {
   return (
-    <textarea
-      className={`min-h-24 w-full rounded-xl border border-glass-border bg-sheet px-3.5 py-2.5 text-sm text-ink outline-none placeholder:text-muted focus:border-brand ${className}`}
-      {...props}
-    />
+    <div className={`relative w-full ${className}`}>
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        aria-hidden
+        className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted"
+      >
+        <path
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="m21 21-4.3-4.3M11 18a7 7 0 1 1 0-14 7 7 0 0 1 0 14Z"
+        />
+      </svg>
+      <input
+        type="search"
+        className="h-10 w-full rounded-xl border border-glass-border bg-transparent py-2 pr-3.5 pl-10 text-sm text-ink outline-none placeholder:text-muted focus:border-brand focus:ring-2 focus:ring-brand/15"
+        {...props}
+      />
+    </div>
   );
 }
 
@@ -54,28 +76,6 @@ export function Label({ children }: { children: ReactNode }) {
     <label className="mb-1 block text-xs font-medium tracking-wide text-muted">
       {children}
     </label>
-  );
-}
-
-export function Panel({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`pulse-sheet p-4 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-export function Badge({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex rounded-md bg-brand/14 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
-      {children}
-    </span>
   );
 }
 

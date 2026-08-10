@@ -14,7 +14,7 @@ export function BrandMark({
   return (
     <Image
       src="/brand/pulse-logo.png"
-      alt="Pulse Studio"
+      alt="Pulse Admin"
       width={size}
       height={size}
       priority={priority}

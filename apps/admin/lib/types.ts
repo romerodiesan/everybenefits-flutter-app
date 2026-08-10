@@ -63,11 +63,4 @@ export type AdminInsights = {
   deactivated: number;
   pendingDeletion: number;
   orgNodeCount: number;
-  recentRegistrations: Array<{
-    uid: string;
-    displayName: string | null;
-    email: string | null;
-    role: string;
-    createdAt: number | null;
-  }>;
 };

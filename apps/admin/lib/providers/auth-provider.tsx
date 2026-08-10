@@ -12,16 +12,20 @@ import {
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { initFirebaseClient, getFirebaseAuth } from "@/lib/firebase/client";
 import { ensureProfile, watchProfile } from "@/lib/firebase/users";
+import { watchRolePermissions } from "@/lib/firebase/roles";
 import {
   clearCachedProfile,
   readCachedProfile,
   writeCachedProfile,
 } from "@/lib/profile-cache";
 import type { UserProfile } from "@/lib/types";
+import { resolveAccess, type RoleOrPermissions } from "@pulse/shared";
 
 type AuthContextValue = {
   user: User | null;
   profile: UserProfile | null;
+  /** Resolved permission keys for the current profile role. */
+  permissions: string[];
   loading: boolean;
   profileLoading: boolean;
   refreshProfile: () => Promise<void>;
@@ -38,6 +42,7 @@ function isPermissionDenied(error: unknown): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
 
@@ -55,6 +60,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!next) {
         setProfile(null);
+        setPermissions([]);
         setProfileLoading(false);
         clearCachedProfile();
         return;
@@ -113,6 +119,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!profile?.role) {
+      setPermissions([]);
+      return;
+    }
+    return watchRolePermissions(
+      profile.role,
+      setPermissions,
+      (error) => {
+        if (isPermissionDenied(error)) return;
+        console.error(error);
+      },
+    );
+  }, [profile?.role]);
+
   const refreshProfile = useCallback(async () => {
     const current = getFirebaseAuth().currentUser;
     if (!current) return;
@@ -123,8 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, profile, loading, profileLoading, refreshProfile }),
-    [user, profile, loading, profileLoading, refreshProfile],
+    () => ({ user, profile, permissions, loading, profileLoading, refreshProfile }),
+    [user, profile, permissions, loading, profileLoading, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -134,4 +155,13 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
+}
+
+/** Live permissions when loaded, otherwise the profile role slug. */
+export function useAccess(): RoleOrPermissions {
+  const { permissions, profile } = useAuth();
+  return useMemo(
+    () => resolveAccess(permissions, profile?.role),
+    [permissions, profile?.role],
+  );
 }

@@ -1,6 +1,5 @@
 import {
   createAdminRepository,
-  FunctionsUnavailableError,
   type AdminRepository,
 } from "@pulse/firebase-web";
 import { getFirebaseFunctions } from "../firebase/client";
@@ -13,5 +12,3 @@ export function getAdminRepository(): AdminRepository {
   }
   return cached;
 }
-
-export { FunctionsUnavailableError };

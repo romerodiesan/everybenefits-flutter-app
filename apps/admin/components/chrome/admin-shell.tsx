@@ -7,11 +7,14 @@ import {
   type ReactNode,
   type SVGProps,
 } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
-import { canAccessAdmin, headlineName } from "@/lib/roles";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { canAccessAdmin, canManagePlatform, headlineName } from "@/lib/roles";
 import { signOutAndRedirect } from "@/lib/firebase/auth";
+import { adminQueryKeys } from "@/lib/admin-query-keys";
+import { getAdminRepository } from "@/lib/repositories/admin-repository";
 import { CommandPalette } from "@/components/chrome/command-palette";
 import { AppSwitcher } from "@/components/chrome/app-switcher";
 import { AdminShellSkeleton } from "@/components/chrome/admin-shell-skeleton";
@@ -37,6 +40,7 @@ const ROLE_KEY: Record<UserRole, string> = {
   instructor: "roleInstructor",
   manager: "roleManager",
   admin: "roleAdmin",
+  system: "roleSystem",
 };
 
 type IconProps = SVGProps<SVGSVGElement> & { filled?: boolean };
@@ -114,6 +118,29 @@ function IconApprovals({ filled, ...props }: IconProps) {
   );
 }
 
+function IconRoles({ filled, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      <path
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        fill={filled ? "currentColor" : "none"}
+        fillOpacity={filled ? 0.12 : 0}
+        d="M12 3.5 4.5 7v4.5c0 4.3 3.1 8.2 7.5 9 4.4-.8 7.5-4.7 7.5-9V7L12 3.5Z"
+      />
+      <path
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M9.5 12.2 11 13.7l3.5-3.5"
+      />
+    </svg>
+  );
+}
+
 function IconSettings({ filled, ...props }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
@@ -149,12 +176,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const { user, profile, loading, profileLoading } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const queryClient = useQueryClient();
   const [cmdOpen, setCmdOpen] = useState(false);
   const [ssoRedirecting, setSsoRedirecting] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
   const role = profile?.role ?? "guest";
-  const allowed = canAccessAdmin(role);
+  const access = useAccess();
+  const allowed = canAccessAdmin(access);
   const blocked =
     profile?.accountStatus === "deactivated" ||
     profile?.accountStatus === "pendingDeletion";
@@ -186,6 +215,28 @@ export function AdminShell({ children }: { children: ReactNode }) {
       router.replace("/no-access");
     }
   }, [loading, user, profile, allowed, blocked, router, locale, pathname]);
+
+  useEffect(() => {
+    if (!profile || !allowed || blocked) return;
+    const repo = getAdminRepository();
+    void queryClient.prefetchQuery({
+      queryKey: adminQueryKeys.insights(),
+      queryFn: () => repo.getInsights(),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: adminQueryKeys.users({ pageSize: 25 }),
+      queryFn: () => repo.listUsers({ pageSize: 25 }),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: adminQueryKeys.orgRoots(),
+      queryFn: () =>
+        repo.listOrgSubtree(null, { includeInactive: true }),
+    });
+    void queryClient.prefetchQuery({
+      queryKey: adminQueryKeys.agencies({ pageSize: 25 }),
+      queryFn: () => repo.listAgencies({ pageSize: 25 }),
+    });
+  }, [profile, allowed, blocked, queryClient]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -227,6 +278,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
         label: t("navApprovals"),
         match: (p: string) => p.startsWith("/approvals"),
         Icon: IconApprovals,
+      },
+      {
+        href: "/roles",
+        label: t("navRoles"),
+        match: (p: string) => p.startsWith("/roles"),
+        adminOnly: true,
+        Icon: IconRoles,
       },
       {
         href: "/settings",
@@ -282,7 +340,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
     return null;
   }
 
-  const isPlatformAdmin = role === "admin";
+  const isPlatformAdmin = canManagePlatform(access);
   const visibleNav = nav.filter((item) => !item.adminOnly || isPlatformAdmin);
 
   return (
@@ -303,7 +361,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
       >
         <div className="border-b border-glass-border px-3 pb-3 pt-[max(0.875rem,env(safe-area-inset-top,0px)+0.5rem)] lg:pt-3.5">
           <div className="flex items-center justify-between gap-2 px-1">
-            <AppSwitcher current="admin" role={profile.role} />
+            <AppSwitcher current="admin" permissions={access} />
             <button
               type="button"
               className="rounded-lg p-2 text-muted hover:bg-ink/[0.05] hover:text-ink lg:hidden"
@@ -336,7 +394,9 @@ export function AdminShell({ children }: { children: ReactNode }) {
                 {name}
               </p>
               <span className="mt-1 inline-flex rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
-                {t(ROLE_KEY[profile.role])}
+                {ROLE_KEY[profile.role as UserRole]
+                  ? t(ROLE_KEY[profile.role as UserRole])
+                  : profile.role}
               </span>
             </div>
           </div>
@@ -456,7 +516,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
             </svg>
           </button>
           <div className="min-w-0 flex-1">
-            <AppSwitcher current="admin" role={profile.role} />
+            <AppSwitcher current="admin" permissions={access} />
           </div>
           <button
             type="button"

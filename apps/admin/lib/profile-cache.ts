@@ -6,7 +6,7 @@ type CachedProfile = {
   uid: string;
   displayName: string | null;
   photoUrl: string | null;
-  role: UserRole;
+  role: string;
   isAnonymous: boolean;
   profileCompleted: boolean;
   accountStatus?: AccountStatus;
@@ -32,7 +32,7 @@ function revive(cached: CachedProfile): UserProfile {
     email: null,
     displayName: cached.displayName,
     photoUrl: cached.photoUrl,
-    role: cached.role,
+    role: cached.role as UserRole,
     isAnonymous: cached.isAnonymous,
     profileCompleted: cached.profileCompleted,
     phoneCountryCode: null,
@@ -84,16 +84,6 @@ export function clearCachedProfile() {
   }
 }
 
-export function isUserRole(value: unknown): value is UserRole {
-  return (
-    typeof value === "string" &&
-    [
-      "guest",
-      "student",
-      "agent",
-      "instructor",
-      "manager",
-      "admin",
-    ].includes(value)
-  );
+export function isUserRole(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }

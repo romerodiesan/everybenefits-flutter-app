@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canManagePlatform } from "@/lib/roles";
 import {
   setPulseAiEnabled,
@@ -14,7 +14,8 @@ export function SettingsHome() {
   const t = useTranslations();
   const router = useRouter();
   const { profile } = useAuth();
-  const isAdmin = canManagePlatform(profile?.role ?? "guest");
+  const access = useAccess();
+  const isAdmin = canManagePlatform(access);
   const [aiEnabled, setAiEnabled] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
 

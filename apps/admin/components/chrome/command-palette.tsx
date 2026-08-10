@@ -40,6 +40,11 @@ export function CommandPalette({
         run: () => router.push("/approvals"),
       },
       {
+        id: "roles",
+        label: t("navRoles"),
+        run: () => router.push("/roles"),
+      },
+      {
         id: "settings",
         label: t("navSettings"),
         run: () => router.push("/settings"),
