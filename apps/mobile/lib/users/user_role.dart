@@ -6,7 +6,8 @@ enum UserRole {
   agent,
   instructor,
   manager,
-  admin;
+  admin,
+  system;
 
   String get wireValue => name;
 
@@ -17,10 +18,13 @@ enum UserRole {
         UserRole.instructor => l10n.roleInstructor,
         UserRole.manager => l10n.roleManager,
         UserRole.admin => l10n.roleAdmin,
+        // Reuse admin label until dedicated system copy exists.
+        UserRole.system => l10n.roleAdmin,
       };
 
   /// Unknown / missing values fail closed as [guest] (no elevated privileges).
   /// Legacy wire value `teacher` maps to [instructor].
+  /// Custom role slugs also fail closed on mobile until permission hydration ships.
   static UserRole parse(String? value) {
     if (value == 'teacher') return UserRole.instructor;
     return UserRole.values.firstWhere(
@@ -30,26 +34,59 @@ enum UserRole {
   }
 }
 
-/// Roles that may create group chats (teacher = instructor).
+/// Mirrors `@pulse/shared` default permission gates for built-in roles.
 bool canCreateChatGroups(UserRole role) {
   return role == UserRole.admin ||
+      role == UserRole.system ||
       role == UserRole.instructor ||
       role == UserRole.manager;
 }
 
-/// Roles auto-joined into the default staff/agents community chat.
+/// `chats.groups.default.join`
 bool belongsInDefaultAgentGroup(UserRole role) {
   return role == UserRole.agent ||
       role == UserRole.instructor ||
       role == UserRole.manager ||
-      role == UserRole.admin;
+      role == UserRole.admin ||
+      role == UserRole.system;
 }
 
-/// Support chat is for members who need help — not staff (admin/manager).
+/// `support.access` — members who need help (not platform staff).
 bool canAccessSupport(UserRole role, {required bool isAnonymous}) {
   if (isAnonymous || role == UserRole.guest) return false;
-  if (role == UserRole.admin || role == UserRole.manager) return false;
+  if (role == UserRole.admin ||
+      role == UserRole.manager ||
+      role == UserRole.system) {
+    return false;
+  }
   return role == UserRole.student ||
       role == UserRole.agent ||
       role == UserRole.instructor;
+}
+
+/// `tools.access`
+bool canAccessTools(UserRole role) {
+  return role == UserRole.agent ||
+      role == UserRole.instructor ||
+      role == UserRole.manager ||
+      role == UserRole.admin ||
+      role == UserRole.system;
+}
+
+/// `forums.participate`
+bool canParticipateInForums(UserRole role, {required bool isAnonymous}) {
+  if (isAnonymous || role == UserRole.guest) return false;
+  return role == UserRole.student ||
+      role == UserRole.agent ||
+      role == UserRole.instructor ||
+      role == UserRole.manager ||
+      role == UserRole.admin ||
+      role == UserRole.system;
+}
+
+/// `admin.access` / `apps.admin.access`
+bool canAccessAdmin(UserRole role) {
+  return role == UserRole.admin ||
+      role == UserRole.manager ||
+      role == UserRole.system;
 }

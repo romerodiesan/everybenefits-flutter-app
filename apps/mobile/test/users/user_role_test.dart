@@ -14,6 +14,7 @@ void main() {
       expect(UserRole.parse('instructor'), UserRole.instructor);
       expect(UserRole.parse('manager'), UserRole.manager);
       expect(UserRole.parse('admin'), UserRole.admin);
+      expect(UserRole.parse('system'), UserRole.system);
     });
 
     test('falls back to guest for unknown values', () {
@@ -28,6 +29,7 @@ void main() {
       expect(UserRole.instructor.wireValue, 'instructor');
       expect(UserRole.manager.wireValue, 'manager');
       expect(UserRole.admin.wireValue, 'admin');
+      expect(UserRole.system.wireValue, 'system');
     });
 
     test('label is human readable', () {
@@ -37,6 +39,16 @@ void main() {
       expect(UserRole.instructor.label(l10n), 'Instructor');
       expect(UserRole.manager.label(l10n), 'Manager');
       expect(UserRole.admin.label(l10n), 'Admin');
+      expect(UserRole.system.label(l10n), 'Admin');
+    });
+  });
+
+  group('capability helpers', () {
+    test('canAccessAdmin matches staff defaults', () {
+      expect(canAccessAdmin(UserRole.admin), isTrue);
+      expect(canAccessAdmin(UserRole.manager), isTrue);
+      expect(canAccessAdmin(UserRole.system), isTrue);
+      expect(canAccessAdmin(UserRole.agent), isFalse);
     });
   });
 }
