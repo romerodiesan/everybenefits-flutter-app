@@ -26,11 +26,10 @@ runConfig:
   concurrency: 80
 
 env:
-  # --- Firebase client (every-benefits-us) ---
-  # Client API key lives in App Hosting secrets (not committed).
-  #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_WEB_API_KEY --project every-benefits-us
+  # --- Firebase client (every-benefits-us web app) ---
+  # Public client SDK config — same Firebase web app for Pulse / Studio / Admin.
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    secret: FIREBASE_WEB_API_KEY
+    value: AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk
     availability:
       - BUILD
       - RUNTIME
