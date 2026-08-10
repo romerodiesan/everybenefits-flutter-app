@@ -1,0 +1,29 @@
+# Firebase App Hosting — Legal Center
+# Project: every-benefits-us
+#
+# Console / GitHub backend settings:
+#   Root directory = apps/legal  (must match firebase.json apphosting.rootDir)
+#
+# Prefer Firebase Hosting for this static site (`pnpm deploy:legal`).
+# App Hosting works via a small static file server over the prerendered build.
+#
+# Important: Console overrideEnv PUBLIC_PULSE_WEB_URL must be the Pulse web
+# origin (https://pulse.everybenefits.us), not the legal site hostname.
+
+scripts:
+  buildCommand: pnpm run build:legal
+  runCommand: pnpm --filter @pulse/legal start
+
+runConfig:
+  cpu: 1
+  memoryMiB: 512
+  minInstances: 0
+  maxInstances: 5
+  concurrency: 80
+
+env:
+  - variable: PUBLIC_PULSE_WEB_URL
+    value: https://pulse.everybenefits.us
+    availability:
+      - BUILD
+      - RUNTIME

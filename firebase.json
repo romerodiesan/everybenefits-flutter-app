@@ -100,6 +100,26 @@
         "test"
       ],
       "alwaysDeployFromSource": true
+    },
+    {
+      "backendId": "legal",
+      "rootDir": "apps/legal",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local",
+        "apps/mobile",
+        "apps/functions",
+        "apps/web",
+        "apps/studio",
+        "apps/admin",
+        "docs",
+        "tooling",
+        "test"
+      ],
+      "alwaysDeployFromSource": true
     }
   ],
   "functions": [
