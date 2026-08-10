@@ -2,20 +2,20 @@
  * Shared profile field validation / normalization for Pulse clients.
  */
 
+import { hasPermission, resolvePermissionSet } from "./permissions";
+
 const EMAIL_LIKE =
   /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 const NPN_DIGITS = /^\d{7,9}$/;
 
-/** Roles that must provide NPN + US address. */
-export const LICENSE_PROFILE_ROLES = [
-  "agent",
-  "instructor",
-  "manager",
-  "admin",
-] as const;
-
-export function requiresLicenseProfile(role: string): boolean {
-  return (LICENSE_PROFILE_ROLES as readonly string[]).includes(role);
+/** True when license profile fields are required for this role/permission set. */
+export function requiresLicenseProfile(
+  roleOrPermissions: string | readonly string[] | null | undefined,
+): boolean {
+  return hasPermission(
+    resolvePermissionSet(roleOrPermissions),
+    "license.profile.required",
+  );
 }
 
 /** True when the string looks like an email used as a display name. */
@@ -130,4 +130,37 @@ export function needsProfileCompletion(input: ProfileCompletenessInput): boolean
     if (!validateUsZip(String(input.addressZip ?? ""))) return true;
   }
   return input.profileCompleted === false;
+}
+
+/** Display name for UI chrome (profile / chats / forums). */
+export function headlineName(profile: {
+  displayName: string | null;
+  email: string | null;
+  isAnonymous: boolean;
+}) {
+  if (profile.displayName?.trim()) return profile.displayName.trim();
+  if (profile.email) return profile.email;
+  return profile.isAnonymous ? "Guest" : "User";
+}
+
+/** Compose a US mailing address string from structured fields. */
+export function composeUsAddress(parts: {
+  street?: string | null;
+  apt?: string | null;
+  city?: string | null;
+  state?: string | null;
+  zip?: string | null;
+}) {
+  const s = parts.street?.trim() ?? "";
+  const a = parts.apt?.trim() ?? "";
+  const c = parts.city?.trim() ?? "";
+  const st = (parts.state?.trim() ?? "").toUpperCase();
+  const z = parts.zip?.trim() ?? "";
+  const line1 = [s, a].filter(Boolean).join(", ");
+  const stateZip = [st, z].filter(Boolean).join(" ");
+  const line2 = [c, stateZip].filter(Boolean).join(", ");
+  if (!line1 && !line2) return null;
+  if (!line1) return line2;
+  if (!line2) return line1;
+  return `${line1}\n${line2}`;
 }

@@ -1,11 +1,20 @@
+import {
+  can,
+  getDefaultPermissionsForRole,
+  hasPermission,
+  resolvePermissionSet,
+} from "./permissions";
+
 export type UserRole =
   | "guest"
   | "student"
   | "agent"
   | "instructor"
   | "manager"
-  | "admin";
+  | "admin"
+  | "system";
 
+/** Built-in role slugs used across clients and Firestore rules. */
 export const ALL_ROLES: readonly UserRole[] = [
   "guest",
   "student",
@@ -13,98 +22,28 @@ export const ALL_ROLES: readonly UserRole[] = [
   "instructor",
   "manager",
   "admin",
+  "system",
 ] as const;
 
-/** Roles that may read/write forums (non-anonymous). */
-export const FORUM_ROLES: readonly UserRole[] = [
+/** Product system roles (editable only by `system` in Admin). */
+export const SYSTEM_ROLE_IDS = [
+  "system",
+  "admin",
+  "manager",
+  "agent",
   "student",
-  "agent",
+] as const satisfies readonly UserRole[];
+
+/** Legacy built-ins kept for compatibility. */
+export const LEGACY_ROLE_IDS = [
+  "guest",
   "instructor",
-  "manager",
-  "admin",
-] as const;
+] as const satisfies readonly UserRole[];
 
-/** Default agent group membership. */
-export const DEFAULT_GROUP_ROLES: readonly UserRole[] = [
-  "agent",
-  "instructor",
-  "manager",
-  "admin",
-] as const;
-
-/** Who may create non-support chat groups. */
-export const GROUP_CREATOR_ROLES: readonly UserRole[] = [
-  "instructor",
-  "manager",
-  "admin",
-] as const;
-
-export function parseRole(value: unknown): UserRole {
-  if (typeof value !== "string") return "guest";
-  // Legacy every-benefits-us used "teacher" for course authors.
-  if (value === "teacher") return "instructor";
-  if ((ALL_ROLES as readonly string[]).includes(value)) {
-    return value as UserRole;
-  }
-  return "guest";
-}
-
-/** Instructors, managers, and admins can author courses in Studio. */
-export function canAuthorCourses(role: UserRole) {
-  return (
-    role === "instructor" || role === "manager" || role === "admin"
-  );
-}
-
-/** Same authors who write courses can draft learning paths. */
-export function canAuthorPaths(role: UserRole) {
-  return canAuthorCourses(role);
-}
-
-/** Only admins publish and approve courses and paths. */
-export function canManageCourses(role: UserRole) {
-  return role === "admin";
-}
-
-/** Authors keep editing until an admin publishes; admins always may. */
-export function canEditCourse(
-  course: { createdBy: string; status: string },
-  viewer: { uid: string; role: UserRole },
-) {
-  if (viewer.role === "admin") return true;
-  if (!canAuthorCourses(viewer.role)) return false;
-  return course.createdBy === viewer.uid && course.status !== "published";
-}
-
-/** Authors keep editing their path until an admin publishes; admins always may. */
-export function canEditPath(
-  path: { createdBy: string; status: string },
-  viewer: { uid: string; role: UserRole },
-) {
-  if (viewer.role === "admin") return true;
-  if (!canAuthorPaths(viewer.role)) return false;
-  return path.createdBy === viewer.uid && path.status !== "published";
-}
-
-export function belongsInDefaultAgentGroup(role: UserRole) {
-  return (DEFAULT_GROUP_ROLES as readonly string[]).includes(role);
-}
-
-/** Agent tools (quote calculators, etc.) — not for students or guests. */
-export function canAccessTools(role: UserRole) {
-  return belongsInDefaultAgentGroup(role);
-}
-
-export function canCreateChatGroups(role: UserRole) {
-  return (GROUP_CREATOR_ROLES as readonly string[]).includes(role);
-}
-
-/** Who may enable persistent auto-join-by-role on a group. */
-export function canConfigureGroupAutoJoin(role: UserRole) {
-  return role === "admin" || role === "manager";
-}
-
-/** Roles that can be targeted for group seed / auto-join (not guest). */
+/**
+ * Role IDs that may be targeted for group seed / auto-join pickers.
+ * This is a data filter (which roles can be selected), not an authz check.
+ */
 export const GROUP_SEED_ROLES = [
   "student",
   "agent",
@@ -113,31 +52,138 @@ export const GROUP_SEED_ROLES = [
   "admin",
 ] as const satisfies readonly UserRole[];
 
+export type RoleOrPermissions =
+  | UserRole
+  | string
+  | string[]
+  | readonly string[]
+  | null
+  | undefined;
 
-export function canParticipateInForums(role: UserRole, isAnonymous: boolean) {
-  if (isAnonymous || role === "guest") return false;
-  return (FORUM_ROLES as readonly string[]).includes(role);
+export function parseRole(value: unknown): UserRole {
+  if (typeof value !== "string") return "guest";
+  // Legacy every-benefits-us used "teacher" for course authors.
+  if (value === "teacher") return "instructor";
+  if ((ALL_ROLES as readonly string[]).includes(value)) {
+    return value as UserRole;
+  }
+  // Custom role slugs are stored as-is on users; treat as opaque string
+  // typed through UserRole for backwards compatibility with call sites.
+  if (value.trim() && value !== "guest") {
+    return value as UserRole;
+  }
+  return "guest";
 }
 
-export function canParticipateInChats(role: UserRole, isAnonymous: boolean) {
-  return canParticipateInForums(role, isAnonymous);
+/** Mega-role above admin — DB-only assignment and role-doc edits. */
+export function isSystemRole(role: UserRole | string) {
+  return role === "system";
 }
 
-/** Support inbox is for members who need help — not staff (admin/manager). */
-export function canAccessSupport(role: UserRole, isAnonymous: boolean) {
-  if (isAnonymous || role === "guest") return false;
-  if (role === "admin" || role === "manager") return false;
+export function canAuthorCourses(roleOrPermissions: RoleOrPermissions) {
+  return can(roleOrPermissions, "courses.author");
+}
+
+export function canAuthorPaths(roleOrPermissions: RoleOrPermissions) {
+  return can(roleOrPermissions, "paths.author");
+}
+
+export function canManageCourses(roleOrPermissions: RoleOrPermissions) {
   return (
-    role === "student" || role === "agent" || role === "instructor"
+    can(roleOrPermissions, "courses.manage") ||
+    can(roleOrPermissions, "courses.publish")
   );
 }
 
-/** Pulse Admin portal — managers and admins only. */
-export function canAccessAdmin(role: UserRole) {
-  return role === "manager" || role === "admin";
+export function canEditCourse(
+  course: { createdBy: string; status: string },
+  viewer: { uid: string; role: UserRole; permissions?: readonly string[] },
+) {
+  const perms = viewer.permissions ?? getDefaultPermissionsForRole(viewer.role);
+  if (hasPermission(perms, "courses.edit.any")) return true;
+  if (!hasPermission(perms, "courses.author")) return false;
+  return course.createdBy === viewer.uid && course.status !== "published";
 }
 
-/** Platform-wide ops (role changes, deactivate any user, root org). */
-export function canManagePlatform(role: UserRole) {
-  return role === "admin";
+export function canEditPath(
+  path: { createdBy: string; status: string },
+  viewer: { uid: string; role: UserRole; permissions?: readonly string[] },
+) {
+  const perms = viewer.permissions ?? getDefaultPermissionsForRole(viewer.role);
+  if (hasPermission(perms, "paths.edit.any")) return true;
+  if (!hasPermission(perms, "paths.author")) return false;
+  return path.createdBy === viewer.uid && path.status !== "published";
+}
+
+export function belongsInDefaultAgentGroup(
+  roleOrPermissions: RoleOrPermissions,
+) {
+  return can(roleOrPermissions, "chats.groups.default.join");
+}
+
+export function canAccessTools(roleOrPermissions: RoleOrPermissions) {
+  return can(roleOrPermissions, "tools.access");
+}
+
+export function canCreateChatGroups(roleOrPermissions: RoleOrPermissions) {
+  return can(roleOrPermissions, "chats.groups.create");
+}
+
+export function canConfigureGroupAutoJoin(
+  roleOrPermissions: RoleOrPermissions,
+) {
+  return can(roleOrPermissions, "chats.groups.autojoin.configure");
+}
+
+export function canParticipateInForums(
+  roleOrPermissions: RoleOrPermissions,
+  isAnonymous: boolean,
+) {
+  if (isAnonymous) return false;
+  const perms = resolvePermissionSet(roleOrPermissions);
+  if (
+    typeof roleOrPermissions === "string" &&
+    (roleOrPermissions === "guest" || !roleOrPermissions)
+  ) {
+    return false;
+  }
+  return hasPermission(perms, "forums.participate");
+}
+
+export function canParticipateInChats(
+  roleOrPermissions: RoleOrPermissions,
+  isAnonymous: boolean,
+) {
+  if (isAnonymous) return false;
+  return can(roleOrPermissions, "chats.participate");
+}
+
+export function canAccessSupport(
+  roleOrPermissions: RoleOrPermissions,
+  isAnonymous: boolean,
+) {
+  if (isAnonymous) return false;
+  return can(roleOrPermissions, "support.access");
+}
+
+export function canAccessAdmin(roleOrPermissions: RoleOrPermissions) {
+  return (
+    can(roleOrPermissions, "admin.access") ||
+    can(roleOrPermissions, "apps.admin.access")
+  );
+}
+
+export function canManagePlatform(roleOrPermissions: RoleOrPermissions) {
+  return can(roleOrPermissions, "platform.manage");
+}
+
+export function canModerateForums(roleOrPermissions: RoleOrPermissions) {
+  return can(roleOrPermissions, "forums.moderate");
+}
+
+export function canAccessStudio(roleOrPermissions: RoleOrPermissions) {
+  return (
+    can(roleOrPermissions, "apps.studio.access") ||
+    can(roleOrPermissions, "courses.author")
+  );
 }

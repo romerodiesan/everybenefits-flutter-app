@@ -19,19 +19,19 @@ exports.PULSE_APPS = [
         blurbKey: "appSwitchStudioBlurb",
         homePath: "/",
         tileClass: "bg-ink/[0.08] text-ink dark:bg-white/[0.1] dark:text-white",
-        visible: (role) => Boolean(role && (0, roles_1.canAuthorCourses)(role)),
+        visible: (roleOrPermissions) => (0, roles_1.canAccessStudio)(roleOrPermissions),
     },
     {
         id: "admin",
         labelKey: "appSwitchAdmin",
         blurbKey: "appSwitchAdminBlurb",
         homePath: "/",
-        tileClass: "bg-brand/10 text-brand",
-        visible: (role) => Boolean(role && (0, roles_1.canAccessAdmin)(role)),
+        tileClass: "bg-brand text-on-brand",
+        visible: (roleOrPermissions) => (0, roles_1.canAccessAdmin)(roleOrPermissions),
     },
 ];
-function listVisibleApps(role) {
-    return exports.PULSE_APPS.filter((app) => !app.visible || app.visible(role));
+function listVisibleApps(roleOrPermissions) {
+    return exports.PULSE_APPS.filter((app) => !app.visible || app.visible(roleOrPermissions));
 }
 function getAppEntry(id) {
     return exports.PULSE_APPS.find((app) => app.id === id);

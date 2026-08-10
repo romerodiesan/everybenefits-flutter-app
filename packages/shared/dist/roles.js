@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.GROUP_SEED_ROLES = exports.GROUP_CREATOR_ROLES = exports.DEFAULT_GROUP_ROLES = exports.FORUM_ROLES = exports.ALL_ROLES = void 0;
+exports.GROUP_SEED_ROLES = exports.LEGACY_ROLE_IDS = exports.SYSTEM_ROLE_IDS = exports.ALL_ROLES = void 0;
 exports.parseRole = parseRole;
+exports.isSystemRole = isSystemRole;
 exports.canAuthorCourses = canAuthorCourses;
 exports.canAuthorPaths = canAuthorPaths;
 exports.canManageCourses = canManageCourses;
@@ -16,6 +17,10 @@ exports.canParticipateInChats = canParticipateInChats;
 exports.canAccessSupport = canAccessSupport;
 exports.canAccessAdmin = canAccessAdmin;
 exports.canManagePlatform = canManagePlatform;
+exports.canModerateForums = canModerateForums;
+exports.canAccessStudio = canAccessStudio;
+const permissions_1 = require("./permissions");
+/** Built-in role slugs used across clients and Firestore rules. */
 exports.ALL_ROLES = [
     "guest",
     "student",
@@ -23,24 +28,28 @@ exports.ALL_ROLES = [
     "instructor",
     "manager",
     "admin",
+    "system",
 ];
-/** Roles that may read/write forums (non-anonymous). */
-exports.FORUM_ROLES = [
+/** Product system roles (editable only by `system` in Admin). */
+exports.SYSTEM_ROLE_IDS = [
+    "system",
+    "admin",
+    "manager",
+    "agent",
+    "student",
+];
+/** Legacy built-ins kept for compatibility. */
+exports.LEGACY_ROLE_IDS = [
+    "guest",
+    "instructor",
+];
+/**
+ * Role IDs that may be targeted for group seed / auto-join pickers.
+ * This is a data filter (which roles can be selected), not an authz check.
+ */
+exports.GROUP_SEED_ROLES = [
     "student",
     "agent",
-    "instructor",
-    "manager",
-    "admin",
-];
-/** Default agent group membership. */
-exports.DEFAULT_GROUP_ROLES = [
-    "agent",
-    "instructor",
-    "manager",
-    "admin",
-];
-/** Who may create non-support chat groups. */
-exports.GROUP_CREATOR_ROLES = [
     "instructor",
     "manager",
     "admin",
@@ -54,79 +63,86 @@ function parseRole(value) {
     if (exports.ALL_ROLES.includes(value)) {
         return value;
     }
+    // Custom role slugs are stored as-is on users; treat as opaque string
+    // typed through UserRole for backwards compatibility with call sites.
+    if (value.trim() && value !== "guest") {
+        return value;
+    }
     return "guest";
 }
-/** Instructors, managers, and admins can author courses in Studio. */
-function canAuthorCourses(role) {
-    return (role === "instructor" || role === "manager" || role === "admin");
+/** Mega-role above admin — DB-only assignment and role-doc edits. */
+function isSystemRole(role) {
+    return role === "system";
 }
-/** Same authors who write courses can draft learning paths. */
-function canAuthorPaths(role) {
-    return canAuthorCourses(role);
+function canAuthorCourses(roleOrPermissions) {
+    return (0, permissions_1.can)(roleOrPermissions, "courses.author");
 }
-/** Only admins publish and approve courses and paths. */
-function canManageCourses(role) {
-    return role === "admin";
+function canAuthorPaths(roleOrPermissions) {
+    return (0, permissions_1.can)(roleOrPermissions, "paths.author");
 }
-/** Authors keep editing until an admin publishes; admins always may. */
+function canManageCourses(roleOrPermissions) {
+    return ((0, permissions_1.can)(roleOrPermissions, "courses.manage") ||
+        (0, permissions_1.can)(roleOrPermissions, "courses.publish"));
+}
 function canEditCourse(course, viewer) {
-    if (viewer.role === "admin")
+    const perms = viewer.permissions ?? (0, permissions_1.getDefaultPermissionsForRole)(viewer.role);
+    if ((0, permissions_1.hasPermission)(perms, "courses.edit.any"))
         return true;
-    if (!canAuthorCourses(viewer.role))
+    if (!(0, permissions_1.hasPermission)(perms, "courses.author"))
         return false;
     return course.createdBy === viewer.uid && course.status !== "published";
 }
-/** Authors keep editing their path until an admin publishes; admins always may. */
 function canEditPath(path, viewer) {
-    if (viewer.role === "admin")
+    const perms = viewer.permissions ?? (0, permissions_1.getDefaultPermissionsForRole)(viewer.role);
+    if ((0, permissions_1.hasPermission)(perms, "paths.edit.any"))
         return true;
-    if (!canAuthorPaths(viewer.role))
+    if (!(0, permissions_1.hasPermission)(perms, "paths.author"))
         return false;
     return path.createdBy === viewer.uid && path.status !== "published";
 }
-function belongsInDefaultAgentGroup(role) {
-    return exports.DEFAULT_GROUP_ROLES.includes(role);
+function belongsInDefaultAgentGroup(roleOrPermissions) {
+    return (0, permissions_1.can)(roleOrPermissions, "chats.groups.default.join");
 }
-/** Agent tools (quote calculators, etc.) — not for students or guests. */
-function canAccessTools(role) {
-    return belongsInDefaultAgentGroup(role);
+function canAccessTools(roleOrPermissions) {
+    return (0, permissions_1.can)(roleOrPermissions, "tools.access");
 }
-function canCreateChatGroups(role) {
-    return exports.GROUP_CREATOR_ROLES.includes(role);
+function canCreateChatGroups(roleOrPermissions) {
+    return (0, permissions_1.can)(roleOrPermissions, "chats.groups.create");
 }
-/** Who may enable persistent auto-join-by-role on a group. */
-function canConfigureGroupAutoJoin(role) {
-    return role === "admin" || role === "manager";
+function canConfigureGroupAutoJoin(roleOrPermissions) {
+    return (0, permissions_1.can)(roleOrPermissions, "chats.groups.autojoin.configure");
 }
-/** Roles that can be targeted for group seed / auto-join (not guest). */
-exports.GROUP_SEED_ROLES = [
-    "student",
-    "agent",
-    "instructor",
-    "manager",
-    "admin",
-];
-function canParticipateInForums(role, isAnonymous) {
-    if (isAnonymous || role === "guest")
+function canParticipateInForums(roleOrPermissions, isAnonymous) {
+    if (isAnonymous)
         return false;
-    return exports.FORUM_ROLES.includes(role);
-}
-function canParticipateInChats(role, isAnonymous) {
-    return canParticipateInForums(role, isAnonymous);
-}
-/** Support inbox is for members who need help — not staff (admin/manager). */
-function canAccessSupport(role, isAnonymous) {
-    if (isAnonymous || role === "guest")
+    const perms = (0, permissions_1.resolvePermissionSet)(roleOrPermissions);
+    if (typeof roleOrPermissions === "string" &&
+        (roleOrPermissions === "guest" || !roleOrPermissions)) {
         return false;
-    if (role === "admin" || role === "manager")
+    }
+    return (0, permissions_1.hasPermission)(perms, "forums.participate");
+}
+function canParticipateInChats(roleOrPermissions, isAnonymous) {
+    if (isAnonymous)
         return false;
-    return (role === "student" || role === "agent" || role === "instructor");
+    return (0, permissions_1.can)(roleOrPermissions, "chats.participate");
 }
-/** Pulse Admin portal — managers and admins only. */
-function canAccessAdmin(role) {
-    return role === "manager" || role === "admin";
+function canAccessSupport(roleOrPermissions, isAnonymous) {
+    if (isAnonymous)
+        return false;
+    return (0, permissions_1.can)(roleOrPermissions, "support.access");
 }
-/** Platform-wide ops (role changes, deactivate any user, root org). */
-function canManagePlatform(role) {
-    return role === "admin";
+function canAccessAdmin(roleOrPermissions) {
+    return ((0, permissions_1.can)(roleOrPermissions, "admin.access") ||
+        (0, permissions_1.can)(roleOrPermissions, "apps.admin.access"));
+}
+function canManagePlatform(roleOrPermissions) {
+    return (0, permissions_1.can)(roleOrPermissions, "platform.manage");
+}
+function canModerateForums(roleOrPermissions) {
+    return (0, permissions_1.can)(roleOrPermissions, "forums.moderate");
+}
+function canAccessStudio(roleOrPermissions) {
+    return ((0, permissions_1.can)(roleOrPermissions, "apps.studio.access") ||
+        (0, permissions_1.can)(roleOrPermissions, "courses.author"));
 }

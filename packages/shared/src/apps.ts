@@ -1,4 +1,9 @@
-import { canAccessAdmin, canAuthorCourses, type UserRole } from "./roles";
+import {
+  canAccessAdmin,
+  canAccessStudio,
+  type RoleOrPermissions,
+  type UserRole,
+} from "./roles";
 
 /**
  * Pulse product family apps (cross-origin SSO targets).
@@ -28,7 +33,8 @@ export type AppRegistryEntry = {
   homePath: string;
   /** Tailwind token classes for the icon tile. */
   tileClass: string;
-  visible?: (role: UserRole | undefined) => boolean;
+  /** Prefer passing resolved permissions; role slug falls back to defaults. */
+  visible?: (roleOrPermissions: RoleOrPermissions) => boolean;
 };
 
 /** Registry of Pulse family apps. Add entries here as products launch. */
@@ -46,24 +52,28 @@ export const PULSE_APPS: readonly AppRegistryEntry[] = [
     blurbKey: "appSwitchStudioBlurb",
     homePath: "/",
     tileClass: "bg-ink/[0.08] text-ink dark:bg-white/[0.1] dark:text-white",
-    visible: (role) => Boolean(role && canAuthorCourses(role)),
+    visible: (roleOrPermissions) => canAccessStudio(roleOrPermissions),
   },
   {
     id: "admin",
     labelKey: "appSwitchAdmin",
     blurbKey: "appSwitchAdminBlurb",
     homePath: "/",
-    tileClass: "bg-brand/10 text-brand",
-    visible: (role) => Boolean(role && canAccessAdmin(role)),
+    tileClass: "bg-brand text-on-brand",
+    visible: (roleOrPermissions) => canAccessAdmin(roleOrPermissions),
   },
 ];
 
 export function listVisibleApps(
-  role?: UserRole,
+  roleOrPermissions?: RoleOrPermissions,
 ): AppRegistryEntry[] {
-  return PULSE_APPS.filter((app) => !app.visible || app.visible(role));
+  return PULSE_APPS.filter(
+    (app) => !app.visible || app.visible(roleOrPermissions),
+  );
 }
 
 export function getAppEntry(id: PulseAppId): AppRegistryEntry | undefined {
   return PULSE_APPS.find((app) => app.id === id);
 }
+
+export type { UserRole };
