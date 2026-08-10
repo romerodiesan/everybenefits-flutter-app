@@ -7,12 +7,14 @@
 # Prefer Firebase Hosting for this static site (`pnpm deploy:legal`).
 # App Hosting works via a small static file server over the prerendered build.
 #
+# Do NOT set scripts.buildCommand here. The Node buildpack rewrites
+# package.json when buildCommand is set, and its Go struct serializes missing
+# `dependencies` as null — pnpm 11 then fails with
+# ERR_PNPM_INVALID_DEPENDENCIES_FIELD. Use package.json#apphosting:build /
+# start instead (same workaround as GoogleCloudPlatform/buildpacks#621).
+#
 # Important: Console overrideEnv PUBLIC_PULSE_WEB_URL must be the Pulse web
 # origin (https://pulse.everybenefits.us), not the legal site hostname.
-
-scripts:
-  buildCommand: pnpm run build:legal
-  runCommand: pnpm --filter @pulse/legal start
 
 runConfig:
   cpu: 1
