@@ -93,7 +93,11 @@ export function initFirebaseClient() {
     // Connect BEFORE any Auth/Firestore/RTDB use — otherwise the SDK may latch
     // onto production and ignore later connect*Emulator calls.
     try {
-      connectAuthEmulator(getFirebaseAuth(), `http://${host}:9099`, {
+      const auth = getFirebaseAuth();
+      // Auth emulator cannot exercise production reCAPTCHA Enterprise keys;
+      // without this, SMS MFA / phone verify fails with "Invalid site key".
+      auth.settings.appVerificationDisabledForTesting = true;
+      connectAuthEmulator(auth, `http://${host}:9099`, {
         disableWarnings: true,
       });
       connectFirestoreEmulator(getFirebaseDb(), host, 8080);
