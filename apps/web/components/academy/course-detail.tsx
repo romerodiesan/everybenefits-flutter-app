@@ -7,6 +7,7 @@ import { useAuth } from "@/lib/providers/auth-provider";
 import { canEditCourse } from "@/lib/roles";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { buildSsoHandoffUrl, ssoConsumeUrl } from "@/lib/sso";
+import { studioCourseHref } from "@/lib/studio-url";
 import {
   enrollInCourse,
   progressOf,
@@ -201,9 +202,7 @@ export function CourseDetail({ courseId }: { courseId: string }) {
                     const user = getFirebaseAuth().currentUser;
                     const path = `/courses/${course.id}`;
                     if (!user) {
-                      window.location.assign(
-                        `${process.env.NEXT_PUBLIC_STUDIO_URL?.replace(/\/$/, "") || "http://localhost:3001"}/${locale}${path}`,
-                      );
+                      window.location.assign(studioCourseHref(course.id, locale));
                       return;
                     }
                     const idToken = await user.getIdToken();

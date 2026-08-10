@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canManageCourses } from "@/lib/roles";
 import {
   createPath,
@@ -57,6 +57,7 @@ export function LibraryHome() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useAuth();
+  const access = useAccess();
   const levelLabel = useLevelLabels();
 
   const [tab, setTab] = useState<Tab>("courses");
@@ -75,7 +76,7 @@ export function LibraryHome() {
   const [pathForm, setPathForm] = useState(emptyPathForm);
 
   const uid = profile?.uid ?? "";
-  const isAdmin = canManageCourses(profile?.role ?? "guest");
+  const isAdmin = canManageCourses(access);
 
   useEffect(() => {
     const create = searchParams.get("create");

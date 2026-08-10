@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
-import { headlineName } from "@/lib/firebase/users";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { headlineName } from "@/lib/display-name";
 import { getOrCreateSupportChat } from "@/lib/firebase/chats";
 import { signOutAndRedirect } from "@/lib/firebase/auth";
-import { canAccessSupport } from "@/lib/roles";
+import { can, canAccessSupport } from "@/lib/roles";
 import type { UserProfile } from "@/lib/types";
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
 import {
@@ -39,6 +39,7 @@ function roleLabel(
     instructor: t("roleInstructor"),
     manager: t("roleManager"),
     admin: t("roleAdmin"),
+    system: t("roleSystem"),
   }[role];
 }
 
@@ -147,6 +148,7 @@ export function ProfilePage() {
   // an effect so we never overwrite a deep-link hash with a stale default.
   const [section, setSection] = useState<SettingsSection>("account");
   const [sectionReady, setSectionReady] = useState(false);
+  const access = useAccess();
 
   useEffect(() => {
     restorePendingLocaleHash();
@@ -179,8 +181,7 @@ export function ProfilePage() {
     }
   }, [section, sectionReady]);
 
-  const canApprove =
-    profile?.role === "admin" || profile?.role === "manager";
+  const canApprove = can(access, "admin.approvals.decide");
   const isAnonymous = profile?.isAnonymous ?? true;
 
   const navItems = useMemo<SettingsNavItem[]>(() => {
@@ -294,7 +295,7 @@ export function ProfilePage() {
               </p>
             )}
             <div className="mt-3 space-y-1.5">
-              {canAccessSupport(profile.role, profile.isAnonymous) && (
+              {canAccessSupport(access, profile.isAnonymous) && (
                 <Button
                   className="h-9 w-full text-xs"
                   onClick={async () => {

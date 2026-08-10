@@ -9,8 +9,8 @@ import {
 } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
-import { canAuthorCourses, headlineName } from "@/lib/roles";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { canAccessStudio, canManageCourses, headlineName } from "@/lib/roles";
 import { signOutAndRedirect } from "@/lib/firebase/auth";
 import { CommandPalette } from "@/components/chrome/command-palette";
 import { AppSwitcher } from "@/components/chrome/app-switcher";
@@ -37,6 +37,7 @@ const ROLE_KEY: Record<UserRole, string> = {
   instructor: "roleInstructor",
   manager: "roleManager",
   admin: "roleAdmin",
+  system: "roleSystem",
 };
 
 type IconProps = SVGProps<SVGSVGElement> & { filled?: boolean };
@@ -149,7 +150,8 @@ export function StudioShell({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
 
   const role = profile?.role ?? "guest";
-  const isAuthor = canAuthorCourses(role);
+  const access = useAccess();
+  const canEnterStudio = canAccessStudio(access);
   const blocked =
     profile?.accountStatus === "deactivated" ||
     profile?.accountStatus === "pendingDeletion";
@@ -177,10 +179,10 @@ export function StudioShell({ children }: { children: ReactNode }) {
       router.replace("/login");
       return;
     }
-    if (profile && !isAuthor && !blocked) {
+    if (profile && !canEnterStudio && !blocked) {
       router.replace("/no-access");
     }
-  }, [loading, user, profile, isAuthor, blocked, router, locale, pathname]);
+  }, [loading, user, profile, canEnterStudio, blocked, router, locale, pathname]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -271,12 +273,12 @@ export function StudioShell({ children }: { children: ReactNode }) {
     );
   }
 
-  if (!isAuthor) {
+  if (!canEnterStudio) {
     return null;
   }
 
-  const isAdmin = role === "admin";
-  const visibleNav = nav.filter((item) => !item.adminOnly || isAdmin);
+  const canReview = canManageCourses(access);
+  const visibleNav = nav.filter((item) => !item.adminOnly || canReview);
 
   return (
     <div className="studio-bg flex h-[100svh] overflow-hidden">
@@ -297,7 +299,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
       >
         <div className="border-b border-glass-border px-3 pb-3 pt-[max(0.875rem,env(safe-area-inset-top,0px)+0.5rem)] lg:pt-3.5">
           <div className="flex items-center justify-between gap-2 px-1">
-            <AppSwitcher current="studio" role={profile.role} />
+            <AppSwitcher current="studio" permissions={access} />
             <button
               type="button"
               className="rounded-lg p-2 text-muted hover:bg-ink/[0.05] hover:text-ink lg:hidden"
@@ -330,7 +332,9 @@ export function StudioShell({ children }: { children: ReactNode }) {
                 {name}
               </p>
               <span className="mt-1 inline-flex rounded-md bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
-                {t(ROLE_KEY[profile.role])}
+                {ROLE_KEY[profile.role as UserRole]
+                  ? t(ROLE_KEY[profile.role as UserRole])
+                  : profile.role}
               </span>
             </div>
           </div>
@@ -450,7 +454,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
             </svg>
           </button>
           <div className="min-w-0 flex-1">
-            <AppSwitcher current="studio" role={profile.role} />
+            <AppSwitcher current="studio" permissions={access} />
           </div>
           <button
             type="button"

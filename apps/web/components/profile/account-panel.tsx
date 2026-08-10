@@ -5,6 +5,8 @@ import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/providers/auth-provider";
 import {
   headlineName,
+} from "@/lib/display-name";
+import {
   updateUserProfile,
   uploadAvatar,
 } from "@/lib/firebase/users";

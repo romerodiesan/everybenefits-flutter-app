@@ -243,5 +243,3 @@ export async function listDirectory(excludeUid?: string, max = 80) {
 export async function searchDirectoryContacts(query: string, max = 40) {
   return searchDirectoryFn(query, max);
 }
-
-export { headlineName };

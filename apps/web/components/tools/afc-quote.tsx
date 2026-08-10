@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canAccessTools } from "@/lib/roles";
 import {
   AFC_AGES,
@@ -27,7 +27,8 @@ export function AfcQuote() {
   const locale = useLocale();
   const router = useRouter();
   const { profile, loading } = useAuth();
-  const allowed = profile ? canAccessTools(profile.role) : false;
+  const access = useAccess();
+  const allowed = profile ? canAccessTools(access) : false;
 
   const [age, setAge] = useState<AfcAge>("30");
   const [tier, setTier] = useState<AfcTier>("elite_plus");
@@ -35,10 +36,10 @@ export function AfcQuote() {
 
   useEffect(() => {
     if (loading || !profile) return;
-    if (!canAccessTools(profile.role)) {
+    if (!canAccessTools(access)) {
       router.replace("/home");
     }
-  }, [loading, profile, router]);
+  }, [loading, profile, router, access]);
 
   const premium = useMemo(
     () => lookupAfcPremium(tier, age, coverage),

@@ -7,13 +7,12 @@ import {
   type ReactNode,
 } from "react";
 
-export function Button({
-  variant = "primary",
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-}) {
+export const Button = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: "primary" | "secondary" | "ghost" | "danger";
+  }
+>(function Button({ variant = "primary", className = "", ...props }, ref) {
   const styles = {
     primary:
       "bg-brand text-on-brand hover:brightness-110 disabled:opacity-50",
@@ -24,11 +23,12 @@ export function Button({
   }[variant];
   return (
     <button
+      ref={ref}
       className={`inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition disabled:cursor-not-allowed ${styles} ${className}`}
       {...props}
     />
   );
-}
+});
 
 export const Input = forwardRef<
   HTMLInputElement,

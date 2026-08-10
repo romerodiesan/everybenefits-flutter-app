@@ -6,14 +6,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import { onAuthStateChanged, type User } from "firebase/auth";
 import { initFirebaseClient, getFirebaseAuth } from "@/lib/firebase/client";
 import { ensureProfile, watchProfile } from "@/lib/firebase/users";
+import { watchRolePermissions } from "@/lib/firebase/roles";
 import { ensureDefaultAgentGroup } from "@/lib/firebase/ensure-default-group";
 import { belongsInDefaultAgentGroup } from "@/lib/roles";
+import { resolveAccess } from "@pulse/shared";
 import {
   clearCachedProfile,
   hasTrustedShellCache,
@@ -21,10 +24,13 @@ import {
   writeCachedProfile,
 } from "@/lib/profile-cache";
 import type { UserProfile } from "@/lib/types";
+import type { RoleOrPermissions } from "@pulse/shared";
 
 type AuthContextValue = {
   user: User | null;
   profile: UserProfile | null;
+  /** Resolved permission keys for the current profile role. */
+  permissions: string[];
   /** True until the first auth state is known. */
   loading: boolean;
   /** True while Firestore profile is still resolving (cache may already show). */
@@ -43,8 +49,10 @@ function isPermissionDenied(error: unknown): boolean {
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [permissions, setPermissions] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const ensuredDefaultGroupForUid = useRef<string | null>(null);
 
   useEffect(() => {
     initFirebaseClient();
@@ -53,15 +61,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     let unsubProfile: (() => void) | undefined;
     let generation = 0;
-    /** Once per uid — avoid re-firing on every profile snapshot. */
-    let ensuredDefaultGroupForUid: string | null = null;
-
-    const maybeEnsureDefaultAgentGroup = (p: UserProfile) => {
-      if (ensuredDefaultGroupForUid === p.uid) return;
-      if (!belongsInDefaultAgentGroup(p.role) || p.isAnonymous) return;
-      ensuredDefaultGroupForUid = p.uid;
-      ensureDefaultAgentGroup().catch(() => undefined);
-    };
 
     const unsubAuth = onAuthStateChanged(getFirebaseAuth(), (next) => {
       unsubProfile?.();
@@ -71,16 +70,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
 
       if (!next) {
-        ensuredDefaultGroupForUid = null;
+        ensuredDefaultGroupForUid.current = null;
         setProfile(null);
+        setPermissions([]);
         setProfileLoading(false);
         clearCachedProfile();
         return;
       }
 
       const uid = next.uid;
-      if (ensuredDefaultGroupForUid !== uid) {
-        ensuredDefaultGroupForUid = null;
+      if (ensuredDefaultGroupForUid.current !== uid) {
+        ensuredDefaultGroupForUid.current = null;
       }
       const cached = readCachedProfile(uid);
       if (cached) setProfile(cached);
@@ -96,7 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           setProfile(ensured);
           writeCachedProfile(ensured);
-          maybeEnsureDefaultAgentGroup(ensured);
 
           if (getFirebaseAuth().currentUser?.uid !== uid) return;
           unsubProfile = watchProfile(
@@ -107,7 +106,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               if (p) {
                 setProfile(p);
                 writeCachedProfile(p);
-                maybeEnsureDefaultAgentGroup(p);
               }
             },
             (error) => {
@@ -140,6 +138,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    if (!profile?.role) {
+      setPermissions([]);
+      return;
+    }
+    return watchRolePermissions(
+      profile.role,
+      setPermissions,
+      (error) => {
+        if (isPermissionDenied(error)) return;
+        console.error(error);
+      },
+    );
+  }, [profile?.role]);
+
+  useEffect(() => {
+    if (!profile) return;
+    if (ensuredDefaultGroupForUid.current === profile.uid) return;
+    const access = resolveAccess(permissions, profile.role);
+    if (!belongsInDefaultAgentGroup(access) || profile.isAnonymous) return;
+    ensuredDefaultGroupForUid.current = profile.uid;
+    ensureDefaultAgentGroup().catch(() => undefined);
+  }, [profile, permissions]);
+
   const refreshProfile = useCallback(async () => {
     const current = getFirebaseAuth().currentUser;
     if (!current) return;
@@ -150,8 +172,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, profile, loading, profileLoading, refreshProfile }),
-    [user, profile, loading, profileLoading, refreshProfile],
+    () => ({
+      user,
+      profile,
+      permissions,
+      loading,
+      profileLoading,
+      refreshProfile,
+    }),
+    [user, profile, permissions, loading, profileLoading, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
@@ -161,4 +190,13 @@ export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
+}
+
+/** Live permissions when loaded, otherwise the profile role slug. */
+export function useAccess(): RoleOrPermissions {
+  const { permissions, profile } = useAuth();
+  return useMemo(
+    () => resolveAccess(permissions, profile?.role),
+    [permissions, profile?.role],
+  );
 }

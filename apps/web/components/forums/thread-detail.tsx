@@ -10,7 +10,8 @@ import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { useAlerts } from "@/lib/providers/alert-provider";
 import {
   addReply,
   castForumVote,
@@ -27,7 +28,7 @@ import {
 } from "@/lib/firebase/forums";
 import { headlineName } from "@/lib/display-name";
 import { mapCallableError } from "@/lib/firebase/callable-errors";
-import { canParticipateInForums } from "@/lib/roles";
+import { canModerateForums, canParticipateInForums } from "@/lib/roles";
 import { type ForumReply, type ForumThread } from "@/lib/types";
 import {
   removeSavedThread,
@@ -60,6 +61,7 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
   const t = useTranslations();
   const router = useRouter();
   const { profile } = useAuth();
+  const alerts = useAlerts();
   const pulseAiEnabled = usePulseAiEnabled();
   const reduceMotion = useSafeReducedMotion();
   const { isSaved: saved, toggle: toggleSave } = useSavedThread(threadId);
@@ -118,11 +120,12 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
     };
   }, [replies, profile, threadId, t]);
 
+  const access = useAccess();
   const canPost =
-    profile && canParticipateInForums(profile.role, profile.isAnonymous);
-  const isAdmin = profile?.role === "admin";
+    profile && canParticipateInForums(access, profile.isAnonymous);
+  const isModerator = canModerateForums(access);
   const isAuthor = Boolean(profile && thread && profile.uid === thread.authorId);
-  const canManageThread = Boolean(isAuthor || isAdmin);
+  const canManageThread = Boolean(isAuthor || isModerator);
   const canAccept = canManageThread;
   const effectiveReplyVotes =
     profile && replies.length ? replyVotes : ({} as Record<string, number>);
@@ -238,7 +241,13 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
 
   async function onDeleteThread() {
     if (!canManageThread) return;
-    if (!window.confirm(t("threadDeleteConfirm"))) return;
+    const confirmed = await alerts.confirm({
+      title: t("threadDelete"),
+      description: t("threadDeleteConfirm"),
+      confirmLabel: t("threadDelete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     setBusy(true);
     setActionError(null);
     try {
@@ -274,7 +283,13 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
   }
 
   async function onDeleteReply(reply: ForumReply) {
-    if (!window.confirm(t("replyDeleteConfirm"))) return;
+    const confirmed = await alerts.confirm({
+      title: t("replyDelete"),
+      description: t("replyDeleteConfirm"),
+      confirmLabel: t("replyDelete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     setBusy(true);
     setActionError(null);
     try {
@@ -502,7 +517,7 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
               const accepted = thread.acceptedReplyId === reply.id;
               const rLikeCount = Math.max(0, reply.score);
               const canManageReply = Boolean(
-                profile && (isAdmin || reply.authorId === profile.uid),
+                profile && (isModerator || reply.authorId === profile.uid),
               );
               const isEditing = editingReplyId === reply.id;
               return (

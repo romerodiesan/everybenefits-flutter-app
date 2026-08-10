@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { useAlerts } from "@/lib/providers/alert-provider";
 import { canEditPath, canManageCourses } from "@/lib/roles";
 import { useAutosave } from "@/lib/hooks/use-autosave";
 import {
@@ -25,7 +26,8 @@ import {
 
 export function PathWorkspace({ pathId }: { pathId: string }) {
   const t = useTranslations();
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, permissions, loading: authLoading } = useAuth();
+  const access = useAccess();
   const [path, setPath] = useState<LearningPath | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -43,8 +45,15 @@ export function PathWorkspace({ pathId }: { pathId: string }) {
     );
   }, [pathId]);
 
-  const isAdmin = canManageCourses(profile?.role ?? "guest");
-  const editable = path && profile ? canEditPath(path, profile) : false;
+  const isAdmin = canManageCourses(access);
+  const editable =
+    path && profile
+      ? canEditPath(path, {
+          uid: profile.uid,
+          role: profile.role,
+          permissions: Array.isArray(access) ? access : undefined,
+        })
+      : false;
 
   if (authLoading || loading) {
     return (
@@ -93,6 +102,7 @@ function PathWorkspaceBody({
   const t = useTranslations();
   const router = useRouter();
   const levelLabel = useLevelLabels();
+  const alerts = useAlerts();
 
   const [title, setTitle] = useState(path.title);
   const [description, setDescription] = useState(path.description);
@@ -176,7 +186,13 @@ function PathWorkspaceBody({
   };
 
   const removePath = async () => {
-    if (!window.confirm(`${t("actionDelete")}: ${path.title}?`)) return;
+    const confirmed = await alerts.confirm({
+      title: t("actionDelete"),
+      description: path.title,
+      confirmLabel: t("actionDelete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     setBusy(true);
     try {
       await deletePath(path.id);

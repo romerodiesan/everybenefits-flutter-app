@@ -1,14 +1,18 @@
 "use client";
 
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import {
+  forwardRef,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+} from "react";
 
-export function Button({
-  variant = "primary",
-  className = "",
-  ...props
-}: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: "primary" | "secondary" | "ghost" | "danger";
-}) {
+export const Button = forwardRef<
+  HTMLButtonElement,
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: "primary" | "secondary" | "ghost" | "danger";
+  }
+>(function Button({ variant = "primary", className = "", ...props }, ref) {
   const styles = {
     primary:
       "bg-brand text-on-brand hover:brightness-110 disabled:opacity-50",
@@ -19,11 +23,12 @@ export function Button({
   }[variant];
   return (
     <button
-      className={`inline-flex h-10 items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition ${styles} ${className}`}
+      ref={ref}
+      className={`inline-flex h-10 cursor-pointer items-center justify-center gap-1.5 rounded-xl px-4 text-sm font-semibold transition disabled:cursor-not-allowed ${styles} ${className}`}
       {...props}
     />
   );
-}
+});
 
 export function Input({
   className = "",
@@ -54,59 +59,5 @@ export function Label({ children }: { children: ReactNode }) {
     <label className="mb-1 block text-xs font-medium tracking-wide text-muted">
       {children}
     </label>
-  );
-}
-
-export function Panel({
-  children,
-  className = "",
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`pulse-sheet p-4 ${className}`}>
-      {children}
-    </div>
-  );
-}
-
-export function Badge({ children }: { children: ReactNode }) {
-  return (
-    <span className="inline-flex rounded-md bg-brand/14 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-brand">
-      {children}
-    </span>
-  );
-}
-
-export function Avatar({
-  name,
-  photoUrl,
-  size = 36,
-  className = "",
-}: {
-  name: string;
-  photoUrl?: string | null;
-  size?: number;
-  className?: string;
-}) {
-  const initial = (name.trim() || "U").charAt(0).toUpperCase();
-  return (
-    <div
-      className={`relative shrink-0 overflow-hidden rounded-full bg-brand/14 text-brand ${className}`}
-      style={{ width: size, height: size }}
-    >
-      {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={photoUrl} alt="" className="h-full w-full object-cover" />
-      ) : (
-        <span
-          className="flex h-full w-full items-center justify-center font-display font-semibold"
-          style={{ fontSize: size * 0.36 }}
-        >
-          {initial}
-        </span>
-      )}
-    </div>
   );
 }

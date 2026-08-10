@@ -81,7 +81,7 @@ function retentionFrom(data: Record<string, unknown>): number[] {
   return buckets;
 }
 
-export function parseSummary(
+function parseSummary(
   data: Record<string, unknown> | undefined,
 ): CourseAnalyticsSummary {
   return {
@@ -105,7 +105,7 @@ export function parseSummary(
   };
 }
 
-export function parseRealtime(
+function parseRealtime(
   data: Record<string, unknown> | undefined,
 ): CourseAnalyticsRealtime {
   return {
@@ -153,7 +153,7 @@ export function parseTraffic(
   };
 }
 
-export function parseLessonRollup(
+function parseLessonRollup(
   id: string,
   data: Record<string, unknown>,
 ): LessonAnalyticsRollup {
@@ -196,15 +196,6 @@ export type CourseAnalyticsBundle = {
   days: CourseAnalyticsDay[];
   lessons: LessonAnalyticsRollup[];
 };
-
-const emptyBundle = (): CourseAnalyticsBundle => ({
-  summary: parseSummary(undefined),
-  realtime: parseRealtime(undefined),
-  audience: parseAudience(undefined),
-  traffic: parseTraffic(undefined),
-  days: [],
-  lessons: [],
-});
 
 export type FetchCourseAnalyticsOptions = {
   /** Inclusive day window (default 90). */
@@ -279,32 +270,6 @@ export async function fetchCourseAnalytics(
   return bundle;
 }
 
-export function watchCourseAnalyticsSummary(
-  courseId: string,
-  onNext: (summary: CourseAnalyticsSummary) => void,
-  onError?: (error: unknown) => void,
-): Unsubscribe {
-  return onSnapshot(
-    doc(getFirebaseDb(), "courses", courseId, "analytics", "summary"),
-    (snap) =>
-      onNext(parseSummary(snap.data() as Record<string, unknown> | undefined)),
-    (error) => onError?.(error),
-  );
-}
-
-export function watchCourseAnalyticsRealtime(
-  courseId: string,
-  onNext: (realtime: CourseAnalyticsRealtime) => void,
-  onError?: (error: unknown) => void,
-): Unsubscribe {
-  return onSnapshot(
-    doc(getFirebaseDb(), "courses", courseId, "analytics", "realtime"),
-    (snap) =>
-      onNext(parseRealtime(snap.data() as Record<string, unknown> | undefined)),
-    (error) => onError?.(error),
-  );
-}
-
 export async function fetchAuthorDashboardStats(
   courseIds: string[],
 ): Promise<{
@@ -370,4 +335,3 @@ export async function fetchCourseStudentCounts(
   return { enrolled: summary.enrolled, completed: summary.completed };
 }
 
-export { emptyBundle };

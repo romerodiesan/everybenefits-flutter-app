@@ -15,7 +15,7 @@ import { useSearchParams } from "next/navigation";
 import type { DocumentSnapshot } from "firebase/firestore";
 import { Link, useRouter } from "@/i18n/navigation";
 import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import {
   castForumVote,
   createThread,
@@ -62,6 +62,7 @@ export function ForumsHome() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useAuth();
+  const access = useAccess();
   const pulseAiEnabled = usePulseAiEnabled();
   const reduceMotion = useSafeReducedMotion();
   const [threads, setThreads] = useState<ForumThread[]>([]);
@@ -86,7 +87,7 @@ export function ForumsHome() {
   const lastTapRef = useRef<{ id: string; at: number }>({ id: "", at: 0 });
 
   const canPost =
-    profile && canParticipateInForums(profile.role, profile.isAnonymous);
+    profile && canParticipateInForums(access, profile.isAnonymous);
   const sort = mode === "pulse" ? "relevant" : "recent";
 
   const loadVotes = useCallback(

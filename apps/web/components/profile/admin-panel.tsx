@@ -12,8 +12,9 @@ import {
   setPulseAiEnabled,
   watchPulseAiEnabled,
 } from "@/lib/firebase/platform-config";
-import { headlineName } from "@/lib/firebase/users";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { headlineName } from "@/lib/display-name";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { can, canManagePlatform } from "@/lib/roles";
 import type { UserProfile } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
 import {
@@ -25,7 +26,10 @@ import {
 export function AdminPanel() {
   const t = useTranslations();
   const { profile } = useAuth();
-  const isAdmin = profile?.role === "admin";
+  const access = useAccess();
+  const canManageAi =
+    canManagePlatform(access) || can(access, "platform.settings.write");
+  const canPromote = can(access, "admin.users.update");
   const [students, setStudents] = useState<UserProfile[]>([]);
   const [pending, setPending] = useState<UserProfile[]>([]);
   const [aiEnabled, setAiEnabled] = useState(true);
@@ -35,20 +39,20 @@ export function AdminPanel() {
     listPendingApprovals()
       .then(setPending)
       .catch(() => setPending([]));
-    if (profile?.role === "admin") {
+    if (canPromote) {
       listStudentsForPromotion()
         .then(setStudents)
         .catch(() => setStudents([]));
     }
-  }, [profile?.role]);
+  }, [canPromote]);
 
   useEffect(() => {
-    if (profile?.role !== "admin") return;
+    if (!canManageAi) return;
     return watchPulseAiEnabled(setAiEnabled);
-  }, [profile?.role]);
+  }, [canManageAi]);
 
   const toggleAi = async () => {
-    if (!profile || aiBusy || !isAdmin) return;
+    if (!profile || aiBusy || !canManageAi) return;
     const next = !aiEnabled;
     setAiEnabled(next);
     setAiBusy(true);
@@ -66,7 +70,7 @@ export function AdminPanel() {
       title={t("profileAdmin")}
       subtitle={t("profileAdminHint")}
     >
-      {isAdmin && (
+      {canManageAi && (
         <div className="mb-6 border-b border-glass-border pb-4">
           <SettingsRow
             label={t("adminPulseAi")}
@@ -146,7 +150,7 @@ export function AdminPanel() {
         <p className="mb-8 text-sm text-muted">{t("approvalSectionEmpty")}</p>
       )}
 
-      {isAdmin && (
+      {canPromote && (
         <>
           <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
             {t("profilePromote")}

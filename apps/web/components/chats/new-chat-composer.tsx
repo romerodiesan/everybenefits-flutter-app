@@ -15,12 +15,14 @@ const ROLE_LABEL_KEYS: Record<
   | "chatsRoleInstructor"
   | "chatsRoleManager"
   | "chatsRoleAdmin"
+  | "roleSystem"
 > = {
   student: "chatsRoleStudent",
   agent: "chatsRoleAgent",
   instructor: "chatsRoleInstructor",
   manager: "chatsRoleManager",
   admin: "chatsRoleAdmin",
+  system: "roleSystem",
 };
 
 function contactSubtitle(person: UserProfile) {

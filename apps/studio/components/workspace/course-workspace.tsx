@@ -11,7 +11,8 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { useAlerts } from "@/lib/providers/alert-provider";
 import { canEditCourse, canManageCourses } from "@/lib/roles";
 import { useAutosave } from "@/lib/hooks/use-autosave";
 import {
@@ -70,7 +71,9 @@ export function CourseWorkspace({ courseId }: { courseId: string }) {
 function CourseWorkspaceInner({ courseId }: { courseId: string }) {
   const t = useTranslations();
   const router = useRouter();
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, permissions, loading: authLoading } = useAuth();
+  const access = useAccess();
+  const alerts = useAlerts();
 
   const [course, setCourse] = useState<Course | null>(null);
   const [content, setContent] = useState<CourseContent>({
@@ -172,8 +175,15 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
     };
   }, [courseId, course?.studentCount]);
 
-  const isAdmin = canManageCourses(profile?.role ?? "guest");
-  const editable = course && profile ? canEditCourse(course, profile) : false;
+  const isAdmin = canManageCourses(access);
+  const editable =
+    course && profile
+      ? canEditCourse(course, {
+          uid: profile.uid,
+          role: profile.role,
+          permissions: Array.isArray(access) ? access : undefined,
+        })
+      : false;
 
   const selectedLesson = useMemo(
     () => content.lessons.find((lesson) => lesson.id === selectedLessonId) ?? null,
@@ -221,7 +231,13 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
 
   const removeCourse = async () => {
     if (!course) return;
-    if (!window.confirm(`${t("actionDelete")}: ${course.title}?`)) return;
+    const confirmed = await alerts.confirm({
+      title: t("actionDelete"),
+      description: course.title,
+      confirmLabel: t("actionDelete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     setBusy(true);
     try {
       await deleteCourse(course.id);
@@ -957,6 +973,7 @@ function ModuleTree({
   onBusy: (value: boolean) => void;
 }) {
   const t = useTranslations();
+  const alerts = useAlerts();
   const [draft, setDraft] = useState(title);
   const [expanded, setExpanded] = useState(true);
 
@@ -973,7 +990,13 @@ function ModuleTree({
   };
 
   const remove = async () => {
-    if (!window.confirm(`${t("actionDelete")}: ${title}?`)) return;
+    const confirmed = await alerts.confirm({
+      title: t("actionDelete"),
+      description: title,
+      confirmLabel: t("actionDelete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     onBusy(true);
     try {
       await deleteModule(courseId, moduleId);
@@ -1068,6 +1091,7 @@ function LessonTreeRow({
   onBusy: (value: boolean) => void;
 }) {
   const t = useTranslations();
+  const alerts = useAlerts();
   const hasVideo =
     lesson.type === "video" && Boolean(lesson.videoPath || lesson.videoUrl);
   const videoLabel =
@@ -1079,7 +1103,13 @@ function LessonTreeRow({
   };
 
   const remove = async () => {
-    if (!window.confirm(`${t("actionDelete")}: ${lesson.title}?`)) return;
+    const confirmed = await alerts.confirm({
+      title: t("actionDelete"),
+      description: lesson.title,
+      confirmLabel: t("actionDelete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     onBusy(true);
     try {
       await deleteLesson(courseId, lesson.id);

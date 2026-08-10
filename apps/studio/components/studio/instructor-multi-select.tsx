@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { canAuthorCourses } from "@/lib/roles";
+import { loadPermissionsForRoles } from "@/lib/firebase/roles";
 import { headlineName, listDirectory } from "@/lib/firebase/users";
 import type { UserProfile } from "@/lib/types";
 
@@ -30,10 +31,17 @@ export function InstructorMultiSelect({ value, onChange, disabled }: Props) {
     let cancelled = false;
     setLoading(true);
     listDirectory(undefined, 120)
-      .then((profiles) => {
+      .then(async (profiles) => {
+        if (cancelled) return;
+        const rolePerms = await loadPermissionsForRoles(
+          profiles.map((profile) => profile.role),
+        );
         if (cancelled) return;
         setCandidates(
-          profiles.filter((profile) => canAuthorCourses(profile.role)),
+          profiles.filter((profile) => {
+            const roleId = profile.role.trim() || "guest";
+            return canAuthorCourses(rolePerms[roleId] ?? roleId);
+          }),
         );
       })
       .catch(() => {

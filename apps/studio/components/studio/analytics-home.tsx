@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canManageCourses } from "@/lib/roles";
 import {
   watchAuthoredCourses,
@@ -93,10 +93,11 @@ function FilterSelect({
 
 function useAuthorCatalog() {
   const { profile } = useAuth();
+  const access = useAccess();
   const [courses, setCourses] = useState<Course[]>([]);
   const [paths, setPaths] = useState<LearningPath[]>([]);
   const uid = profile?.uid ?? "";
-  const isAdmin = canManageCourses(profile?.role ?? "guest");
+  const isAdmin = canManageCourses(access);
 
   useEffect(() => {
     if (!uid) return;

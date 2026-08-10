@@ -1,5 +1,6 @@
 import { Suspense } from "react";
 import { CoursePlayer } from "@/components/academy/course-player";
+import { PlayerSkeleton } from "@/components/ui/skeleton";
 
 export default async function CourseLearnPage({
   params,
@@ -8,7 +9,7 @@ export default async function CourseLearnPage({
 }) {
   const { courseId } = await params;
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={<PlayerSkeleton />}>
       <CoursePlayer courseId={courseId} />
     </Suspense>
   );

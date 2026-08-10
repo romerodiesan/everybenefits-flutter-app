@@ -3,18 +3,24 @@
 import { useCallback } from "react";
 import { useLocale } from "next-intl";
 import { AppSwitcher as SharedAppSwitcher } from "@pulse/chrome";
-import type { PulseAppId, UserRole } from "@pulse/shared";
+import type { PulseAppId, RoleOrPermissions } from "@pulse/shared";
 import { Link } from "@/i18n/navigation";
-import { BrandMark } from "@/components/chrome/brand-mark";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { resolveSwitchUrl } from "@/lib/sso";
 
+/**
+ * Host wrapper around the shared Pulse family app switcher.
+ * Keep this file identical across web / studio / admin.
+ */
 export function AppSwitcher({
   current,
+  permissions,
   role,
 }: {
   current: PulseAppId;
-  role?: UserRole;
+  permissions?: RoleOrPermissions;
+  /** @deprecated Prefer `permissions`. */
+  role?: RoleOrPermissions;
 }) {
   const locale = useLocale();
 
@@ -36,12 +42,9 @@ export function AppSwitcher({
   return (
     <SharedAppSwitcher
       current={current}
-      role={role}
+      permissions={permissions ?? role}
       resolveSwitchUrl={resolve}
       HomeLink={Link}
-      renderTriggerIcon={(meta) =>
-        meta.id === "pulse" ? <BrandMark size={28} /> : undefined
-      }
     />
   );
 }

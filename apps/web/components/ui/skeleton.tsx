@@ -13,6 +13,119 @@ export function Skeleton({
   );
 }
 
+/** Content-only page fallback — AppShell (nav) stays mounted in the parent layout. */
+export function PageContentSkeleton({
+  rows = 4,
+}: {
+  rows?: number;
+}) {
+  return (
+    <div
+      className="mx-auto max-w-3xl space-y-3 p-4 lg:p-6"
+      aria-busy="true"
+      aria-label="Loading"
+    >
+      <Skeleton className="h-8 w-40 rounded-lg" />
+      <Skeleton className="h-4 w-64 rounded" />
+      {Array.from({ length: rows }, (_, i) => (
+        <Skeleton key={i} className="h-28 rounded-2xl" />
+      ))}
+    </div>
+  );
+}
+
+export function FeedPageSkeleton() {
+  return (
+    <div
+      className="mx-auto max-w-3xl space-y-3 p-4 lg:p-6"
+      aria-busy="true"
+      aria-label="Loading"
+    >
+      <Skeleton className="h-8 w-40 rounded-lg" />
+      <Skeleton className="h-4 w-64 rounded" />
+      {Array.from({ length: 4 }, (_, i) => (
+        <div
+          key={i}
+          className="space-y-3 rounded-2xl border border-glass-border bg-sheet/40 p-4"
+        >
+          <div className="flex items-center gap-3">
+            <Skeleton className="h-11 w-11 shrink-0 rounded-full" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-3 w-28" />
+              <Skeleton className="h-2.5 w-16" />
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Skeleton className="h-4 w-[88%]" />
+            <Skeleton className="h-3 w-full" />
+            <Skeleton className="h-3 w-[72%]" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function ChatsPageSkeleton() {
+  return (
+    <div
+      className="flex min-h-0 flex-1 flex-col"
+      aria-busy="true"
+      aria-label="Loading"
+    >
+      <div className="border-b border-glass-border px-4 py-3 lg:hidden">
+        <Skeleton className="h-6 w-28" />
+      </div>
+      <ChatInboxSkeleton rows={8} />
+    </div>
+  );
+}
+
+export function AcademyPageSkeleton() {
+  return (
+    <div
+      className="mx-auto w-full max-w-6xl space-y-6 px-4 py-8 lg:px-8"
+      aria-busy="true"
+      aria-label="Loading"
+    >
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-48" />
+        <Skeleton className="h-4 w-72" />
+      </div>
+      <CourseGridSkeleton />
+    </div>
+  );
+}
+
+export function AccountPageSkeleton() {
+  return (
+    <div
+      className="mx-auto w-full max-w-3xl space-y-6 px-4 py-8 lg:px-8"
+      aria-busy="true"
+      aria-label="Loading"
+    >
+      <div className="space-y-2">
+        <Skeleton className="h-8 w-40" />
+        <Skeleton className="h-4 w-64" />
+      </div>
+      <ProfileFormSkeleton />
+    </div>
+  );
+}
+
+export function NotificationsPageSkeleton() {
+  return (
+    <div
+      className="mx-auto w-full max-w-3xl space-y-4 px-4 py-8 lg:px-8"
+      aria-busy="true"
+      aria-label="Loading"
+    >
+      <Skeleton className="h-8 w-48" />
+      <CardListSkeleton rows={5} />
+    </div>
+  );
+}
+
 export function ChatInboxSkeleton({ rows = 6 }: { rows?: number }) {
   return (
     <div className="space-y-2 p-3" aria-busy="true" aria-label="Loading">

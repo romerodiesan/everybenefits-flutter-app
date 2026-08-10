@@ -1,6 +1,5 @@
 import {
   doc,
-  getDoc,
   onSnapshot,
   serverTimestamp,
   setDoc,
@@ -20,11 +19,6 @@ export type PulseAiConfig = {
 export function parsePulseAiEnabled(data: Record<string, unknown> | undefined): boolean {
   if (!data || typeof data.enabled !== "boolean") return false;
   return data.enabled;
-}
-
-export async function getPulseAiEnabled(): Promise<boolean> {
-  const snap = await getDoc(doc(getFirebaseDb(), "platformConfig", "pulseAi"));
-  return parsePulseAiEnabled(snap.data() as Record<string, unknown> | undefined);
 }
 
 export function watchPulseAiEnabled(

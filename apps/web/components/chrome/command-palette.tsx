@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canAccessTools } from "@/lib/roles";
 import { AGENT_TOOLS } from "@/lib/tools/catalog";
 
@@ -24,10 +24,11 @@ export function CommandPalette({
   const t = useTranslations();
   const router = useRouter();
   const { profile } = useAuth();
+  const access = useAccess();
   const pulseAiEnabled = usePulseAiEnabled();
   const [query, setQuery] = useState("");
   const activeQuery = open ? query : "";
-  const toolsAllowed = profile ? canAccessTools(profile.role) : false;
+  const toolsAllowed = profile ? canAccessTools(access) : false;
 
   const close = () => {
     setQuery("");

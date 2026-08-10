@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { useThemeSettings } from "@/lib/providers/theme-provider";
 import { signOutAndRedirect, hasPasswordProvider } from "@/lib/firebase/auth";
 import { getOrCreateSupportChat } from "@/lib/firebase/chats";
@@ -102,6 +102,7 @@ const ROLE_KEY: Record<UserRole, string> = {
   instructor: "roleInstructor",
   manager: "roleManager",
   admin: "roleAdmin",
+  system: "roleSystem",
 };
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -109,7 +110,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const locale = useLocale();
   const pathname = usePathname();
   const router = useRouter();
-  const { user, profile, loading, profileLoading, refreshProfile } = useAuth();
+  const { user, profile, permissions, loading, profileLoading, refreshProfile } = useAuth();
   const pulseAiEnabled = usePulseAiEnabled();
   const [supportBusy, setSupportBusy] = useState(false);
   const [supportError, setSupportError] = useState<string | null>(null);
@@ -119,11 +120,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { unreadTotal, notifUnread, forumBadge, pushToast } =
     useShellStats(profile);
 
+  const access = useAccess();
   const navItems = useMemo(
     () => NAV.filter((item) => item.href !== "/ai" || pulseAiEnabled),
     [pulseAiEnabled],
   );
-  const toolsAllowed = Boolean(profile && canAccessTools(profile.role));
+  const toolsAllowed = Boolean(profile && canAccessTools(access));
   const toolsActive = pathname === "/tools" || pathname.startsWith("/tools/");
 
   useEffect(() => {
@@ -197,7 +199,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (
       !profile ||
       supportBusy ||
-      !canAccessSupport(profile.role, profile.isAnonymous)
+      !canAccessSupport(access, profile.isAnonymous)
     ) {
       return;
     }
@@ -276,7 +278,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <aside className="hidden h-full w-72 shrink-0 flex-col border-r border-glass-border bg-sheet lg:flex">
         <div className="border-b border-glass-border px-3 pb-3 pt-3.5">
           <div className="flex items-center justify-between gap-2 px-1" data-tour="shell-apps">
-            <AppSwitcher current="pulse" role={profile.role} />
+            <AppSwitcher current="pulse" permissions={access} />
             <ThemeToggle />
           </div>
           <Link
@@ -437,7 +439,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           {supportError ? (
             <p className="px-2.5 text-xs text-red-400">{supportError}</p>
           ) : null}
-          {canAccessSupport(profile.role, profile.isAnonymous) && (
+          {canAccessSupport(access, profile.isAnonymous) && (
             <button
               type="button"
               disabled={supportBusy}
@@ -484,7 +486,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="relative flex min-h-0 flex-1 flex-col">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-2 px-3 pt-[max(0.75rem,env(safe-area-inset-top,0px)+0.35rem)] lg:hidden">
           <div className="pointer-events-auto min-w-0" data-tour="shell-apps">
-            <AppSwitcher current="pulse" role={profile.role} />
+            <AppSwitcher current="pulse" permissions={access} />
           </div>
           <div className="pointer-events-auto shrink-0">
             <ThemeToggle />
@@ -649,7 +651,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {canAccessSupport(profile.role, profile.isAnonymous) && !onChats && (
+      {canAccessSupport(access, profile.isAnonymous) && !onChats && (
         <button
           type="button"
           disabled={supportBusy}
@@ -665,6 +667,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
       <ProductTour
         profile={profile}
+        permissions={permissions}
         profileReady={!profileLoading}
         pulseAiEnabled={pulseAiEnabled}
         onCompleted={() => {

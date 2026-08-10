@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canManageCourses } from "@/lib/roles";
 import {
   watchAuthoredCourses,
@@ -43,6 +43,7 @@ function Kpi({
 export function DashboardHome() {
   const t = useTranslations();
   const { profile } = useAuth();
+  const access = useAccess();
   const [courses, setCourses] = useState<Course[]>([]);
   const [totals, setTotals] = useState<CourseAnalyticsSummary | null>(null);
   const [byCourse, setByCourse] = useState<
@@ -52,7 +53,7 @@ export function DashboardHome() {
   const [loadingStats, setLoadingStats] = useState(true);
 
   const uid = profile?.uid ?? "";
-  const isAdmin = canManageCourses(profile?.role ?? "guest");
+  const isAdmin = canManageCourses(access);
 
   useEffect(() => {
     if (!uid) return;

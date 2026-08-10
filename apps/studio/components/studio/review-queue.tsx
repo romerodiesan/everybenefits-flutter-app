@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canManageCourses } from "@/lib/roles";
 import {
   setCourseStatus,
@@ -20,12 +20,13 @@ export function ReviewQueue() {
   const t = useTranslations();
   const router = useRouter();
   const { profile, loading } = useAuth();
+  const access = useAccess();
   const levelLabel = useLevelLabels();
   const [courses, setCourses] = useState<Course[]>([]);
   const [paths, setPaths] = useState<LearningPath[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
 
-  const isAdmin = canManageCourses(profile?.role ?? "guest");
+  const isAdmin = canManageCourses(access);
 
   useEffect(() => {
     if (!isAdmin) return;

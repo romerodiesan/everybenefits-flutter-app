@@ -38,12 +38,3 @@ export function markLocalTourDone(): void {
     // ignore quota / private mode
   }
 }
-
-export function clearLocalTourDone(): void {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(LOCAL_KEY);
-  } catch {
-    // ignore
-  }
-}

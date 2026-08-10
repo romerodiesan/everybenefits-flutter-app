@@ -20,7 +20,7 @@ type CachedProfile = {
   email: string | null;
   displayName: string | null;
   photoUrl: string | null;
-  role: UserRole;
+  role: string;
   isAnonymous: boolean;
   profileCompleted: boolean;
   /** Precomputed at write time from the full Firestore profile. */
@@ -55,7 +55,7 @@ function revive(cached: CachedProfile): UserProfile {
     email: cached.email,
     displayName: cached.displayName,
     photoUrl: cached.photoUrl,
-    role: cached.role,
+    role: cached.role as UserRole,
     isAnonymous: cached.isAnonymous,
     // Honor precomputed flag — never infer from null NPN/address.
     profileCompleted:
@@ -145,18 +145,8 @@ export function clearCachedProfile() {
   }
 }
 
-export function isUserRole(value: unknown): value is UserRole {
-  return (
-    typeof value === "string" &&
-    [
-      "guest",
-      "student",
-      "agent",
-      "instructor",
-      "manager",
-      "admin",
-    ].includes(value)
-  );
+export function isUserRole(value: unknown): value is string {
+  return typeof value === "string" && value.trim().length > 0;
 }
 
 export function isAccountStatus(value: unknown): value is AccountStatus {

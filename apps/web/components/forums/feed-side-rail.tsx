@@ -2,7 +2,7 @@
 
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import { canAccessTools } from "@/lib/roles";
 import type { ForumThread } from "@/lib/types";
@@ -27,9 +27,10 @@ export function FeedSideRail({
 }) {
   const t = useTranslations();
   const { profile } = useAuth();
+  const access = useAccess();
   const savedIds = useSavedThreadIds();
   const pulseAiEnabled = usePulseAiEnabled();
-  const showTools = profile && canAccessTools(profile.role);
+  const showTools = profile && canAccessTools(access);
 
   const topicList: TopicStat[] = topics
     .filter(([, count]) => count > 0)

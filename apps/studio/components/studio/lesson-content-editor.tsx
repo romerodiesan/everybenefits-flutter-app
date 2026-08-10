@@ -18,6 +18,7 @@ import { Button, Input, Label, TextArea } from "@/components/ui/primitives";
 import { ProgressBar } from "@/components/academy/shared";
 import { Markdown } from "@/components/academy/markdown";
 import { useLessonUploadQueueOptional } from "@/lib/uploads/lesson-upload-queue";
+import { useAlerts } from "@/lib/providers/alert-provider";
 
 const MIN_OPTIONS = 2;
 const MAX_OPTIONS = 6;
@@ -47,6 +48,7 @@ function VideoEditor({
   lesson: Lesson;
 }) {
   const t = useTranslations();
+  const alerts = useAlerts();
   const fileRef = useRef<HTMLInputElement | null>(null);
   const queue = useLessonUploadQueueOptional();
   const [dragOver, setDragOver] = useState(false);
@@ -94,7 +96,13 @@ function VideoEditor({
 
   const removeVideo = async () => {
     if (!hasVideo) return;
-    if (!window.confirm(t("studioRemoveVideoConfirm"))) return;
+    const confirmed = await alerts.confirm({
+      title: t("actionDelete"),
+      description: t("studioRemoveVideoConfirm"),
+      confirmLabel: t("actionDelete"),
+      danger: true,
+    });
+    if (!confirmed) return;
     setRemoving(true);
     try {
       await clearLessonVideo(courseId, lesson.id);

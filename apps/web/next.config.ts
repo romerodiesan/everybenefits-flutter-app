@@ -25,7 +25,7 @@ const contentSecurityPolicy = buildContentSecurityPolicy({
     nodeEnv: process.env.NODE_ENV,
   }),
   emulatorHosts: emulatorHost,
-  includeLottie: true,
+  includeLottie: false,
   includeAnalytics: true,
   includeMaps: true,
   // Dev/HMR may need eval; production keeps it off.

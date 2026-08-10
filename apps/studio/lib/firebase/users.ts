@@ -4,20 +4,15 @@ import {
   onSnapshot,
   serverTimestamp,
   setDoc,
-  updateDoc,
   type Unsubscribe,
 } from "firebase/firestore";
-import {
-  getDownloadURL,
-  ref,
-  uploadBytes,
-} from "firebase/storage";
-import { updateProfile, type User } from "firebase/auth";
-import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
+import { type User } from "firebase/auth";
+import { getFirebaseDb } from "./client";
 import { listPublicProfiles } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
-import { composeUsAddress, headlineName, parseRole } from "../roles";
+import { headlineName, parseRole } from "../roles";
+
 function toDate(value: unknown): Date | null {
   if (!value) return null;
   if (value instanceof Date) return value;
@@ -61,13 +56,13 @@ export function profileFromData(
       data.accountStatus === "pendingDeletion"
         ? data.accountStatus
         : "active",
+    deletionScheduledAt: toDate(data.deletionScheduledAt),
     approvalStatus:
       data.approvalStatus === "pending" ||
       data.approvalStatus === "approved" ||
       data.approvalStatus === "rejected"
         ? data.approvalStatus
         : undefined,
-    deletionScheduledAt: toDate(data.deletionScheduledAt),
     appearance: appearanceFrom(data.appearance),
   };
 }
@@ -122,7 +117,9 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   await setDoc(refDoc, {
     uid: profile.uid,
     email: profile.email,
+    emailLower: profile.email?.toLowerCase() ?? null,
     displayName: profile.displayName,
+    displayNameLower: profile.displayName?.trim().toLowerCase() || null,
     photoUrl: profile.photoUrl,
     role: profile.role,
     isAnonymous: profile.isAnonymous,
@@ -161,66 +158,6 @@ export function watchProfile(
     },
     (error) => onError?.(error),
   );
-}
-
-export async function updateUserProfile(
-  profile: UserProfile,
-  patch: Partial<UserProfile>,
-): Promise<void> {
-  const next = { ...profile, ...patch };
-  const address =
-    composeUsAddress({
-      street: next.addressStreet,
-      apt: next.addressApt,
-      city: next.addressCity,
-      state: next.addressState,
-      zip: next.addressZip,
-    }) ?? next.address;
-
-  await updateDoc(doc(getFirebaseDb(), "users", profile.uid), {
-    email: next.email,
-    displayName: next.displayName,
-    photoUrl: next.photoUrl,
-    role: next.role,
-    isAnonymous: next.isAnonymous,
-    profileCompleted: next.profileCompleted,
-    phoneCountryCode: next.phoneCountryCode,
-    phoneNumber: next.phoneNumber,
-    npn: next.npn,
-    address,
-    addressStreet: next.addressStreet,
-    addressApt: next.addressApt,
-    addressCity: next.addressCity,
-    addressState: next.addressState,
-    addressZip: next.addressZip,
-    agency: next.agency,
-    updatedAt: serverTimestamp(),
-  });
-
-  // Keep Firebase Auth in sync for fields that also live on the Auth user.
-  if ("displayName" in patch || "photoUrl" in patch) {
-    const authUser = getFirebaseAuth().currentUser;
-    if (authUser && authUser.uid === profile.uid) {
-      await updateProfile(authUser, {
-        ...("displayName" in patch
-          ? { displayName: next.displayName?.trim() || null }
-          : {}),
-        ...("photoUrl" in patch ? { photoURL: next.photoUrl || null } : {}),
-      });
-    }
-  }
-}
-
-export async function uploadAvatar(uid: string, file: File): Promise<string> {
-  const storageRef = ref(getFirebaseStorage(), `avatars/${uid}.jpg`);
-  const contentType =
-    file.type === "image/jpeg" ||
-    file.type === "image/png" ||
-    file.type === "image/webp"
-      ? file.type
-      : "image/jpeg";
-  await uploadBytes(storageRef, file, { contentType });
-  return getDownloadURL(storageRef);
 }
 
 export async function listDirectory(excludeUid?: string, max = 80) {

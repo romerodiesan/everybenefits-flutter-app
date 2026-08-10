@@ -1,10 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
 import { multiFactor } from "firebase/auth";
+import { useTranslations } from "next-intl";
 import { usePathname } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { usingFirebaseEmulators } from "@/lib/firebase/auth";
 import { canAccessAdmin } from "@/lib/roles";
 import { Link } from "@/i18n/navigation";
@@ -15,37 +14,26 @@ import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
  * Managers/admins must enroll at least one MFA factor before using the shell.
  * Account → Security stays reachable so they can enroll.
  * Skipped on Auth emulator: TOTP is unsupported and SMS is awkward locally.
+ *
+ * Boot skeleton only when auth/profile are missing — never tear down chrome
+ * while an existing profile is revalidating (same idea as AdminShell).
  */
 export function MfaAdminGate({ children }: { children: React.ReactNode }) {
   const t = useTranslations();
   const pathname = usePathname();
-  const { user, profile, loading, profileLoading } = useAuth();
-  const [ready, setReady] = useState(false);
-  const [needsMfa, setNeedsMfa] = useState(false);
+  const { user, profile, loading } = useAuth();
   const emulators = usingFirebaseEmulators();
+  const access = useAccess();
 
-  useEffect(() => {
-    if (loading || profileLoading || !user || !profile) {
-      setReady(false);
-      return;
-    }
-    if (
-      emulators ||
-      !canAccessAdmin(profile.role) ||
-      profile.isAnonymous
-    ) {
-      setNeedsMfa(false);
-      setReady(true);
-      return;
-    }
-    const factors = multiFactor(user).enrolledFactors;
-    setNeedsMfa(factors.length === 0);
-    setReady(true);
-  }, [loading, profileLoading, user, profile, emulators]);
-
-  if (loading || profileLoading || !ready) {
+  if (loading || !user || !profile) {
     return <AppShellSkeleton />;
   }
+
+  const needsMfa =
+    !emulators &&
+    canAccessAdmin(access) &&
+    !profile.isAnonymous &&
+    multiFactor(user).enrolledFactors.length === 0;
 
   const onAccount =
     pathname === "/account" || pathname.startsWith("/account/");

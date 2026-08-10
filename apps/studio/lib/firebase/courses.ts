@@ -1,6 +1,5 @@
 import {
   collection,
-  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -24,21 +23,16 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 import { getFirebaseDb, getFirebaseStorage } from "./client";
-import { callCloudFunction } from "./call-function";
 import type {
   Course,
   CourseContent,
   CourseLevel,
   CourseModule,
   CourseStatus,
-  CourseStudent,
-  Enrollment,
   LearningPath,
   Lesson,
   LessonType,
   QuizAnswerKey,
-  QuizAttempt,
-  QuizAttemptResult,
   QuizQuestion,
   QuizSelectionMode,
 } from "../types";
@@ -125,21 +119,6 @@ function questionsFrom(value: unknown): QuizQuestion[] {
   });
 }
 
-function attemptsFrom(value: unknown): Record<string, QuizAttempt> {
-  if (typeof value !== "object" || value === null) return {};
-  const out: Record<string, QuizAttempt> = {};
-  for (const [lessonId, raw] of Object.entries(value)) {
-    if (typeof raw !== "object" || raw === null) continue;
-    const entry = raw as Record<string, unknown>;
-    out[lessonId] = {
-      score: Number(entry.score ?? 0),
-      passed: entry.passed === true,
-      at: toDate(entry.at),
-    };
-  }
-  return out;
-}
-
 function lessonFrom(id: string, data: Record<string, unknown>): Lesson {
   const instructorId = String(data.instructorId ?? "").trim();
   return {
@@ -159,18 +138,6 @@ function lessonFrom(id: string, data: Record<string, unknown>): Lesson {
   };
 }
 
-/** Whether a lesson is ready for learners, whatever its type. */
-export function lessonHasContent(lesson: Lesson): boolean {
-  switch (lesson.type) {
-    case "reading":
-      return Boolean(lesson.bodyMarkdown?.trim());
-    case "quiz":
-      return lesson.questions.length > 0;
-    default:
-      return Boolean(lesson.videoPath?.trim() || lesson.videoUrl?.trim());
-  }
-}
-
 function pathFrom(id: string, data: Record<string, unknown>): LearningPath {
   return {
     id,
@@ -182,33 +149,6 @@ function pathFrom(id: string, data: Record<string, unknown>): LearningPath {
     order: Number(data.order ?? 0),
     createdBy: String(data.createdBy ?? ""),
   };
-}
-
-function enrollmentFrom(
-  courseId: string,
-  data: Record<string, unknown>,
-): Enrollment {
-  return {
-    courseId: String(data.courseId ?? courseId),
-    completedLessonIds: stringList(data.completedLessonIds),
-    lastLessonId: (data.lastLessonId as string) ?? null,
-    lastPositionSeconds: Number(data.lastPositionSeconds ?? 0),
-    enrolledAt: toDate(data.enrolledAt),
-    updatedAt: toDate(data.updatedAt) ?? toDate(data.enrolledAt),
-    completedAt: toDate(data.completedAt),
-    quizAttempts: attemptsFrom(data.quizAttempts),
-  };
-}
-
-/** Fraction of a course finished, clamped to [0, 1]. */
-export function progressOf(
-  enrollment: Enrollment | null | undefined,
-  lessonCount: number,
-) {
-  if (!enrollment) return 0;
-  if (lessonCount <= 0) return enrollment.completedAt ? 1 : 0;
-  const ratio = enrollment.completedLessonIds.length / lessonCount;
-  return Math.min(1, Math.max(0, ratio));
 }
 
 // --- Catalog reads ---
@@ -255,34 +195,6 @@ export function watchCourse(
   );
 }
 
-export async function getCourse(courseId: string) {
-  const snap = await getDoc(doc(getFirebaseDb(), "courses", courseId));
-  if (!snap.exists()) return null;
-  return courseFrom(snap.id, snap.data() as Record<string, unknown>);
-}
-
-export async function fetchCourseContent(
-  courseId: string,
-): Promise<CourseContent> {
-  const db = getFirebaseDb();
-  const [modules, lessons] = await Promise.all([
-    getDocs(
-      query(collection(db, "courses", courseId, "modules"), orderBy("order")),
-    ),
-    getDocs(
-      query(collection(db, "courses", courseId, "lessons"), orderBy("order")),
-    ),
-  ]);
-  return {
-    modules: modules.docs.map((d) =>
-      moduleFrom(d.id, d.data() as Record<string, unknown>),
-    ),
-    lessons: lessons.docs.map((d) =>
-      lessonFrom(d.id, d.data() as Record<string, unknown>),
-    ),
-  };
-}
-
 export function watchCourseContent(
   courseId: string,
   onChange: (content: CourseContent) => void,
@@ -320,35 +232,6 @@ export function watchCourseContent(
   };
 }
 
-export function watchPaths(
-  onChange: (paths: LearningPath[]) => void,
-  onError?: (error: Error) => void,
-): Unsubscribe {
-  const q = query(
-    collection(getFirebaseDb(), "paths"),
-    where("status", "==", "published"),
-    orderBy("order"),
-    limit(30),
-  );
-  return onSnapshot(
-    q,
-    (snap) => {
-      onChange(
-        snap.docs.map((d) =>
-          pathFrom(d.id, d.data() as Record<string, unknown>),
-        ),
-      );
-    },
-    (error) => onError?.(error),
-  );
-}
-
-export async function getPath(pathId: string) {
-  const snap = await getDoc(doc(getFirebaseDb(), "paths", pathId));
-  if (!snap.exists()) return null;
-  return pathFrom(snap.id, snap.data() as Record<string, unknown>);
-}
-
 export function watchPath(
   pathId: string,
   onChange: (path: LearningPath | null) => void,
@@ -375,29 +258,6 @@ export function watchAuthoredPaths(
   const q = query(
     collection(getFirebaseDb(), "paths"),
     where("createdBy", "==", uid),
-    orderBy("updatedAt", "desc"),
-  );
-  return onSnapshot(
-    q,
-    (snap) => {
-      onChange(
-        snap.docs.map((d) =>
-          pathFrom(d.id, d.data() as Record<string, unknown>),
-        ),
-      );
-    },
-    (error) => onError?.(error),
-  );
-}
-
-export function watchPathsByStatus(
-  status: CourseStatus,
-  onChange: (paths: LearningPath[]) => void,
-  onError?: (error: Error) => void,
-): Unsubscribe {
-  const q = query(
-    collection(getFirebaseDb(), "paths"),
-    where("status", "==", status),
     orderBy("updatedAt", "desc"),
   );
   return onSnapshot(
@@ -511,118 +371,6 @@ export async function deletePath(pathId: string) {
   await deleteDoc(doc(getFirebaseDb(), "paths", pathId));
 }
 
-// --- Enrollment and progress ---
-
-export function watchEnrollments(
-  uid: string,
-  onChange: (enrollments: Enrollment[]) => void,
-  onError?: (error: Error) => void,
-): Unsubscribe {
-  const q = query(
-    collection(getFirebaseDb(), "users", uid, "enrollments"),
-    orderBy("updatedAt", "desc"),
-  );
-  return onSnapshot(
-    q,
-    (snap) => {
-      onChange(
-        snap.docs.map((d) =>
-          enrollmentFrom(d.id, d.data() as Record<string, unknown>),
-        ),
-      );
-    },
-    (error) => onError?.(error),
-  );
-}
-
-export function watchEnrollment(
-  uid: string,
-  courseId: string,
-  onChange: (enrollment: Enrollment | null) => void,
-  onError?: (error: Error) => void,
-): Unsubscribe {
-  return onSnapshot(
-    doc(getFirebaseDb(), "users", uid, "enrollments", courseId),
-    (snap) => {
-      if (!snap.exists()) {
-        onChange(null);
-        return;
-      }
-      onChange(
-        enrollmentFrom(snap.id, snap.data() as Record<string, unknown>),
-      );
-    },
-    (error) => onError?.(error),
-  );
-}
-
-export async function enrollInCourse(uid: string, courseId: string) {
-  void uid;
-  await callCloudFunction("enrollInCourse", { courseId });
-}
-
-/**
- * Persists playback position and marks the lesson complete past the threshold.
- * Returns the enrollment the caller should render.
- */
-export async function saveLessonProgress(input: {
-  uid: string;
-  courseId: string;
-  lessonCount: number;
-  enrollment: Enrollment;
-  lessonId: string;
-  positionSeconds: number;
-  completed: boolean;
-}): Promise<Enrollment> {
-  const completedLessonIds = [...input.enrollment.completedLessonIds];
-  if (input.completed && !completedLessonIds.includes(input.lessonId)) {
-    completedLessonIds.push(input.lessonId);
-  }
-  const allDone =
-    input.lessonCount > 0 && completedLessonIds.length >= input.lessonCount;
-  const now = new Date();
-  const next: Enrollment = {
-    ...input.enrollment,
-    completedLessonIds,
-    lastLessonId: input.lessonId,
-    lastPositionSeconds: Math.max(0, Math.round(input.positionSeconds)),
-    updatedAt: now,
-    completedAt: allDone ? (input.enrollment.completedAt ?? now) : null,
-  };
-
-  await callCloudFunction("saveCourseProgress", {
-    courseId: input.courseId,
-    lessonId: input.lessonId,
-    positionSeconds: next.lastPositionSeconds,
-    completed: input.completed,
-  });
-  return next;
-}
-
-/**
- * Grades a quiz on the server: the answer key never reaches the browser, and
- * the callable is what marks the lesson complete when the learner passes.
- */
-export async function submitQuizAttempt(input: {
-  courseId: string;
-  lessonId: string;
-  answers: Record<string, number[]>;
-}): Promise<QuizAttemptResult> {
-  const raw = await callCloudFunction<Partial<QuizAttemptResult>>(
-    "submitQuizAttempt",
-    input,
-  );
-  return {
-    score: Number(raw?.score ?? 0),
-    passed: raw?.passed === true,
-    passPercent: Number(raw?.passPercent ?? QUIZ_DEFAULT_PASS_PERCENT),
-    correctByQuestion:
-      typeof raw?.correctByQuestion === "object" && raw.correctByQuestion
-        ? raw.correctByQuestion
-        : {},
-  };
-}
-
 /** Rough reading time so mixed courses still report a sensible duration. */
 export function estimateReadingSeconds(markdown: string) {
   const words = markdown.trim().split(/\s+/).filter(Boolean).length;
@@ -658,12 +406,6 @@ export async function resolveVideoUrl(lesson: Lesson) {
   if (lesson.videoUrl?.trim()) return lesson.videoUrl.trim();
   if (!lesson.videoPath?.trim()) return null;
   return getStorageUrl(lesson.videoPath);
-}
-
-export async function resolveCoverUrl(course: Course) {
-  if (course.coverUrl?.trim()) return course.coverUrl.trim();
-  if (!course.coverPath?.trim()) return null;
-  return getStorageUrl(course.coverPath);
 }
 
 /** Resumable upload so the Studio can render real progress. */
@@ -924,29 +666,6 @@ export function watchAuthoredCourses(
   };
 }
 
-export function watchCoursesByStatus(
-  status: CourseStatus,
-  onChange: (courses: Course[]) => void,
-  onError?: (error: Error) => void,
-): Unsubscribe {
-  const q = query(
-    collection(getFirebaseDb(), "courses"),
-    where("status", "==", status),
-    orderBy("updatedAt", "desc"),
-  );
-  return onSnapshot(
-    q,
-    (snap) => {
-      onChange(
-        snap.docs.map((d) =>
-          courseFrom(d.id, d.data() as Record<string, unknown>),
-        ),
-      );
-    },
-    (error) => onError?.(error),
-  );
-}
-
 /** Single listener for studio admin queues (draft + pending + published). */
 export function watchCoursesInStatuses(
   statuses: CourseStatus[],
@@ -1107,21 +826,6 @@ export async function deleteModule(courseId: string, moduleId: string) {
   batch.delete(doc(db, "courses", courseId, "modules", moduleId));
   await batch.commit();
   scheduleRecomputeCourseTotals(courseId);
-}
-
-export async function reorderModules(
-  courseId: string,
-  orderedIds: string[],
-) {
-  const db = getFirebaseDb();
-  const batch = writeBatch(db);
-  orderedIds.forEach((id, index) => {
-    batch.update(doc(db, "courses", courseId, "modules", id), {
-      order: index,
-      updatedAt: serverTimestamp(),
-    });
-  });
-  await batch.commit();
 }
 
 export async function upsertLesson(input: {
@@ -1345,21 +1049,4 @@ export async function recomputeCourseTotals(courseId: string) {
     durationMinutes: Math.round(totalSeconds / 60),
     updatedAt: serverTimestamp(),
   });
-}
-
-/** @deprecated Prefer fetchCourseStudentCounts — exposes learner UIDs. Admin only now. */
-export async function fetchCourseStudents(
-  courseId: string,
-): Promise<CourseStudent[]> {
-  const snap = await getDocs(
-    query(
-      collectionGroup(getFirebaseDb(), "enrollments"),
-      where("courseId", "==", courseId),
-    ),
-  );
-  return snap.docs.map((d) => ({
-    // users/{uid}/enrollments/{courseId}
-    uid: d.ref.parent.parent?.id ?? "",
-    enrollment: enrollmentFrom(d.id, d.data() as Record<string, unknown>),
-  }));
 }

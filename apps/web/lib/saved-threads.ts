@@ -82,11 +82,3 @@ export function removeSavedThread(threadId: string) {
   localStorage.setItem(SAVED_KEY, JSON.stringify(next));
   emit();
 }
-
-export function pruneSavedThreads(validIds: Set<string>) {
-  const current = readRaw();
-  const next = current.filter((id) => validIds.has(id));
-  if (next.length === current.length) return;
-  localStorage.setItem(SAVED_KEY, JSON.stringify(next));
-  emit();
-}

@@ -3,11 +3,12 @@
 import { useMemo, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { useEnrollments } from "@/lib/providers/enrollments-provider";
 import { canAuthorCourses } from "@/lib/roles";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { buildSsoHandoffUrl, ssoConsumeUrl } from "@/lib/sso";
+import { studioLibraryHref } from "@/lib/studio-url";
 import { progressOf, watchPaths } from "@/lib/firebase/courses";
 import { usePublishedCourses } from "@/lib/hooks/use-published-courses";
 import { useVisibleSubscription } from "@/lib/hooks/use-visible-subscription";
@@ -36,8 +37,8 @@ export function AcademyCatalog() {
   const [level, setLevel] = useState<CourseLevel | "all">("all");
   const [query, setQuery] = useState("");
 
-  const role = profile?.role ?? "guest";
-  const isAuthor = canAuthorCourses(role);
+  const access = useAccess();
+  const isAuthor = canAuthorCourses(access);
 
   useVisibleSubscription(true, () => {
     return watchPaths(setPaths, () => setPaths([]));
@@ -100,9 +101,7 @@ export function AcademyCatalog() {
                 void (async () => {
                   const user = getFirebaseAuth().currentUser;
                   if (!user) {
-                    window.location.assign(
-                      `${process.env.NEXT_PUBLIC_STUDIO_URL?.replace(/\/$/, "") || "http://localhost:3001"}/${locale}`,
-                    );
+                    window.location.assign(studioLibraryHref(locale));
                     return;
                   }
                   const idToken = await user.getIdToken();

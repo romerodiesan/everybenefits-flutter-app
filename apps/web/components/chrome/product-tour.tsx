@@ -16,6 +16,8 @@ import {
   PRODUCT_TOUR_VERSION,
   shouldShowProductTour,
 } from "@/lib/product-tour";
+import { belongsInDefaultAgentGroup, canAccessTools } from "@/lib/roles";
+import { resolveAccess } from "@pulse/shared";
 import type { UserProfile } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
 
@@ -130,11 +132,13 @@ function tooltipPlacement(rect: Rect): {
 
 export function ProductTour({
   profile,
+  permissions,
   profileReady = true,
   pulseAiEnabled,
   onCompleted,
 }: {
   profile: UserProfile;
+  permissions?: readonly string[];
   /** False while Firestore profile is still hydrating — keep tour closed. */
   profileReady?: boolean;
   pulseAiEnabled: boolean;
@@ -147,11 +151,9 @@ export function ProductTour({
   const [busy, setBusy] = useState(false);
   const [rect, setRect] = useState<Rect | null>(null);
 
+  const access = resolveAccess(permissions, profile.role);
   const isAgent =
-    profile.role === "agent" ||
-    profile.role === "admin" ||
-    profile.role === "instructor" ||
-    profile.role === "manager";
+    canAccessTools(access) || belongsInDefaultAgentGroup(access);
 
   const steps = useMemo(
     () =>

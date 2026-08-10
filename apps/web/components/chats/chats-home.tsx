@@ -8,7 +8,7 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { useAuth } from "@/lib/providers/auth-provider";
+import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import {
   chatTitleFor,
   createGroupChat,
@@ -46,6 +46,7 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
   const t = useTranslations();
   const router = useRouter();
   const { profile } = useAuth();
+  const access = useAccess();
   const {
     chats,
     ready: inboxReady,
@@ -71,10 +72,10 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
   const [directoryLoading, setDirectoryLoading] = useState(false);
 
   const canChat =
-    profile && canParticipateInChats(profile.role, profile.isAnonymous);
-  const canGroup = profile && canCreateChatGroups(profile.role);
+    profile && canParticipateInChats(access, profile.isAnonymous);
+  const canGroup = profile && canCreateChatGroups(access);
   const canAutoJoin =
-    profile && canConfigureGroupAutoJoin(profile.role);
+    profile && canConfigureGroupAutoJoin(access);
   const rtdbConfigured = Boolean(process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL);
   const inboxError =
     inboxProviderError === "inbox" ? t("errorGeneric") : null;
@@ -143,7 +144,7 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
   const sections = useMemo(() => {
     if (!profile) return null;
     const next = partitionChatInbox(chats, profile.uid);
-    if (!canAccessSupport(profile.role, profile.isAnonymous)) {
+    if (!canAccessSupport(access, profile.isAnonymous)) {
       return { ...next, support: [] as ChatConversation[] };
     }
     return next;
