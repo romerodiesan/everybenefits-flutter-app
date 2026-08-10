@@ -10,11 +10,27 @@
 # Do NOT set scripts.buildCommand here. The Node buildpack rewrites
 # package.json when buildCommand is set, and its Go struct serializes missing
 # `dependencies` as null — pnpm 11 then fails with
-# ERR_PNPM_INVALID_DEPENDENCIES_FIELD. Use package.json#apphosting:build /
-# start instead (same workaround as GoogleCloudPlatform/buildpacks#621).
+# ERR_PNPM_INVALID_DEPENDENCIES_FIELD. Use package.json#apphosting:build
+# (same workaround as GoogleCloudPlatform/buildpacks#621).
+#
+# Runtime needs an explicit runCommand: App Hosting's output optimizer can
+# ship a package.json without scripts, so `pnpm start` fails with
+# ERR_PNPM_NO_SCRIPT_OR_SERVER (Cloud Run then reports the PORT=8080 timeout).
+#
+# scripts.runCommand runs from the monorepo /workspace root. Use a
+# repo-root-relative path to the self-contained server.js. Keep the whole app
+# dir (`include: [.]`) — narrower includes dropped the start script files.
 #
 # Important: Console overrideEnv PUBLIC_PULSE_WEB_URL must be the Pulse web
 # origin (https://pulse.everybenefits.us), not the legal site hostname.
+
+scripts:
+  runCommand: node apps/legal/server.js
+
+outputFiles:
+  serverApp:
+    include:
+      - .
 
 runConfig:
   cpu: 1
