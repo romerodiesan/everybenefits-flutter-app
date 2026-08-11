@@ -98,7 +98,7 @@ export function UsersHome() {
   const invalidate = useInvalidateAdminQueries();
 
   const [query, setQuery] = useState("");
-  const debouncedQuery = useDebounced(query.trim(), 300);
+  const debouncedQuery = useDebounced(query.trim(), 200);
   const [role, setRole] = useState<UserRole | "">("");
   const [approvalStatus, setApprovalStatus] = useState("");
   const [pageSize, setPageSize] = useState(25);

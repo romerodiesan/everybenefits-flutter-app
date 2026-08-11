@@ -7,6 +7,7 @@ import {
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import {
   ALL_ROLES,
+  displayNameSearchFields,
   parseRole,
   type UserRole,
 } from "@pulse/shared";
@@ -49,12 +50,6 @@ function mapAdminUserRow(id: string, data: DocumentData) {
   };
 }
 
-function lowerOrNull(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const trimmed = value.trim().toLowerCase();
-  return trimmed || null;
-}
-
 function encodePageToken(createdAtMs: number, uid: string): string {
   return Buffer.from(JSON.stringify({ c: createdAtMs, u: uid }), "utf8").toString(
     "base64url",
@@ -94,25 +89,63 @@ async function requireAdminCaller(
   return { uid, role: parseRole(role), permissions };
 }
 
+function prefixRange(query: string): { start: string; end: string } {
+  return { start: query, end: `${query}\uf8ff` };
+}
+
+async function collectUserSearchDocs(
+  query: string,
+  limit: number,
+): Promise<Map<string, DocumentData>> {
+  const matched = new Map<string, DocumentData>();
+  const push = (id: string, data: DocumentData) => {
+    if (matched.has(id) || matched.size >= limit) return;
+    matched.set(id, data);
+  };
+
+  const { start, end } = prefixRange(query);
+  const token = query.split(/\s+/).filter(Boolean)[0] ?? query;
+
+  const snaps = await Promise.all([
+    db
+      .collection("users")
+      .where("displayNameLower", ">=", start)
+      .where("displayNameLower", "<=", end)
+      .orderBy("displayNameLower", "asc")
+      .limit(limit)
+      .get(),
+    db
+      .collection("users")
+      .where("emailLower", ">=", start)
+      .where("emailLower", "<=", end)
+      .orderBy("emailLower", "asc")
+      .limit(limit)
+      .get(),
+    token.length >= 2
+      ? db
+          .collection("users")
+          .where("nameTokens", "array-contains", token)
+          .limit(limit)
+          .get()
+      : Promise.resolve(null),
+  ]);
+
+  for (const snap of snaps) {
+    if (!snap) continue;
+    for (const doc of snap.docs) {
+      push(doc.id, doc.data());
+    }
+  }
+  return matched;
+}
+
 function buildUsersBaseQuery(filters: {
   roleFilter: string;
   approvalFilter: string;
   accountFilter: string;
   orgNodeId: string;
-  query: string;
 }): Query {
   let q: Query = db.collection("users");
-
-  if (filters.query) {
-    const field = filters.query.includes("@") ? "emailLower" : "displayNameLower";
-    const prefix = filters.query;
-    const end = `${prefix}\uf8ff`;
-    q = q
-      .where(field, ">=", prefix)
-      .where(field, "<=", end)
-      .orderBy(field, "asc");
-    return q;
-  }
 
   if (filters.roleFilter && (ALL_ROLES as readonly string[]).includes(filters.roleFilter)) {
     q = q.where("role", "==", filters.roleFilter);
@@ -147,30 +180,30 @@ export const listUsersForAdmin = onCall(callableOpts, async (request) => {
   );
   const pageToken = String(request.data?.pageToken ?? "").trim();
 
-  let q = buildUsersBaseQuery({
-    roleFilter,
-    approvalFilter,
-    accountFilter,
-    orgNodeId,
-    query,
-  });
+  let rows: ReturnType<typeof mapAdminUserRow>[] = [];
 
-  if (pageToken && !query) {
-    const cursor = decodePageToken(pageToken);
-    if (!cursor) {
-      throw new HttpsError("invalid-argument", "Invalid pageToken.");
+  if (query) {
+    const matched = await collectUserSearchDocs(query, Math.min(200, pageSize * 4));
+    rows = [...matched.entries()].map(([id, data]) =>
+      mapAdminUserRow(id, data),
+    );
+  } else {
+    let q = buildUsersBaseQuery({
+      roleFilter,
+      approvalFilter,
+      accountFilter,
+      orgNodeId,
+    });
+    if (pageToken) {
+      const cursor = decodePageToken(pageToken);
+      if (!cursor) {
+        throw new HttpsError("invalid-argument", "Invalid pageToken.");
+      }
+      q = q.startAfter(cursor.createdAt, cursor.uid);
     }
-    q = q.startAfter(cursor.createdAt, cursor.uid);
+    const snap = await q.limit(pageSize + 1).get();
+    rows = snap.docs.map((doc) => mapAdminUserRow(doc.id, doc.data()));
   }
-
-  // Fetch one extra to detect a next page. When search/prefix is used, oversample
-  // slightly so in-memory secondary filters still fill a page.
-  const fetchLimit = query
-    ? Math.min(200, pageSize * 4)
-    : pageSize + 1;
-  const snap = await q.limit(fetchLimit).get();
-
-  let rows = snap.docs.map((doc) => mapAdminUserRow(doc.id, doc.data()));
 
   rows = rows.filter((row) => {
     if (row.isAnonymous) return false;
@@ -179,12 +212,32 @@ export const listUsersForAdmin = onCall(callableOpts, async (request) => {
     if (orgNodeId && row.orgNodeId !== orgNodeId) return false;
     if (roleFilter && row.role !== roleFilter) return false;
     if (query) {
-      const hay =
-        `${row.displayName ?? ""} ${row.email ?? ""} ${row.npn ?? ""}`.toLowerCase();
-      if (!hay.includes(query)) return false;
+      const name = (row.displayName ?? "").toLowerCase();
+      const email = (row.email ?? "").toLowerCase();
+      const npn = (row.npn ?? "").toLowerCase();
+      const hay = `${name} ${email} ${npn}`;
+      const tokens = name.split(/\s+/).filter(Boolean);
+      const hit =
+        hay.includes(query) ||
+        name.startsWith(query) ||
+        email.startsWith(query) ||
+        tokens.some((t) => t.startsWith(query) || t.includes(query));
+      if (!hit) return false;
     }
     return true;
   });
+
+  // Prefer name/email relevance: prefix matches first, then alphabetical.
+  if (query) {
+    rows.sort((a, b) => {
+      const an = (a.displayName ?? a.email ?? "").toLowerCase();
+      const bn = (b.displayName ?? b.email ?? "").toLowerCase();
+      const aPrefix = an.startsWith(query) || (a.email ?? "").toLowerCase().startsWith(query);
+      const bPrefix = bn.startsWith(query) || (b.email ?? "").toLowerCase().startsWith(query);
+      if (aPrefix !== bPrefix) return aPrefix ? -1 : 1;
+      return an.localeCompare(bn);
+    });
+  }
 
   const hasMore = rows.length > pageSize;
   const page = rows.slice(0, pageSize);
@@ -192,11 +245,7 @@ export const listUsersForAdmin = onCall(callableOpts, async (request) => {
   const nextPageToken =
     hasMore && last && last.createdAt != null && !query
       ? encodePageToken(last.createdAt, last.uid)
-      : hasMore && query
-        ? null
-        : hasMore && last?.createdAt != null
-          ? encodePageToken(last.createdAt, last.uid)
-          : null;
+      : null;
 
   return { users: page, nextPageToken };
 });
@@ -327,8 +376,7 @@ export const adminCreateUser = onCall(callableOpts, async (request) => {
     uid: user.uid,
     email,
     emailLower: email,
-    displayName: displayName || null,
-    displayNameLower: lowerOrNull(displayName),
+    ...displayNameSearchFields(displayName || null),
     photoUrl: null,
     role,
     isAnonymous: false,
@@ -381,8 +429,7 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
 
   if (typeof request.data?.displayName === "string") {
     const displayName = request.data.displayName.trim();
-    updates.displayName = displayName || null;
-    updates.displayNameLower = lowerOrNull(displayName);
+    Object.assign(updates, displayNameSearchFields(displayName));
     authUpdates.displayName = displayName || undefined;
   }
   if (typeof request.data?.email === "string") {
@@ -531,3 +578,87 @@ export const getAdminInsights = onCall(callableOpts, async (request) => {
     orgNodeCount: stats.orgNodes,
   };
 });
+
+/**
+ * One-shot / resumable backfill for directory search fields on `users/{uid}`.
+ * Writes `displayNameLower`, `nameTokens`, and `emailLower` when missing/stale.
+ * Call repeatedly with `pageToken` until `done` is true.
+ */
+export const backfillUserSearchFields = onCall(
+  { ...callableOpts, timeoutSeconds: 300 },
+  async (request) => {
+    await requireAdminCaller(request, "backfillUserSearchFields", true);
+    const pageSize = Math.max(
+      50,
+      Math.min(500, Math.round(Number(request.data?.pageSize ?? 400))),
+    );
+    const pageToken = String(request.data?.pageToken ?? "").trim();
+
+    let q = db.collection("users").orderBy("__name__", "asc").limit(pageSize);
+    if (pageToken) {
+      const cursor = await db.doc(`users/${pageToken}`).get();
+      if (cursor.exists) {
+        q = q.startAfter(cursor);
+      }
+    }
+
+    const snap = await q.get();
+    let updated = 0;
+    let scanned = 0;
+    let batch = db.batch();
+    let ops = 0;
+
+    const flush = async () => {
+      if (ops === 0) return;
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    };
+
+    for (const doc of snap.docs) {
+      scanned += 1;
+      const data = doc.data();
+      const search = displayNameSearchFields(
+        typeof data.displayName === "string" ? data.displayName : null,
+      );
+      const emailLower =
+        typeof data.email === "string"
+          ? data.email.trim().toLowerCase() || null
+          : null;
+      const existingTokens = Array.isArray(data.nameTokens)
+        ? data.nameTokens.map(String)
+        : [];
+      const needsUpdate =
+        data.displayNameLower !== search.displayNameLower ||
+        data.emailLower !== emailLower ||
+        JSON.stringify(existingTokens) !== JSON.stringify(search.nameTokens);
+
+      if (!needsUpdate) continue;
+
+      batch.set(
+        doc.ref,
+        {
+          ...search,
+          emailLower,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      ops += 1;
+      updated += 1;
+      if (ops >= 400) {
+        await flush();
+      }
+    }
+    await flush();
+
+    const last = snap.docs[snap.docs.length - 1];
+    const done = snap.size < pageSize;
+    return {
+      scanned,
+      updated,
+      done,
+      nextPageToken: done || !last ? null : last.id,
+    };
+  },
+);

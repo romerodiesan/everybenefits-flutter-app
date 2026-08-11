@@ -95,6 +95,9 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
 /**
  * Directory search for chats (name, email, NPN). Returns PII for org members
  * who can participate in chats — respecting each target's privacy prefs.
+ *
+ * Uses indexed prefix queries (`displayNameLower` / `emailLower`) and
+ * `nameTokens` array-contains so results are not limited to a loaded page.
  */
 export const searchDirectory = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "searchDirectory");
@@ -121,6 +124,8 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
   const npnDigits = rawQuery.replace(/\D/g, "");
   const looksEmail = q.includes("@");
   const looksNpn = npnDigits.length >= 5 && /^\d[\d\s-]*$/.test(rawQuery);
+  const token = q.split(/\s+/).filter(Boolean)[0] ?? q;
+  const end = `${q}\uf8ff`;
 
   const matched = new Map<string, Record<string, unknown>>();
 
@@ -148,46 +153,53 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     matched.set(doc.id, data);
   };
 
-  if (looksEmail) {
-    const exact = await db
+  const snaps = await Promise.all([
+    looksEmail
+      ? db.collection("users").where("email", "==", q).limit(limit).get()
+      : Promise.resolve(null),
+    looksEmail
+      ? db
+          .collection("users")
+          .where("emailLower", ">=", q)
+          .where("emailLower", "<=", end)
+          .orderBy("emailLower", "asc")
+          .limit(limit)
+          .get()
+      : Promise.resolve(null),
+    looksNpn
+      ? db.collection("users").where("npn", "==", npnDigits).limit(limit).get()
+      : Promise.resolve(null),
+    db
       .collection("users")
-      .where("email", "==", q)
+      .where("displayNameLower", ">=", q)
+      .where("displayNameLower", "<=", end)
+      .orderBy("displayNameLower", "asc")
       .limit(limit)
-      .get();
-    exact.docs.forEach((doc) => pushDoc(doc, "email"));
-  }
+      .get(),
+    !looksEmail
+      ? db
+          .collection("users")
+          .where("emailLower", ">=", q)
+          .where("emailLower", "<=", end)
+          .orderBy("emailLower", "asc")
+          .limit(limit)
+          .get()
+      : Promise.resolve(null),
+    token.length >= 2
+      ? db
+          .collection("users")
+          .where("nameTokens", "array-contains", token)
+          .limit(limit)
+          .get()
+      : Promise.resolve(null),
+  ]);
 
-  if (looksNpn && matched.size < limit) {
-    const exact = await db
-      .collection("users")
-      .where("npn", "==", npnDigits)
-      .limit(limit)
-      .get();
-    exact.docs.forEach((doc) => pushDoc(doc, "npn"));
-  }
-
-  if (matched.size < limit) {
-    const pool = await db
-      .collection("users")
-      .where("isAnonymous", "==", false)
-      .limit(200)
-      .get();
-    for (const doc of pool.docs) {
-      if (matched.size >= limit) break;
-      const data = doc.data();
-      const privacy = readPrivacy(data.privacy);
-      const name = String(data.displayName ?? "").toLowerCase();
-      const email = String(data.email ?? "").toLowerCase();
-      const npn = String(data.npn ?? "").replace(/\D/g, "");
-      const nameHit = name.includes(q);
-      const emailHit = privacy.searchableByEmail && email.includes(q);
-      const npnHit =
-        privacy.searchableByNpn &&
-        npnDigits.length >= 2 &&
-        npn.includes(npnDigits);
-      if (nameHit || emailHit || npnHit) {
-        pushDoc(doc, "general");
-      }
+  for (const [index, snap] of snaps.entries()) {
+    if (!snap) continue;
+    const kind: "email" | "npn" | "general" =
+      index <= 1 ? "email" : index === 2 ? "npn" : "general";
+    for (const doc of snap.docs) {
+      pushDoc(doc, kind);
     }
   }
 
@@ -214,5 +226,14 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     };
   });
 
-  return { profiles };
+  profiles.sort((a, b) => {
+    const an = (a.displayName ?? a.email ?? "").toLowerCase();
+    const bn = (b.displayName ?? b.email ?? "").toLowerCase();
+    const aPrefix = an.startsWith(q);
+    const bPrefix = bn.startsWith(q);
+    if (aPrefix !== bPrefix) return aPrefix ? -1 : 1;
+    return an.localeCompare(bn);
+  });
+
+  return { profiles: profiles.slice(0, limit) };
 });

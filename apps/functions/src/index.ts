@@ -81,6 +81,7 @@ export {
   adminCreateUser,
   adminUpdateUser,
   getAdminInsights,
+  backfillUserSearchFields,
 } from "./admin";
 
 export { validateUsAddress } from "./address";

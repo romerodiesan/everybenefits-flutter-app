@@ -33,7 +33,23 @@ export function useAdminUsersQuery(
   return useQuery({
     queryKey: adminQueryKeys.users(filters),
     queryFn: () => getAdminRepository().listUsers(filters),
-    placeholderData: (prev) => prev,
+    // Keep previous page only when paginating the same search/filters.
+    placeholderData: (previousData, previousQuery) => {
+      if (!previousData || !previousQuery) return undefined;
+      const prevFilters = previousQuery.queryKey[2] as
+        | AdminUserFilters
+        | undefined;
+      if (!prevFilters) return undefined;
+      if (
+        (prevFilters.query ?? "") !== (filters.query ?? "") ||
+        (prevFilters.role ?? "") !== (filters.role ?? "") ||
+        (prevFilters.approvalStatus ?? "") !== (filters.approvalStatus ?? "") ||
+        (prevFilters.pageSize ?? 25) !== (filters.pageSize ?? 25)
+      ) {
+        return undefined;
+      }
+      return previousData;
+    },
   });
 }
 

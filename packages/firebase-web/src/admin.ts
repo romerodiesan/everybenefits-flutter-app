@@ -272,6 +272,15 @@ export type AdminRepository = {
   }) => Promise<RoleDoc | null>;
   deleteRole: (id: string, hard?: boolean) => Promise<void>;
   seedSystemRoles: () => Promise<ListRolesResult>;
+  backfillUserSearchFields: (input?: {
+    pageSize?: number;
+    pageToken?: string | null;
+  }) => Promise<{
+    scanned: number;
+    updated: number;
+    done: boolean;
+    nextPageToken: string | null;
+  }>;
 };
 export function createAdminRepository(functions: Functions): AdminRepository {
   return {
@@ -476,6 +485,23 @@ export function createAdminRepository(functions: Functions): AdminRepository {
       }>(functions, "seedSystemRoles", {});
       return {
         roles: (data?.roles ?? []).map(mapRoleDoc).filter((r) => r.id),
+      };
+    },
+    async backfillUserSearchFields(input) {
+      const data = await callCloudFunction<{
+        scanned?: number;
+        updated?: number;
+        done?: boolean;
+        nextPageToken?: string | null;
+      }>(functions, "backfillUserSearchFields", {
+        pageSize: input?.pageSize,
+        pageToken: input?.pageToken ?? undefined,
+      });
+      return {
+        scanned: Number(data?.scanned ?? 0),
+        updated: Number(data?.updated ?? 0),
+        done: Boolean(data?.done),
+        nextPageToken: data?.nextPageToken ?? null,
       };
     },
   };
