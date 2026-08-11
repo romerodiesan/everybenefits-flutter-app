@@ -388,32 +388,20 @@ export function createAdminRepository(functions: Functions): AdminRepository {
       }
     },
     async listAgencies(opts) {
-      try {
-        const data = await callCloudFunction<{
-          agencies?: Array<Record<string, unknown>>;
-          nextPageToken?: string | null;
-        }>(functions, "listAgenciesForAdmin", opts ?? {});
-        return {
-          agencies: (data?.agencies ?? []).map(mapOrgNode).filter((n) => n.id),
-          nextPageToken: data?.nextPageToken ?? null,
-        };
-      } catch (error) {
-        if (error instanceof FunctionsUnavailableError) {
-          return { agencies: [], nextPageToken: null };
-        }
-        throw error;
-      }
+      const data = await callCloudFunction<{
+        agencies?: Array<Record<string, unknown>>;
+        nextPageToken?: string | null;
+      }>(functions, "listAgenciesForAdmin", opts ?? {});
+      return {
+        agencies: (data?.agencies ?? []).map(mapOrgNode).filter((n) => n.id),
+        nextPageToken: data?.nextPageToken ?? null,
+      };
     },
     async listOrgNodesByType(type, pageSize = 100) {
-      try {
-        const data = await callCloudFunction<{
-          nodes?: Array<Record<string, unknown>>;
-        }>(functions, "listOrgNodesByType", { type, pageSize });
-        return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
-      } catch (error) {
-        if (error instanceof FunctionsUnavailableError) return [];
-        throw error;
-      }
+      const data = await callCloudFunction<{
+        nodes?: Array<Record<string, unknown>>;
+      }>(functions, "listOrgNodesByType", { type, pageSize });
+      return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
     },
     async ensureOrgRoot() {
       try {

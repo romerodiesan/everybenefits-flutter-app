@@ -32,11 +32,27 @@ async function requireOrgAdmin(
 
 export const ensureOrgRoot = onCall(callableOpts, async (request) => {
   await requireOrgAdmin(request, "ensureOrgRoot", true);
-  const ref = db.doc(`orgNodes/${ORG_ROOT_ID}`);
-  const snap = await ref.get();
-  if (snap.exists) {
-    return { node: serializeOrgNode(ORG_ROOT_ID, snap.data() ?? {}) };
+  const preferredRef = db.doc(`orgNodes/${ORG_ROOT_ID}`);
+  const preferredSnap = await preferredRef.get();
+  if (preferredSnap.exists) {
+    return { node: serializeOrgNode(ORG_ROOT_ID, preferredSnap.data() ?? {}) };
   }
+
+  // Prefer an existing organization root (parentId == null) over creating a
+  // second empty "Every Benefits" matrix next to a migrated tree.
+  const existingRoots = await db
+    .collection("orgNodes")
+    .where("parentId", "==", null)
+    .limit(20)
+    .get();
+  const activeRoot = existingRoots.docs.find((doc) => {
+    const data = doc.data();
+    return data.type === "organization" && data.active !== false;
+  });
+  if (activeRoot) {
+    return { node: serializeOrgNode(activeRoot.id, activeRoot.data()) };
+  }
+
   const node = {
     name: DEFAULT_ORG_ROOT_NAME,
     type: "organization" as const,
@@ -48,7 +64,7 @@ export const ensureOrgRoot = onCall(callableOpts, async (request) => {
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
-  await ref.set(node);
+  await preferredRef.set(node);
   return {
     node: serializeOrgNode(ORG_ROOT_ID, {
       ...node,
@@ -90,6 +106,8 @@ export const listOrgSubtree = onCall(callableOpts, async (request) => {
 
 /**
  * Paginated agencies for Admin (type == agency). Soft-deleted = active:false.
+ * Sorts in memory (same pattern as listAgenciesForProfile) so the list works
+ * even when the type+name composite index is still building.
  */
 export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
   await requireOrgAdmin(request, "listAgenciesForAdmin");
@@ -101,20 +119,18 @@ export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
   const includeInactive = request.data?.includeInactive === true;
   const query = String(request.data?.query ?? "").trim().toLowerCase();
 
-  let q = db
+  const snap = await db
     .collection("orgNodes")
     .where("type", "==", "agency")
-    .orderBy("name", "asc");
+    .limit(3000)
+    .get();
 
-  if (pageToken) {
-    q = q.startAfter(pageToken);
-  }
-
-  const fetchLimit = query ? Math.min(200, pageSize * 4) : pageSize + 1;
-  const snap = await q.limit(fetchLimit).get();
   let agencies = snap.docs
     .map((doc) => serializeOrgNode(doc.id, doc.data()))
-    .filter((node) => includeInactive || node.active);
+    .filter((node) => includeInactive || node.active)
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    );
 
   if (query) {
     agencies = agencies.filter((node) =>
@@ -122,10 +138,15 @@ export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
     );
   }
 
-  const hasMore = agencies.length > pageSize;
-  const page = agencies.slice(0, pageSize);
+  let start = 0;
+  if (pageToken) {
+    const idx = agencies.findIndex((node) => node.name === pageToken);
+    start = idx >= 0 ? idx + 1 : 0;
+  }
+  const page = agencies.slice(start, start + pageSize);
   const last = page[page.length - 1];
-  const nextPageToken = hasMore && last && !query ? last.name : null;
+  const nextPageToken =
+    start + page.length < agencies.length && last && !query ? last.name : null;
 
   return { agencies: page, nextPageToken };
 });
@@ -269,15 +290,19 @@ export const listOrgNodesByType = onCall(callableOpts, async (request) => {
     Math.min(200, Math.round(Number(request.data?.pageSize ?? 100))),
   );
   const includeInactive = request.data?.includeInactive === true;
+  // Avoid requiring the type+name composite index (sort in memory).
   const snap = await db
     .collection("orgNodes")
     .where("type", "==", type)
-    .orderBy("name", "asc")
-    .limit(pageSize)
+    .limit(Math.max(pageSize, 500))
     .get();
   const nodes = snap.docs
     .map((doc) => serializeOrgNode(doc.id, doc.data()))
-    .filter((node) => includeInactive || node.active);
+    .filter((node) => includeInactive || node.active)
+    .sort((a, b) =>
+      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
+    )
+    .slice(0, pageSize);
   return { nodes };
 });
 

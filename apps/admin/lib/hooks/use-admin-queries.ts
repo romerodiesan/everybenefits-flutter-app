@@ -86,7 +86,7 @@ export function useOrgRootsQuery(enabled = true) {
   return useQuery({
     queryKey: adminQueryKeys.orgRoots(),
     queryFn: () =>
-      getAdminRepository().listOrgSubtree(null, { includeInactive: true }),
+      getAdminRepository().listOrgSubtree(null, { includeInactive: false }),
     enabled,
   });
 }
@@ -99,7 +99,7 @@ export async function fetchOrgChildren(
     queryKey: adminQueryKeys.orgChildren(parentId),
     queryFn: () =>
       getAdminRepository().listOrgSubtree(parentId, {
-        includeInactive: true,
+        includeInactive: false,
       }),
     staleTime: 45_000,
   });
