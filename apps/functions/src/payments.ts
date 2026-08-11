@@ -8,6 +8,7 @@ import {
   contractTermInputSchema,
   deriveRelationshipType,
   importStatementInputSchema,
+  isUserAssignableOrgType,
   normalizeParticipantType,
   paymentsParticipantInputSchema,
   runOverrideCalculation,
@@ -331,22 +332,133 @@ export const listPaymentsParticipants = onCall(callableOpts, async (request) => 
 
 export const upsertPaymentsParticipant = onCall(callableOpts, async (request) => {
   await requirePaymentsAdmin(request, "upsertPaymentsParticipant");
-  const id =
+  const idRaw =
     typeof request.data?.id === "string" && request.data.id.trim()
       ? request.data.id.trim()
       : null;
-  const parsed = paymentsParticipantInputSchema.safeParse(request.data ?? {});
+
+  const raw = { ...(request.data ?? {}) } as Record<string, unknown>;
+  const typeHint = normalizeParticipantType(raw.type);
+  if (!String(raw.name ?? "").trim()) {
+    raw.name = typeHint === "agency" ? "Agency" : "Agent";
+  }
+
+  const parsed = paymentsParticipantInputSchema.safeParse(raw);
   if (!parsed.success) {
     throw new HttpsError("invalid-argument", parsed.error.message);
   }
-  const ref = id
-    ? db.doc(`paymentsParticipants/${id}`)
+
+  const input = { ...parsed.data };
+  const type = normalizeParticipantType(input.type);
+  if (!type) {
+    throw new HttpsError("invalid-argument", "type must be agency or agent.");
+  }
+  input.type = type;
+
+  let resolvedId = idRaw;
+
+  if (type === "agency") {
+    const linkedOrgNodeId =
+      typeof input.linkedOrgNodeId === "string"
+        ? input.linkedOrgNodeId.trim()
+        : "";
+    if (!resolvedId && !linkedOrgNodeId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Agency participants require linkedOrgNodeId.",
+      );
+    }
+    if (linkedOrgNodeId) {
+      const orgSnap = await db.doc(`orgNodes/${linkedOrgNodeId}`).get();
+      if (!orgSnap.exists) {
+        throw new HttpsError("not-found", "Org node not found.");
+      }
+      const orgData = orgSnap.data() ?? {};
+      if (!isUserAssignableOrgType(orgData.type)) {
+        throw new HttpsError(
+          "invalid-argument",
+          "linkedOrgNodeId must be an assignable agency/organization.",
+        );
+      }
+      if (!input.name?.trim() || input.name === "Agency") {
+        input.name = String(orgData.name ?? "Agency");
+      }
+      if (input.npn == null && typeof orgData.npn === "string") {
+        input.npn = orgData.npn.trim() || null;
+      }
+      input.userId = null;
+      input.linkedOrgNodeId = linkedOrgNodeId;
+      if (raw.active === undefined) {
+        input.active = orgData.active !== false;
+      }
+
+      const existing = await db
+        .collection("paymentsParticipants")
+        .where("linkedOrgNodeId", "==", linkedOrgNodeId)
+        .limit(1)
+        .get();
+      if (!existing.empty) {
+        resolvedId = existing.docs[0].id;
+      }
+    }
+  } else {
+    const userId =
+      typeof input.userId === "string" ? input.userId.trim() : "";
+    if (!resolvedId && !userId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Agent participants require userId.",
+      );
+    }
+    if (userId) {
+      const userSnap = await db.doc(`users/${userId}`).get();
+      if (!userSnap.exists) {
+        throw new HttpsError("not-found", "User not found.");
+      }
+      const userData = userSnap.data() ?? {};
+      if (!input.name?.trim() || input.name === "Agent") {
+        const display =
+          typeof userData.displayName === "string"
+            ? userData.displayName.trim()
+            : "";
+        const email =
+          typeof userData.email === "string" ? userData.email.trim() : "";
+        input.name = display || email || "Agent";
+      }
+      if (input.npn == null && typeof userData.npn === "string") {
+        input.npn = userData.npn.trim() || null;
+      }
+      input.userId = userId;
+      if (
+        (input.linkedOrgNodeId == null || input.linkedOrgNodeId === "") &&
+        typeof userData.orgNodeId === "string"
+      ) {
+        input.linkedOrgNodeId = userData.orgNodeId.trim() || null;
+      }
+
+      const existing = await db
+        .collection("paymentsParticipants")
+        .where("userId", "==", userId)
+        .limit(1)
+        .get();
+      if (!existing.empty) {
+        resolvedId = existing.docs[0].id;
+      }
+    }
+  }
+
+  if (!input.name?.trim()) {
+    throw new HttpsError("invalid-argument", "name required.");
+  }
+
+  const ref = resolvedId
+    ? db.doc(`paymentsParticipants/${resolvedId}`)
     : db.collection("paymentsParticipants").doc();
   await ref.set(
     {
-      ...parsed.data,
+      ...input,
       updatedAt: FieldValue.serverTimestamp(),
-      ...(id ? {} : { createdAt: FieldValue.serverTimestamp() }),
+      ...(resolvedId ? {} : { createdAt: FieldValue.serverTimestamp() }),
     },
     { merge: true },
   );

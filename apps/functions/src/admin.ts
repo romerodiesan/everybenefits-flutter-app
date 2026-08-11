@@ -296,6 +296,13 @@ export const adminDeactivateUser = onCall(callableOpts, async (request) => {
     String(snap.data()?.accountStatus ?? "active"),
     "deactivated",
   );
+  const { syncAgentParticipantSafe } = await import(
+    "./payments-participants-sync"
+  );
+  await syncAgentParticipantSafe(targetUid, {
+    ...(snap.data() ?? {}),
+    accountStatus: "deactivated",
+  });
   const tokens = await db
     .collection(`users/${targetUid}/fcmTokens`)
     .limit(50)
@@ -327,6 +334,13 @@ export const adminReactivateUser = onCall(callableOpts, async (request) => {
   });
   const { bumpAccountStatusChange } = await import("./platform-stats");
   await bumpAccountStatusChange("deactivated", "active");
+  const { syncAgentParticipantSafe } = await import(
+    "./payments-participants-sync"
+  );
+  await syncAgentParticipantSafe(targetUid, {
+    ...(snap.data() ?? {}),
+    accountStatus: "active",
+  });
   return { ok: true };
 });
 
@@ -420,6 +434,10 @@ export const adminCreateUser = onCall(callableOpts, async (request) => {
   await db.doc(`users/${user.uid}`).set(payload);
   const { bumpUserCreated } = await import("./platform-stats");
   await bumpUserCreated(parseRole(role), approvalStatus === "pending");
+  const { syncAgentParticipantSafe } = await import(
+    "./payments-participants-sync"
+  );
+  await syncAgentParticipantSafe(user.uid, payload as DocumentData);
   const after = await db.doc(`users/${user.uid}`).get();
   return { user: mapAdminUserRow(user.uid, after.data() ?? payload) };
 });
@@ -538,6 +556,10 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
     );
   }
   const after = await userRef.get();
+  const { syncAgentParticipantSafe } = await import(
+    "./payments-participants-sync"
+  );
+  await syncAgentParticipantSafe(targetUid, after.data() ?? {});
   return { user: mapAdminUserRow(targetUid, after.data() ?? {}) };
 });
 

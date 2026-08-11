@@ -111,6 +111,13 @@ export const setUserApproval = onCall(callableOpts, async (request) => {
       headlineName(data),
       data?.isAnonymous === true,
     );
+    const { syncAgentParticipantSafe } = await import(
+      "./payments-participants-sync"
+    );
+    await syncAgentParticipantSafe(targetUid, {
+      ...(data ?? {}),
+      approvalStatus: "approved",
+    });
   }
   return { ok: true, uid: targetUid, status };
 });

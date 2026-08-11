@@ -181,6 +181,16 @@ async function syncAgencyOwners(opts: {
   }
 
   if (ops > 0) await batch.commit();
+
+  const { syncAgentParticipantSafe } = await import(
+    "./payments-participants-sync"
+  );
+  for (const uid of [...added, ...removed]) {
+    const snap = await db.doc(`users/${uid}`).get();
+    if (snap.exists) {
+      await syncAgentParticipantSafe(uid, snap.data() ?? {});
+    }
+  }
 }
 
 export const ensureOrgRoot = onCall(callableOpts, async (request) => {
@@ -390,6 +400,10 @@ export const createOrgNode = onCall(callableOpts, async (request) => {
       next: ownerUids,
     });
   }
+  const { syncAgencyParticipantSafe } = await import(
+    "./payments-participants-sync"
+  );
+  await syncAgencyParticipantSafe(ref.id, payload as DocumentData);
   const { bumpOrgNodeCreated } = await import("./platform-stats");
   await bumpOrgNodeCreated();
   return {
@@ -453,6 +467,10 @@ export const updateOrgNode = onCall(callableOpts, async (request) => {
   }
 
   const after = await ref.get();
+  const { syncAgencyParticipantSafe } = await import(
+    "./payments-participants-sync"
+  );
+  await syncAgencyParticipantSafe(id, after.data() ?? {});
   return { node: serializeOrgNode(id, after.data() ?? {}) };
 });
 

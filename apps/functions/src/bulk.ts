@@ -65,6 +65,13 @@ export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
           headlineName(data),
           data?.isAnonymous === true,
         );
+        const { syncAgentParticipantSafe } = await import(
+          "./payments-participants-sync"
+        );
+        await syncAgentParticipantSafe(targetUid, {
+          ...(data ?? {}),
+          approvalStatus: "approved",
+        });
       }
       result.succeeded.push(targetUid);
     } catch (error) {
@@ -293,6 +300,13 @@ export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => 
           updatedAt: FieldValue.serverTimestamp(),
         });
         await bumpAccountStatusChange(current, "deactivated");
+        const { syncAgentParticipantSafe } = await import(
+          "./payments-participants-sync"
+        );
+        await syncAgentParticipantSafe(targetUid, {
+          ...(snap.data() ?? {}),
+          accountStatus: "deactivated",
+        });
         const tokens = await db
           .collection(`users/${targetUid}/fcmTokens`)
           .limit(50)
@@ -315,6 +329,13 @@ export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => 
           updatedAt: FieldValue.serverTimestamp(),
         });
         await bumpAccountStatusChange("deactivated", "active");
+        const { syncAgentParticipantSafe } = await import(
+          "./payments-participants-sync"
+        );
+        await syncAgentParticipantSafe(targetUid, {
+          ...(snap.data() ?? {}),
+          accountStatus: "active",
+        });
       }
       result.succeeded.push(targetUid);
     } catch (error) {
