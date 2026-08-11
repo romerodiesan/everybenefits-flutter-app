@@ -956,11 +956,41 @@ abstract class AppLocalizations {
   /// **'Full name'**
   String get fieldFullName;
 
+  /// No description provided for @fieldGivenName.
+  ///
+  /// In en, this message translates to:
+  /// **'First name'**
+  String get fieldGivenName;
+
+  /// No description provided for @fieldFamilyName.
+  ///
+  /// In en, this message translates to:
+  /// **'Last name'**
+  String get fieldFamilyName;
+
   /// No description provided for @validationName.
   ///
   /// In en, this message translates to:
   /// **'Enter your name.'**
   String get validationName;
+
+  /// No description provided for @validationNameEmail.
+  ///
+  /// In en, this message translates to:
+  /// **'Use your real name, not your email.'**
+  String get validationNameEmail;
+
+  /// No description provided for @validationNameLast.
+  ///
+  /// In en, this message translates to:
+  /// **'Include your last name.'**
+  String get validationNameLast;
+
+  /// No description provided for @validationNameShort.
+  ///
+  /// In en, this message translates to:
+  /// **'First and last name need at least 2 letters (middle initials like A are fine).'**
+  String get validationNameShort;
 
   /// No description provided for @countryCodePickerTitle.
   ///

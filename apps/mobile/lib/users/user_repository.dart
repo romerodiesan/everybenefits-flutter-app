@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 
 import '../firebase/firebase_emulators.dart';
 import 'avatar_storage.dart';
+import 'profile_validation.dart';
 import 'user_profile.dart';
 import 'user_role.dart';
 
@@ -40,10 +41,16 @@ class FirestoreUserProfileStore implements UserProfileStore {
       _firestore.collection('users');
 
   Map<String, Object?> _payload(UserProfile profile) {
+    final displayName = profile.displayName?.trim();
+    final normalized =
+        displayName == null || displayName.isEmpty ? null : displayName;
     return {
       'uid': profile.uid,
       'email': profile.email,
-      'displayName': profile.displayName,
+      'emailLower': profile.email?.trim().toLowerCase(),
+      'displayName': normalized,
+      'displayNameLower': normalized?.toLowerCase(),
+      'nameTokens': nameSearchTokens(normalized),
       'photoUrl': profile.photoUrl,
       'role': profile.role.wireValue,
       'isAnonymous': profile.isAnonymous,
@@ -149,10 +156,12 @@ Future<void> syncFirebaseAuthProfile({
   FirebaseAuth? auth,
 }) async {
   final user = (auth ?? FirebaseAuth.instance).currentUser;
-  if (user == null || user.uid != uid) return;
+  if (user == null || user.uid != uid) {
+    throw StateError('Signed-in user required to update Auth profile fields.');
+  }
   final name = displayName?.trim();
   await Future.wait([
-    user.updateDisplayName(name?.isEmpty == true ? null : name),
+    user.updateDisplayName(name == null || name.isEmpty ? null : name),
     user.updatePhotoURL(photoUrl),
   ]);
 }

@@ -75,8 +75,9 @@ void main() {
     expect(find.text('Street address'), findsNothing);
     expect(find.text('Agency'), findsNothing);
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Sam Student');
-    await tester.enterText(find.byType(TextFormField).at(1), '88887777');
+    await tester.enterText(find.byType(TextFormField).at(0), 'Sam');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Student');
+    await tester.enterText(find.byType(TextFormField).at(2), '88887777');
     await tester.tap(find.text('Finish'));
     await tester.pump();
 
@@ -135,14 +136,15 @@ void main() {
     expect(find.text('Street address'), findsOneWidget);
     expect(find.textContaining('Every Benefits'), findsWidgets);
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'Alex Agent');
-    await tester.enterText(find.byType(TextFormField).at(1), '70001111');
-    await tester.enterText(find.byType(TextFormField).at(2), '998877');
-    await tester.enterText(find.byType(TextFormField).at(3), '100 Main St');
-    // apt optional at index 4
-    await tester.enterText(find.byType(TextFormField).at(5), 'Miami');
-    await tester.enterText(find.byType(TextFormField).at(6), 'FL');
-    await tester.enterText(find.byType(TextFormField).at(7), '33101');
+    await tester.enterText(find.byType(TextFormField).at(0), 'Alex');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Agent');
+    await tester.enterText(find.byType(TextFormField).at(2), '70001111');
+    await tester.enterText(find.byType(TextFormField).at(3), '998877');
+    await tester.enterText(find.byType(TextFormField).at(4), '100 Main St');
+    // apt optional at index 5
+    await tester.enterText(find.byType(TextFormField).at(6), 'Miami');
+    await tester.enterText(find.byType(TextFormField).at(7), 'FL');
+    await tester.enterText(find.byType(TextFormField).at(8), '33101');
     await tester.ensureVisible(find.text('Finish'));
     await tester.tap(find.text('Finish'));
     await tester.pump();

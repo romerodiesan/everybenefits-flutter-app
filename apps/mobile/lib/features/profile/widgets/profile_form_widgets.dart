@@ -134,7 +134,8 @@ class ProfileDetailsForm extends StatefulWidget {
 
 class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _name;
+  late final TextEditingController _givenName;
+  late final TextEditingController _familyName;
   late final TextEditingController _phone;
   late final TextEditingController _npn;
   late final TextEditingController _street;
@@ -153,7 +154,9 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   @override
   void initState() {
     super.initState();
-    _name = TextEditingController(text: widget.initialName ?? '');
+    final parts = splitDisplayName(widget.initialName ?? '');
+    _givenName = TextEditingController(text: parts.givenName);
+    _familyName = TextEditingController(text: parts.familyName);
     _phone = TextEditingController(text: widget.initialPhoneNumber ?? '');
     _npn = TextEditingController(text: widget.initialNpn ?? '');
     _street = TextEditingController(text: widget.initialAddressStreet ?? '');
@@ -173,7 +176,8 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
 
   @override
   void dispose() {
-    _name.dispose();
+    _givenName.dispose();
+    _familyName.dispose();
     _phone.dispose();
     _npn.dispose();
     _street.dispose();
@@ -187,10 +191,11 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    final displayName = widget.lockName
+        ? (widget.initialName ?? '').trim()
+        : composeDisplayName(_givenName.text, _familyName.text);
     await widget.onSubmit((
-      displayName: widget.lockName
-          ? (widget.initialName ?? '').trim()
-          : _name.text.trim(),
+      displayName: displayName,
       phoneCountryCode: _country.dialCode,
       phoneNumber: _phone.text.trim(),
       npn: _isAgent
@@ -238,19 +243,43 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
                   : '—',
               hint: l10n.editProfileNameFrozen,
             )
-          else
+          else ...[
             TextFormField(
-              controller: _name,
+              controller: _givenName,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
-              decoration: InputDecoration(labelText: l10n.fieldFullName),
+              decoration: InputDecoration(labelText: l10n.fieldGivenName),
               validator: (value) {
-                if (value == null || value.trim().length < 2) {
-                  return l10n.validationName;
+                final result = validateGivenName(value ?? '');
+                if (result.ok) return null;
+                if (result.issue == DisplayNameIssue.emailAsName) {
+                  return l10n.validationNameEmail;
                 }
-                return null;
+                if (result.issue == DisplayNameIssue.tooShort) {
+                  return l10n.validationNameShort;
+                }
+                return l10n.validationName;
               },
             ),
+            const SizedBox(height: AppSpacing.sm),
+            TextFormField(
+              controller: _familyName,
+              textCapitalization: TextCapitalization.words,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(labelText: l10n.fieldFamilyName),
+              validator: (value) {
+                final result = validateFamilyName(value ?? '');
+                if (result.ok) return null;
+                if (result.issue == DisplayNameIssue.needLastName) {
+                  return l10n.validationNameLast;
+                }
+                if (result.issue == DisplayNameIssue.tooShort) {
+                  return l10n.validationNameShort;
+                }
+                return l10n.validationName;
+              },
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

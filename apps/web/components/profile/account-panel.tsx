@@ -7,6 +7,13 @@ import {
   headlineName,
 } from "@/lib/display-name";
 import {
+  composeDisplayName,
+  normalizePersonName,
+  splitDisplayName,
+  validateFamilyName,
+  validateGivenName,
+} from "@/lib/roles";
+import {
   updateUserProfile,
   uploadAvatar,
 } from "@/lib/firebase/users";
@@ -26,7 +33,9 @@ import {
 export function AccountPanel() {
   const t = useTranslations();
   const { profile, refreshProfile } = useAuth();
-  const [displayName, setDisplayName] = useState(profile?.displayName ?? "");
+  const initialParts = splitDisplayName(profile?.displayName ?? "");
+  const [givenName, setGivenName] = useState(initialParts.givenName);
+  const [familyName, setFamilyName] = useState(initialParts.familyName);
   const [phoneCountryCode, setPhoneCountryCode] = useState(
     profile?.phoneCountryCode ?? "+1",
   );
@@ -45,6 +54,13 @@ export function AccountPanel() {
     return () => clearProfilePhoneRecaptcha();
   }, []);
 
+  useEffect(() => {
+    if (!profile?.displayName) return;
+    const parts = splitDisplayName(profile.displayName);
+    setGivenName(parts.givenName);
+    setFamilyName(parts.familyName);
+  }, [profile?.displayName]);
+
   if (!profile) return null;
 
   const phoneChanged =
@@ -58,11 +74,37 @@ export function AccountPanel() {
     setStatus(null);
     setError(null);
     try {
+      const given = validateGivenName(givenName);
+      if (!given.ok) {
+        setError(
+          given.issue === "email_as_name"
+            ? t("validationNameEmail")
+            : given.issue === "too_short"
+              ? t("validationNameShort")
+              : t("validationName"),
+        );
+        setBusy(false);
+        return;
+      }
+      const family = validateFamilyName(familyName);
+      if (!family.ok) {
+        setError(
+          family.issue === "need_last_name"
+            ? t("validationNameLast")
+            : family.issue === "too_short"
+              ? t("validationNameShort")
+              : t("validationName"),
+        );
+        setBusy(false);
+        return;
+      }
+      const nextDisplayName = composeDisplayName(given.value, family.value);
+
       if (phoneChanged) {
         const digits = phoneNumber.trim();
         if (!digits) {
           await updateUserProfile(profile, {
-            displayName: displayName.trim() || profile.displayName,
+            displayName: nextDisplayName,
             phoneCountryCode: phoneCountryCode.trim() || null,
             phoneNumber: null,
             phoneVerified: false,
@@ -77,7 +119,7 @@ export function AccountPanel() {
         } else {
           await confirmProfilePhone(verificationId, smsCode);
           await updateUserProfile(profile, {
-            displayName: displayName.trim() || profile.displayName,
+            displayName: nextDisplayName,
             phoneCountryCode: phoneCountryCode.trim() || null,
             phoneNumber: phoneNumber.trim() || null,
             phoneVerified: true,
@@ -87,7 +129,7 @@ export function AccountPanel() {
         }
       } else {
         await updateUserProfile(profile, {
-          displayName: displayName.trim() || profile.displayName,
+          displayName: nextDisplayName,
         });
       }
 
@@ -176,12 +218,27 @@ export function AccountPanel() {
       </div>
 
       <form onSubmit={onSave} className="mt-5 space-y-4">
-        <div className="max-w-sm">
-          <Label>{t("displayName")}</Label>
-          <Input
-            value={displayName}
-            onChange={(e) => setDisplayName(e.target.value)}
-          />
+        <div className="grid max-w-md gap-3 sm:grid-cols-2">
+          <div>
+            <Label>{t("givenName")}</Label>
+            <Input
+              value={givenName}
+              onChange={(e) => setGivenName(e.target.value)}
+              onBlur={() => setGivenName((v) => normalizePersonName(v))}
+              autoComplete="given-name"
+              required
+            />
+          </div>
+          <div>
+            <Label>{t("familyName")}</Label>
+            <Input
+              value={familyName}
+              onChange={(e) => setFamilyName(e.target.value)}
+              onBlur={() => setFamilyName((v) => normalizePersonName(v))}
+              autoComplete="family-name"
+              required
+            />
+          </div>
         </div>
         <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-[9.5rem_1fr]">
           <div>

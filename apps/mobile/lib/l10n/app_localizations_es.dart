@@ -478,7 +478,23 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fieldFullName => 'Nombre completo';
 
   @override
+  String get fieldGivenName => 'Nombre';
+
+  @override
+  String get fieldFamilyName => 'Apellido';
+
+  @override
   String get validationName => 'Ingresa tu nombre.';
+
+  @override
+  String get validationNameEmail => 'Usa tu nombre real, no tu correo.';
+
+  @override
+  String get validationNameLast => 'Incluye tu apellido.';
+
+  @override
+  String get validationNameShort =>
+      'Nombre y apellido necesitan al menos 2 letras (iniciales como A van bien).';
 
   @override
   String get countryCodePickerTitle => 'País / código';

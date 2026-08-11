@@ -6,6 +6,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.requiresLicenseProfile = requiresLicenseProfile;
 exports.looksLikeEmailName = looksLikeEmailName;
 exports.normalizePersonName = normalizePersonName;
+exports.splitDisplayName = splitDisplayName;
+exports.composeDisplayName = composeDisplayName;
+exports.nameSearchTokens = nameSearchTokens;
+exports.displayNameSearchFields = displayNameSearchFields;
+exports.validateGivenName = validateGivenName;
+exports.validateFamilyName = validateFamilyName;
 exports.validateDisplayName = validateDisplayName;
 exports.validateNpn = validateNpn;
 exports.validateUsState = validateUsState;
@@ -18,6 +24,7 @@ exports.composeUsAddress = composeUsAddress;
 const permissions_1 = require("./permissions");
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 const NPN_DIGITS = /^\d{7,9}$/;
+const NAME_LETTERS = /[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g;
 /** True when license profile fields are required for this role/permission set. */
 function requiresLicenseProfile(roleOrPermissions) {
     return (0, permissions_1.hasPermission)((0, permissions_1.resolvePermissionSet)(roleOrPermissions), "license.profile.required");
@@ -25,6 +32,9 @@ function requiresLicenseProfile(roleOrPermissions) {
 /** True when the string looks like an email used as a display name. */
 function looksLikeEmailName(value) {
     return EMAIL_LIKE.test(value.trim());
+}
+function letterCount(part) {
+    return part.replace(NAME_LETTERS, "").length;
 }
 /**
  * Title-cases a person name when it is ALL CAPS or all lowercase.
@@ -34,7 +44,7 @@ function normalizePersonName(raw) {
     const trimmed = raw.trim().replace(/\s+/g, " ");
     if (!trimmed)
         return "";
-    const letters = trimmed.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, "");
+    const letters = trimmed.replace(NAME_LETTERS, "");
     if (!letters)
         return trimmed;
     const allUpper = letters === letters.toUpperCase();
@@ -51,19 +61,87 @@ function normalizePersonName(raw) {
     })
         .join(" ");
 }
-function validateDisplayName(raw) {
+/** Last token is family name; everything before is given name (allows middle initials). */
+function splitDisplayName(raw) {
+    const value = normalizePersonName(raw);
+    const parts = value.split(" ").filter(Boolean);
+    if (parts.length === 0)
+        return { givenName: "", familyName: "" };
+    if (parts.length === 1)
+        return { givenName: parts[0], familyName: "" };
+    return {
+        givenName: parts.slice(0, -1).join(" "),
+        familyName: parts[parts.length - 1],
+    };
+}
+function composeDisplayName(givenName, familyName) {
+    return normalizePersonName([givenName.trim(), familyName.trim()].filter(Boolean).join(" "));
+}
+/** Lowercased name tokens for Firestore `array-contains` directory search. */
+function nameSearchTokens(displayName) {
+    const parts = String(displayName ?? "")
+        .trim()
+        .toLowerCase()
+        .split(/\s+/)
+        .map((part) => part.replace(/[^a-z0-9áéíóúüñ]/gi, ""))
+        .filter((part) => part.length >= 1);
+    return [...new Set(parts)];
+}
+/** Fields to keep in sync whenever displayName changes. */
+function displayNameSearchFields(displayName) {
+    const trimmed = typeof displayName === "string" ? displayName.trim() || null : null;
+    return {
+        displayName: trimmed,
+        displayNameLower: trimmed?.toLowerCase() || null,
+        nameTokens: nameSearchTokens(trimmed),
+    };
+}
+function validateGivenName(raw) {
     const value = normalizePersonName(raw);
     if (!value)
         return { ok: false, issue: "empty" };
     if (looksLikeEmailName(value))
         return { ok: false, issue: "email_as_name" };
     const parts = value.split(" ").filter(Boolean);
-    if (parts.length < 2)
+    // First token needs 2+ letters; later tokens may be middle initials (e.g. "A").
+    if (letterCount(parts[0]) < 2)
+        return { ok: false, issue: "too_short" };
+    for (const part of parts.slice(1)) {
+        if (letterCount(part) < 1)
+            return { ok: false, issue: "too_short" };
+    }
+    return { ok: true, value };
+}
+function validateFamilyName(raw) {
+    const value = normalizePersonName(raw);
+    if (!value)
         return { ok: false, issue: "need_last_name" };
-    if (parts.some((p) => p.replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/g, "").length < 2)) {
+    const parts = value.split(" ").filter(Boolean);
+    if (parts.some((part) => letterCount(part) < 2)) {
         return { ok: false, issue: "too_short" };
     }
     return { ok: true, value };
+}
+function validateDisplayName(raw) {
+    const normalized = normalizePersonName(raw);
+    if (!normalized)
+        return { ok: false, issue: "empty" };
+    if (looksLikeEmailName(normalized)) {
+        return { ok: false, issue: "email_as_name" };
+    }
+    const { givenName, familyName } = splitDisplayName(normalized);
+    if (!familyName)
+        return { ok: false, issue: "need_last_name" };
+    const given = validateGivenName(givenName);
+    if (!given.ok)
+        return given;
+    const family = validateFamilyName(familyName);
+    if (!family.ok)
+        return family;
+    return {
+        ok: true,
+        value: composeDisplayName(given.value, family.value),
+    };
 }
 function validateNpn(raw) {
     const digits = String(raw ?? "").replace(/\D/g, "");

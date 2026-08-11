@@ -38,13 +38,12 @@ export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
   const isAnonymous = isAnonymousUser(user);
   const email = user.email ?? null;
   const displayName = user.displayName ?? null;
+  const { displayNameSearchFields } = await import("@pulse/shared");
   const payload = {
     uid: user.uid,
     email,
     emailLower: typeof email === "string" ? email.toLowerCase() : null,
-    displayName,
-    displayNameLower:
-      typeof displayName === "string" ? displayName.trim().toLowerCase() || null : null,
+    ...displayNameSearchFields(displayName),
     photoUrl: user.photoURL ?? null,
     role: isAnonymous ? "guest" : "student",
     isAnonymous,

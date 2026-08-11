@@ -20,6 +20,12 @@ import {
   readLoginNext,
   resolvePostAuthDestination,
 } from "@/lib/auth-redirect";
+import {
+  composeDisplayName,
+  normalizePersonName,
+  validateFamilyName,
+  validateGivenName,
+} from "@/lib/roles";
 import type { MultiFactorResolver } from "firebase/auth";
 import { useSearchParams } from "next/navigation";
 
@@ -30,7 +36,8 @@ export function RegisterForm() {
   const router = useRouter();
   const { user, profile, loading, profileLoading, refreshProfile } = useAuth();
   const params = useSearchParams();
-  const [displayName, setDisplayName] = useState("");
+  const [givenName, setGivenName] = useState("");
+  const [familyName, setFamilyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
@@ -69,6 +76,29 @@ export function RegisterForm() {
       setError(t("setPasswordMismatch"));
       return;
     }
+    const given = validateGivenName(givenName);
+    if (!given.ok) {
+      setError(
+        given.issue === "email_as_name"
+          ? t("validationNameEmail")
+          : given.issue === "too_short"
+            ? t("validationNameShort")
+            : t("validationName"),
+      );
+      return;
+    }
+    const family = validateFamilyName(familyName);
+    if (!family.ok) {
+      setError(
+        family.issue === "need_last_name"
+          ? t("validationNameLast")
+          : family.issue === "too_short"
+            ? t("validationNameShort")
+            : t("validationName"),
+      );
+      return;
+    }
+    const displayName = composeDisplayName(given.value, family.value);
     setBusy(true);
     setError(null);
     try {
@@ -128,13 +158,29 @@ export function RegisterForm() {
         <p className="mt-2 text-muted">{t("registerSubtitle")}</p>
 
         <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-          <div>
-            <Label>{t("displayName")}</Label>
-            <Input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              required
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>{t("givenName")}</Label>
+              <Input
+                value={givenName}
+                onChange={(e) => setGivenName(e.target.value)}
+                onBlur={() => setGivenName((v) => normalizePersonName(v))}
+                placeholder={t("givenNamePlaceholder")}
+                autoComplete="given-name"
+                required
+              />
+            </div>
+            <div>
+              <Label>{t("familyName")}</Label>
+              <Input
+                value={familyName}
+                onChange={(e) => setFamilyName(e.target.value)}
+                onBlur={() => setFamilyName((v) => normalizePersonName(v))}
+                placeholder={t("familyNamePlaceholder")}
+                autoComplete="family-name"
+                required
+              />
+            </div>
           </div>
           <div>
             <Label>{t("email")}</Label>

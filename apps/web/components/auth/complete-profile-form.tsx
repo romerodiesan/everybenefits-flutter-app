@@ -13,10 +13,13 @@ import { updateUserProfile } from "@/lib/firebase/users";
 import { validateUsAddress } from "@/lib/firebase/address";
 import { type UserRole } from "@/lib/types";
 import {
+  composeDisplayName,
   needsProfileCompletion,
   normalizePersonName,
   requiresLicenseProfile,
-  validateDisplayName,
+  splitDisplayName,
+  validateFamilyName,
+  validateGivenName,
   validateNpn,
   validateUsState,
   validateUsZip,
@@ -29,7 +32,8 @@ export function CompleteProfileForm() {
   const params = useSearchParams();
   const { user, profile, loading, profileLoading, refreshProfile } = useAuth();
   const [role, setRole] = useState<"student" | "agent">("student");
-  const [displayName, setDisplayName] = useState("");
+  const [givenName, setGivenName] = useState("");
+  const [familyName, setFamilyName] = useState("");
   const [npn, setNpn] = useState("");
   const [agency, setAgency] = useState("");
   const [street, setStreet] = useState("");
@@ -74,7 +78,9 @@ export function CompleteProfileForm() {
     }
     startTransition(() => {
       if (profile.displayName) {
-        setDisplayName(normalizePersonName(profile.displayName));
+        const parts = splitDisplayName(profile.displayName);
+        setGivenName(parts.givenName);
+        setFamilyName(parts.familyName);
       }
       if (profile.role === "agent") setRole("agent");
       if (profile.npn) setNpn(profile.npn);
@@ -100,11 +106,17 @@ export function CompleteProfileForm() {
     setBusy(true);
     setError(null);
     try {
-      const name = validateDisplayName(displayName);
-      if (!name.ok) {
-        setError(nameErrorMessage(name.issue));
+      const given = validateGivenName(givenName);
+      if (!given.ok) {
+        setError(nameErrorMessage(given.issue));
         return;
       }
+      const family = validateFamilyName(familyName);
+      if (!family.ok) {
+        setError(nameErrorMessage(family.issue));
+        return;
+      }
+      const displayName = composeDisplayName(given.value, family.value);
 
       let nextNpn: string | null = null;
       let nextStreet: string | null = null;
@@ -170,7 +182,7 @@ export function CompleteProfileForm() {
 
       const nextRole: UserRole = lockedRole ?? role;
       await updateUserProfile(profile, {
-        displayName: name.value,
+        displayName,
         role: nextRole,
         profileCompleted: true,
         npn: nextNpn,
@@ -210,15 +222,29 @@ export function CompleteProfileForm() {
         <p className="mt-2 text-sm text-muted">{t("completeProfileNameHint")}</p>
 
         <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-          <div>
-            <Label>{t("displayName")}</Label>
-            <Input
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              onBlur={() => setDisplayName((v) => normalizePersonName(v))}
-              placeholder={t("displayNamePlaceholder")}
-              required
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <Label>{t("givenName")}</Label>
+              <Input
+                value={givenName}
+                onChange={(e) => setGivenName(e.target.value)}
+                onBlur={() => setGivenName((v) => normalizePersonName(v))}
+                placeholder={t("givenNamePlaceholder")}
+                autoComplete="given-name"
+                required
+              />
+            </div>
+            <div>
+              <Label>{t("familyName")}</Label>
+              <Input
+                value={familyName}
+                onChange={(e) => setFamilyName(e.target.value)}
+                onBlur={() => setFamilyName((v) => normalizePersonName(v))}
+                placeholder={t("familyNamePlaceholder")}
+                autoComplete="family-name"
+                required
+              />
+            </div>
           </div>
 
           {canPickRole && (

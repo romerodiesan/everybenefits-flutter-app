@@ -14,6 +14,7 @@ import {
 } from "firebase/storage";
 import { updateProfile, type User } from "firebase/auth";
 import { mapUserProfile, toDate } from "@pulse/firebase-web";
+import { displayNameSearchFields } from "@pulse/shared";
 import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
 import { listPublicProfiles, searchDirectory as searchDirectoryFn } from "./functions";
 import type { UserProfile } from "../types";
@@ -62,7 +63,25 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   const refDoc = doc(getFirebaseDb(), "users", user.uid);
   const snap = await getDoc(refDoc);
   if (snap.exists()) {
-    return profileFromData(user.uid, snap.data() as Record<string, unknown>);
+    const data = snap.data() as Record<string, unknown>;
+    const profile = profileFromData(user.uid, data);
+    const search = displayNameSearchFields(profile.displayName);
+    const emailLower = profile.email?.toLowerCase() ?? null;
+    const tokens = Array.isArray(data.nameTokens)
+      ? data.nameTokens.map(String)
+      : [];
+    const needsSearchBackfill =
+      data.displayNameLower !== search.displayNameLower ||
+      data.emailLower !== emailLower ||
+      JSON.stringify(tokens) !== JSON.stringify(search.nameTokens);
+    if (needsSearchBackfill) {
+      await updateDoc(refDoc, {
+        ...search,
+        emailLower,
+        updatedAt: serverTimestamp(),
+      });
+    }
+    return profile;
   }
 
   const isAnonymous = user.isAnonymous;
@@ -94,7 +113,8 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   await setDoc(refDoc, {
     uid: profile.uid,
     email: profile.email,
-    displayName: profile.displayName,
+    emailLower: profile.email?.toLowerCase() ?? null,
+    ...displayNameSearchFields(profile.displayName),
     photoUrl: profile.photoUrl,
     role: profile.role,
     isAnonymous: profile.isAnonymous,
@@ -181,6 +201,13 @@ export async function updateUserProfile(
       data[key] = Number(value ?? 0);
     } else if (key === "phoneVerified") {
       data[key] = Boolean(value);
+    } else if (key === "displayName") {
+      const fields = displayNameSearchFields(
+        typeof value === "string" ? value : null,
+      );
+      data.displayName = fields.displayName;
+      data.displayNameLower = fields.displayNameLower;
+      data.nameTokens = fields.nameTokens;
     } else {
       data[key] = value;
     }
@@ -199,20 +226,36 @@ export async function updateUserProfile(
       }) ?? next.address;
   }
 
-  await updateDoc(doc(getFirebaseDb(), "users", profile.uid), data);
-
-  // Keep Firebase Auth in sync for fields that also live on the Auth user.
-  if ("displayName" in patch || "photoUrl" in patch) {
-    const authUser = getFirebaseAuth().currentUser;
-    if (authUser && authUser.uid === profile.uid) {
-      await updateProfile(authUser, {
-        ...("displayName" in patch
-          ? { displayName: patch.displayName?.trim() || null }
-          : {}),
-        ...("photoUrl" in patch ? { photoURL: patch.photoUrl || null } : {}),
-      });
-    }
+  const authUser = getFirebaseAuth().currentUser;
+  if (
+    ("displayName" in patch || "photoUrl" in patch) &&
+    (!authUser || authUser.uid !== profile.uid)
+  ) {
+    throw new Error("Signed-in user required to update Auth profile fields.");
   }
+
+  // Keep Firebase Auth + Firestore users/{uid} in lockstep for identity fields.
+  const authPatch =
+    authUser && ("displayName" in patch || "photoUrl" in patch)
+      ? updateProfile(authUser, {
+          ...("displayName" in patch
+            ? {
+                displayName:
+                  typeof patch.displayName === "string"
+                    ? patch.displayName.trim() || null
+                    : null,
+              }
+            : {}),
+          ...("photoUrl" in patch
+            ? { photoURL: patch.photoUrl || null }
+            : {}),
+        })
+      : Promise.resolve();
+
+  await Promise.all([
+    updateDoc(doc(getFirebaseDb(), "users", profile.uid), data),
+    authPatch,
+  ]);
 }
 
 export async function uploadAvatar(uid: string, file: File): Promise<string> {

@@ -10,7 +10,35 @@ export declare function looksLikeEmailName(value: string): boolean;
  * Leaves mixed-case names alone (preserves intentional casing like McDonald).
  */
 export declare function normalizePersonName(raw: string): string;
+/** Last token is family name; everything before is given name (allows middle initials). */
+export declare function splitDisplayName(raw: string): {
+    givenName: string;
+    familyName: string;
+};
+export declare function composeDisplayName(givenName: string, familyName: string): string;
+/** Lowercased name tokens for Firestore `array-contains` directory search. */
+export declare function nameSearchTokens(displayName: string | null | undefined): string[];
+/** Fields to keep in sync whenever displayName changes. */
+export declare function displayNameSearchFields(displayName: string | null | undefined): {
+    displayName: string | null;
+    displayNameLower: string | null;
+    nameTokens: string[];
+};
 export type DisplayNameIssue = "empty" | "too_short" | "need_last_name" | "email_as_name";
+export declare function validateGivenName(raw: string): {
+    ok: true;
+    value: string;
+} | {
+    ok: false;
+    issue: DisplayNameIssue;
+};
+export declare function validateFamilyName(raw: string): {
+    ok: true;
+    value: string;
+} | {
+    ok: false;
+    issue: DisplayNameIssue;
+};
 export declare function validateDisplayName(raw: string): {
     ok: true;
     value: string;
