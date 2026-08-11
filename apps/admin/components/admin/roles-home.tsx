@@ -30,7 +30,7 @@ import {
 } from "@/lib/hooks/use-admin-queries";
 
 const FILTER_SELECT_CLASS =
-  "h-10 w-full min-w-[9.5rem] rounded-xl border border-glass-border bg-transparent px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15";
+  "h-8 w-full min-w-[9.5rem] rounded-lg border border-glass-border bg-transparent px-2.5 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15";
 
 function FilterField({
   label,
@@ -270,12 +270,12 @@ export function RolesHome() {
         </div>
         <div className="flex flex-wrap gap-2">
           {canMutateCustom ? (
-            <Button variant="secondary" disabled={rowBusy === "__seed__"} onClick={() => void onSeed()}>
+            <Button size="sm" variant="secondary" disabled={rowBusy === "__seed__"} onClick={() => void onSeed()}>
               {t("rolesSeed")}
             </Button>
           ) : null}
           {canMutateCustom ? (
-            <Button onClick={openCreate}>{t("rolesCreate")}</Button>
+            <Button size="sm" onClick={openCreate}>{t("rolesCreate")}</Button>
           ) : null}
         </div>
       </header>
@@ -283,6 +283,7 @@ export function RolesHome() {
       <div className="grid gap-3 sm:grid-cols-3">
         <FilterField label={t("usersSearchLabel")} className="sm:col-span-1">
           <SearchInput
+            size="sm"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("rolesSearch")}
@@ -305,7 +306,7 @@ export function RolesHome() {
           </select>
         </FilterField>
         <FilterField label={t("rolesActive")}>
-          <label className="flex h-10 items-center gap-2 text-sm">
+          <label className="flex h-8 items-center gap-2 text-xs">
             <input
               type="checkbox"
               checked={includeInactive}

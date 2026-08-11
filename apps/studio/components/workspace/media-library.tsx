@@ -110,7 +110,7 @@ export function MediaLibrary({
       >
         <header className="flex items-center justify-between gap-3 border-b border-glass-border px-4 py-3">
           <h2 className="font-display text-lg">{t("mediaTitle")}</h2>
-          <Button variant="ghost" className="h-9 px-3 text-xs" onClick={onClose}>
+          <Button variant="ghost" size="sm" onClick={onClose}>
             {t("actionCancel")}
           </Button>
         </header>
@@ -134,7 +134,8 @@ export function MediaLibrary({
                       </div>
                       <Button
                         variant="secondary"
-                        className="h-8 shrink-0 px-2.5 text-[11px]"
+                        size="sm"
+                        className="shrink-0"
                         disabled={!url}
                         onClick={() => url && void copy(item.id, url)}
                       >

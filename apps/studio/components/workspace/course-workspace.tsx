@@ -452,7 +452,7 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
         <div className="flex max-w-full flex-wrap items-center gap-2">
           <Button
             variant="ghost"
-            className="h-9 px-3 text-xs"
+            size="sm"
             onClick={() => {
               setExpandQueue(true);
             }}
@@ -462,28 +462,28 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
           </Button>
           <Button
             variant="ghost"
-            className="h-9 px-3 text-xs"
+            size="sm"
             onClick={() => setSettingsOpen(true)}
           >
             {t("workspaceSettings")}
           </Button>
           <Button
             variant="ghost"
-            className="h-9 px-3 text-xs"
+            size="sm"
             onClick={() => setMediaOpen(true)}
           >
             {t("actionMedia")}
           </Button>
           <Button
             variant="secondary"
-            className="h-9 px-3 text-xs"
+            size="sm"
             onClick={() => setPreviewOpen(true)}
           >
             {t("actionPreview")}
           </Button>
           {course.status === "draft" && !isAdmin ? (
             <Button
-              className="h-9 px-3 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void changeStatus("pending")}
             >
@@ -492,7 +492,7 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
           ) : null}
           {isAdmin && course.status !== "published" ? (
             <Button
-              className="h-9 px-3 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void changeStatus("published")}
             >
@@ -502,7 +502,7 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
           {isAdmin && course.status === "pending" ? (
             <Button
               variant="secondary"
-              className="h-9 px-3 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void changeStatus("draft")}
             >
@@ -512,7 +512,7 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
           {isAdmin && course.status === "published" ? (
             <Button
               variant="secondary"
-              className="h-9 px-3 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void changeStatus("draft")}
             >
@@ -521,7 +521,7 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
           ) : null}
           <Button
             variant="danger"
-            className="h-9 px-3 text-xs"
+            size="sm"
             disabled={busy}
             onClick={() => void removeCourse()}
           >
@@ -608,6 +608,7 @@ function CourseWorkspaceInner({ courseId }: { courseId: string }) {
                 {editable && activeModuleId ? (
                   <Button
                     variant="secondary"
+                    size="sm"
                     onClick={() => void addLesson(activeModuleId)}
                   >
                     {t("workspaceAddLesson")}
@@ -753,6 +754,7 @@ function LessonTitleEditor({
       <div className="min-w-[200px] flex-1">
         <Label>{typeLabel(lesson.type)}</Label>
         <Input
+          size="sm"
           value={draft}
           disabled={!editable}
           onChange={(event) => setDraft(event.target.value)}
@@ -769,7 +771,7 @@ function LessonTitleEditor({
             setType(next);
             void persist(draft, next, instructorId);
           }}
-          className="h-10 rounded-xl border border-glass-border bg-sheet px-3 text-sm disabled:opacity-50"
+          className="h-8 rounded-lg border border-glass-border bg-sheet px-2.5 text-xs disabled:opacity-50"
         >
           {LESSON_TYPES.map((option) => (
             <option key={option} value={option}>
@@ -788,7 +790,7 @@ function LessonTitleEditor({
             setInstructorId(next);
             void persist(draft, type, next);
           }}
-          className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm disabled:opacity-50"
+          className="h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs disabled:opacity-50"
         >
           <option value="">{t("instructorNone")}</option>
           {lessonInstructorChoices.map((option) => (
@@ -1215,6 +1217,7 @@ function InspectorPane({
         <div>
           <Label>{t("fieldTitle")}</Label>
           <Input
+            size="sm"
             value={title}
             disabled={!editable}
             onChange={(event) => onTitle(event.target.value)}
@@ -1234,7 +1237,7 @@ function InspectorPane({
             value={level}
             disabled={!editable}
             onChange={(event) => onLevel(event.target.value as CourseLevel)}
-            className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm disabled:opacity-50"
+            className="h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs disabled:opacity-50"
           >
             {COURSE_LEVELS.map((option) => (
               <option key={option} value={option}>

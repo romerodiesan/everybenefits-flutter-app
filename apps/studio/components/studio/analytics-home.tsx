@@ -400,6 +400,7 @@ function AnalyticsLanding({
               <label className="flex min-w-[12rem] flex-1 flex-col gap-1 text-[11px] font-medium text-muted">
                 {t("librarySearch")}
                 <Input
+                  size="sm"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   placeholder={t("analyticsSearchHint")}

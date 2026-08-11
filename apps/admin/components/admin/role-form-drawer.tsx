@@ -234,11 +234,15 @@ export function RoleFormDrawer({
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" disabled={busy} onClick={onClose}>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
             {t("orgCancel")}
           </Button>
           {canEdit ? (
-            <Button disabled={busy} onClick={() => void onSubmit(values)}>
+            <Button
+              size="sm"
+              disabled={busy}
+              onClick={() => void onSubmit(values)}
+            >
               {busy ? t("loading") : t("usersSave")}
             </Button>
           ) : null}
@@ -260,6 +264,7 @@ export function RoleFormDrawer({
           <div>
             <Label>{t("rolesSlug")}</Label>
             <Input
+              size="sm"
               value={values.id}
               disabled={readOnly}
               onChange={(e) =>
@@ -275,12 +280,13 @@ export function RoleFormDrawer({
         ) : (
           <div>
             <Label>{t("rolesSlug")}</Label>
-            <Input value={values.id} disabled />
+            <Input size="sm" value={values.id} disabled />
           </div>
         )}
         <div>
           <Label>{t("colName")}</Label>
           <Input
+            size="sm"
             value={values.name}
             disabled={readOnly}
             onChange={(e) =>
@@ -291,6 +297,7 @@ export function RoleFormDrawer({
         <div>
           <Label>{t("rolesDescription")}</Label>
           <Input
+            size="sm"
             value={values.description}
             disabled={readOnly}
             onChange={(e) =>
@@ -301,7 +308,7 @@ export function RoleFormDrawer({
         <div>
           <Label>{t("rolesCategory")}</Label>
           <select
-            className="h-10 w-full rounded-xl border border-glass-border bg-transparent px-3 text-sm"
+            className="h-8 w-full rounded-lg border border-glass-border bg-transparent px-2.5 text-xs"
             value={values.category}
             disabled={readOnly}
             onChange={(e) =>

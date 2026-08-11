@@ -165,7 +165,7 @@ export default function ParticipantsPage() {
         <label className="block text-sm">
           <span className="text-muted">{t("type")}</span>
           <select
-            className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
             value={type}
             onChange={(e) => {
               setType(e.target.value as ParticipantType);
@@ -184,7 +184,7 @@ export default function ParticipantsPage() {
           <label className="block text-sm">
             <span className="text-muted">{t("participantsLinkAgency")}</span>
             <select
-              className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+              className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
               value={agencyId}
               onChange={(e) => setAgencyId(e.target.value)}
               required
@@ -203,7 +203,7 @@ export default function ParticipantsPage() {
           <div className="block text-sm">
             <span className="text-muted">{t("participantsLinkAgent")}</span>
             {selectedUser ? (
-              <div className="mt-1 flex items-center justify-between gap-2 rounded-xl border border-glass-border bg-sheet px-3 py-2">
+              <div className="mt-1 flex h-8 items-center justify-between gap-2 rounded-lg border border-glass-border bg-sheet px-2.5 text-xs">
                 <span className="truncate">
                   {selectedUser.displayName?.trim() ||
                     selectedUser.email ||
@@ -220,7 +220,7 @@ export default function ParticipantsPage() {
             ) : (
               <>
                 <input
-                  className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+                  className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
                   value={userQuery}
                   onChange={(e) => setUserQuery(e.target.value)}
                   placeholder={t("participantsSearchAgents")}
@@ -259,7 +259,7 @@ export default function ParticipantsPage() {
         )}
 
         <div className="sm:col-span-2">
-          <Button type="submit" disabled={busy || !canSubmit}>
+          <Button type="submit" size="sm" disabled={busy || !canSubmit}>
             {t("create")}
           </Button>
         </div>

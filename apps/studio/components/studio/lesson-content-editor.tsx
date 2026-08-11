@@ -136,7 +136,8 @@ function VideoEditor({
             <Button
               type="button"
               variant="danger"
-              className="h-9 shrink-0 px-3 text-xs"
+              size="sm"
+              className="shrink-0"
               disabled={removing || Boolean(activeJob)}
               onClick={() => void removeVideo()}
             >
@@ -264,7 +265,7 @@ function ReadingEditor({
       <div className="mt-2 flex flex-wrap items-center gap-3">
         <Button
           variant="secondary"
-          className="h-9 px-3 text-xs"
+          size="sm"
           onClick={() => void save()}
           disabled={saving}
         >
@@ -468,17 +469,17 @@ function QuizEditor({
             type="number"
             min={0}
             max={100}
+            size="sm"
             value={passPercent}
             onChange={(event) => {
               setSaved(false);
               setPassPercent(Number(event.target.value));
             }}
-            className="h-9"
           />
         </div>
         <Button
           variant="secondary"
-          className="h-9 px-3 text-xs"
+          size="sm"
           onClick={addQuestion}
         >
           {t("studioQuizAddQuestion")}
@@ -500,6 +501,7 @@ function QuizEditor({
                 </span>
                 <div className="min-w-0 flex-1">
                   <Input
+                    size="sm"
                     value={question.prompt}
                     onChange={(event) =>
                       update(index, { prompt: event.target.value })
@@ -513,7 +515,7 @@ function QuizEditor({
                     onChange={(event) =>
                       setMode(index, event.target.value as QuizSelectionMode)
                     }
-                    className="h-10 min-w-0 flex-1 rounded-xl border border-glass-border bg-sheet px-2 text-xs text-ink outline-none focus:border-brand sm:flex-none"
+                    className="h-8 min-w-0 flex-1 rounded-lg border border-glass-border bg-sheet px-2.5 text-xs text-ink outline-none focus:border-brand sm:flex-none"
                   >
                     <option value="single">{t("quizPickOne")}</option>
                     <option value="multi">{t("quizPickMany")}</option>
@@ -523,7 +525,7 @@ function QuizEditor({
                     onClick={() => removeQuestion(index)}
                     title={t("studioDelete")}
                     aria-label={t("studioDelete")}
-                    className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-sm text-muted transition hover:bg-ink/[0.05] hover:text-ink dark:hover:bg-white/[0.06]"
+                    className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-sm text-muted transition hover:bg-ink/[0.05] hover:text-ink dark:hover:bg-white/[0.06]"
                   >
                     ✕
                   </button>
@@ -544,6 +546,7 @@ function QuizEditor({
                       className="h-4 w-4 shrink-0 accent-[var(--brand)]"
                     />
                     <Input
+                      size="sm"
                       value={option}
                       onChange={(event) =>
                         setOption(index, optionIndex, event.target.value)
@@ -551,7 +554,6 @@ function QuizEditor({
                       placeholder={t("studioQuizOption", {
                         index: optionIndex + 1,
                       })}
-                      className="h-9"
                     />
                     <button
                       type="button"
@@ -559,7 +561,7 @@ function QuizEditor({
                       disabled={question.options.length <= MIN_OPTIONS}
                       title={t("studioDelete")}
                       aria-label={t("studioDelete")}
-                      className="flex h-9 w-8 shrink-0 items-center justify-center rounded-lg text-xs text-muted transition hover:text-ink disabled:opacity-30"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs text-muted transition hover:text-ink disabled:opacity-30"
                     >
                       ✕
                     </button>
@@ -584,7 +586,7 @@ function QuizEditor({
       <div className="mt-3 flex flex-wrap items-center gap-3">
         <Button
           variant="secondary"
-          className="h-9 px-3 text-xs"
+          size="sm"
           onClick={() => void save()}
           disabled={saving}
         >

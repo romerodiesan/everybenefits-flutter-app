@@ -386,6 +386,7 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                 <div>
                   <Label>{t("threadEditTitle")}</Label>
                   <Input
+                    size="sm"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
                     required
@@ -406,12 +407,13 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                   <Button
                     type="button"
                     variant="ghost"
+                    size="sm"
                     onClick={() => setEditingThread(false)}
                     disabled={busy}
                   >
                     {t("threadCancel")}
                   </Button>
-                  <Button type="submit" disabled={busy}>
+                  <Button type="submit" size="sm" disabled={busy}>
                     {t("threadSave")}
                   </Button>
                 </div>
@@ -557,6 +559,7 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                             <Button
                               type="button"
                               variant="ghost"
+                              size="sm"
                               onClick={() => {
                                 setEditingReplyId(null);
                                 setEditReplyBody("");
@@ -565,7 +568,7 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                             >
                               {t("threadCancel")}
                             </Button>
-                            <Button type="submit" disabled={busy}>
+                            <Button type="submit" size="sm" disabled={busy}>
                               {t("threadSave")}
                             </Button>
                           </div>

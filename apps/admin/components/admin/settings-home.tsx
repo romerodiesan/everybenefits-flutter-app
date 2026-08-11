@@ -125,6 +125,7 @@ export function SettingsHome() {
         <div className="flex flex-wrap items-center gap-3">
           <Button
             type="button"
+            size="sm"
             disabled={busy}
             onClick={() => void runSearchBackfill()}
           >
@@ -142,6 +143,7 @@ export function SettingsHome() {
         <p className="text-sm text-muted">{t("settingsSeedRolesBody")}</p>
         <Button
           type="button"
+          size="sm"
           disabled={busy}
           onClick={() => void runSeedRoles()}
         >
@@ -158,6 +160,7 @@ export function SettingsHome() {
         </p>
         <Button
           type="button"
+          size="sm"
           disabled={busy}
           onClick={() => void runMigrateSubAgencies()}
         >

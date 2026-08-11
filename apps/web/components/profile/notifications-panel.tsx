@@ -209,6 +209,7 @@ export function NotificationsPanel({ uid }: { uid: string }) {
                 </div>
                 <Button
                   variant="secondary"
+                  size="sm"
                   className="w-fit shrink-0"
                   disabled={pushBusy}
                   onClick={() => void enablePush()}

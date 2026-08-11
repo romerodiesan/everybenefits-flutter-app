@@ -139,7 +139,11 @@ export function ConversationPane({
     return (
       <div className="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 p-6">
         <p className="text-sm text-red-400">{paneError}</p>
-        <Button variant="secondary" onClick={() => router.push("/chats")}>
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => router.push("/chats")}
+        >
           {t("navChats")}
         </Button>
       </div>
@@ -195,6 +199,7 @@ export function ConversationPane({
             <>
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={async () => {
                   try {
                     await setPinned(chatId, profile.uid, !pinned);
@@ -207,6 +212,7 @@ export function ConversationPane({
               </Button>
               <Button
                 variant="ghost"
+                size="sm"
                 onClick={async () => {
                   try {
                     await hideChatForMe(chatId, profile.uid);

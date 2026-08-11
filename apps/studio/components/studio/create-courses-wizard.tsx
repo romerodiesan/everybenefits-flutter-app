@@ -208,7 +208,7 @@ export function CreateCoursesWizard({
               <div>
                 <Label>{t("fieldLevel")}</Label>
                 <select
-                  className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm"
+                  className="h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
                   value={level}
                   onChange={(e) => setLevel(e.target.value as CourseLevel)}
                 >
@@ -222,7 +222,7 @@ export function CreateCoursesWizard({
               <div>
                 <Label>{t("fieldPath")}</Label>
                 <select
-                  className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm"
+                  className="h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
                   value={pathChoice}
                   onChange={(e) =>
                     setPathChoice(e.target.value as PathChoice)
@@ -241,6 +241,7 @@ export function CreateCoursesWizard({
                 <div>
                   <Label>{t("fieldPathTitle")}</Label>
                   <Input
+                    size="sm"
                     value={pathTitle}
                     onChange={(e) => setPathTitle(e.target.value)}
                   />
@@ -256,6 +257,7 @@ export function CreateCoursesWizard({
                 {titles.map((row, index) => (
                   <li key={index} className="flex gap-2">
                     <Input
+                      size="sm"
                       value={row}
                       placeholder={`${t("fieldTitle")} ${index + 1}`}
                       onChange={(e) =>
@@ -269,6 +271,7 @@ export function CreateCoursesWizard({
                     {titles.length > 1 ? (
                       <Button
                         type="button"
+                        size="sm"
                         variant="ghost"
                         className="shrink-0 px-3"
                         onClick={() =>
@@ -285,6 +288,7 @@ export function CreateCoursesWizard({
               </ul>
               <Button
                 type="button"
+                size="sm"
                 variant="secondary"
                 onClick={() => setTitles((prev) => [...prev, ""])}
               >
@@ -299,6 +303,7 @@ export function CreateCoursesWizard({
                 />
                 <Button
                   type="button"
+                  size="sm"
                   variant="ghost"
                   className="mt-2"
                   disabled={!pasteBuffer.trim()}
@@ -366,6 +371,7 @@ export function CreateCoursesWizard({
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-glass-border px-5 py-3">
           <Button
             type="button"
+            size="sm"
             variant="ghost"
             disabled={busy || step === "defaults"}
             onClick={() =>
@@ -381,17 +387,19 @@ export function CreateCoursesWizard({
             {t("wizardBack")}
           </Button>
           <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={busy}
-                onClick={onClose}
-              >
-                {t("actionCancel")}
-              </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={busy}
+              onClick={onClose}
+            >
+              {t("actionCancel")}
+            </Button>
             {step === "defaults" ? (
               <Button
                 type="button"
+                size="sm"
                 disabled={!defaultsReady}
                 onClick={() => setStep("titles")}
               >
@@ -401,6 +409,7 @@ export function CreateCoursesWizard({
             {step === "titles" ? (
               <Button
                 type="button"
+                size="sm"
                 disabled={cleanTitles.length === 0}
                 onClick={() => setStep("review")}
               >
@@ -410,6 +419,7 @@ export function CreateCoursesWizard({
             {step === "review" ? (
               <Button
                 type="button"
+                size="sm"
                 disabled={busy || cleanTitles.length === 0}
                 onClick={() => void createAll()}
               >

@@ -129,7 +129,7 @@ export function ReviewQueue() {
                     </div>
                     <div className="flex gap-2">
                       <Button
-                        className="h-9 px-3 text-xs"
+                        size="sm"
                         disabled={busyId === course.id}
                         onClick={() => void approveCourse(course.id)}
                       >
@@ -137,7 +137,7 @@ export function ReviewQueue() {
                       </Button>
                       <Button
                         variant="secondary"
-                        className="h-9 px-3 text-xs"
+                        size="sm"
                         disabled={busyId === course.id}
                         onClick={() => void rejectCourse(course.id)}
                       >
@@ -177,7 +177,7 @@ export function ReviewQueue() {
                     </div>
                     <div className="flex gap-2">
                       <Button
-                        className="h-9 px-3 text-xs"
+                        size="sm"
                         disabled={busyId === path.id}
                         onClick={() => void approvePath(path.id)}
                       >
@@ -185,7 +185,7 @@ export function ReviewQueue() {
                       </Button>
                       <Button
                         variant="secondary"
-                        className="h-9 px-3 text-xs"
+                        size="sm"
                         disabled={busyId === path.id}
                         onClick={() => void rejectPath(path.id)}
                       >

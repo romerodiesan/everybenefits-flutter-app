@@ -98,7 +98,7 @@ export default function StatementsPage() {
           <label className="block text-sm sm:col-span-3">
             <span className="text-muted">{t("label")}</span>
             <input
-              className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+              className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
               value={label}
               onChange={(e) => setLabel(e.target.value)}
               required
@@ -108,7 +108,7 @@ export default function StatementsPage() {
             <span className="text-muted">{t("periodStart")}</span>
             <input
               type="date"
-              className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+              className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
               value={periodStart}
               onChange={(e) => setPeriodStart(e.target.value)}
               required
@@ -118,7 +118,7 @@ export default function StatementsPage() {
             <span className="text-muted">{t("periodEnd")}</span>
             <input
               type="date"
-              className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+              className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
               value={periodEnd}
               onChange={(e) => setPeriodEnd(e.target.value)}
               required
@@ -129,14 +129,14 @@ export default function StatementsPage() {
           <span className="text-muted">{t("linesJson")}</span>
           <p className="mt-1 text-xs text-muted">{t("linesJsonHint")}</p>
           <textarea
-            className="mt-2 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2 font-mono text-xs"
+            className="mt-2 w-full rounded-lg border border-glass-border bg-sheet px-2.5 py-2 font-mono text-xs"
             rows={10}
             value={linesJson}
             onChange={(e) => setLinesJson(e.target.value)}
             required
           />
         </label>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" size="sm" disabled={busy}>
           {t("importStatement")}
         </Button>
       </form>
@@ -170,6 +170,7 @@ export default function StatementsPage() {
                     <Button
                       type="button"
                       variant="ghost"
+                      size="sm"
                       disabled={busy}
                       onClick={() => void onRun(row.id)}
                     >

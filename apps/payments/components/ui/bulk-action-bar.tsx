@@ -61,7 +61,8 @@ export function BulkBarShell({
         ) : null}
         <Button
           variant="ghost"
-          className="h-8 px-2.5 text-xs text-muted hover:text-ink"
+          size="sm"
+          className="text-muted hover:text-ink"
           disabled={busy}
           onClick={onClear}
         >

@@ -69,7 +69,7 @@ export function AdminPanel() {
                     <div className="flex justify-end gap-2">
                       <Button
                         variant="secondary"
-                        className="h-8 px-3 text-xs"
+                        size="sm"
                         onClick={async () => {
                           await setUserApproval(person.uid, "approved");
                           setPending((prev) =>
@@ -81,7 +81,7 @@ export function AdminPanel() {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="h-8 px-3 text-xs"
+                        size="sm"
                         onClick={async () => {
                           await setUserApproval(person.uid, "rejected");
                           setPending((prev) =>
@@ -134,7 +134,7 @@ export function AdminPanel() {
                       <td className="px-4 py-3 text-right md:px-5">
                         <Button
                           variant="secondary"
-                          className="h-8 px-3 text-xs"
+                          size="sm"
                           onClick={async () => {
                             await setUserRole(student.uid, "agent");
                             setStudents((prev) =>

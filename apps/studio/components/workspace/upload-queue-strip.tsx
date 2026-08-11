@@ -57,7 +57,7 @@ export function UploadQueueStrip() {
             <Button
               type="button"
               variant="ghost"
-              className="h-8 px-2 text-xs"
+              size="sm"
               onClick={clearFinished}
             >
               {t("workspaceUploadsClear")}

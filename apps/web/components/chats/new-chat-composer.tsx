@@ -108,6 +108,7 @@ export function NewChatComposer({
         {mode === "group" && (
           <form onSubmit={onStartGroup} className="space-y-3">
             <Input
+              size="sm"
               placeholder={t("chatsGroupName")}
               value={groupTitle}
               onChange={(e) => onGroupTitleChange(e.target.value)}
@@ -211,6 +212,7 @@ export function NewChatComposer({
         )}
 
         <Input
+          size="sm"
           placeholder={t("chatsSearchContacts")}
           value={searchQuery}
           onChange={(e) => onSearchQueryChange(e.target.value)}

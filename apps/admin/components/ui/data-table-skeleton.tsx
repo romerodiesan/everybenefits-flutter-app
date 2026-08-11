@@ -94,9 +94,9 @@ export function TablePageSkeleton({
       <div className="studio-panel overflow-hidden rounded-2xl">
         {withToolbar ? (
           <div className="flex flex-wrap gap-2 border-b border-glass-border px-4 py-3">
-            <div className="h-10 min-w-[12rem] flex-1 animate-pulse rounded-xl bg-ink/[0.06] dark:bg-white/[0.06]" />
-            <div className="h-10 w-28 animate-pulse rounded-xl bg-ink/[0.06] dark:bg-white/[0.06]" />
-            <div className="h-10 w-28 animate-pulse rounded-xl bg-ink/[0.06] dark:bg-white/[0.06]" />
+            <div className="h-8 min-w-[12rem] flex-1 animate-pulse rounded-lg bg-ink/[0.06] dark:bg-white/[0.06]" />
+            <div className="h-8 w-28 animate-pulse rounded-lg bg-ink/[0.06] dark:bg-white/[0.06]" />
+            <div className="h-8 w-28 animate-pulse rounded-lg bg-ink/[0.06] dark:bg-white/[0.06]" />
           </div>
         ) : null}
         <div className="overflow-x-auto">

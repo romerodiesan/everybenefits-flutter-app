@@ -20,7 +20,7 @@ import { Label, Panel } from "@/components/ui/primitives";
 import { CardListSkeleton } from "@/components/ui/skeleton";
 
 const selectClass =
-  "h-10 w-full rounded-xl border border-glass-border bg-sheet px-3.5 text-sm text-ink outline-none focus:border-brand";
+  "h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs text-ink outline-none focus:border-brand";
 
 export function AfcQuote() {
   const t = useTranslations();

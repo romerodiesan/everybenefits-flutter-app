@@ -109,6 +109,7 @@ export function NotificationsHome() {
         <div className="flex shrink-0 items-center gap-1">
           <Button
             variant="ghost"
+            size="sm"
             disabled={busy || visibleItems.every((item) => item.read)}
             onClick={async () => {
               setBusy(true);

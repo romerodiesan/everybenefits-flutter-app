@@ -51,7 +51,7 @@ const ROLE_KEYS: Record<UserRole, string> = {
 };
 
 const FILTER_SELECT_CLASS =
-  "h-10 w-full min-w-[9.5rem] rounded-xl border border-glass-border bg-transparent px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15";
+  "h-8 w-full min-w-[9.5rem] rounded-lg border border-glass-border bg-transparent px-2.5 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15";
 
 function useDebounced<T>(value: T, ms = 300): T {
   const [debounced, setDebounced] = useState(value);
@@ -421,6 +421,7 @@ export function UsersHome() {
     <>
       <FilterField label={t("usersSearchLabel")} className="min-w-[16rem] flex-1">
         <SearchInput
+          size="sm"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t("usersSearch")}
@@ -455,7 +456,7 @@ export function UsersHome() {
         </select>
       </FilterField>
       {isAdmin ? (
-        <Button className="shrink-0" onClick={openCreate}>
+        <Button size="sm" className="shrink-0" onClick={openCreate}>
           {t("usersCreate")}
         </Button>
       ) : null}

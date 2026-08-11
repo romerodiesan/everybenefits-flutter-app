@@ -268,6 +268,7 @@ export function LibraryHome() {
           ))}
         </div>
         <Input
+          size="sm"
           className="w-full sm:max-w-xs"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -492,6 +493,7 @@ export function LibraryHome() {
               <div>
                 <Label>{t("fieldTitle")}</Label>
                 <Input
+                  size="sm"
                   value={pathForm.title}
                   onChange={(e) =>
                     setPathForm((f) => ({ ...f, title: e.target.value }))
@@ -510,7 +512,7 @@ export function LibraryHome() {
               <div>
                 <Label>{t("fieldLevel")}</Label>
                 <select
-                  className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm"
+                  className="h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
                   value={pathForm.level}
                   onChange={(e) =>
                     setPathForm((f) => ({
@@ -530,12 +532,14 @@ export function LibraryHome() {
             <div className="mt-5 flex justify-end gap-2">
               <Button
                 variant="ghost"
+                size="sm"
                 disabled={busy}
                 onClick={() => setCreating(null)}
               >
                 {t("actionCancel")}
               </Button>
               <Button
+                size="sm"
                 disabled={createPathDisabled}
                 onClick={() => void createPathOnly()}
               >

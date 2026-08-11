@@ -103,7 +103,7 @@ export default function RelationshipsPage() {
         <label className="block text-sm">
           <span className="text-muted">{t("upline")}</span>
           <select
-            className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
             value={upline}
             onChange={(e) => {
               const next = e.target.value;
@@ -123,7 +123,7 @@ export default function RelationshipsPage() {
         <label className="block text-sm">
           <span className="text-muted">{t("downline")}</span>
           <select
-            className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
             value={downline}
             onChange={(e) => setDownline(e.target.value)}
             required
@@ -142,7 +142,7 @@ export default function RelationshipsPage() {
         </label>
         <div className="block text-sm">
           <span className="text-muted">{t("type")}</span>
-          <div className="mt-1 flex min-h-[2.5rem] items-center">
+          <div className="mt-1 flex min-h-8 items-center">
             {derivedType ? (
               <span className="rounded-full border border-glass-border bg-sheet px-3 py-1 text-xs font-medium">
                 {derivedType}
@@ -156,7 +156,7 @@ export default function RelationshipsPage() {
           <span className="text-muted">{t("effectiveFrom")}</span>
           <input
             type="date"
-            className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
             required
@@ -165,6 +165,7 @@ export default function RelationshipsPage() {
         <div className="sm:col-span-2 lg:col-span-4">
           <Button
             type="submit"
+            size="sm"
             disabled={busy || !upline || !downline || !derivedType}
           >
             {t("create")}

@@ -73,7 +73,7 @@ export function LearnerPreview({
             <h1 className="truncate font-display text-lg">{course.title}</h1>
           </div>
         </div>
-        <Button variant="secondary" className="h-9 shrink-0 px-3 text-xs" onClick={onClose}>
+        <Button variant="secondary" size="sm" className="shrink-0" onClick={onClose}>
           {t("previewClose")}
         </Button>
       </header>

@@ -305,6 +305,7 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
           {canChat && (
             <div className="relative">
               <Button
+                size="sm"
                 onClick={() => {
                   if (canGroup) {
                     setShowNewMenu((v) => !v);

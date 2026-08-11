@@ -16,7 +16,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { useAlerts } from "@/lib/providers/alert-provider";
 
 const FILTER_SELECT_CLASS =
-  "h-10 w-full min-w-[9.5rem] rounded-xl border border-glass-border bg-transparent px-3 text-sm text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15";
+  "h-8 w-full min-w-[9.5rem] rounded-lg border border-glass-border bg-transparent px-2.5 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15";
 
 function FilterField({
   label,
@@ -175,7 +175,7 @@ export default function CarriersPage() {
               <Button
                 type="button"
                 variant="danger"
-                className="h-7 rounded-lg px-2.5 text-[11px]"
+                size="sm"
                 disabled={busy || deleting}
                 onClick={() => void onDelete(carrier)}
               >
@@ -262,7 +262,8 @@ export default function CarriersPage() {
         <div className="flex items-end">
           <Button
             type="submit"
-            className="h-8 rounded-lg px-3 text-xs"
+            size="sm"
+            className="px-3"
             disabled={busy || !name.trim() || !code.trim()}
           >
             {t("create")}
@@ -309,6 +310,7 @@ export default function CarriersPage() {
               className="min-w-[16rem] flex-1"
             >
               <SearchInput
+                size="sm"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder={t("carriersSearch")}

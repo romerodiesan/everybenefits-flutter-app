@@ -200,6 +200,7 @@ export function AcademyCatalog() {
           </h2>
           <div className="w-full sm:w-64">
             <Input
+              size="sm"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder={t("academySearchPlaceholder")}

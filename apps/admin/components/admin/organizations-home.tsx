@@ -538,14 +538,16 @@ export function OrganizationsHome() {
       <div className="flex gap-2 border-b border-glass-border pb-2">
         <Button
           variant={tab === "tree" ? "secondary" : "ghost"}
-          className="h-9 px-3 text-xs"
+          size="sm"
+          className="px-3"
           onClick={() => setTab("tree")}
         >
           {t("orgTabTree")}
         </Button>
         <Button
           variant={tab === "agencies" ? "secondary" : "ghost"}
-          className="h-9 px-3 text-xs"
+          size="sm"
+          className="px-3"
           onClick={() => setTab("agencies")}
         >
           {t("orgTabAgencies")}
@@ -642,6 +644,7 @@ export function OrganizationsHome() {
                     {t("usersSearchLabel")}
                   </span>
                   <SearchInput
+                    size="sm"
                     value={agencyQuery}
                     onChange={(e) => setAgencyQuery(e.target.value)}
                     placeholder={t("orgAgencySearch")}
@@ -676,6 +679,7 @@ export function OrganizationsHome() {
             <div className="flex flex-wrap justify-end gap-2">
               <Button
                 variant="ghost"
+                size="sm"
                 disabled={busy}
                 onClick={async () => {
                   if (!selected) return;
@@ -695,6 +699,7 @@ export function OrganizationsHome() {
                 {selected.active ? t("orgInactive") : t("orgActive")}
               </Button>
               <Button
+                size="sm"
                 disabled={busy || !editName.trim()}
                 onClick={async () => {
                   if (!selected) return;
@@ -722,6 +727,7 @@ export function OrganizationsHome() {
             <div>
               <Label>{t("orgName")}</Label>
               <Input
+                size="sm"
                 value={editName}
                 onChange={(e) => setEditName(e.target.value)}
               />
@@ -732,11 +738,13 @@ export function OrganizationsHome() {
                   {t("orgAddChild")} · {t(`orgType_${childType}`)}
                 </p>
                 <Input
+                  size="sm"
                   value={childName}
                   onChange={(e) => setChildName(e.target.value)}
                   placeholder={t("orgName")}
                 />
                 <Button
+                  size="sm"
                   className="w-full"
                   disabled={busy || !childName.trim()}
                   onClick={async () => {
@@ -774,10 +782,15 @@ export function OrganizationsHome() {
         onClose={() => setAgencyDrawer(false)}
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setAgencyDrawer(false)}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setAgencyDrawer(false)}
+            >
               {t("orgCancel")}
             </Button>
             <Button
+              size="sm"
               disabled={
                 busy ||
                 !agencyForm.name.trim() ||
@@ -794,6 +807,7 @@ export function OrganizationsHome() {
           <div>
             <Label>{t("orgName")}</Label>
             <Input
+              size="sm"
               value={agencyForm.name}
               onChange={(e) =>
                 setAgencyForm((f) => ({ ...f, name: e.target.value }))
@@ -805,7 +819,7 @@ export function OrganizationsHome() {
               <Label>{t("orgParentRegion")}</Label>
               <p className="mb-1 text-[11px] text-muted">{t("orgParentHint")}</p>
               <select
-                className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm text-ink"
+                className="h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs text-ink"
                 value={agencyForm.parentId}
                 onChange={(e) =>
                   setAgencyForm((f) => ({ ...f, parentId: e.target.value }))
@@ -860,6 +874,7 @@ export function OrganizationsHome() {
           <div>
             <Label>{t("orgEmail")}</Label>
             <Input
+              size="sm"
               type="email"
               value={agencyForm.email}
               onChange={(e) =>
@@ -870,6 +885,7 @@ export function OrganizationsHome() {
           <div>
             <Label>{t("orgPaymentsEmail")}</Label>
             <Input
+              size="sm"
               type="email"
               value={agencyForm.paymentsEmail}
               onChange={(e) =>
@@ -883,6 +899,7 @@ export function OrganizationsHome() {
           <div>
             <Label>{t("orgNpn")}</Label>
             <Input
+              size="sm"
               value={agencyForm.npn}
               onChange={(e) =>
                 setAgencyForm((f) => ({ ...f, npn: e.target.value }))
@@ -892,6 +909,7 @@ export function OrganizationsHome() {
           <div>
             <Label>{t("orgAgencyLicense")}</Label>
             <Input
+              size="sm"
               value={agencyForm.agencyLicense}
               onChange={(e) =>
                 setAgencyForm((f) => ({
@@ -904,6 +922,7 @@ export function OrganizationsHome() {
           <div>
             <Label>{t("orgEin")}</Label>
             <Input
+              size="sm"
               value={agencyForm.ein}
               onChange={(e) =>
                 setAgencyForm((f) => ({ ...f, ein: e.target.value }))
@@ -946,6 +965,7 @@ export function OrganizationsHome() {
             {agencyForm.ownerUids.length < ORG_OWNER_UIDS_CAP ? (
               <>
                 <SearchInput
+                  size="sm"
                   value={ownerSearch}
                   onChange={(e) => setOwnerSearch(e.target.value)}
                   placeholder={t("orgOwnersSearch")}

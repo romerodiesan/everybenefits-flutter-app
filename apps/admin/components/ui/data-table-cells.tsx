@@ -65,6 +65,7 @@ export function RowActions({ children }: { children: ReactNode }) {
 
 export function RowActionButton({
   variant = "ghost",
+  className = "",
   ...props
 }: React.ComponentProps<typeof Button> & {
   variant?: "primary" | "secondary" | "ghost" | "danger";
@@ -72,7 +73,8 @@ export function RowActionButton({
   return (
     <Button
       variant={variant}
-      className="h-8 rounded-lg px-2.5 text-xs font-semibold"
+      size="sm"
+      className={`font-semibold ${className}`}
       {...props}
     />
   );

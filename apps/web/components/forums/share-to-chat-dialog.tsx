@@ -132,7 +132,12 @@ export function ShareToChatDialog({
         </div>
         {error && <p className="px-5 pb-3 text-sm text-red-400">{error}</p>}
         <div className="border-t border-glass-border p-4">
-          <Button variant="secondary" className="w-full" onClick={onClose}>
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={onClose}
+          >
             {t("dialogClose")}
           </Button>
         </div>

@@ -8,14 +8,23 @@ import {
   type PhoneCountry,
 } from "@/lib/phone-countries";
 
+type ControlSize = "md" | "sm";
+
+const triggerSize: Record<ControlSize, string> = {
+  md: "h-10 rounded-xl px-3 text-sm",
+  sm: "h-8 rounded-lg px-2.5 text-xs",
+};
+
 export function CountryCodeSelect({
   value,
   onChange,
   disabled,
+  size = "md",
 }: {
   value: string;
   onChange: (dialCode: string) => void;
   disabled?: boolean;
+  size?: ControlSize;
 }) {
   const t = useTranslations();
   const locale = useLocale();
@@ -69,7 +78,7 @@ export function CountryCodeSelect({
         aria-expanded={open}
         aria-controls={listId}
         onClick={() => setOpen((prev) => !prev)}
-        className="flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-glass-border bg-sheet px-3 text-sm text-ink outline-none transition hover:border-brand/40 focus:border-brand disabled:opacity-50"
+        className={`flex w-full items-center justify-between gap-2 border border-glass-border bg-sheet text-ink outline-none transition hover:border-brand/40 focus:border-brand disabled:opacity-50 ${triggerSize[size]}`}
       >
         <span className="flex min-w-0 items-center gap-2">
           <span className="text-base leading-none" aria-hidden>

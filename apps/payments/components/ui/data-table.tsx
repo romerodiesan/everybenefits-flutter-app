@@ -232,7 +232,7 @@ export function DataTable<T>({
           <div className="flex gap-1">
             <Button
               variant="secondary"
-              className="h-7 rounded-lg px-2.5 text-[11px]"
+              size="sm"
               disabled={!canPreviousPage || loading}
               onClick={onPreviousPage}
             >
@@ -240,7 +240,7 @@ export function DataTable<T>({
             </Button>
             <Button
               variant="secondary"
-              className="h-7 rounded-lg px-2.5 text-[11px]"
+              size="sm"
               disabled={!canNextPage || loading}
               onClick={onNextPage}
             >

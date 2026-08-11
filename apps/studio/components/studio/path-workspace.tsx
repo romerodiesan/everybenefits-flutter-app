@@ -239,7 +239,7 @@ function PathWorkspaceBody({
         <div className="flex flex-wrap gap-2">
           {path.status === "draft" && !isAdmin ? (
             <Button
-              className="h-9 px-3 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void changeStatus("pending")}
             >
@@ -248,7 +248,7 @@ function PathWorkspaceBody({
           ) : null}
           {isAdmin && path.status !== "published" ? (
             <Button
-              className="h-9 px-3 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void changeStatus("published")}
             >
@@ -258,7 +258,7 @@ function PathWorkspaceBody({
           {isAdmin && path.status === "pending" ? (
             <Button
               variant="secondary"
-              className="h-9 px-3 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void changeStatus("draft")}
             >
@@ -268,7 +268,7 @@ function PathWorkspaceBody({
           {isAdmin && path.status === "published" ? (
             <Button
               variant="secondary"
-              className="h-9 px-3 text-xs"
+              size="sm"
               disabled={busy}
               onClick={() => void changeStatus("draft")}
             >
@@ -277,7 +277,7 @@ function PathWorkspaceBody({
           ) : null}
           <Button
             variant="danger"
-            className="h-9 px-3 text-xs"
+            size="sm"
             disabled={busy}
             onClick={() => void removePath()}
           >
@@ -289,7 +289,7 @@ function PathWorkspaceBody({
       <div className="studio-panel mt-6 space-y-3 p-4">
         <div>
           <Label>{t("fieldTitle")}</Label>
-          <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+          <Input size="sm" value={title} onChange={(event) => setTitle(event.target.value)} />
         </div>
         <div>
           <Label>{t("fieldDescription")}</Label>
@@ -303,7 +303,7 @@ function PathWorkspaceBody({
           <select
             value={level}
             onChange={(event) => setLevel(event.target.value as CourseLevel)}
-            className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm"
+            className="h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
           >
             {COURSE_LEVELS.map((option) => (
               <option key={option} value={option}>
@@ -320,7 +320,7 @@ function PathWorkspaceBody({
           <select
             value={pickId}
             onChange={(event) => setPickId(event.target.value)}
-            className="h-10 min-w-[220px] flex-1 rounded-xl border border-glass-border bg-sheet px-3 text-sm"
+            className="h-8 min-w-[220px] flex-1 rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
           >
             <option value="">{t("pathAddCourse")}</option>
             {available.map((course) => (
@@ -331,6 +331,7 @@ function PathWorkspaceBody({
           </select>
           <Button
             variant="secondary"
+            size="sm"
             disabled={busy || !pickId}
             onClick={() => {
               if (!pickId) return;
@@ -365,7 +366,8 @@ function PathWorkspaceBody({
                 <div className="flex gap-1">
                   <Button
                     variant="ghost"
-                    className="h-8 w-8 px-0 text-xs"
+                    size="sm"
+                    className="w-8 px-0"
                     disabled={busy || index === 0}
                     onClick={() => move(index, -1)}
                   >
@@ -373,7 +375,8 @@ function PathWorkspaceBody({
                   </Button>
                   <Button
                     variant="ghost"
-                    className="h-8 w-8 px-0 text-xs"
+                    size="sm"
+                    className="w-8 px-0"
                     disabled={busy || index === assigned.length - 1}
                     onClick={() => move(index, 1)}
                   >
@@ -381,7 +384,8 @@ function PathWorkspaceBody({
                   </Button>
                   <Button
                     variant="ghost"
-                    className="h-8 px-2 text-xs text-danger"
+                    size="sm"
+                    className="text-danger"
                     disabled={busy}
                     onClick={() =>
                       void persistIds(courseIds.filter((id) => id !== entry.id))

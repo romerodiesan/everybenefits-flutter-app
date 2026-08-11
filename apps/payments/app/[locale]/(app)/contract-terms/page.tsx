@@ -86,7 +86,7 @@ export default function ContractTermsPage() {
         <label className="block text-sm">
           <span className="text-muted">{t("participant")}</span>
           <select
-            className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
             value={participantId}
             onChange={(e) => setParticipantId(e.target.value)}
             required
@@ -103,7 +103,7 @@ export default function ContractTermsPage() {
           <input
             type="number"
             step="0.01"
-            className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
             value={rate}
             onChange={(e) => setRate(e.target.value)}
             required
@@ -112,7 +112,7 @@ export default function ContractTermsPage() {
         <label className="block text-sm">
           <span className="text-muted">{t("carrier")} ID</span>
           <input
-            className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
             value={carrierId}
             onChange={(e) => setCarrierId(e.target.value)}
             placeholder="optional"
@@ -122,14 +122,14 @@ export default function ContractTermsPage() {
           <span className="text-muted">{t("effectiveFrom")}</span>
           <input
             type="date"
-            className="mt-1 w-full rounded-xl border border-glass-border bg-sheet px-3 py-2"
+            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
             required
           />
         </label>
         <div className="sm:col-span-2 lg:col-span-4">
-          <Button type="submit" disabled={busy || !participantId}>
+          <Button type="submit" size="sm" disabled={busy || !participantId}>
             {t("create")}
           </Button>
         </div>

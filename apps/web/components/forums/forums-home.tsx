@@ -488,6 +488,7 @@ export function ForumsHome() {
                 <div>
                   <Label>{t("createThreadTitle")}</Label>
                   <Input
+                    size="sm"
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     autoFocus
@@ -531,6 +532,7 @@ export function ForumsHome() {
                   <Button
                     type="button"
                     variant="ghost"
+                    size="sm"
                     onClick={() => setShowCreate(false)}
                   >
                     {t("forumsComposerCancel")}

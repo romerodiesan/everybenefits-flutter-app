@@ -105,10 +105,11 @@ export function UserFormDrawer({
       onClose={onClose}
       footer={
         <div className="flex justify-end gap-2">
-          <Button variant="ghost" disabled={busy} onClick={onClose}>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={onClose}>
             {t("orgCancel")}
           </Button>
           <Button
+            size="sm"
             disabled={busy}
             onClick={() => void onSubmit(values)}
           >
@@ -126,6 +127,7 @@ export function UserFormDrawer({
         <div>
           <Label>{t("colEmail")}</Label>
           <Input
+            size="sm"
             type="email"
             value={values.email}
             onChange={(e) =>
@@ -138,6 +140,7 @@ export function UserFormDrawer({
         <div>
           <Label>{t("colName")}</Label>
           <Input
+            size="sm"
             value={values.displayName}
             onChange={(e) =>
               setValues((v) => ({ ...v, displayName: e.target.value }))
@@ -148,6 +151,7 @@ export function UserFormDrawer({
           <div>
             <Label>{t("usersPassword")}</Label>
             <Input
+              size="sm"
               type="password"
               value={values.password}
               onChange={(e) =>
@@ -161,7 +165,7 @@ export function UserFormDrawer({
         <div>
           <Label>{t("colRole")}</Label>
           <select
-            className="h-10 w-full rounded-xl border border-glass-border bg-transparent px-3 text-sm"
+            className="h-8 w-full rounded-lg border border-glass-border bg-transparent px-2.5 text-xs"
             value={values.role}
             onChange={(e) =>
               setValues((v) => ({
@@ -184,7 +188,7 @@ export function UserFormDrawer({
         <div>
           <Label>{t("colAgency")}</Label>
           <select
-            className="h-10 w-full rounded-xl border border-glass-border bg-transparent px-3 text-sm"
+            className="h-8 w-full rounded-lg border border-glass-border bg-transparent px-2.5 text-xs"
             value={values.orgNodeId}
             onChange={(e) =>
               setValues((v) => ({ ...v, orgNodeId: e.target.value }))
@@ -205,7 +209,7 @@ export function UserFormDrawer({
         <div>
           <Label>{t("colApproval")}</Label>
           <select
-            className="h-10 w-full rounded-xl border border-glass-border bg-transparent px-3 text-sm"
+            className="h-8 w-full rounded-lg border border-glass-border bg-transparent px-2.5 text-xs"
             value={values.approvalStatus}
             onChange={(e) =>
               setValues((v) => ({
@@ -222,6 +226,7 @@ export function UserFormDrawer({
         <div>
           <Label>NPN</Label>
           <Input
+            size="sm"
             value={values.npn}
             onChange={(e) => setValues((v) => ({ ...v, npn: e.target.value }))}
           />

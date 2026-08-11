@@ -323,7 +323,7 @@ export default function CarrierRatesPage() {
             <Button
               type="button"
               variant="ghost"
-              className="h-8 rounded-lg px-2.5 text-xs"
+              size="sm"
               disabled={busy}
               onClick={resetForm}
             >
@@ -332,7 +332,8 @@ export default function CarrierRatesPage() {
           ) : null}
           <Button
             type="submit"
-            className="h-8 rounded-lg px-3 text-xs"
+            size="sm"
+            className="px-3"
             disabled={
               busy ||
               !rateState ||
@@ -388,7 +389,7 @@ export default function CarrierRatesPage() {
                   <Button
                     type="button"
                     variant={selected ? "primary" : "secondary"}
-                    className="h-7 rounded-lg px-2.5 text-[11px]"
+                    size="sm"
                     disabled={busy || rowBusy === row.id}
                     onClick={() => startEdit(row)}
                   >
@@ -397,7 +398,7 @@ export default function CarrierRatesPage() {
                   <Button
                     type="button"
                     variant="danger"
-                    className="h-7 rounded-lg px-2.5 text-[11px]"
+                    size="sm"
                     disabled={busy || rowBusy === row.id}
                     onClick={() => void onDeleteRate(row)}
                   >

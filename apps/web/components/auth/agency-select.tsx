@@ -19,11 +19,19 @@ export type AgencySelectValue = {
   orgNodeId: string | null;
 };
 
+type ControlSize = "md" | "sm";
+
+const triggerSize: Record<ControlSize, string> = {
+  md: "h-10 rounded-xl px-3.5 text-sm",
+  sm: "h-8 rounded-lg px-2.5 text-xs",
+};
+
 type Props = {
   value: string;
   onChange: (next: AgencySelectValue) => void;
   disabled?: boolean;
   required?: boolean;
+  size?: ControlSize;
 };
 
 function resolveSelectedId(agency: string, agencies: AgencyOption[]): string {
@@ -41,7 +49,13 @@ function resolveSelectedId(agency: string, agencies: AgencyOption[]): string {
  * Searchable agency picker: org directory + "I run solo" + "I have my own agency".
  * One control only — no secondary text field.
  */
-export function AgencySelect({ value, onChange, disabled, required }: Props) {
+export function AgencySelect({
+  value,
+  onChange,
+  disabled,
+  required,
+  size = "md",
+}: Props) {
   const t = useTranslations();
   const listId = useId();
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -148,7 +162,7 @@ export function AgencySelect({ value, onChange, disabled, required }: Props) {
         aria-controls={listId}
         aria-required={required}
         onClick={() => setOpen((prev) => !prev)}
-        className="flex h-10 w-full items-center justify-between gap-2 rounded-xl border border-glass-border bg-sheet px-3.5 text-sm text-ink outline-none transition hover:border-brand/40 focus:border-brand disabled:opacity-50"
+        className={`flex w-full items-center justify-between gap-2 border border-glass-border bg-sheet text-ink outline-none transition hover:border-brand/40 focus:border-brand disabled:opacity-50 ${triggerSize[size]}`}
       >
         <span
           className={`min-w-0 truncate text-left ${
@@ -179,6 +193,7 @@ export function AgencySelect({ value, onChange, disabled, required }: Props) {
         >
           <div className="border-b border-glass-border p-2">
             <Input
+              size="sm"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t("agencySearchPlaceholder")}

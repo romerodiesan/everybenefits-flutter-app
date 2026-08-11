@@ -78,7 +78,7 @@ export function CoursePicker({
         aria-controls={listId}
         aria-label={t("analyticsPickCourse")}
         onClick={() => setOpen((prev) => !prev)}
-        className="flex h-10 w-full max-w-md items-center justify-between gap-2 rounded-xl border border-glass-border bg-sheet px-3 text-left text-sm text-ink outline-none transition hover:border-brand/40 focus:border-brand disabled:opacity-50"
+        className="flex h-8 w-full max-w-md items-center justify-between gap-2 rounded-lg border border-glass-border bg-sheet px-2.5 text-left text-xs text-ink outline-none transition hover:border-brand/40 focus:border-brand disabled:opacity-50"
       >
         <span
           className={`min-w-0 flex-1 truncate ${selected ? "" : "text-muted"}`}
