@@ -4,7 +4,8 @@
  * Users attach to a node via `orgNodeId`; they are not nodes themselves.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_ORG_ROOT_NAME = exports.ORG_DEPTH_TYPE = exports.ORG_TYPE_DEPTH = exports.ORG_NODE_TYPES = void 0;
+exports.USER_ASSIGNABLE_ORG_TYPES = exports.DEFAULT_ORG_ROOT_NAME = exports.ORG_DEPTH_TYPE = exports.ORG_TYPE_DEPTH = exports.ORG_NODE_TYPES = void 0;
+exports.isUserAssignableOrgType = isUserAssignableOrgType;
 exports.parseOrgNodeType = parseOrgNodeType;
 exports.depthForType = depthForType;
 exports.typeForDepth = typeForDepth;
@@ -37,6 +38,20 @@ exports.ORG_DEPTH_TYPE = {
     7: "unit",
 };
 exports.DEFAULT_ORG_ROOT_NAME = "Every Benefits";
+/**
+ * Org node types a user/agent may be attached to via `orgNodeId`.
+ * The matrix (`organization`, e.g. Every Benefits) is itself an assignable
+ * agency — not only leaf `agency` / `sub_agency` nodes.
+ */
+exports.USER_ASSIGNABLE_ORG_TYPES = [
+    "organization",
+    "agency",
+    "sub_agency",
+];
+function isUserAssignableOrgType(type) {
+    return (typeof type === "string" &&
+        exports.USER_ASSIGNABLE_ORG_TYPES.includes(type));
+}
 function parseOrgNodeType(value) {
     if (typeof value !== "string")
         return null;

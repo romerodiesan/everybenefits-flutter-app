@@ -192,7 +192,11 @@ export function UserFormDrawer({
             <option value="">{t("none")}</option>
             {agencies.map((n) => (
               <option key={n.id} value={n.id}>
-                {n.name}
+                {n.type === "organization"
+                  ? `${n.name} (${t("orgType_organization")})`
+                  : n.type === "sub_agency"
+                    ? `${n.name} (${t("orgType_sub_agency")})`
+                    : n.name}
               </option>
             ))}
           </select>

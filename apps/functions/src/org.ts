@@ -5,6 +5,7 @@ import {
   canAccessAdmin,
   canManagePlatform,
   depthForType,
+  isUserAssignableOrgType,
   isValidChildType,
   parseOrgNodeType,
 } from "@pulse/shared";
@@ -105,9 +106,10 @@ export const listOrgSubtree = onCall(callableOpts, async (request) => {
 });
 
 /**
- * Paginated agencies for Admin (type == agency). Soft-deleted = active:false.
- * Sorts in memory (same pattern as listAgenciesForProfile) so the list works
- * even when the type+name composite index is still building.
+ * Paginated assignable agencies for Admin.
+ * Includes the matrix (`organization`, e.g. Every Benefits) plus `agency` /
+ * `sub_agency` — agents may belong to the root as well as downline agencies.
+ * Soft-deleted = active:false. Sorts in memory so no type+name index is required.
  */
 export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
   await requireOrgAdmin(request, "listAgenciesForAdmin");
@@ -119,18 +121,31 @@ export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
   const includeInactive = request.data?.includeInactive === true;
   const query = String(request.data?.query ?? "").trim().toLowerCase();
 
-  const snap = await db
-    .collection("orgNodes")
-    .where("type", "==", "agency")
-    .limit(3000)
-    .get();
+  const snaps = await Promise.all([
+    db.collection("orgNodes").where("type", "==", "organization").limit(50).get(),
+    db.collection("orgNodes").where("type", "==", "agency").limit(3000).get(),
+    db.collection("orgNodes").where("type", "==", "sub_agency").limit(3000).get(),
+  ]);
 
-  let agencies = snap.docs
+  const seen = new Set<string>();
+  let agencies = snaps
+    .flatMap((snap) => snap.docs)
+    .filter((doc) => {
+      if (seen.has(doc.id)) return false;
+      seen.add(doc.id);
+      return isUserAssignableOrgType(doc.data().type);
+    })
     .map((doc) => serializeOrgNode(doc.id, doc.data()))
     .filter((node) => includeInactive || node.active)
-    .sort((a, b) =>
-      a.name.localeCompare(b.name, undefined, { sensitivity: "base" }),
-    );
+    .sort((a, b) => {
+      // Matrix first, then agencies / sub-agencies alphabetically.
+      if (a.type !== b.type) {
+        const rank = (t: string) =>
+          t === "organization" ? 0 : t === "agency" ? 1 : 2;
+        return rank(a.type) - rank(b.type);
+      }
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    });
 
   if (query) {
     agencies = agencies.filter((node) =>
@@ -140,13 +155,13 @@ export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
 
   let start = 0;
   if (pageToken) {
-    const idx = agencies.findIndex((node) => node.name === pageToken);
+    const idx = agencies.findIndex((node) => node.id === pageToken || node.name === pageToken);
     start = idx >= 0 ? idx + 1 : 0;
   }
   const page = agencies.slice(start, start + pageSize);
   const last = page[page.length - 1];
   const nextPageToken =
-    start + page.length < agencies.length && last && !query ? last.name : null;
+    start + page.length < agencies.length && last && !query ? last.id : null;
 
   return { agencies: page, nextPageToken };
 });
@@ -307,28 +322,48 @@ export const listOrgNodesByType = onCall(callableOpts, async (request) => {
 });
 
 /**
- * Public-to-signed-in list of active agencies for profile completion.
+ * Public-to-signed-in list of active assignable agencies for profile completion.
+ * Includes the matrix organization (Every Benefits) plus agency / sub_agency.
  * Returns id + name only (no managers / path).
  */
 export const listAgenciesForProfile = onCall(callableOpts, async (request) => {
   await requireCaller(request, "listAgenciesForProfile");
 
-  const snap = await db
-    .collection("orgNodes")
-    .where("type", "==", "agency")
-    .limit(2000)
-    .get();
+  const snaps = await Promise.all([
+    db.collection("orgNodes").where("type", "==", "organization").limit(50).get(),
+    db.collection("orgNodes").where("type", "==", "agency").limit(2000).get(),
+    db.collection("orgNodes").where("type", "==", "sub_agency").limit(2000).get(),
+  ]);
 
-  const agencies = snap.docs
+  const seen = new Set<string>();
+  const agencies = snaps
+    .flatMap((snap) => snap.docs)
     .map((doc) => {
+      if (seen.has(doc.id)) return null;
+      seen.add(doc.id);
       const data = doc.data();
+      if (!isUserAssignableOrgType(data.type)) return null;
       if (data.active === false) return null;
       const name = String(data.name ?? "").trim();
       if (!name) return null;
-      return { id: doc.id, name };
+      return {
+        id: doc.id,
+        name,
+        type: String(data.type),
+      };
     })
-    .filter((row): row is { id: string; name: string } => row !== null)
-    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+    .filter(
+      (row): row is { id: string; name: string; type: string } => row !== null,
+    )
+    .sort((a, b) => {
+      if (a.type !== b.type) {
+        const rank = (t: string) =>
+          t === "organization" ? 0 : t === "agency" ? 1 : 2;
+        return rank(a.type) - rank(b.type);
+      }
+      return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
+    })
+    .map(({ id, name }) => ({ id, name }));
 
   return { agencies };
 });

@@ -287,6 +287,15 @@ export function OrganizationsHome() {
         ),
       },
       {
+        id: "type",
+        header: t("rolesBuiltIn"),
+        cell: ({ row }) => (
+          <span className="text-xs text-muted">
+            {t(`orgType_${row.original.type}`)}
+          </span>
+        ),
+      },
+      {
         id: "status",
         header: t("orgActive"),
         cell: ({ row }) => (

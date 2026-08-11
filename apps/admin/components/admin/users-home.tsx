@@ -518,7 +518,11 @@ export function UsersHome() {
               <option value="__none__">{t("bulkNoAgency")}</option>
               {agencies.map((agency) => (
                 <option key={agency.id} value={agency.id}>
-                  {agency.name}
+                  {agency.type === "organization"
+                    ? `${agency.name} (${t("orgType_organization")})`
+                    : agency.type === "sub_agency"
+                      ? `${agency.name} (${t("orgType_sub_agency")})`
+                      : agency.name}
                 </option>
               ))}
             </BulkSelect>
