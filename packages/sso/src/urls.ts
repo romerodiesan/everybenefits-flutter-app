@@ -22,9 +22,17 @@ export function adminWebUrl() {
   );
 }
 
+export function paymentsWebUrl() {
+  return (
+    process.env.NEXT_PUBLIC_PAYMENTS_URL?.replace(/\/$/, "") ||
+    "http://localhost:3004"
+  );
+}
+
 export function appBaseUrl(app: PulseAppId) {
   if (app === "studio") return studioWebUrl();
   if (app === "admin") return adminWebUrl();
+  if (app === "payments") return paymentsWebUrl();
   return pulseWebUrl();
 }
 
@@ -35,7 +43,7 @@ export function siblingApp(app: PulseAppId): PulseAppId {
 }
 
 export function otherApps(current: PulseAppId): PulseAppId[] {
-  return (["pulse", "studio", "admin"] as const).filter(
+  return (["pulse", "studio", "admin", "payments"] as const).filter(
     (app) => app !== current,
   );
 }
@@ -80,6 +88,7 @@ export function allAppOrigins(): Set<string> {
     new URL(pulseWebUrl()).origin,
     new URL(studioWebUrl()).origin,
     new URL(adminWebUrl()).origin,
+    new URL(paymentsWebUrl()).origin,
   ]);
 }
 

@@ -24,7 +24,11 @@
     {
       "target": "legal",
       "public": "apps/legal/build",
-      "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+      "ignore": [
+        "firebase.json",
+        "**/.*",
+        "**/node_modules/**"
+      ],
       "cleanUrls": true,
       "trailingSlash": false,
       "headers": [
@@ -57,7 +61,8 @@
         "apps/legal",
         "docs",
         "tooling",
-        "test"
+        "test",
+        "apps/payments"
       ],
       "alwaysDeployFromSource": true
     },
@@ -77,7 +82,8 @@
         "apps/legal",
         "docs",
         "tooling",
-        "test"
+        "test",
+        "apps/payments"
       ],
       "alwaysDeployFromSource": true
     },
@@ -97,7 +103,8 @@
         "apps/legal",
         "docs",
         "tooling",
-        "test"
+        "test",
+        "apps/payments"
       ],
       "alwaysDeployFromSource": true
     },
@@ -115,6 +122,28 @@
         "apps/web",
         "apps/studio",
         "apps/admin",
+        "docs",
+        "tooling",
+        "test",
+        "apps/payments"
+      ],
+      "alwaysDeployFromSource": true
+    },
+    {
+      "backendId": "payments-web-app",
+      "rootDir": "apps/payments",
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local",
+        "apps/mobile",
+        "apps/functions",
+        "apps/web",
+        "apps/studio",
+        "apps/admin",
+        "apps/legal",
         "docs",
         "tooling",
         "test"

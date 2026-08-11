@@ -4,6 +4,7 @@ exports.PULSE_ACCOUNT_PATH = void 0;
 exports.pulseWebUrl = pulseWebUrl;
 exports.studioWebUrl = studioWebUrl;
 exports.adminWebUrl = adminWebUrl;
+exports.paymentsWebUrl = paymentsWebUrl;
 exports.appBaseUrl = appBaseUrl;
 exports.siblingApp = siblingApp;
 exports.otherApps = otherApps;
@@ -30,11 +31,17 @@ function adminWebUrl() {
     return (process.env.NEXT_PUBLIC_ADMIN_URL?.replace(/\/$/, "") ||
         "http://localhost:3002");
 }
+function paymentsWebUrl() {
+    return (process.env.NEXT_PUBLIC_PAYMENTS_URL?.replace(/\/$/, "") ||
+        "http://localhost:3004");
+}
 function appBaseUrl(app) {
     if (app === "studio")
         return studioWebUrl();
     if (app === "admin")
         return adminWebUrl();
+    if (app === "payments")
+        return paymentsWebUrl();
     return pulseWebUrl();
 }
 /** Prefer Pulse as the SSO hub for silent bridges. */
@@ -44,7 +51,7 @@ function siblingApp(app) {
     return "studio";
 }
 function otherApps(current) {
-    return ["pulse", "studio", "admin"].filter((app) => app !== current);
+    return ["pulse", "studio", "admin", "payments"].filter((app) => app !== current);
 }
 /** Canonical account settings path on the Pulse auth hub. */
 exports.PULSE_ACCOUNT_PATH = "/account";
@@ -78,6 +85,7 @@ function allAppOrigins() {
         new URL(pulseWebUrl()).origin,
         new URL(studioWebUrl()).origin,
         new URL(adminWebUrl()).origin,
+        new URL(paymentsWebUrl()).origin,
     ]);
 }
 /** Absolute SSO consume URL on `app`, with optional post-login path. */

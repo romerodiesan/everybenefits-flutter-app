@@ -123,6 +123,7 @@ function SsoConsumePage({ homePath = "/", rootRedirectPath, LoadingUI, signInWit
                 if (!alive)
                     return;
                 const clientErr = (0, client_1.asSsoClientError)(err);
+                (0, client_1.clearHandoffCodeStash)();
                 setError(t((0, errors_1.ssoMessageKeyForCode)(clientErr.code)));
             }
         };

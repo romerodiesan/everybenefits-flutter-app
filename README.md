@@ -1,6 +1,6 @@
 # Pulse (Every Benefits)
 
-Insurance-agent learning and community platform: forums, chats, Academy, Pulse AI, and ops portals — all on Firebase.
+Insurance-agent learning and community platform: forums, chats, Academy, and ops portals — all on Firebase.
 
 Turborepo monorepo (`apps/` + `packages/`) orchestrated with pnpm.
 
@@ -10,11 +10,12 @@ Turborepo monorepo (`apps/` + `packages/`) orchestrated with pnpm.
 | Pulse Web (learners) | `apps/web/` | `http://localhost:3000` |
 | Pulse Studio (authors) | `apps/studio/` | `http://localhost:3001` |
 | Pulse Admin (ops) | `apps/admin/` | `http://localhost:3002` |
+| Pulse Payments (overrides) | `apps/payments/` | `http://localhost:3004` |
 | Cloud Functions | `apps/functions/` | Emulator `:5001` |
 | Shared TS contracts | `packages/shared` | `@pulse/shared` |
 | Shared web Firebase clients | `packages/firebase-web` | `@pulse/firebase-web` |
 
-Architecture docs: [`docs/architecture/`](docs/architecture/). Pulse AI runbook: [`docs/pulse-ai.md`](docs/pulse-ai.md).
+Architecture docs: [`docs/architecture/`](docs/architecture/).
 
 ## Prerequisites
 
@@ -45,6 +46,7 @@ pnpm emulators
 pnpm dev:web
 pnpm dev:studio
 pnpm dev:admin
+pnpm dev:payments
 
 # Flutter
 cd apps/mobile && flutter run
@@ -71,7 +73,6 @@ Scripts live under [`tooling/scripts/`](tooling/scripts/).
 | `pnpm seed:academy` | Sample Academy content only |
 | `pnpm seed:notifications -- <uid>` | Notification fixtures for one user |
 | `tooling/scripts/migrate-academy-every-benefits-us.mjs` | Academy migration |
-| `tooling/scripts/reindex-ai-knowledge.mjs` | Pulse AI knowledge reindex |
 | `tooling/scripts/import-manhattanlife-course.mjs` | Course import |
 
 With emulators running (`pnpm emulators`):
@@ -92,6 +93,7 @@ Firebase App Hosting backends (Turborepo monorepo):
 | `pulse-web-app` | `apps/web` | `pnpm deploy:web` |
 | `studio-web-app` | `apps/studio` | `pnpm deploy:studio` |
 | `admin-web-app` | `apps/admin` | `pnpm deploy:admin` |
+| `payments-web-app` | `apps/payments` | `pnpm deploy:payments` |
 
 Keep the Console **Root directory** aligned with `firebase.json` → `apphosting[].rootDir`. App Hosting reads the repo-root `turbo.json` / `pnpm-workspace.yaml` and builds workspace packages before the target Next app.
 
@@ -106,6 +108,7 @@ pnpm deploy:functions
 pnpm deploy:web
 # pnpm deploy:studio
 # pnpm deploy:admin
+# pnpm deploy:payments
 ```
 
 ## Naming

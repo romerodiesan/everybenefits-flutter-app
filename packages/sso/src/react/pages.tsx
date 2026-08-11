@@ -161,6 +161,7 @@ export function SsoConsumePage({
       } catch (err) {
         if (!alive) return;
         const clientErr = asSsoClientError(err);
+        clearHandoffCodeStash();
         setError(t(ssoMessageKeyForCode(clientErr.code)));
       }
     };

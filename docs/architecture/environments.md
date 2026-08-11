@@ -16,6 +16,7 @@ Treat **`.firebaserc` → `every-insurance`** as the active CLI default unless y
 - `pulse.everybenefits.us` — webapp
 - `studio.everybenefits.us` — studio
 - `admin.everybenefits.us` — admin
+- `payments.everybenefits.us` — override management (Payments)
 - `legal.everybenefits.us` — legal center (Privacy, Data Use, Cookies, Terms; SvelteKit static)
 
 ## Local ports
@@ -26,6 +27,7 @@ Treat **`.firebaserc` → `every-insurance`** as the active CLI default unless y
 | apps/studio | 3001 |
 | apps/admin | 3002 |
 | apps/legal | 3003 |
+| apps/payments | 3004 |
 | Auth emulator | (see `firebase.json`) |
 | Firestore emulator | (see `firebase.json`) |
 | RTDB emulator | (see `firebase.json`) |
@@ -38,6 +40,7 @@ Copy:
 - `apps/web/.env.example` → `apps/web/.env.local`
 - `apps/studio/.env.example` → `apps/studio/.env.local`
 - `apps/admin/.env.example` → `apps/admin/.env.local`
+- `apps/payments/.env.example` → `apps/payments/.env.local`
 - `apps/legal/.env.example` → `apps/legal/.env`
 
 Pulse links to the legal app via `NEXT_PUBLIC_LEGAL_ORIGIN` (dev: `http://localhost:3003`, prod: `https://legal.everybenefits.us`).
@@ -50,7 +53,7 @@ firebase deploy --only hosting:legal
 
 Map the Hosting site `pulse-legal` to `legal.everybenefits.us` in Firebase Console (DNS / custom domain). The `.firebaserc` target name is `legal`.
 
-Never commit secrets. AI keys and service accounts are webapp-server only (see `docs/pulse-ai.md`).
+Never commit secrets. Service accounts and other server credentials stay in App Hosting / Functions env only — never in client bundles.
 
 ## Creator analytics (Studio)
 

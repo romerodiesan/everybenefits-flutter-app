@@ -99,33 +99,6 @@
       ]
     },
     {
-      "collectionGroup": "aiKnowledgeChunks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "group", "order": "ASCENDING" },
-        {
-          "fieldPath": "embedding",
-          "vectorConfig": { "dimension": 768, "flat": {} }
-        }
-      ]
-    },
-    {
-      "collectionGroup": "aiKnowledgeChunks",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "group", "order": "ASCENDING" },
-        { "fieldPath": "searchTokens", "arrayConfig": "CONTAINS" }
-      ]
-    },
-    {
-      "collectionGroup": "aiRuns",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "surface", "order": "ASCENDING" },
-        { "fieldPath": "createdAt", "order": "DESCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "courses",
       "queryScope": "COLLECTION",
       "fields": [
@@ -209,24 +182,58 @@
         { "fieldPath": "type", "order": "ASCENDING" },
         { "fieldPath": "name", "order": "ASCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "statementLines",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "statementId", "order": "ASCENDING" },
+        { "fieldPath": "productionDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "overrideRuns",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "statementId", "order": "ASCENDING" },
+        { "fieldPath": "startedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "overrideAllocations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "runId", "order": "ASCENDING" },
+        { "fieldPath": "participantId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "reconciliationItems",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "runId", "order": "ASCENDING" },
+        { "fieldPath": "statementLineId", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "contractTerms",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "participantId", "order": "ASCENDING" },
+        { "fieldPath": "effectiveFrom", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "carrierStateRates",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "carrierId", "order": "ASCENDING" },
+        { "fieldPath": "state", "order": "ASCENDING" },
+        { "fieldPath": "effectiveFrom", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [
-    {
-      "collectionGroup": "aiKnowledgeChunks",
-      "fieldPath": "content",
-      "indexes": []
-    },
-    {
-      "collectionGroup": "aiKnowledgeChunks",
-      "fieldPath": "title",
-      "indexes": []
-    },
-    {
-      "collectionGroup": "aiKnowledgeChunks",
-      "fieldPath": "embedding",
-      "indexes": []
-    },
     {
       "collectionGroup": "messages",
       "fieldPath": "text",

@@ -10,7 +10,7 @@ import {
   adminAuth,
   adminDb,
   usingEmulators,
-} from "@/lib/ai/firebase-admin";
+} from "@/lib/firebase-admin";
 
 const server = createSsoServer({
   auth: adminAuth,

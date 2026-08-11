@@ -1,5 +1,6 @@
 import {
   canAccessAdmin,
+  canAccessPayments,
   canAccessStudio,
   type RoleOrPermissions,
   type UserRole,
@@ -8,23 +9,25 @@ import {
 /**
  * Pulse product family apps (cross-origin SSO targets).
  *
- * Host apps (web / studio / admin) must provide these next-intl keys:
+ * Host apps (web / studio / admin / payments) must provide these next-intl keys:
  * - appSwitchTitle, appSwitchHere, appSwitchHandoffFailed
- * - appSwitchPulse, appSwitchStudio, appSwitchAdmin
- * - appSwitchPulseBlurb, appSwitchStudioBlurb, appSwitchAdminBlurb
+ * - appSwitchPulse, appSwitchStudio, appSwitchAdmin, appSwitchPayments
+ * - appSwitchPulseBlurb, appSwitchStudioBlurb, appSwitchAdminBlurb, appSwitchPaymentsBlurb
  * - SSO keys documented in `@pulse/sso` (SsoMessageKey)
  */
-export type PulseAppId = "pulse" | "studio" | "admin";
+export type PulseAppId = "pulse" | "studio" | "admin" | "payments";
 
 export type AppSwitchLabelKey =
   | "appSwitchPulse"
   | "appSwitchStudio"
-  | "appSwitchAdmin";
+  | "appSwitchAdmin"
+  | "appSwitchPayments";
 
 export type AppSwitchBlurbKey =
   | "appSwitchPulseBlurb"
   | "appSwitchStudioBlurb"
-  | "appSwitchAdminBlurb";
+  | "appSwitchAdminBlurb"
+  | "appSwitchPaymentsBlurb";
 
 export type AppRegistryEntry = {
   id: PulseAppId;
@@ -61,6 +64,14 @@ export const PULSE_APPS: readonly AppRegistryEntry[] = [
     homePath: "/",
     tileClass: "bg-brand text-on-brand",
     visible: (roleOrPermissions) => canAccessAdmin(roleOrPermissions),
+  },
+  {
+    id: "payments",
+    labelKey: "appSwitchPayments",
+    blurbKey: "appSwitchPaymentsBlurb",
+    homePath: "/",
+    tileClass: "bg-ink text-on-brand dark:bg-white dark:text-ink",
+    visible: (roleOrPermissions) => canAccessPayments(roleOrPermissions),
   },
 ];
 

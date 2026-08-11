@@ -158,18 +158,18 @@ export function canParticipateInChats(
   return can(roleOrPermissions, "chats.participate");
 }
 
-export function canAccessSupport(
-  roleOrPermissions: RoleOrPermissions,
-  isAnonymous: boolean,
-) {
-  if (isAnonymous) return false;
-  return can(roleOrPermissions, "support.access");
-}
-
 export function canAccessAdmin(roleOrPermissions: RoleOrPermissions) {
   return (
     can(roleOrPermissions, "admin.access") ||
     can(roleOrPermissions, "apps.admin.access")
+  );
+}
+
+/** Override Management portal — platform admins only (not managers by default). */
+export function canAccessPayments(roleOrPermissions: RoleOrPermissions) {
+  return (
+    can(roleOrPermissions, "apps.payments.access") ||
+    can(roleOrPermissions, "platform.manage")
   );
 }
 

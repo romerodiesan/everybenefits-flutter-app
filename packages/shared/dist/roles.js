@@ -14,8 +14,8 @@ exports.canCreateChatGroups = canCreateChatGroups;
 exports.canConfigureGroupAutoJoin = canConfigureGroupAutoJoin;
 exports.canParticipateInForums = canParticipateInForums;
 exports.canParticipateInChats = canParticipateInChats;
-exports.canAccessSupport = canAccessSupport;
 exports.canAccessAdmin = canAccessAdmin;
+exports.canAccessPayments = canAccessPayments;
 exports.canManagePlatform = canManagePlatform;
 exports.canModerateForums = canModerateForums;
 exports.canAccessStudio = canAccessStudio;
@@ -127,14 +127,14 @@ function canParticipateInChats(roleOrPermissions, isAnonymous) {
         return false;
     return (0, permissions_1.can)(roleOrPermissions, "chats.participate");
 }
-function canAccessSupport(roleOrPermissions, isAnonymous) {
-    if (isAnonymous)
-        return false;
-    return (0, permissions_1.can)(roleOrPermissions, "support.access");
-}
 function canAccessAdmin(roleOrPermissions) {
     return ((0, permissions_1.can)(roleOrPermissions, "admin.access") ||
         (0, permissions_1.can)(roleOrPermissions, "apps.admin.access"));
+}
+/** Override Management portal — platform admins only (not managers by default). */
+function canAccessPayments(roleOrPermissions) {
+    return ((0, permissions_1.can)(roleOrPermissions, "apps.payments.access") ||
+        (0, permissions_1.can)(roleOrPermissions, "platform.manage"));
 }
 function canManagePlatform(roleOrPermissions) {
     return (0, permissions_1.can)(roleOrPermissions, "platform.manage");

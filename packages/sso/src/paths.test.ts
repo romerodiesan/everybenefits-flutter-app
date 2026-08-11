@@ -90,12 +90,18 @@ describe("auth hub helpers", () => {
     const finalUrl = "http://localhost:3001/en/login";
     const url = buildLogoutCascadeUrl("studio", "en", finalUrl);
     expect(url).toContain("/auth/logout?next=");
-    // otherApps(studio)=[pulse,admin]; reverse-wrap → outermost is pulse.
+    // otherApps(studio)=[pulse,admin,payments]; reverse-wrap → outermost is pulse.
     expect(url.startsWith("http://localhost:3000/en/auth/logout?next=")).toBe(
       true,
     );
-    const decoded = decodeURIComponent(decodeURIComponent(url));
+    let decoded = url;
+    for (let i = 0; i < 8; i++) {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) break;
+      decoded = next;
+    }
     expect(decoded).toContain("localhost:3002/en/auth/logout");
+    expect(decoded).toContain("localhost:3004/en/auth/logout");
     expect(decoded).toContain(finalUrl);
   });
 });

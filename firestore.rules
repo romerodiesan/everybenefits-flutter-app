@@ -306,27 +306,6 @@ service cloud.firestore {
 
       allow update, delete: if isAdmin();
 
-      // Pulse AI history. Clients read their own transcript; every write goes
-      // through the agent backend with the Admin SDK, so a client can never
-      // forge an assistant turn or edit a citation.
-      match /aiConversations/{conversationId} {
-        allow read: if isOwner(uid);
-        allow delete: if isOwner(uid);
-        allow create, update: if false;
-
-        match /messages/{messageId} {
-          allow read: if isOwner(uid);
-          allow delete: if isOwner(uid);
-          allow create, update: if false;
-        }
-      }
-
-      // Quota counters: the owner may see what is left, only the server writes.
-      match /aiUsage/{dayId} {
-        allow read: if isOwner(uid);
-        allow write: if false;
-      }
-
       match /forumVotes/{voteId} {
         allow read: if isOwner(uid);
         allow write: if false;
@@ -666,17 +645,6 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Retrieval index and run metrics are backend-only: the chunks flatten
-    // content across users and the metrics exist for operators, not clients.
-    // Admin SDK writes bypass rules, so denying everything here is enough.
-    match /aiKnowledgeChunks/{chunkId} {
-      allow read, write: if false;
-    }
-
-    match /aiRuns/{runId} {
-      allow read, write: if false;
-    }
-
     match /functionUsage/{counterId} {
       allow read, write: if false;
     }
@@ -690,16 +658,6 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Platform feature flags (e.g. Pulse AI kill switch).
-    match /platformConfig/{docId} {
-      allow read: if isSignedIn();
-      allow create, update: if (isAdmin() || hasPermission('platform.settings.write'))
-        && request.resource.data.keys().hasOnly(['enabled', 'updatedAt', 'updatedBy'])
-        && request.resource.data.enabled is bool
-        && request.resource.data.updatedBy == request.auth.uid;
-      allow delete: if isAdmin() || hasPermission('platform.settings.write');
-    }
-
     // Role permission documents — clients may read to hydrate Auth; writes via Functions.
     match /roles/{roleId} {
       allow read: if isSignedIn();
@@ -709,6 +667,52 @@ service cloud.firestore {
     // Org tree — clients may read; mutations go through Cloud Functions.
     match /orgNodes/{nodeId} {
       allow read: if isSignedIn() && isManagerOrAdmin();
+      allow write: if false;
+    }
+
+    // Payments / Override Management — admin read; all writes via Functions.
+    function canAccessPaymentsData() {
+      return isAdmin() || hasPermission('apps.payments.access');
+    }
+
+    match /paymentsParticipants/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /businessRelationships/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /contractTerms/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /carriers/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /carrierStateRates/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /statements/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /statementLines/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /overrideRuns/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /overrideAllocations/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /reconciliationItems/{id} {
+      allow read: if canAccessPaymentsData();
       allow write: if false;
     }
 

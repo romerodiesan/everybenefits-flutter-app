@@ -111,3 +111,9 @@ env:
     availability:
       - BUILD
       - RUNTIME
+
+  - variable: NEXT_PUBLIC_PAYMENTS_URL
+    value: https://payments.everybenefits.us
+    availability:
+      - BUILD
+      - RUNTIME

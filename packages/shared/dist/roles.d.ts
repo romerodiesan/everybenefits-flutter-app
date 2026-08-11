@@ -39,8 +39,9 @@ export declare function canCreateChatGroups(roleOrPermissions: RoleOrPermissions
 export declare function canConfigureGroupAutoJoin(roleOrPermissions: RoleOrPermissions): boolean;
 export declare function canParticipateInForums(roleOrPermissions: RoleOrPermissions, isAnonymous: boolean): boolean;
 export declare function canParticipateInChats(roleOrPermissions: RoleOrPermissions, isAnonymous: boolean): boolean;
-export declare function canAccessSupport(roleOrPermissions: RoleOrPermissions, isAnonymous: boolean): boolean;
 export declare function canAccessAdmin(roleOrPermissions: RoleOrPermissions): boolean;
+/** Override Management portal — platform admins only (not managers by default). */
+export declare function canAccessPayments(roleOrPermissions: RoleOrPermissions): boolean;
 export declare function canManagePlatform(roleOrPermissions: RoleOrPermissions): boolean;
 export declare function canModerateForums(roleOrPermissions: RoleOrPermissions): boolean;
 export declare function canAccessStudio(roleOrPermissions: RoleOrPermissions): boolean;

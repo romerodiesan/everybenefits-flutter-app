@@ -133,16 +133,12 @@ export async function resolveSwitchUrl(opts: {
 /**
  * Read opaque handoff code from query. Stashes in sessionStorage for Strict Mode.
  * Strips legacy `ht` / hash idToken params without using them.
+ *
+ * Prefer a fresh `hc` query param over any stashed leftover — a failed exchange
+ * must not block the next handoff URL.
  */
 export function takeHandoffCode(): string | null {
   if (typeof window === "undefined") return null;
-
-  try {
-    const stashed = sessionStorage.getItem(SSO_CODE_STASH_KEY);
-    if (stashed && stashed.length >= CODE_MIN_LEN) return stashed;
-  } catch {
-    // ignore
-  }
 
   const url = new URL(window.location.href);
   let dirty = false;
@@ -167,6 +163,13 @@ export function takeHandoffCode(): string | null {
       `${url.pathname}${url.search}${url.hash}`,
     );
     return fromQuery;
+  }
+
+  try {
+    const stashed = sessionStorage.getItem(SSO_CODE_STASH_KEY);
+    if (stashed && stashed.length >= CODE_MIN_LEN) return stashed;
+  } catch {
+    // ignore
   }
 
   const hash = window.location.hash.replace(/^#/, "");

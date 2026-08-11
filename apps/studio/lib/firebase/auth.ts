@@ -23,7 +23,7 @@ export async function signOutUser() {
  * sessions clear too. Lands on `returnPath` on the current origin.
  */
 export async function signOutAndRedirect(opts: {
-  current: "pulse" | "studio" | "admin";
+  current: "pulse" | "studio" | "admin" | "payments";
   locale: string;
   /** Path on the current app after the cascade finishes. */
   returnPath?: string;

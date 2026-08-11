@@ -306,5 +306,7 @@
   "workspaceImporting": "Creating lessons…",
   "workspaceDropVideo": "Drop a video here, or choose a file",
   "workspaceReplaceDrop": "Drop a new video to replace",
-  "workspaceActiveUploads": "{count, plural, one {# upload} other {# uploads}}"
+  "workspaceActiveUploads": "{count, plural, one {# upload} other {# uploads}}",
+  "appSwitchPayments": "Payments",
+  "appSwitchPaymentsBlurb": "Overrides, statements, and reconciliation"
 }

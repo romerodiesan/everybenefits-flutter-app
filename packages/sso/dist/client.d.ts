@@ -22,6 +22,9 @@ export declare function resolveSwitchUrl(opts: {
 /**
  * Read opaque handoff code from query. Stashes in sessionStorage for Strict Mode.
  * Strips legacy `ht` / hash idToken params without using them.
+ *
+ * Prefer a fresh `hc` query param over any stashed leftover — a failed exchange
+ * must not block the next handoff URL.
  */
 export declare function takeHandoffCode(): string | null;
 export declare function clearHandoffCodeStash(): void;

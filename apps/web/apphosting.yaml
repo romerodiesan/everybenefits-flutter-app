@@ -12,9 +12,6 @@
 # Secrets (create once, then grant to this backend):
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_WEB_API_KEY --project every-benefits-us
 #   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us
-#   npx -y firebase-tools@latest apphosting:secrets:set AI_GATEWAY_API_KEY --project every-benefits-us
-#   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_WEB_SEARCH_API_KEY --project every-benefits-us
-#   npx -y firebase-tools@latest apphosting:secrets:set PULSE_AI_ADMIN_TASK_KEY --project every-benefits-us
 #
 # Do NOT set NEXT_PUBLIC_FIREBASE_* via Console overrideEnv — stale overrides
 # previously forced the Maps API key + a deleted web appId and broke App Check.
@@ -89,7 +86,7 @@ env:
 
   # App Check is disabled for now. Re-enable later with
   # NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY + PULSE_SSO_REQUIRE_APP_CHECK /
-  # PULSE_AI_REQUIRE_APP_CHECK / FUNCTIONS_ENFORCE_APP_CHECK=true.
+  # FUNCTIONS_ENFORCE_APP_CHECK=true.
 
   # --- Admin ---
   - variable: FIREBASE_PROJECT_ID
@@ -120,50 +117,8 @@ env:
       - BUILD
       - RUNTIME
 
-  # --- Pulse AI (server) ---
-  # Uncomment after secrets are set + granted to this backend:
-  #   npx -y firebase-tools@latest apphosting:secrets:set AI_GATEWAY_API_KEY --project every-benefits-us
-  - variable: PULSE_AI_MODEL
-    value: "anthropic/claude-sonnet-5"
+  - variable: NEXT_PUBLIC_PAYMENTS_URL
+    value: https://payments.everybenefits.us
     availability:
-      - RUNTIME
-  - variable: PULSE_AI_FAST_MODEL
-    value: "google/gemini-3.6-flash"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_EMBEDDING_MODEL
-    value: "google/gemini-embedding-001"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_EMBEDDING_DIMENSIONS
-    value: "768"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_DAILY_MESSAGE_LIMIT
-    value: "60"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_PER_MINUTE_MESSAGE_LIMIT
-    value: "8"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_MAX_WEB_SEARCHES_PER_RUN
-    value: "1"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_MAX_EMBEDDING_SEARCHES_PER_RUN
-    value: "4"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_REQUIRE_APP_CHECK
-    value: "false"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_ALLOW_ANONYMOUS
-    value: "false"
-    availability:
-      - RUNTIME
-  - variable: PULSE_AI_WEB_SEARCH_PROVIDER
-    value: "none"
-    availability:
+      - BUILD
       - RUNTIME

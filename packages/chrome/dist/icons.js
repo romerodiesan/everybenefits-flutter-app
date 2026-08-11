@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.IconPulseMark = IconPulseMark;
 exports.IconStudioMark = IconStudioMark;
 exports.IconAdminMark = IconAdminMark;
+exports.IconPaymentsMark = IconPaymentsMark;
 exports.IconChevron = IconChevron;
 exports.IconCheck = IconCheck;
 exports.AppIcon = AppIcon;
@@ -16,6 +17,9 @@ function IconStudioMark(props) {
 function IconAdminMark(props) {
     return ((0, jsx_runtime_1.jsxs)("svg", { viewBox: "0 0 24 24", fill: "none", "aria-hidden": true, ...props, children: [(0, jsx_runtime_1.jsx)("path", { d: "M12 3.5 19 7v5c0 4.5-3 7.5-7 8.5-4-1-7-4-7-8.5V7l7-3.5Z", stroke: "currentColor", strokeWidth: "1.8", strokeLinejoin: "round" }), (0, jsx_runtime_1.jsx)("path", { d: "M9.5 12.2l1.8 1.8 3.4-3.5", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round", strokeLinejoin: "round" })] }));
 }
+function IconPaymentsMark(props) {
+    return ((0, jsx_runtime_1.jsxs)("svg", { viewBox: "0 0 24 24", fill: "none", "aria-hidden": true, ...props, children: [(0, jsx_runtime_1.jsx)("path", { d: "M4 8.5h16v9H4z", stroke: "currentColor", strokeWidth: "1.8", strokeLinejoin: "round" }), (0, jsx_runtime_1.jsx)("path", { d: "M4 11.5h16M8 15h3", stroke: "currentColor", strokeWidth: "1.8", strokeLinecap: "round" })] }));
+}
 function IconChevron(props) {
     return ((0, jsx_runtime_1.jsx)("svg", { viewBox: "0 0 16 16", fill: "none", "aria-hidden": true, ...props, children: (0, jsx_runtime_1.jsx)("path", { d: "M4 6.2 8 10l4-3.8", stroke: "currentColor", strokeWidth: "1.6", strokeLinecap: "round", strokeLinejoin: "round" }) }));
 }
@@ -26,6 +30,7 @@ const APP_ICONS = {
     pulse: IconPulseMark,
     studio: IconStudioMark,
     admin: IconAdminMark,
+    payments: IconPaymentsMark,
 };
 function AppIcon({ id, ...props }) {
     const Icon = APP_ICONS[id];

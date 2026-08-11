@@ -7,8 +7,6 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | Path | Purpose |
 |------|---------|
 | `users/{uid}` | Profile, role, approval, accountStatus, orgNodeId, prefs |
-| `users/{uid}/aiConversations/**` | Pulse AI history |
-| `users/{uid}/aiUsage/{dayId}` | AI quotas |
 | `users/{uid}/forumVotes/{voteId}` | Per-user vote records |
 | `users/{uid}/enrollments/{courseId}` | Academy progress |
 | `users/{uid}/notifications/{id}` | In-app inbox |
@@ -28,8 +26,16 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `analyticsViewerDays/{id}` | Approximate unique viewers (Functions-only) |
 | `paths/{pathId}` | Learning paths |
 | `orgNodes/{id}` | Org hierarchy (Admin); mutations via Functions |
-| `aiKnowledgeChunks/{id}` | RAG vectors (backend-only) |
-| `aiRuns/{id}` | AI run telemetry (backend-only) |
+| `paymentsParticipants/{id}` | Override economic participants (`agency` \| `agent` only) |
+| `businessRelationships/{id}` | Temporal upline→downline edges; type derived from participant pair |
+| `contractTerms/{id}` | Contract levels (e.g. PMPM) by participant + scope |
+| `carriers/{id}` | Carrier catalog (`market`: aca \| medicare \| life) |
+| `carrierStateRates/{id}` | Per-state platform-owner intake: commission + override (`flat` \| `percent`); one active row per carrier+state |
+| `statements/{id}` | Imported carrier/FMO statements |
+| `statementLines/{id}` | Production / received-override lines |
+| `overrideRuns/{id}` | Calculation run metadata |
+| `overrideAllocations/{id}` | Per-participant override portions for a run |
+| `reconciliationItems/{id}` | Expected vs received diffs for a run |
 | `functionUsage/{id}` | Callable rate / usage counters |
 | `ssoHandoffs/{code}` | Cross-app SSO codes (60s TTL; configure Firestore TTL on `expiresAt`) |
 | `ssoRateLimit/{id}` | SSO abuse counters (configure Firestore TTL on `expiresAt`) |

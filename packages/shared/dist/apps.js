@@ -29,6 +29,14 @@ exports.PULSE_APPS = [
         tileClass: "bg-brand text-on-brand",
         visible: (roleOrPermissions) => (0, roles_1.canAccessAdmin)(roleOrPermissions),
     },
+    {
+        id: "payments",
+        labelKey: "appSwitchPayments",
+        blurbKey: "appSwitchPaymentsBlurb",
+        homePath: "/",
+        tileClass: "bg-ink text-on-brand dark:bg-white dark:text-ink",
+        visible: (roleOrPermissions) => (0, roles_1.canAccessPayments)(roleOrPermissions),
+    },
 ];
 function listVisibleApps(roleOrPermissions) {
     return exports.PULSE_APPS.filter((app) => !app.visible || app.visible(roleOrPermissions));

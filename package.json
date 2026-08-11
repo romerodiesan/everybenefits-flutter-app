@@ -22,13 +22,17 @@
     "seed": "node ./tooling/scripts/seed-mega.mjs",
     "seed:quick": "SEED_PROFILE=quick node ./tooling/scripts/seed-mega.mjs",
     "seed:mega": "node ./tooling/scripts/seed-mega.mjs",
+    "purge:ai-support": "node ./tooling/scripts/purge-ai-and-support.mjs",
     "sync:functions-shared": "pnpm --filter @pulse/functions run sync:shared",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,database,storage",
     "deploy:functions": "pnpm sync:functions-shared && firebase deploy --only functions",
     "deploy:web": "firebase deploy --only apphosting:pulse-web-app",
     "deploy:studio": "firebase deploy --only apphosting:studio-web-app",
     "deploy:admin": "firebase deploy --only apphosting:admin-web-app",
-    "deploy:legal": "pnpm build:legal && firebase deploy --only hosting:legal"
+    "deploy:legal": "pnpm build:legal && firebase deploy --only hosting:legal",
+    "build:payments": "turbo run build --filter=@pulse/payments",
+    "dev:payments": "pnpm --filter @pulse/payments dev",
+    "deploy:payments": "firebase deploy --only apphosting:payments-web-app"
   },
   "devDependencies": {
     "turbo": "^2.10.8",

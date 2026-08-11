@@ -44,14 +44,18 @@ export const callableOpts = {
         "http://127.0.0.1:3001",
         "http://localhost:3002",
         "http://127.0.0.1:3002",
+        "http://localhost:3004",
+        "http://127.0.0.1:3004",
         "https://every-insurance.web.app",
         "https://every-insurance.firebaseapp.com",
         "https://pulse.everybenefits.us",
         "https://studio.everybenefits.us",
         "https://admin.everybenefits.us",
+        "https://payments.everybenefits.us",
         "https://pulse-web-app--every-benefits-us.us-central1.hosted.app",
         "https://studio-web-app--every-benefits-us.us-central1.hosted.app",
         "https://admin-web-app--every-benefits-us.us-central1.hosted.app",
+        "https://payments-web-app--every-benefits-us.us-central1.hosted.app",
         ...(process.env.FUNCTIONS_ALLOWED_ORIGINS ?? "")
           .split(",")
           .map((origin) => origin.trim())

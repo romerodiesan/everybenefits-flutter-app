@@ -2,6 +2,7 @@ import type { PulseAppId } from "@pulse/shared";
 export declare function pulseWebUrl(): string;
 export declare function studioWebUrl(): string;
 export declare function adminWebUrl(): string;
+export declare function paymentsWebUrl(): string;
 export declare function appBaseUrl(app: PulseAppId): string;
 /** Prefer Pulse as the SSO hub for silent bridges. */
 export declare function siblingApp(app: PulseAppId): PulseAppId;

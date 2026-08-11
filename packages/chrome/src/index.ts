@@ -8,6 +8,7 @@ export {
   IconAdminMark,
   IconCheck,
   IconChevron,
+  IconPaymentsMark,
   IconPulseMark,
   IconStudioMark,
 } from "./icons";

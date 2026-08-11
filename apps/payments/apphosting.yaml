@@ -1,0 +1,115 @@
+# Firebase App Hosting — Payments
+# Project: every-benefits-us
+#
+# Console / GitHub backend settings:
+#   Root directory = apps/payments  (must match firebase.json apphosting.rootDir)
+# App Hosting detects the repo-root turbo.json + pnpm workspace and builds
+# @pulse/payments plus workspace deps (@pulse/shared, @pulse/firebase-web).
+#
+# Local CLI deploy (from repo root):
+#   pnpm deploy:payments
+#
+# Secrets:
+#   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_WEB_API_KEY --project every-benefits-us
+#   npx -y firebase-tools@latest apphosting:secrets:set FIREBASE_SERVICE_ACCOUNT_KEY --project every-benefits-us
+#
+# Do NOT set NEXT_PUBLIC_FIREBASE_* via Console overrideEnv — stale overrides
+# previously forced the Maps API key + a deleted web appId and broke App Check.
+#
+# Cross-app URLs: pulse.everybenefits.us / studio.everybenefits.us / payments.everybenefits.us
+
+runConfig:
+  cpu: 1
+  memoryMiB: 1024
+  minInstances: 0
+  maxInstances: 5
+  concurrency: 80
+
+env:
+  # --- Firebase client (every-benefits-us web app) ---
+  # Public client SDK config — same Firebase web app for Pulse / Studio / Payments.
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: every-benefits-us.firebaseapp.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: every-benefits-us
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: every-benefits-us.appspot.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "1001601265155"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:1001601265155:web:f03d9d5d1f14602dd8e836
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
+    value: https://every-benefits-us-default-rtdb.firebaseio.com
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: G-BM8TQCEQQN
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_FUNCTIONS_REGION
+    value: us-central1
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_USE_FIREBASE_EMULATORS
+    value: "false"
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # App Check is disabled for now. Re-enable later with
+  # NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY + PULSE_SSO_REQUIRE_APP_CHECK=true.
+
+  - variable: FIREBASE_PROJECT_ID
+    value: every-benefits-us
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: SERVICE_ACCOUNT_KEY
+    secret: FIREBASE_SERVICE_ACCOUNT_KEY
+    availability:
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_PULSE_WEB_URL
+    value: https://pulse.everybenefits.us
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_STUDIO_URL
+    value: https://studio.everybenefits.us
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_ADMIN_URL
+    value: https://admin.everybenefits.us
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_PAYMENTS_URL
+    value: https://payments.everybenefits.us
+    availability:
+      - BUILD
+      - RUNTIME

@@ -1,0 +1,161 @@
+import {
+  doc,
+  getDoc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+  type Unsubscribe,
+} from "firebase/firestore";
+import { type User } from "firebase/auth";
+import { getFirebaseDb } from "./client";
+import type { UserProfile } from "../types";
+import { DEFAULT_AGENCY } from "../types";
+import { parseRole } from "../roles";
+
+function toDate(value: unknown): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "object" && value !== null && "toDate" in value) {
+    const fn = (value as { toDate: () => Date }).toDate;
+    if (typeof fn === "function") return fn.call(value);
+  }
+  return null;
+}
+
+export function profileFromData(
+  uid: string,
+  data: Record<string, unknown>,
+): UserProfile {
+  return {
+    uid: (data.uid as string) ?? uid,
+    email: (data.email as string) ?? null,
+    displayName: (data.displayName as string) ?? null,
+    photoUrl: (data.photoUrl as string) ?? null,
+    role: parseRole(data.role),
+    isAnonymous: Boolean(data.isAnonymous),
+    profileCompleted: (data.profileCompleted as boolean) ?? true,
+    phoneCountryCode: (data.phoneCountryCode as string) ?? null,
+    phoneNumber: (data.phoneNumber as string) ?? null,
+    npn: (data.npn as string) ?? null,
+    address: (data.address as string) ?? null,
+    addressStreet: (data.addressStreet as string) ?? null,
+    addressApt: (data.addressApt as string) ?? null,
+    addressCity: (data.addressCity as string) ?? null,
+    addressState: (data.addressState as string) ?? null,
+    addressZip: (data.addressZip as string) ?? null,
+    agency: (data.agency as string) ?? null,
+    orgNodeId: (data.orgNodeId as string) ?? null,
+    createdAt: toDate(data.createdAt),
+    updatedAt: toDate(data.updatedAt),
+    accountStatus:
+      data.accountStatus === "deactivated" ||
+      data.accountStatus === "pendingDeletion"
+        ? data.accountStatus
+        : "active",
+    deletionScheduledAt: toDate(data.deletionScheduledAt),
+    approvalStatus:
+      data.approvalStatus === "pending" ||
+      data.approvalStatus === "approved" ||
+      data.approvalStatus === "rejected"
+        ? data.approvalStatus
+        : undefined,
+    appearance: appearanceFrom(data.appearance),
+  };
+}
+
+function appearanceFrom(
+  raw: unknown,
+): UserProfile["appearance"] {
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as Record<string, unknown>;
+  const theme = data.theme;
+  const accent = data.accent;
+  if (theme !== "system" && theme !== "light" && theme !== "dark") {
+    return null;
+  }
+  return {
+    theme,
+    accent: typeof accent === "string" && accent ? accent : "green",
+  };
+}
+
+export async function ensureProfile(user: User): Promise<UserProfile> {
+  const refDoc = doc(getFirebaseDb(), "users", user.uid);
+  const snap = await getDoc(refDoc);
+  if (snap.exists()) {
+    return profileFromData(user.uid, snap.data() as Record<string, unknown>);
+  }
+
+  const isAnonymous = user.isAnonymous;
+  const profile: UserProfile = {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    photoUrl: user.photoURL,
+    role: isAnonymous ? "guest" : "student",
+    isAnonymous,
+    profileCompleted: isAnonymous,
+    phoneCountryCode: null,
+    phoneNumber: null,
+    npn: null,
+    address: null,
+    addressStreet: null,
+    addressApt: null,
+    addressCity: null,
+    addressState: null,
+    addressZip: null,
+    agency: isAnonymous ? null : DEFAULT_AGENCY,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    approvalStatus: isAnonymous ? "approved" : "pending",
+  };
+
+  await setDoc(refDoc, {
+    uid: profile.uid,
+    email: profile.email,
+    emailLower: profile.email?.toLowerCase() ?? null,
+    displayName: profile.displayName,
+    displayNameLower: profile.displayName?.trim().toLowerCase() || null,
+    photoUrl: profile.photoUrl,
+    role: profile.role,
+    isAnonymous: profile.isAnonymous,
+    profileCompleted: profile.profileCompleted,
+    phoneCountryCode: null,
+    phoneNumber: null,
+    npn: null,
+    address: null,
+    addressStreet: null,
+    addressApt: null,
+    addressCity: null,
+    addressState: null,
+    addressZip: null,
+    agency: profile.agency,
+    approvalStatus: profile.approvalStatus,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+
+  return profile;
+}
+
+export function watchProfile(
+  uid: string,
+  onChange: (profile: UserProfile | null) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onSnapshot(
+    doc(getFirebaseDb(), "users", uid),
+    (snap) => {
+      if (!snap.exists()) {
+        onChange(null);
+        return;
+      }
+      onChange(profileFromData(uid, snap.data() as Record<string, unknown>));
+    },
+    (error) => onError?.(error),
+  );
+}

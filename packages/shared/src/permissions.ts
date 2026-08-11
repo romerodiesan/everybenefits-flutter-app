@@ -298,7 +298,7 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
     key: "chats.groups.create",
     category: "comms",
     name: "Create chat groups",
-    description: "Create non-support chat groups",
+    description: "Create chat groups",
   },
   {
     key: "chats.groups.default.join",
@@ -311,18 +311,6 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
     category: "comms",
     name: "Configure group auto-join",
     description: "Configure auto-join-by-role on groups",
-  },
-  {
-    key: "chats.support.staff",
-    category: "comms",
-    name: "Support staff inbox",
-    description: "Handle support inbox as staff",
-  },
-  {
-    key: "support.access",
-    category: "comms",
-    name: "Access support",
-    description: "Open support as a member needing help",
   },
   {
     key: "notifications.manage",
@@ -349,6 +337,12 @@ export const PERMISSION_CATALOG: readonly PermissionDef[] = [
     category: "apps",
     name: "Access Admin app",
     description: "Access Pulse Admin (alias of admin.access)",
+  },
+  {
+    key: "apps.payments.access",
+    category: "apps",
+    name: "Access Payments",
+    description: "Access Override Management (Payments) portal",
   },
 ] as const;
 
@@ -597,11 +591,11 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "chats.groups.create",
     "chats.groups.default.join",
     "chats.groups.autojoin.configure",
-    "chats.support.staff",
     "notifications.manage",
     "apps.web.access",
     "apps.studio.access",
     "apps.admin.access",
+    "apps.payments.access",
   ],
   manager: [
     "platform.stats.read",
@@ -631,7 +625,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "chats.groups.create",
     "chats.groups.default.join",
     "chats.groups.autojoin.configure",
-    "chats.support.staff",
     "apps.web.access",
     "apps.studio.access",
     "apps.admin.access",
@@ -646,7 +639,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "forums.participate",
     "chats.participate",
     "chats.groups.default.join",
-    "support.access",
     "apps.web.access",
   ],
   student: [
@@ -654,7 +646,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "academy.progress.read",
     "forums.participate",
     "chats.participate",
-    "support.access",
     "apps.web.access",
   ],
   instructor: [
@@ -670,7 +661,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "chats.participate",
     "chats.groups.create",
     "chats.groups.default.join",
-    "support.access",
     "apps.web.access",
     "apps.studio.access",
   ],

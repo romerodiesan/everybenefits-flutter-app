@@ -56,6 +56,25 @@ export function IconAdminMark(props: IconProps) {
   );
 }
 
+export function IconPaymentsMark(props: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" aria-hidden {...props}>
+      <path
+        d="M4 8.5h16v9H4z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M4 11.5h16M8 15h3"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 export function IconChevron(props: IconProps) {
   return (
     <svg viewBox="0 0 16 16" fill="none" aria-hidden {...props}>
@@ -91,6 +110,7 @@ const APP_ICONS: Record<
   pulse: IconPulseMark,
   studio: IconStudioMark,
   admin: IconAdminMark,
+  payments: IconPaymentsMark,
 };
 
 export function AppIcon({
