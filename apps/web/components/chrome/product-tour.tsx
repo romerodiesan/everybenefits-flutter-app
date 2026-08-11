@@ -26,7 +26,6 @@ export type TourTargetId =
   | "nav-home"
   | "nav-chats"
   | "nav-academy"
-  | "nav-ai"
   | "nav-profile";
 
 type StepDef = {
@@ -36,17 +35,14 @@ type StepDef = {
     | "tourCommunityTitle"
     | "tourChatsTitle"
     | "tourAcademyTitle"
-    | "tourAiTitle"
     | "tourYouTitle";
   bodyKey:
     | "tourWelcomeBody"
     | "tourCommunityBody"
     | "tourChatsBody"
     | "tourAcademyBody"
-    | "tourAiBody"
     | "tourYouBody"
     | "tourYouBodyAgent";
-  requireAi?: boolean;
 };
 
 const ALL_STEPS: StepDef[] = [
@@ -69,12 +65,6 @@ const ALL_STEPS: StepDef[] = [
     id: "nav-academy",
     titleKey: "tourAcademyTitle",
     bodyKey: "tourAcademyBody",
-  },
-  {
-    id: "nav-ai",
-    titleKey: "tourAiTitle",
-    bodyKey: "tourAiBody",
-    requireAi: true,
   },
   {
     id: "nav-profile",
@@ -134,14 +124,12 @@ export function ProductTour({
   profile,
   permissions,
   profileReady = true,
-  pulseAiEnabled,
   onCompleted,
 }: {
   profile: UserProfile;
   permissions?: readonly string[];
   /** False while Firestore profile is still hydrating — keep tour closed. */
   profileReady?: boolean;
-  pulseAiEnabled: boolean;
   onCompleted?: (next: UserProfile) => void;
 }) {
   const t = useTranslations();
@@ -157,12 +145,12 @@ export function ProductTour({
 
   const steps = useMemo(
     () =>
-      ALL_STEPS.filter((s) => !s.requireAi || pulseAiEnabled).map((s) =>
+      ALL_STEPS.map((s) =>
         s.id === "nav-profile" && isAgent
           ? { ...s, bodyKey: "tourYouBodyAgent" as const }
           : s,
       ),
-    [pulseAiEnabled, isAgent],
+    [isAgent],
   );
 
   useEffect(() => {

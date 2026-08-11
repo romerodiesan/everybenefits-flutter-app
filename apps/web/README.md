@@ -43,19 +43,6 @@ Optional:
 > Flutter debug defaults to **emulators**. Web `pnpm dev` talks to **production**
 > Firebase unless you set `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true`.
 
-## Pulse AI
-
-The agent lives under `lib/ai/` and `app/api/ai/`. It answers US insurance questions
-with RAG over accepted forum answers, the academy and official regulator sources.
-
-See the full runbook: [`../docs/pulse-ai.md`](../docs/pulse-ai.md).
-
-```bash
-pnpm test          # unit tests + offline evals
-pnpm eval:ai       # scope / citation eval suite
-node ../scripts/reindex-ai-knowledge.mjs   # rebuild retrieval index
-```
-
 ## Deploy (Vercel)
 
 - Root directory: `webapp`
@@ -76,8 +63,7 @@ pnpm dlx vercel
 | Auth | Email/password, Google popup, magic link, guest |
 | Profile completion | Student vs agent |
 | Forums | Feed + master-detail, votes, accept answer, share to chat |
-| Chats | RTDB inbox + split pane, DM/group/support, reactions, pin/hide |
-| AI | Pulse AI agent (streaming, sources, history) — see [`docs/pulse-ai.md`](../docs/pulse-ai.md) |
+| Chats | RTDB inbox + split pane, DM/group, reactions, pin/hide |
 | Academy | Learner catalog, courses, paths (authoring → [`../studio`](../studio)) |
 | Admin | Promote students (`listStudentsForPromotion` / `setUserRole`) |
 

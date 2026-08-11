@@ -10,7 +10,7 @@ import {
 } from "react";
 import { useTranslations } from "next-intl";
 
-export type PhoneTab = "home" | "chats" | "ai" | "academy" | "profile";
+export type PhoneTab = "home" | "chats" | "academy" | "profile";
 
 /** The mock UI is authored at this size and scaled to whatever width it gets. */
 const DESIGN_WIDTH = 282;
@@ -54,20 +54,6 @@ function IconChat({ filled, ...props }: IconProps) {
           d="M6.5 4h11A2.5 2.5 0 0 1 20 6.5v8A2.5 2.5 0 0 1 17.5 17H9l-3.8 2.8c-.5.4-1.2 0-1.2-.6V6.5A2.5 2.5 0 0 1 6.5 4Z"
         />
       )}
-    </svg>
-  );
-}
-
-function IconAi({ filled, ...props }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" {...props}>
-      <path
-        fill={filled ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth={filled ? 0 : 1.8}
-        strokeLinejoin="round"
-        d="M12 3.5 13.8 9l5.7 1.2-4.5 3.8 1.4 5.7L12 16.8 7.6 19.7l1.4-5.7-4.5-3.8L10.2 9 12 3.5Z"
-      />
     </svg>
   );
 }
@@ -126,12 +112,11 @@ function IconPerson({ filled, ...props }: IconProps) {
 
 const TABS: {
   id: PhoneTab;
-  labelKey: "navHome" | "navChats" | "navAi" | "navAcademy" | "navProfile";
+  labelKey: "navHome" | "navChats" | "navAcademy" | "navProfile";
   Icon: ComponentType<IconProps>;
 }[] = [
   { id: "home", labelKey: "navHome", Icon: IconHome },
   { id: "chats", labelKey: "navChats", Icon: IconChat },
-  { id: "ai", labelKey: "navAi", Icon: IconAi },
   { id: "academy", labelKey: "navAcademy", Icon: IconSchool },
   { id: "profile", labelKey: "navProfile", Icon: IconPerson },
 ];

@@ -4,20 +4,20 @@ import { createContext, useContext, type ComponentProps, type ReactNode } from "
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-/** Lets Pulse AI turn its `[S1]` markers into clickable source chips. */
+/** Lets `[S1]` citation markers become clickable source chips. */
 const CitationContext = createContext<((ref: string) => ReactNode) | null>(null);
 
 const CITATION_SCHEME = "pulse-cite:";
 
 /**
- * GFM Markdown renderer for reading lessons (and Pulse AI answers).
+ * GFM Markdown renderer for reading lessons.
  *
  * Supports GitHub Flavored Markdown: headings, lists, tables, blockquotes,
  * fenced code, strikethrough, autolinks, plus inline bold/italic/code/links.
  * Output is React elements via react-markdown — no raw HTML (`rehype-raw`
  * is not used), so authored content cannot inject markup.
  *
- * Pulse citation markers `[S1]` are rewritten to a private link scheme and
+ * Citation markers `[S1]` are rewritten to a private link scheme and
  * resolved through `renderCitation` when provided.
  */
 export function Markdown({

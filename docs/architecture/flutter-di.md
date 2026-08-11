@@ -8,19 +8,15 @@ Typical graph:
 
 - `AuthService` — Firebase Auth providers / MFA
 - `UserRepository` — profile persistence
-- Feature repositories — forums, chats, university/academy, notifications, AI client
+- Feature repositories — forums, chats, university/academy, notifications
 - `PulseShell` — tab navigation and badge streams
 
 Pass repositories into feature screens via constructors or inherited shell state; avoid service locators.
 
 ## Navigation
 
-Imperative `Navigator` / `MaterialPageRoute` from the shell tabs (Forums, Chats, Academy, Profile; AI as full-screen route). **`go_router` is deferred** until a navigation-heavy change justifies it.
+Imperative `Navigator` / `MaterialPageRoute` from the shell tabs (Forums, Chats, Academy, Profile). **`go_router` is deferred** until a navigation-heavy change justifies it.
 
 ## Domain parity
 
 Field names on `UserProfile` and related models should match `@pulse/shared` fixtures under `packages/shared/fixtures/`. Prefer adding `orgNodeId` and account lifecycle fields when Admin/Functions expose them.
-
-## Pulse AI client
-
-[`apps/mobile/lib/features/ai_chat/pulse_ai_client.dart`](../../apps/mobile/lib/features/ai_chat/pulse_ai_client.dart) calls the webapp SSE endpoint documented in [ADR-004](ADR-004-pulse-ai.md) and `docs/pulse-ai.md`. Configure base URL with `--dart-define=PULSE_AI_BASE_URL=...` for release.

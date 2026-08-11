@@ -51,19 +51,6 @@ bool belongsInDefaultAgentGroup(UserRole role) {
       role == UserRole.system;
 }
 
-/// `support.access` — members who need help (not platform staff).
-bool canAccessSupport(UserRole role, {required bool isAnonymous}) {
-  if (isAnonymous || role == UserRole.guest) return false;
-  if (role == UserRole.admin ||
-      role == UserRole.manager ||
-      role == UserRole.system) {
-    return false;
-  }
-  return role == UserRole.student ||
-      role == UserRole.agent ||
-      role == UserRole.instructor;
-}
-
 /// `tools.access`
 bool canAccessTools(UserRole role) {
   return role == UserRole.agent ||

@@ -159,13 +159,6 @@ class _NotificationPrefsScreenState extends State<NotificationPrefsScreen> {
                 (p) => p.copyWith(pushAcademy: v),
               ),
             ),
-            _PrefTile(
-              label: l10n.notificationsPrefSupport,
-              value: _prefs.pushSupport,
-              onChanged: (v) => _toggle(
-                (p) => p.copyWith(pushSupport: v),
-              ),
-            ),
           ],
         ],
       ),

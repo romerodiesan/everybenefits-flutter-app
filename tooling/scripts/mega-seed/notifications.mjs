@@ -3,7 +3,6 @@ import { commitInBatches, db, log } from "./admin.mjs";
 
 const TYPES = [
   "chat_message",
-  "support_message",
   "forum_reply",
   "forum_vote",
   "forum_new_thread",
@@ -77,7 +76,6 @@ export async function seedNotifications(userCtx, academy) {
           pushChats: true,
           pushForums: true,
           pushAcademy: true,
-          pushSupport: true,
         },
         updatedAt: new Date(now),
       },

@@ -14,7 +14,6 @@ import { PhoneMock, type PhoneTab } from "@/components/landing/phone-mock";
 import { ForumsScreen } from "@/components/landing/screens/forums-screen";
 import { ChatsScreen } from "@/components/landing/screens/chats-screen";
 import { AcademyScreen } from "@/components/landing/screens/academy-screen";
-import { AiScreen } from "@/components/landing/screens/ai-screen";
 import { PulseField } from "@/components/landing/pulse-field";
 
 type Channel = {
@@ -23,13 +22,11 @@ type Channel = {
   titleKey:
     | "landingHowForumsTitle"
     | "landingHowChatsTitle"
-    | "landingHowAcademyTitle"
-    | "landingHowAiTitle";
+    | "landingHowAcademyTitle";
   bodyKey:
     | "landingHowForumsBody"
     | "landingHowChatsBody"
-    | "landingHowAcademyBody"
-    | "landingHowAiBody";
+    | "landingHowAcademyBody";
   tab: PhoneTab;
   screen: ReactNode;
 };
@@ -58,14 +55,6 @@ const CHANNELS: Channel[] = [
     bodyKey: "landingHowAcademyBody",
     tab: "academy",
     screen: <AcademyScreen />,
-  },
-  {
-    id: "ai",
-    freq: "107.9",
-    titleKey: "landingHowAiTitle",
-    bodyKey: "landingHowAiBody",
-    tab: "ai",
-    screen: <AiScreen />,
   },
 ];
 

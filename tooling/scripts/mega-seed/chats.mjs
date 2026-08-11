@@ -26,7 +26,6 @@ function inboxRow(chatId, chat, uid) {
     createdAt: Number(chat.createdAt ?? 0),
     createdBy: String(chat.createdBy ?? ""),
     isDefaultAgentGroup: chat.isDefaultAgentGroup === true,
-    isSupportChat: chat.isSupportChat === true,
     autoJoinRoles: chat.autoJoinRoles ?? {},
   };
 }
@@ -113,7 +112,6 @@ export async function seedChats(userCtx) {
       createdAt: now - 86_400_000,
       createdBy: userCtx.fixtures["admin@pulse.local"] ?? agentUids[0],
       isDefaultAgentGroup: true,
-      isSupportChat: false,
       autoJoinRoles: { agent: true },
     };
     updates[`chats/${DEFAULT_AGENT_GROUP_ID}`] = chat;
@@ -169,7 +167,6 @@ export async function seedChats(userCtx) {
       createdAt,
       createdBy: a.uid,
       isDefaultAgentGroup: false,
-      isSupportChat: false,
       autoJoinRoles: {},
     };
     updates[`chats/${chatId}`] = chat;
@@ -228,7 +225,6 @@ export async function seedChats(userCtx) {
       createdAt,
       createdBy: creator.uid,
       isDefaultAgentGroup: false,
-      isSupportChat: false,
       autoJoinRoles: {},
     };
     updates[`chats/${chatId}`] = chat;

@@ -91,7 +91,6 @@ enum OnboardingIllustrationKind {
   pulse,
   community,
   chats,
-  ai,
   academy,
 }
 
@@ -134,8 +133,6 @@ class OnboardingIllustration extends StatelessWidget {
                 _CommunityCards(brand: brand, colors: colors),
               OnboardingIllustrationKind.chats =>
                 _ChatBubbles(brand: brand, colors: colors),
-              OnboardingIllustrationKind.ai =>
-                _AiConstellation(brand: brand, colors: colors, t: float),
               OnboardingIllustrationKind.academy =>
                 _AcademyPath(brand: brand, colors: colors),
             },
@@ -439,90 +436,6 @@ class _ChatBubbles extends StatelessWidget {
       ),
     );
   }
-}
-
-class _AiConstellation extends StatelessWidget {
-  const _AiConstellation({
-    required this.brand,
-    required this.colors,
-    required this.t,
-  });
-
-  final Color brand;
-  final AppColors colors;
-  final double t;
-
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _ConstellationPainter(brand: brand, border: colors.border, t: t),
-      child: Center(
-        child: Container(
-          width: 110,
-          height: 110,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: colors.sheet,
-            border: Border.all(color: colors.border),
-            boxShadow: [
-              BoxShadow(
-                color: brand.withValues(alpha: 0.2),
-                blurRadius: 24,
-              ),
-            ],
-          ),
-          child: Icon(Icons.auto_awesome, size: 42, color: brand),
-        ),
-      ),
-    );
-  }
-}
-
-class _ConstellationPainter extends CustomPainter {
-  _ConstellationPainter({
-    required this.brand,
-    required this.border,
-    required this.t,
-  });
-
-  final Color brand;
-  final Color border;
-  final double t;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final nodes = <Offset>[
-      c + Offset(-90, -40 + t * 6),
-      c + Offset(95, -55 - t * 4),
-      c + Offset(-70, 70 - t * 5),
-      c + Offset(80, 60 + t * 3),
-      c + Offset(0, -95 + t * 2),
-    ];
-    final line = Paint()
-      ..color = brand.withValues(alpha: 0.22)
-      ..strokeWidth = 1.2;
-    for (final n in nodes) {
-      canvas.drawLine(c, n, line);
-    }
-    final fill = Paint()..style = PaintingStyle.fill;
-    for (var i = 0; i < nodes.length; i++) {
-      fill.color = brand.withValues(alpha: 0.18 + (i % 3) * 0.08);
-      canvas.drawCircle(nodes[i], 10 + (i % 2) * 3.0, fill);
-      canvas.drawCircle(
-        nodes[i],
-        10 + (i % 2) * 3.0,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..color = border
-          ..strokeWidth = 1,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _ConstellationPainter oldDelegate) =>
-      oldDelegate.t != t || oldDelegate.brand != brand;
 }
 
 class _AcademyPath extends StatelessWidget {

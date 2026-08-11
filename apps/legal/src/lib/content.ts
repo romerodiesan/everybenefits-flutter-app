@@ -109,7 +109,7 @@ const privacyEnDraft: LegalDocDraft = {
   kind: "privacy",
   title: "Privacy Policy",
   summary:
-    "This Privacy Policy describes how Every Benefits collects, uses, discloses, and protects personal information in connection with Pulse — our community, learning, messaging, and AI platform for US insurance professionals — and explains the privacy choices available to you in-product and by request.",
+    "This Privacy Policy describes how Every Benefits collects, uses, discloses, and protects personal information in connection with Pulse — our community, learning, and messaging platform for US insurance professionals — and explains the privacy choices available to you in-product and by request.",
   sections: [
     {
       id: "who-we-are",
@@ -123,7 +123,7 @@ const privacyEnDraft: LegalDocDraft = {
       id: "scope",
       title: "2. Scope and applicability",
       paragraphs: [
-        "This Policy applies to personal information processed when you visit pulse.everybenefits.us, use the Pulse mobile apps, create or manage an account, participate in forums or chats, use Academy or practice tools, interact with Pulse AI, or communicate with us about the Services.",
+        "This Policy applies to personal information processed when you visit pulse.everybenefits.us, use the Pulse mobile apps, create or manage an account, participate in forums or chats, use Academy or practice tools, or communicate with us about the Services.",
         "It does not apply to third-party websites, carriers, agencies, or tools that we do not control, even if linked from the Services. Those parties have their own privacy practices.",
       ],
     },
@@ -141,7 +141,7 @@ const privacyEnDraft: LegalDocDraft = {
         "Geolocation data: approximate location derived from IP address; we do not require precise GPS for core Pulse features.",
         "Sensory / media: profile photos or other media you upload.",
         "Inferences: limited product inferences used to personalize learning progress or surface relevant community context (not used for advertising profiles).",
-        "User-generated content: forum posts, replies, reactions, chat messages, AI prompts and conversation history, and feedback you submit.",
+        "User-generated content: forum posts, replies, reactions, chat messages, and feedback you submit.",
       ],
     },
     {
@@ -149,11 +149,11 @@ const privacyEnDraft: LegalDocDraft = {
       title: "4. Sources of information",
       paragraphs: ["We collect personal information from:"],
       bullets: [
-        "You, when you register, complete your profile, post content, send messages, use Pulse AI, enroll in Academy content, or contact support.",
+        "You, when you register, complete your profile, post content, send messages, enroll in Academy content, or contact support.",
         "Your device and browser, through cookies, local storage, SDKs, and automatic logs needed for security and functionality.",
         "Authentication providers you choose (for example Google sign-in via Firebase Authentication).",
         "Your organization administrators, when they invite you, assign roles, or manage agency membership within Every Benefits.",
-        "Service providers that help us operate infrastructure, security, optional analytics, crash reporting, and AI model processing.",
+        "Service providers that help us operate infrastructure, security, optional analytics, and crash reporting.",
       ],
     },
     {
@@ -161,9 +161,8 @@ const privacyEnDraft: LegalDocDraft = {
       title: "5. Information we collect in detail",
       paragraphs: [
         "Account and profile. Name, email, authentication credentials or provider identifiers, preferred language, theme/appearance preferences, agency selection, role, NPN, US mailing address fields required for agent-class roles, and optional profile photo.",
-        "Community and messaging. Forum threads, tags, replies, accepted answers, reactions, direct messages, group chats, support conversations, and related metadata (timestamps, participants, read state).",
+        "Community and messaging. Forum threads, tags, replies, accepted answers, reactions, direct messages, group chats, and related metadata (timestamps, participants, read state).",
         "Learning and tools. Course and path enrollments, lesson progress, completions, quiz or practice activity, and use of practice tools (for example quoting practice helpers). Practice tools are educational and are not carrier-issued quotes.",
-        "Pulse AI. Prompts, model responses, citations or grounding references shown in-product, conversation identifiers, rate-limit metadata, and feedback (for example helpful / not helpful).",
         "Technical and security. Device/browser type, OS version, app or site version, IP address, approximate location from IP, performance and error logs, fraud/abuse signals, and Firebase App Check attestations where enabled.",
         "Mobile crash diagnostics. Stack traces and device metadata via Firebase Crashlytics in release builds to investigate crashes. These reports are not marketing analytics.",
         "Optional product analytics. Aggregated, non-content usage events via Firebase Analytics only if you opt in under Profile → Privacy (web) or Settings → Privacy (mobile). Default is off.",
@@ -177,8 +176,7 @@ const privacyEnDraft: LegalDocDraft = {
       ],
       bullets: [
         "Create and authenticate accounts, enforce role-based access, and maintain session security (including multi-factor authentication where enabled).",
-        "Operate forums, chats, notifications, Academy, practice tools, and Pulse AI.",
-        "Retrieve approved community, Academy, and curated official US insurance sources to ground AI answers and apply safety / scope policies.",
+        "Operate forums, chats, notifications, Academy, and practice tools.",
         "Send transactional notices about account security, service changes, and product features you use.",
         "Detect abuse, spam, policy violations, and security threats; enforce our Terms of Use.",
         "Diagnose reliability issues and crashes on mobile.",
@@ -187,18 +185,8 @@ const privacyEnDraft: LegalDocDraft = {
       ],
     },
     {
-      id: "ai",
-      title: "7. AI-specific processing",
-      paragraphs: [
-        "Pulse AI is an educational assistant scoped to US insurance professional contexts. When you use it, prompts and related retrieval context may be processed by Every Benefits systems and by model or gateway providers solely to generate responses, enforce rate limits, and apply safety filters.",
-        "We design Pulse AI to ground answers in approved community knowledge, Academy materials, and curated official sources where available. Outputs are informational only and are not legal, compliance, tax, or personalized insurance advice. You remain responsible for verifying information before acting.",
-        "We may retain AI conversation and feedback data to provide history in your account, improve retrieval quality, investigate abuse, and maintain service integrity, subject to the retention practices below. We do not use your Pulse AI conversations to train third-party foundation models for unrelated advertising.",
-        "Do not submit confidential client data, protected health information (PHI), Social Security numbers, payment card data, or other sensitive third-party personal data into Pulse AI or public forums.",
-      ],
-    },
-    {
       id: "cookies",
-      title: "8. Cookies and similar technologies",
+      title: "7. Cookies and similar technologies",
       paragraphs: [
         "We use cookies, local storage, and similar technologies that are necessary for authentication, session continuity, locale preference, security, and core site functionality.",
         "We do not use third-party advertising cookies to build cross-site advertising profiles on Pulse. Optional product analytics (when enabled by you) may use analytics identifiers consistent with Firebase Analytics practices.",
@@ -207,7 +195,7 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "controls",
-      title: "9. In-product privacy controls",
+      title: "8. In-product privacy controls",
       paragraphs: [
         "Pulse provides privacy controls so you can manage how other members find and contact you, and whether optional analytics runs on your devices. Controls are available under Profile / Account → Privacy on web and Settings → Privacy on mobile:",
       ],
@@ -221,7 +209,7 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "controls-limits",
-      title: "9.1 Limits of privacy controls",
+      title: "8.1 Limits of privacy controls",
       paragraphs: [
         "Turning off directory visibility does not delete your account or remove content you already published in forums or group chats. Organization administrators may still see membership information needed to operate your agency workspace. Security, authentication, and crash diagnostics required to run the Services are not disabled by analytics opt-out.",
         "If you disable direct messages, existing conversations may remain visible to participants, but new DM invitations from other members can be blocked according to product rules.",
@@ -229,12 +217,12 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "sharing",
-      title: "10. How we share information",
+      title: "9. How we share information",
       paragraphs: [
         "We do not sell personal information for money. We also do not “share” personal information for cross-context behavioral advertising as those terms are defined under the CPRA. We disclose information only as needed to operate the Services:",
       ],
       bullets: [
-        "Service providers / processors: hosting, authentication, databases, storage, email delivery, crash reporting, and AI model/gateway providers that process data on our instructions.",
+        "Service providers / processors: hosting, authentication, databases, storage, email delivery, and crash reporting providers that process data on our instructions.",
         "Other users: content you post or send in forums, chats, or other shared spaces is visible according to product permissions and your privacy settings.",
         "Affiliates and corporate transactions: in connection with a merger, acquisition, financing, or sale of assets, subject to appropriate confidentiality safeguards.",
         "Legal and safety: when required by law, subpoena, or court order, or to protect the rights, property, or safety of Every Benefits, our users, or the public.",
@@ -242,16 +230,16 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "retention",
-      title: "11. Retention",
+      title: "10. Retention",
       paragraphs: [
         "We retain personal information for as long as your account remains active and as reasonably necessary to provide the Services, resolve disputes, enforce agreements, maintain security, and meet legal, accounting, or regulatory requirements.",
-        "Typical operational periods (subject to legal holds and backup cycles): account profile data for the life of the account; community content while published and for a reasonable period after deletion requests to preserve thread integrity; AI conversation history while needed for in-product history and abuse investigation; security logs for a limited period consistent with security operations; crash reports for diagnostics and then deletion or aggregation.",
+        "Typical operational periods (subject to legal holds and backup cycles): account profile data for the life of the account; community content while published and for a reasonable period after deletion requests to preserve thread integrity; security logs for a limited period consistent with security operations; crash reports for diagnostics and then deletion or aggregation.",
         "When information is no longer needed, we delete or de-identify it in accordance with our operational practices. Residual copies may persist in encrypted backups for a limited time until overwritten.",
       ],
     },
     {
       id: "rights",
-      title: "12. Your choices and privacy rights",
+      title: "11. Your choices and privacy rights",
       paragraphs: [
         "Depending on where you live, you may have rights to request access, correction, deletion, portability, or restriction of certain personal information, and to appeal our decision on a request. You may also update many profile and privacy settings directly in the product.",
         "To exercise rights, email support@everybenefits.com with “Privacy Request” in the subject line. We will verify your identity (for example by confirming control of the account email) before fulfilling requests. We will respond within the timelines required by applicable law.",
@@ -269,7 +257,7 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "california",
-      title: "13. Notice for California residents",
+      title: "12. Notice for California residents",
       paragraphs: [
         "If you are a California resident, the CCPA/CPRA provide additional rights described above. In the preceding 12 months, we may have collected the categories listed in Section 3 for the business purposes described in Section 6.",
         "We do not sell personal information or share it for cross-context behavioral advertising. We do not use or disclose sensitive personal information for purposes other than those permitted to provide the Services (for example account security and professional profile fields you provide).",
@@ -278,7 +266,7 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "other-states",
-      title: "14. Other US state privacy laws",
+      title: "13. Other US state privacy laws",
       paragraphs: [
         "Residents of certain other US states (including, where applicable, Virginia, Colorado, Connecticut, Utah, and similar comprehensive privacy regimes) may have comparable rights to access, delete, correct, obtain a copy of, or opt out of certain processing of personal data. We will honor applicable requests consistent with those laws when you contact us as described above.",
         "Pulse does not engage in sale of personal data or cross-context behavioral advertising, and does not profile users for eligibility decisions outside the product’s role-based access controls.",
@@ -286,7 +274,7 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "dnt",
-      title: "15. Do Not Track and Global Privacy Control",
+      title: "14. Do Not Track and Global Privacy Control",
       paragraphs: [
         "Some browsers offer “Do Not Track” (DNT) signals. Because there is no consistent industry standard for DNT, our Services do not respond to DNT signals at this time.",
         "If we deploy support for Global Privacy Control (GPC) or similar legally recognized opt-out preference signals for sale/share, we will treat those signals as an opt-out of sale/share to the extent required by law. Because we do not sell or share for cross-context advertising today, GPC does not change core Pulse processing, but you may still use in-product analytics opt-out.",
@@ -294,7 +282,7 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "security",
-      title: "16. Security",
+      title: "15. Security",
       paragraphs: [
         "We use administrative, technical, and organizational measures designed to protect personal information, including encrypted transport (HTTPS/TLS), authentication and access controls, least-privilege practices for operations staff, and monitoring for abuse.",
         "No method of transmission or storage is completely secure. You are responsible for safeguarding your credentials and for using multi-factor authentication when offered. Notify us promptly at support@everybenefits.com if you suspect unauthorized access to your account.",
@@ -302,14 +290,14 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "children",
-      title: "17. Children’s privacy",
+      title: "16. Children’s privacy",
       paragraphs: [
         "The Services are intended for adults in professional insurance contexts and are not directed to children under 16. We do not knowingly collect personal information from children under 16. If you believe a child has provided personal information, contact us and we will take appropriate steps to delete it.",
       ],
     },
     {
       id: "international",
-      title: "18. International transfers",
+      title: "17. International transfers",
       paragraphs: [
         "Every Benefits is based in the United States. If you access the Services from outside the United States, you understand that your information may be processed in the United States and other countries where our providers operate, which may have different data-protection laws than your country of residence.",
         "Where required, we rely on appropriate transfer mechanisms and contractual protections with processors. By using the Services, you acknowledge these transfers as described in this Policy.",
@@ -317,7 +305,7 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "professional",
-      title: "19. Professional and insurance-specific notice",
+      title: "18. Professional and insurance-specific notice",
       paragraphs: [
         "Pulse is a professional community and learning product. You should not upload client lists, application packages, claim files, medical records, or other confidential consumer information. Doing so may violate law, carrier rules, and our Terms of Use.",
         "NPN and licensing fields are used to support professional identity within the community and organizational workflows. Providing false professional credentials may result in account suspension.",
@@ -325,14 +313,14 @@ const privacyEnDraft: LegalDocDraft = {
     },
     {
       id: "changes",
-      title: "20. Changes to this Policy",
+      title: "19. Changes to this Policy",
       paragraphs: [
         "We may update this Privacy Policy from time to time. We will post the updated version on this page and revise the “Last updated” date. Material changes may also be communicated through the Services or by email when appropriate. Continued use of the Services after an update means you accept the revised Policy, except where applicable law requires additional consent.",
       ],
     },
     {
       id: "contact",
-      title: "21. Contact and governing law",
+      title: "20. Contact and governing law",
       paragraphs: [
         "Privacy contact: support@everybenefits.com.",
         "This Privacy Policy is governed by the laws of the State of Florida, United States, without regard to conflict-of-law principles, except where mandatory local consumer privacy laws apply and cannot be waived.",
@@ -345,7 +333,7 @@ const privacyEsDraft: LegalDocDraft = {
   kind: "privacy",
   title: "Política de privacidad",
   summary:
-    "Esta Política de privacidad describe cómo Every Benefits recopila, usa, divulga y protege la información personal en relación con Pulse — nuestra plataforma de comunidad, aprendizaje, mensajería e IA para profesionales de seguros en EE. UU. — y explica las opciones de privacidad disponibles en el producto y mediante solicitud.",
+    "Esta Política de privacidad describe cómo Every Benefits recopila, usa, divulga y protege la información personal en relación con Pulse — nuestra plataforma de comunidad, aprendizaje y mensajería para profesionales de seguros en EE. UU. — y explica las opciones de privacidad disponibles en el producto y mediante solicitud.",
   sections: [
     {
       id: "who-we-are",
@@ -359,7 +347,7 @@ const privacyEsDraft: LegalDocDraft = {
       id: "scope",
       title: "2. Alcance y aplicabilidad",
       paragraphs: [
-        "Esta Política aplica a la información personal tratada cuando visitas pulse.everybenefits.us, usas las apps móviles de Pulse, creas o administras una cuenta, participas en foros o chats, usas la Academia o herramientas de práctica, interactúas con Pulse AI o te comunicas con nosotros sobre los Servicios.",
+        "Esta Política aplica a la información personal tratada cuando visitas pulse.everybenefits.us, usas las apps móviles de Pulse, creas o administras una cuenta, participas en foros o chats, usas la Academia o herramientas de práctica, o te comunicas con nosotros sobre los Servicios.",
         "No aplica a sitios, carriers, agencias o herramientas de terceros que no controlamos, aunque estén enlazados desde los Servicios. Esas partes tienen sus propias prácticas de privacidad.",
       ],
     },
@@ -377,7 +365,7 @@ const privacyEsDraft: LegalDocDraft = {
         "Datos de geolocalización: ubicación aproximada derivada de la IP; no exigimos GPS preciso para las funciones principales de Pulse.",
         "Medios: fotos de perfil u otros medios que subas.",
         "Inferencias: inferencias limitadas del producto para personalizar progreso de aprendizaje o mostrar contexto comunitario relevante (no se usan para perfiles publicitarios).",
-        "Contenido generado por el usuario: publicaciones en foros, respuestas, reacciones, mensajes de chat, prompts e historial de IA, y comentarios que envíes.",
+        "Contenido generado por el usuario: publicaciones en foros, respuestas, reacciones, mensajes de chat, y comentarios que envíes.",
       ],
     },
     {
@@ -385,11 +373,11 @@ const privacyEsDraft: LegalDocDraft = {
       title: "4. Fuentes de la información",
       paragraphs: ["Recopilamos información personal de:"],
       bullets: [
-        "Tú, cuando te registras, completas tu perfil, publicas contenido, envías mensajes, usas Pulse AI, te inscribes en contenido de la Academia o contactas soporte.",
+        "Tú, cuando te registras, completas tu perfil, publicas contenido, envías mensajes, te inscribes en contenido de la Academia o contactas soporte.",
         "Tu dispositivo y navegador, mediante cookies, almacenamiento local, SDKs y registros automáticos necesarios para seguridad y funcionalidad.",
         "Proveedores de autenticación que elijas (por ejemplo inicio de sesión con Google mediante Firebase Authentication).",
         "Administradores de tu organización, cuando te invitan, asignan roles o gestionan la membresía de agencia dentro de Every Benefits.",
-        "Proveedores de servicios que nos ayudan a operar infraestructura, seguridad, analítica opcional, reportes de fallos y procesamiento de modelos de IA.",
+        "Proveedores de servicios que nos ayudan a operar infraestructura, seguridad, analítica opcional y reportes de fallos.",
       ],
     },
     {
@@ -397,9 +385,8 @@ const privacyEsDraft: LegalDocDraft = {
       title: "5. Información que recopilamos en detalle",
       paragraphs: [
         "Cuenta y perfil. Nombre, correo, credenciales o identificadores de autenticación, idioma preferido, preferencias de tema/apariencia, selección de agencia, rol, NPN, campos de dirección postal en EE. UU. requeridos para roles de clase agente, y foto de perfil opcional.",
-        "Comunidad y mensajería. Hilos de foro, etiquetas, respuestas, respuestas aceptadas, reacciones, mensajes directos, chats de grupo, conversaciones de soporte y metadatos relacionados.",
+        "Comunidad y mensajería. Hilos de foro, etiquetas, respuestas, respuestas aceptadas, reacciones, mensajes directos, chats de grupo y metadatos relacionados.",
         "Aprendizaje y herramientas. Inscripciones a cursos y rutas, progreso de lecciones, finalizaciones, actividad de práctica, y uso de herramientas de práctica (por ejemplo ayudas de cotización). Las herramientas de práctica son educativas y no son cotizaciones emitidas por carriers.",
-        "Pulse AI. Prompts, respuestas del modelo, citas o referencias de anclaje mostradas en el producto, identificadores de conversación, metadatos de límites de uso y comentarios (útil / no útil).",
         "Datos técnicos y de seguridad. Tipo de dispositivo/navegador, versión de SO, versión de app o sitio, IP, ubicación aproximada, registros de rendimiento y errores, señales de fraude/abuso y atestaciones de Firebase App Check cuando estén habilitadas.",
         "Diagnósticos de fallos (móvil). Trazas y metadatos del dispositivo vía Firebase Crashlytics en builds de producción. Estos reportes no son analítica de marketing.",
         "Analítica de producto opcional. Eventos de uso agregados y sin contenido vía Firebase Analytics solo si la activas en Perfil → Privacidad (web) o Ajustes → Privacidad (móvil). Por defecto está desactivada.",
@@ -413,8 +400,7 @@ const privacyEsDraft: LegalDocDraft = {
       ],
       bullets: [
         "Crear y autenticar cuentas, aplicar acceso por roles y mantener la seguridad de sesión (incluida autenticación multifactor cuando esté habilitada).",
-        "Operar foros, chats, notificaciones, Academia, herramientas de práctica y Pulse AI.",
-        "Recuperar conocimiento comunitario aprobado, materiales de Academia y fuentes oficiales curadas de seguros en EE. UU. para anclar respuestas de IA y aplicar políticas de seguridad / alcance.",
+        "Operar foros, chats, notificaciones, Academia y herramientas de práctica.",
         "Enviar avisos transaccionales sobre seguridad de la cuenta, cambios del servicio y funciones que uses.",
         "Detectar abusos, spam, violaciones de políticas y amenazas de seguridad; hacer cumplir los Términos de uso.",
         "Diagnosticar problemas de confiabilidad y fallos en móvil.",
@@ -423,18 +409,8 @@ const privacyEsDraft: LegalDocDraft = {
       ],
     },
     {
-      id: "ai",
-      title: "7. Tratamiento específico de la IA",
-      paragraphs: [
-        "Pulse AI es un asistente educativo con alcance en contextos profesionales de seguros en EE. UU. Cuando lo usas, los prompts y el contexto de recuperación relacionado pueden procesarse en sistemas de Every Benefits y por proveedores de modelos o gateway únicamente para generar respuestas, aplicar límites de uso y filtros de seguridad.",
-        "Diseñamos Pulse AI para anclar respuestas en conocimiento comunitario aprobado, materiales de Academia y fuentes oficiales curadas cuando estén disponibles. Las salidas son solo informativas y no constituyen asesoría legal, de cumplimiento, fiscal ni recomendaciones personalizadas de seguros. Tú sigues siendo responsable de verificar la información antes de actuar.",
-        "Podemos conservar datos de conversación y comentarios de la IA para ofrecer historial en tu cuenta, mejorar la recuperación, investigar abusos y mantener la integridad del servicio, conforme a las prácticas de retención siguientes. No usamos tus conversaciones de Pulse AI para entrenar modelos fundacionales de terceros con fines publicitarios no relacionados.",
-        "No envíes datos confidenciales de clientes, información de salud protegida (PHI), números de Seguro Social, datos de tarjetas de pago u otros datos personales sensibles de terceros a Pulse AI o a foros públicos.",
-      ],
-    },
-    {
       id: "cookies",
-      title: "8. Cookies y tecnologías similares",
+      title: "7. Cookies y tecnologías similares",
       paragraphs: [
         "Usamos cookies, almacenamiento local y tecnologías similares necesarias para autenticación, continuidad de sesión, preferencia de idioma, seguridad y funcionalidad básica del sitio.",
         "No usamos cookies publicitarias de terceros para construir perfiles publicitarios entre sitios en Pulse. La analítica de producto opcional (cuando la activas) puede usar identificadores de analítica coherentes con las prácticas de Firebase Analytics.",
@@ -443,7 +419,7 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "controls",
-      title: "9. Controles de privacidad en el producto",
+      title: "8. Controles de privacidad en el producto",
       paragraphs: [
         "Pulse ofrece controles de privacidad para gestionar cómo otros miembros te encuentran y contactan, y si la analítica opcional se ejecuta en tus dispositivos. Los controles están en Perfil / Cuenta → Privacidad (web) y Ajustes → Privacidad (móvil):",
       ],
@@ -457,7 +433,7 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "controls-limits",
-      title: "9.1 Límites de los controles de privacidad",
+      title: "8.1 Límites de los controles de privacidad",
       paragraphs: [
         "Desactivar la visibilidad en el directorio no elimina tu cuenta ni el contenido que ya publicaste en foros o chats de grupo. Los administradores de la organización pueden seguir viendo información de membresía necesaria para operar el espacio de tu agencia. La seguridad, autenticación y diagnósticos de fallos necesarios para operar los Servicios no se desactivan al optar por no usar analítica.",
         "Si desactivas los mensajes directos, las conversaciones existentes pueden seguir visibles para los participantes, pero las nuevas invitaciones de DM de otros miembros pueden bloquearse según las reglas del producto.",
@@ -465,12 +441,12 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "sharing",
-      title: "10. Cómo compartimos la información",
+      title: "9. Cómo compartimos la información",
       paragraphs: [
         "No vendemos información personal a cambio de dinero. Tampoco “compartimos” información personal para publicidad conductual entre contextos según se define en la CPRA. Divulgamos información solo según sea necesario para operar los Servicios:",
       ],
       bullets: [
-        "Proveedores de servicios / encargados: alojamiento, autenticación, bases de datos, almacenamiento, correo, reportes de fallos y proveedores de modelos/gateway de IA que procesan datos bajo nuestras instrucciones.",
+        "Proveedores de servicios / encargados: alojamiento, autenticación, bases de datos, almacenamiento, correo y reportes de fallos que procesan datos bajo nuestras instrucciones.",
         "Otros usuarios: el contenido que publicas o envías en foros, chats u otros espacios compartidos es visible según los permisos del producto y tus ajustes de privacidad.",
         "Afiliados y operaciones societarias: en relación con una fusión, adquisición, financiamiento o venta de activos, con salvaguardas de confidencialidad adecuadas.",
         "Legal y seguridad: cuando lo exija la ley, una citación o una orden judicial, o para proteger los derechos, la propiedad o la seguridad de Every Benefits, nuestros usuarios o el público.",
@@ -478,16 +454,16 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "retention",
-      title: "11. Conservación",
+      title: "10. Conservación",
       paragraphs: [
         "Conservamos la información personal mientras tu cuenta permanezca activa y según sea razonablemente necesario para prestar los Servicios, resolver disputas, hacer cumplir acuerdos, mantener la seguridad y cumplir requisitos legales, contables o regulatorios.",
-        "Periodos operativos típicos (sujetos a retenciones legales y ciclos de respaldo): datos de perfil durante la vida de la cuenta; contenido comunitario mientras esté publicado y por un periodo razonable tras solicitudes de eliminación para preservar la integridad de los hilos; historial de conversaciones de IA mientras sea necesario para el historial en el producto e investigación de abusos; registros de seguridad por un periodo limitado; reportes de fallos para diagnósticos y luego eliminación o agregación.",
+        "Periodos operativos típicos (sujetos a retenciones legales y ciclos de respaldo): datos de perfil durante la vida de la cuenta; contenido comunitario mientras esté publicado y por un periodo razonable tras solicitudes de eliminación para preservar la integridad de los hilos; registros de seguridad por un periodo limitado; reportes de fallos para diagnósticos y luego eliminación o agregación.",
         "Cuando la información ya no sea necesaria, la eliminamos o desidentificamos conforme a nuestras prácticas operativas. Pueden permanecer copias residuales en respaldos cifrados durante un tiempo limitado hasta que se sobrescriban.",
       ],
     },
     {
       id: "rights",
-      title: "12. Tus opciones y derechos de privacidad",
+      title: "11. Tus opciones y derechos de privacidad",
       paragraphs: [
         "Según dónde vivas, puedes tener derechos a solicitar acceso, corrección, eliminación, portabilidad o limitación de cierta información personal, y a apelar nuestra decisión sobre una solicitud. También puedes actualizar muchos ajustes de perfil y privacidad directamente en el producto.",
         "Para ejercer derechos, escribe a support@everybenefits.com con “Solicitud de privacidad” en el asunto. Verificaremos tu identidad (por ejemplo confirmando el control del correo de la cuenta) antes de atender solicitudes. Responderemos dentro de los plazos exigidos por la ley aplicable.",
@@ -505,7 +481,7 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "california",
-      title: "13. Aviso para residentes de California",
+      title: "12. Aviso para residentes de California",
       paragraphs: [
         "Si eres residente de California, la CCPA/CPRA otorga derechos adicionales descritos arriba. En los 12 meses anteriores, podemos haber recopilado las categorías listadas en la Sección 3 para los fines comerciales descritos en la Sección 6.",
         "No vendemos información personal ni la compartimos para publicidad conductual entre contextos. No usamos ni divulgamos información personal sensible para fines distintos de los permitidos para prestar los Servicios (por ejemplo seguridad de la cuenta y campos profesionales de perfil que proporcionas).",
@@ -514,7 +490,7 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "other-states",
-      title: "14. Otras leyes estatales de privacidad de EE. UU.",
+      title: "13. Otras leyes estatales de privacidad de EE. UU.",
       paragraphs: [
         "Los residentes de ciertos otros estados de EE. UU. (incluyendo, cuando aplique, Virginia, Colorado, Connecticut, Utah y regímenes similares) pueden tener derechos comparables de acceso, eliminación, corrección, obtención de una copia u oposición a cierto tratamiento. Atenderemos las solicitudes aplicables de forma coherente con esas leyes cuando nos contactes como se describe arriba.",
         "Pulse no vende datos personales ni realiza publicidad conductual entre contextos, y no perfila usuarios para decisiones de elegibilidad fuera de los controles de acceso por roles del producto.",
@@ -522,7 +498,7 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "dnt",
-      title: "15. Do Not Track y Global Privacy Control",
+      title: "14. Do Not Track y Global Privacy Control",
       paragraphs: [
         "Algunos navegadores ofrecen señales “Do Not Track” (DNT). Como no hay un estándar industrial consistente para DNT, nuestros Servicios no responden a señales DNT en este momento.",
         "Si implementamos soporte para Global Privacy Control (GPC) o señales de preferencia de exclusión legalmente reconocidas para venta/compartición, trataremos esas señales como una exclusión de venta/compartición en la medida exigida por la ley. Como hoy no vendemos ni compartimos para publicidad entre contextos, GPC no cambia el procesamiento principal de Pulse, pero puedes seguir usando la exclusión de analítica en el producto.",
@@ -530,7 +506,7 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "security",
-      title: "16. Seguridad",
+      title: "15. Seguridad",
       paragraphs: [
         "Usamos medidas administrativas, técnicas y organizativas diseñadas para proteger la información personal, incluido transporte cifrado (HTTPS/TLS), autenticación y controles de acceso, privilegio mínimo para personal de operaciones y monitoreo de abusos.",
         "Ningún método de transmisión o almacenamiento es completamente seguro. Eres responsable de proteger tus credenciales y de usar autenticación multifactor cuando se ofrezca. Notifícanos de inmediato en support@everybenefits.com si sospechas acceso no autorizado a tu cuenta.",
@@ -538,14 +514,14 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "children",
-      title: "17. Privacidad de menores",
+      title: "16. Privacidad de menores",
       paragraphs: [
         "Los Servicios están pensados para adultos en contextos profesionales de seguros y no están dirigidos a menores de 16 años. No recopilamos a sabiendas información personal de menores de 16. Si crees que un menor nos ha proporcionado información personal, contáctanos y tomaremos las medidas adecuadas para eliminarla.",
       ],
     },
     {
       id: "international",
-      title: "18. Transferencias internacionales",
+      title: "17. Transferencias internacionales",
       paragraphs: [
         "Every Benefits está basado en Estados Unidos. Si accedes a los Servicios desde fuera de Estados Unidos, entiendes que tu información puede procesarse en Estados Unidos y en otros países donde operen nuestros proveedores, que pueden tener leyes de protección de datos distintas a las de tu país de residencia.",
         "Cuando se requiera, nos apoyamos en mecanismos de transferencia apropiados y protecciones contractuales con encargados. Al usar los Servicios, reconoces estas transferencias según se describe en esta Política.",
@@ -553,7 +529,7 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "professional",
-      title: "19. Aviso profesional y específico de seguros",
+      title: "18. Aviso profesional y específico de seguros",
       paragraphs: [
         "Pulse es un producto de comunidad y aprendizaje profesional. No debes subir listas de clientes, paquetes de solicitud, expedientes de siniestros, registros médicos u otra información confidencial de consumidores. Hacerlo puede violar la ley, normas de carriers y nuestros Términos de uso.",
         "Los campos de NPN y licencias se usan para apoyar la identidad profesional dentro de la comunidad y los flujos organizacionales. Proporcionar credenciales profesionales falsas puede resultar en suspensión de la cuenta.",
@@ -561,14 +537,14 @@ const privacyEsDraft: LegalDocDraft = {
     },
     {
       id: "changes",
-      title: "20. Cambios a esta Política",
+      title: "19. Cambios a esta Política",
       paragraphs: [
         "Podemos actualizar esta Política de privacidad periódicamente. Publicaremos la versión actualizada en esta página y revisaremos la fecha de “Última actualización”. Los cambios materiales también pueden comunicarse a través de los Servicios o por correo electrónico cuando corresponda. El uso continuado de los Servicios después de una actualización significa que aceptas la Política revisada, salvo cuando la ley aplicable exija consentimiento adicional.",
       ],
     },
     {
       id: "contact",
-      title: "21. Contacto y ley aplicable",
+      title: "20. Contacto y ley aplicable",
       paragraphs: [
         "Contacto de privacidad: support@everybenefits.com.",
         "Esta Política de privacidad se rige por las leyes del Estado de Florida, Estados Unidos, sin perjuicio de los principios de conflicto de leyes, salvo cuando resulten aplicables leyes locales imperativas de privacidad del consumidor que no puedan renunciarse.",
@@ -595,9 +571,8 @@ const termsEnDraft: LegalDocDraft = {
       id: "definitions",
       title: "2. Definitions",
       paragraphs: [
-        "“Content” means text, images, audio, video, files, messages, prompts, feedback, and other materials submitted to or generated through the Services.",
+        "“Content” means text, images, audio, video, files, messages, feedback, and other materials submitted to or generated through the Services.",
         "“User Content” means Content you submit. “Every Benefits Content” means Content we or our licensors provide, including Academy materials, branding, software, and documentation.",
-        "“Pulse AI” means the educational AI assistant features available in Pulse.",
       ],
     },
     {
@@ -622,7 +597,7 @@ const termsEnDraft: LegalDocDraft = {
       id: "services",
       title: "5. The Services",
       paragraphs: [
-        "Pulse provides community forums, messaging, notifications, Academy learning content, optional practice tools, and Pulse AI assistance for insurance professionals. Features may vary by role, organization, locale, or feature flag.",
+        "Pulse provides community forums, messaging, notifications, Academy learning content, and optional practice tools for insurance professionals. Features may vary by role, organization, locale, or feature flag.",
         "We may modify, suspend, or discontinue parts of the Services with or without notice when reasonably necessary for operations, security, legal compliance, or product evolution. We do not guarantee that any particular feature will remain available indefinitely.",
       ],
     },
@@ -645,7 +620,7 @@ const termsEnDraft: LegalDocDraft = {
         "Sharing confidential client data, protected health information (PHI), Social Security numbers, payment card data, or other sensitive personal data of third parties without a lawful basis and appropriate safeguards.",
         "Attempting to bypass security, scrape at scale, disrupt, overload, or reverse engineer the Services except as permitted by law.",
         "Impersonating others, misrepresenting affiliation, spamming, or manipulating ranking, voting, or engagement systems.",
-        "Using Pulse AI or other features to generate deceptive marketing, evade licensing or carrier rules, or provide regulated advice you are not authorized to give.",
+        "Using the Services to generate deceptive marketing, evade licensing or carrier rules, or provide regulated advice you are not authorized to give.",
         "Uploading malware, probing vulnerabilities without authorization, or interfering with other users’ enjoyment of the Services.",
         "Using bots or automated means to create accounts, harvest data, or post content without our prior written consent.",
       ],
@@ -675,17 +650,8 @@ const termsEnDraft: LegalDocDraft = {
       ],
     },
     {
-      id: "pulse-ai",
-      title: "11. Pulse AI disclaimer",
-      paragraphs: [
-        "Pulse AI provides educational information for insurance professionals. It is not a licensed advisor, attorney, broker-dealer, tax professional, or compliance officer. Outputs are not legal advice, compliance advice, tax advice, or personalized insurance recommendations.",
-        "AI responses may be incomplete, outdated, or incorrect. You remain responsible for verifying information against official sources, carrier rules, state regulations, and your professional obligations before acting.",
-        "Every Benefits does not guarantee accuracy, completeness, or fitness of AI outputs for any particular purpose. Do not rely on Pulse AI as the sole basis for client recommendations, filings, or regulatory determinations.",
-      ],
-    },
-    {
       id: "academy",
-      title: "12. Academy and learning materials",
+      title: "11. Academy and learning materials",
       paragraphs: [
         "Academy courses and paths are provided for professional learning. Completion indicators or certificates within Pulse (if any) do not by themselves constitute state CE credit, carrier appointment, or a license to sell insurance unless expressly stated in writing by an authorized provider.",
         "You may not copy, redistribute, or publicly republish Academy materials except as expressly allowed by the product’s sharing features or written permission from Every Benefits.",
@@ -693,7 +659,7 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "tools",
-      title: "13. Practice tools",
+      title: "12. Practice tools",
       paragraphs: [
         "Certain tools (for example practice quoting helpers) are for education and skill practice only. They do not generate binding carrier quotes, applications, or offers of insurance coverage.",
         "You must not present practice outputs to clients as official quotes or as advice from Every Benefits or any carrier.",
@@ -701,7 +667,7 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "ip",
-      title: "14. Intellectual property",
+      title: "13. Intellectual property",
       paragraphs: [
         "The Services, including software, branding, Every Benefits Content, and documentation, are owned by Every Benefits or its licensors and protected by intellectual property laws. Except for the limited license in Section 6, no rights are transferred to you.",
         "“Pulse,” “Every Benefits,” and related marks are trademarks of Every Benefits or its affiliates. You may not use them without prior written permission, except for factual references that comply with applicable law.",
@@ -709,7 +675,7 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "dmca",
-      title: "15. Copyright complaints",
+      title: "14. Copyright complaints",
       paragraphs: [
         "If you believe Content on the Services infringes your copyright, send a notice to support@everybenefits.com with: (a) identification of the copyrighted work; (b) identification of the allegedly infringing material and its location; (c) your contact information; (d) a statement of good-faith belief that use is not authorized; (e) a statement under penalty of perjury that the information is accurate and that you are authorized to act; and (f) your physical or electronic signature.",
         "We may remove or disable access to allegedly infringing material and, in appropriate circumstances, terminate repeat infringers.",
@@ -717,29 +683,29 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "third-parties",
-      title: "16. Third-party services",
+      title: "15. Third-party services",
       paragraphs: [
-        "The Services may rely on third-party infrastructure and providers (including authentication, hosting, analytics SDKs you opt into, crash reporting, and AI model providers). Your use of those components is subject to these Terms and, where applicable, the providers’ terms.",
+        "The Services may rely on third-party infrastructure and providers (including authentication, hosting, analytics SDKs you opt into, and crash reporting). Your use of those components is subject to these Terms and, where applicable, the providers’ terms.",
         "We are not responsible for third-party services we do not control, including carrier portals, agency systems, or external websites linked from the Services.",
       ],
     },
     {
       id: "beta",
-      title: "17. Beta and experimental features",
+      title: "16. Beta and experimental features",
       paragraphs: [
         "We may offer beta, preview, or experimental features. They are provided as-is, may be unstable, and may be changed or withdrawn at any time. Feedback you provide about beta features is subject to Section 10.",
       ],
     },
     {
       id: "fees",
-      title: "18. Fees",
+      title: "17. Fees",
       paragraphs: [
         "Access to Pulse may be provided without a direct consumer fee under your organization’s arrangement with Every Benefits. If paid plans or add-ons are introduced, additional pricing terms will be presented before purchase and will form part of these Terms for those features.",
       ],
     },
     {
       id: "confidentiality",
-      title: "19. Confidentiality and client data",
+      title: "18. Confidentiality and client data",
       paragraphs: [
         "You must not use the Services to store or transmit confidential client files, applications containing sensitive consumer data, claim documentation, or medical records. You agree to comply with applicable privacy, insurance, and data-protection laws in your use of the Services.",
         "Breach of this section is a material breach of these Terms and may result in immediate suspension.",
@@ -747,14 +713,14 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "disclaimers",
-      title: "20. Disclaimers",
+      title: "19. Disclaimers",
       paragraphs: [
-        "THE SERVICES ARE PROVIDED “AS IS” AND “AS AVAILABLE.” TO THE MAXIMUM EXTENT PERMITTED BY LAW, EVERY BENEFITS DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICES WILL BE UNINTERRUPTED, ERROR-FREE, SECURE, OR FREE OF HARMFUL COMPONENTS, OR THAT CONTENT (INCLUDING USER CONTENT AND AI OUTPUTS) WILL BE ACCURATE OR RELIABLE.",
+        "THE SERVICES ARE PROVIDED “AS IS” AND “AS AVAILABLE.” TO THE MAXIMUM EXTENT PERMITTED BY LAW, EVERY BENEFITS DISCLAIMS ALL WARRANTIES, EXPRESS OR IMPLIED, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICES WILL BE UNINTERRUPTED, ERROR-FREE, SECURE, OR FREE OF HARMFUL COMPONENTS, OR THAT CONTENT (INCLUDING USER CONTENT) WILL BE ACCURATE OR RELIABLE.",
       ],
     },
     {
       id: "liability",
-      title: "21. Limitation of liability",
+      title: "20. Limitation of liability",
       paragraphs: [
         "TO THE MAXIMUM EXTENT PERMITTED BY LAW, EVERY BENEFITS AND ITS AFFILIATES, OFFICERS, EMPLOYEES, AND AGENTS WILL NOT BE LIABLE FOR INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR LOST PROFITS, REVENUE, DATA, BUSINESS, OR GOODWILL, ARISING FROM OR RELATED TO YOUR USE OF THE SERVICES, WHETHER BASED IN CONTRACT, TORT, OR ANY OTHER THEORY, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.",
         "OUR TOTAL LIABILITY FOR ANY CLAIM ARISING OUT OF OR RELATING TO THE SERVICES WILL NOT EXCEED THE GREATER OF (A) THE AMOUNTS YOU PAID TO EVERY BENEFITS FOR THE SERVICES IN THE TWELVE MONTHS BEFORE THE CLAIM OR (B) ONE HUNDRED US DOLLARS (US $100).",
@@ -763,14 +729,14 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "indemnity",
-      title: "22. Indemnification",
+      title: "21. Indemnification",
       paragraphs: [
         "You agree to defend, indemnify, and hold harmless Every Benefits and its affiliates, officers, employees, and agents from and against claims, damages, losses, and expenses (including reasonable attorneys’ fees) arising out of your User Content, your misuse of the Services, your violation of these Terms or applicable law, or your infringement of third-party rights.",
       ],
     },
     {
       id: "termination",
-      title: "23. Suspension and termination",
+      title: "22. Suspension and termination",
       paragraphs: [
         "You may stop using the Services at any time. You may request account closure by contacting support@everybenefits.com, subject to verification and retention exceptions described in the Privacy Policy.",
         "We may suspend or terminate access immediately if you violate these Terms, create risk or legal exposure for us or others, or if we discontinue the Services. Provisions that by their nature should survive (including ownership, licenses to User Content already granted to the extent needed for residual operations, disclaimers, limitations of liability, and indemnity) will survive termination.",
@@ -778,7 +744,7 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "disputes",
-      title: "24. Governing law, venue, and disputes",
+      title: "23. Governing law, venue, and disputes",
       paragraphs: [
         "These Terms are governed by the laws of the State of Florida, United States, without regard to conflict-of-law principles.",
         "Except where prohibited by law, exclusive venue for disputes arising out of these Terms or the Services will be the state or federal courts located in Florida, and you consent to personal jurisdiction there.",
@@ -787,14 +753,14 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "export",
-      title: "25. Export and sanctions",
+      title: "24. Export and sanctions",
       paragraphs: [
         "You may not use the Services if you are located in a jurisdiction subject to comprehensive US sanctions or if you are on a US government restricted-party list. You agree to comply with applicable export control and sanctions laws.",
       ],
     },
     {
       id: "misc",
-      title: "26. Miscellaneous",
+      title: "25. Miscellaneous",
       paragraphs: [
         "These Terms, together with the Privacy Policy and any supplemental terms presented for specific features, are the entire agreement between you and Every Benefits regarding the Services and supersede prior agreements on the same subject.",
         "If any provision is found unenforceable, the remaining provisions will remain in effect. Our failure to enforce a provision is not a waiver. You may not assign these Terms without our consent; we may assign them in connection with a corporate transaction. There are no third-party beneficiaries except as expressly stated.",
@@ -803,14 +769,14 @@ const termsEnDraft: LegalDocDraft = {
     },
     {
       id: "changes",
-      title: "27. Changes",
+      title: "26. Changes",
       paragraphs: [
         "We may update these Terms from time to time. We will post the updated Terms on this page and update the “Last updated” date. If you continue using the Services after changes take effect, you accept the revised Terms, except where applicable law requires additional notice or consent.",
       ],
     },
     {
       id: "contact",
-      title: "28. Contact",
+      title: "27. Contact",
       paragraphs: [
         "Every Benefits — Pulse support: support@everybenefits.com.",
       ],
@@ -836,9 +802,8 @@ const termsEsDraft: LegalDocDraft = {
       id: "definitions",
       title: "2. Definiciones",
       paragraphs: [
-        "“Contenido” significa texto, imágenes, audio, video, archivos, mensajes, prompts, comentarios y otros materiales enviados a o generados a través de los Servicios.",
+        "“Contenido” significa texto, imágenes, audio, video, archivos, mensajes, comentarios y otros materiales enviados a o generados a través de los Servicios.",
         "“Contenido del usuario” significa el Contenido que envías. “Contenido de Every Benefits” significa el Contenido que nosotros o nuestros licenciantes proporcionamos, incluidos materiales de Academia, marca, software y documentación.",
-        "“Pulse AI” significa las funciones del asistente educativo de IA disponibles en Pulse.",
       ],
     },
     {
@@ -863,7 +828,7 @@ const termsEsDraft: LegalDocDraft = {
       id: "services",
       title: "5. Los Servicios",
       paragraphs: [
-        "Pulse ofrece foros comunitarios, mensajería, notificaciones, contenido de aprendizaje de Academia, herramientas de práctica opcionales y asistencia de Pulse AI para profesionales de seguros. Las funciones pueden variar según rol, organización, idioma o feature flags.",
+        "Pulse ofrece foros comunitarios, mensajería, notificaciones, contenido de aprendizaje de Academia y herramientas de práctica opcionales para profesionales de seguros. Las funciones pueden variar según rol, organización, idioma o feature flags.",
         "Podemos modificar, suspender o discontinuar partes de los Servicios con o sin aviso cuando sea razonablemente necesario por operaciones, seguridad, cumplimiento legal o evolución del producto. No garantizamos que una función particular permanezca disponible indefinidamente.",
       ],
     },
@@ -886,7 +851,7 @@ const termsEsDraft: LegalDocDraft = {
         "Compartir datos confidenciales de clientes, información de salud protegida (PHI), números de Seguro Social, datos de tarjetas de pago u otros datos personales sensibles de terceros sin base legal y salvaguardas adecuadas.",
         "Intentar eludir la seguridad, hacer scraping a escala, interrumpir, sobrecargar o realizar ingeniería inversa de los Servicios salvo lo permitido por la ley.",
         "Suplantar a otros, tergiversar afiliación, enviar spam o manipular sistemas de ranking, votación o participación.",
-        "Usar Pulse AI u otras funciones para generar marketing engañoso, evadir normas de licencia o de carriers, o brindar asesoría regulada que no estés autorizado a dar.",
+        "Usar los Servicios para generar marketing engañoso, evadir normas de licencia o de carriers, o brindar asesoría regulada que no estés autorizado a dar.",
         "Subir malware, sondear vulnerabilidades sin autorización o interferir con el uso de los Servicios por parte de otros.",
         "Usar bots o medios automatizados para crear cuentas, recolectar datos o publicar contenido sin nuestro consentimiento previo por escrito.",
       ],
@@ -916,17 +881,8 @@ const termsEsDraft: LegalDocDraft = {
       ],
     },
     {
-      id: "pulse-ai",
-      title: "11. Descargo de Pulse AI",
-      paragraphs: [
-        "Pulse AI proporciona información educativa para profesionales de seguros. No es un asesor con licencia, abogado, broker-dealer, profesional fiscal ni responsable de cumplimiento. Las salidas no constituyen asesoría legal, de cumplimiento, fiscal ni recomendaciones personalizadas de seguros.",
-        "Las respuestas de IA pueden ser incompletas, desactualizadas o incorrectas. Tú sigues siendo responsable de verificar la información frente a fuentes oficiales, normas de carriers, regulaciones estatales y tus obligaciones profesionales antes de actuar.",
-        "Every Benefits no garantiza la exactitud, integridad o idoneidad de las salidas de la IA para ningún propósito particular. No te bases en Pulse AI como único fundamento para recomendaciones a clientes, presentaciones o determinaciones regulatorias.",
-      ],
-    },
-    {
       id: "academy",
-      title: "12. Academia y materiales de aprendizaje",
+      title: "11. Academia y materiales de aprendizaje",
       paragraphs: [
         "Los cursos y rutas de Academia se proporcionan para aprendizaje profesional. Los indicadores de finalización o certificados dentro de Pulse (si los hay) no constituyen por sí solos créditos CE estatales, nombramiento de carrier ni licencia para vender seguros, salvo que un proveedor autorizado lo declare expresamente por escrito.",
         "No puedes copiar, redistribuir ni republicar públicamente materiales de Academia excepto según lo permitan expresamente las funciones de compartición del producto o el permiso escrito de Every Benefits.",
@@ -934,7 +890,7 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "tools",
-      title: "13. Herramientas de práctica",
+      title: "12. Herramientas de práctica",
       paragraphs: [
         "Ciertas herramientas (por ejemplo ayudas de cotización de práctica) son solo para educación y práctica de habilidades. No generan cotizaciones vinculantes de carriers, solicitudes ni ofertas de cobertura de seguros.",
         "No debes presentar salidas de práctica a clientes como cotizaciones oficiales ni como asesoría de Every Benefits o de cualquier carrier.",
@@ -942,7 +898,7 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "ip",
-      title: "14. Propiedad intelectual",
+      title: "13. Propiedad intelectual",
       paragraphs: [
         "Los Servicios, incluido el software, la marca, el Contenido de Every Benefits y la documentación, son propiedad de Every Benefits o de sus licenciantes y están protegidos por las leyes de propiedad intelectual. Salvo la licencia limitada de la Sección 6, no se te transfieren otros derechos.",
         "“Pulse”, “Every Benefits” y marcas relacionadas son marcas de Every Benefits o sus afiliados. No puedes usarlas sin permiso previo por escrito, salvo referencias factuales permitidas por la ley aplicable.",
@@ -950,7 +906,7 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "dmca",
-      title: "15. Reclamaciones de derechos de autor",
+      title: "14. Reclamaciones de derechos de autor",
       paragraphs: [
         "Si crees que Contenido en los Servicios infringe tus derechos de autor, envía un aviso a support@everybenefits.com con: (a) identificación de la obra; (b) identificación del material presuntamente infractor y su ubicación; (c) tu información de contacto; (d) una declaración de creencia de buena fe de que el uso no está autorizado; (e) una declaración bajo pena de perjurio de que la información es exacta y que estás autorizado a actuar; y (f) tu firma física o electrónica.",
         "Podemos eliminar o deshabilitar el acceso al material presuntamente infractor y, en circunstancias apropiadas, terminar a infractores reincidentes.",
@@ -958,29 +914,29 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "third-parties",
-      title: "16. Servicios de terceros",
+      title: "15. Servicios de terceros",
       paragraphs: [
-        "Los Servicios pueden depender de infraestructura y proveedores de terceros (incluida autenticación, alojamiento, SDKs de analítica a los que optes, reportes de fallos y proveedores de modelos de IA). Tu uso de esos componentes está sujeto a estos Términos y, cuando corresponda, a los términos de los proveedores.",
+        "Los Servicios pueden depender de infraestructura y proveedores de terceros (incluida autenticación, alojamiento, SDKs de analítica a los que optes y reportes de fallos). Tu uso de esos componentes está sujeto a estos Términos y, cuando corresponda, a los términos de los proveedores.",
         "No somos responsables de servicios de terceros que no controlamos, incluidos portales de carriers, sistemas de agencia o sitios externos enlazados desde los Servicios.",
       ],
     },
     {
       id: "beta",
-      title: "17. Funciones beta y experimentales",
+      title: "16. Funciones beta y experimentales",
       paragraphs: [
         "Podemos ofrecer funciones beta, de vista previa o experimentales. Se proporcionan “tal cual”, pueden ser inestables y pueden cambiarse o retirarse en cualquier momento. Los comentarios que proporciones sobre funciones beta están sujetos a la Sección 10.",
       ],
     },
     {
       id: "fees",
-      title: "18. Tarifas",
+      title: "17. Tarifas",
       paragraphs: [
         "El acceso a Pulse puede proporcionarse sin una tarifa directa al consumidor bajo el acuerdo de tu organización con Every Benefits. Si se introducen planes de pago o complementos, se presentarán términos de precios adicionales antes de la compra y formarán parte de estos Términos para esas funciones.",
       ],
     },
     {
       id: "confidentiality",
-      title: "19. Confidencialidad y datos de clientes",
+      title: "18. Confidencialidad y datos de clientes",
       paragraphs: [
         "No debes usar los Servicios para almacenar o transmitir archivos confidenciales de clientes, solicitudes con datos sensibles de consumidores, documentación de siniestros o registros médicos. Aceptas cumplir las leyes aplicables de privacidad, seguros y protección de datos en tu uso de los Servicios.",
         "El incumplimiento de esta sección es un incumplimiento material de estos Términos y puede resultar en suspensión inmediata.",
@@ -988,14 +944,14 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "disclaimers",
-      title: "20. Descargos de garantía",
+      title: "19. Descargos de garantía",
       paragraphs: [
-        "LOS SERVICIOS SE PROPORCIONAN “TAL CUAL” Y “SEGÚN DISPONIBILIDAD”. EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY, EVERY BENEFITS RENUNCIA A TODAS LAS GARANTÍAS, EXPRESAS O IMPLÍCITAS, INCLUIDAS COMERCIABILIDAD, IDONEIDAD PARA UN PROPÓSITO PARTICULAR, TITULARIDAD Y NO INFRACCIÓN. NO GARANTIZAMOS QUE LOS SERVICIOS SEAN ININTERRUMPIDOS, LIBRES DE ERRORES, SEGUROS O LIBRES DE COMPONENTES DAÑINOS, NI QUE EL CONTENIDO (INCLUIDO EL CONTENIDO DEL USUARIO Y LAS SALIDAS DE IA) SEA EXACTO O CONFIABLE.",
+        "LOS SERVICIOS SE PROPORCIONAN “TAL CUAL” Y “SEGÚN DISPONIBILIDAD”. EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY, EVERY BENEFITS RENUNCIA A TODAS LAS GARANTÍAS, EXPRESAS O IMPLÍCITAS, INCLUIDAS COMERCIABILIDAD, IDONEIDAD PARA UN PROPÓSITO PARTICULAR, TITULARIDAD Y NO INFRACCIÓN. NO GARANTIZAMOS QUE LOS SERVICIOS SEAN ININTERRUMPIDOS, LIBRES DE ERRORES, SEGUROS O LIBRES DE COMPONENTES DAÑINOS, NI QUE EL CONTENIDO (INCLUIDO EL CONTENIDO DEL USUARIO) SEA EXACTO O CONFIABLE.",
       ],
     },
     {
       id: "liability",
-      title: "21. Limitación de responsabilidad",
+      title: "20. Limitación de responsabilidad",
       paragraphs: [
         "EN LA MÁXIMA MEDIDA PERMITIDA POR LA LEY, EVERY BENEFITS Y SUS AFILIADOS, DIRECTIVOS, EMPLEADOS Y AGENTES NO SERÁN RESPONSABLES POR DAÑOS INDIRECTOS, INCIDENTALES, ESPECIALES, CONSECUENTES, EJEMPLARES O PUNITIVOS, NI POR LUCRO CESANTE, PÉRDIDA DE INGRESOS, DATOS, NEGOCIO O CLIENTES, DERIVADOS DE O RELACIONADOS CON TU USO DE LOS SERVICIOS, YA SEA POR CONTRATO, AGRAVIO U OTRA TEORÍA, INCLUSO SI SE ADVERTIDO DE LA POSIBILIDAD DE TALES DAÑOS.",
         "NUESTRA RESPONSABILIDAD TOTAL POR CUALQUIER RECLAMO DERIVADO DE O RELACIONADO CON LOS SERVICIOS NO EXCEDERÁ EL MAYOR DE (A) LOS MONTOS QUE PAGASTE A EVERY BENEFITS POR LOS SERVICIOS EN LOS DOCE MESES ANTERIORES AL RECLAMO O (B) CIEN DÓLARES ESTADOUNIDENSES (US $100).",
@@ -1004,14 +960,14 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "indemnity",
-      title: "22. Indemnización",
+      title: "21. Indemnización",
       paragraphs: [
         "Aceptas defender, indemnizar y mantener indemne a Every Benefits y a sus afiliados, directivos, empleados y agentes frente a reclamos, daños, pérdidas y gastos (incluidos honorarios razonables de abogados) derivados de tu Contenido del usuario, tu mal uso de los Servicios, tu violación de estos Términos o de la ley aplicable, o tu infracción de derechos de terceros.",
       ],
     },
     {
       id: "termination",
-      title: "23. Suspensión y terminación",
+      title: "22. Suspensión y terminación",
       paragraphs: [
         "Puedes dejar de usar los Servicios en cualquier momento. Puedes solicitar el cierre de la cuenta contactando support@everybenefits.com, sujeto a verificación y excepciones de retención descritas en la Política de privacidad.",
         "Podemos suspender o terminar el acceso de inmediato si violas estos Términos, creas riesgo o exposición legal para nosotros u otros, o si discontinuamos los Servicios. Las disposiciones que por su naturaleza deban sobrevivir (incluida propiedad, licencias al Contenido del usuario ya otorgadas en la medida necesaria para operaciones residuales, descargos, limitaciones de responsabilidad e indemnización) sobrevivirán a la terminación.",
@@ -1019,7 +975,7 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "disputes",
-      title: "24. Ley aplicable, foro y disputas",
+      title: "23. Ley aplicable, foro y disputas",
       paragraphs: [
         "Estos Términos se rigen por las leyes del Estado de Florida, Estados Unidos, sin perjuicio de los principios de conflicto de leyes.",
         "Salvo cuando lo prohíba la ley, el foro exclusivo para disputas derivadas de estos Términos o de los Servicios serán los tribunales estatales o federales ubicados en Florida, y consientes la jurisdicción personal allí.",
@@ -1028,14 +984,14 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "export",
-      title: "25. Exportación y sanciones",
+      title: "24. Exportación y sanciones",
       paragraphs: [
         "No puedes usar los Servicios si te encuentras en una jurisdicción sujeta a sanciones integrales de EE. UU. o si estás en una lista de partes restringidas del gobierno de EE. UU. Aceptas cumplir las leyes aplicables de control de exportaciones y sanciones.",
       ],
     },
     {
       id: "misc",
-      title: "26. Disposiciones generales",
+      title: "25. Disposiciones generales",
       paragraphs: [
         "Estos Términos, junto con la Política de privacidad y cualquier término suplementario presentado para funciones específicas, constituyen el acuerdo completo entre tú y Every Benefits respecto de los Servicios y sustituyen acuerdos previos sobre el mismo tema.",
         "Si alguna disposición se considera inaplicable, las restantes permanecerán en vigor. Nuestra falta de hacer cumplir una disposición no constituye una renuncia. No puedes ceder estos Términos sin nuestro consentimiento; nosotros podemos cederlos en relación con una operación societaria. No hay beneficiarios terceros salvo lo expresamente indicado.",
@@ -1044,14 +1000,14 @@ const termsEsDraft: LegalDocDraft = {
     },
     {
       id: "changes",
-      title: "27. Cambios",
+      title: "26. Cambios",
       paragraphs: [
         "Podemos actualizar estos Términos periódicamente. Publicaremos los Términos actualizados en esta página y actualizaremos la fecha de “Última actualización”. Si continúas usando los Servicios después de que los cambios surtan efecto, aceptas los Términos revisados, salvo cuando la ley aplicable exija aviso o consentimiento adicional.",
       ],
     },
     {
       id: "contact",
-      title: "28. Contacto",
+      title: "27. Contacto",
       paragraphs: [
         "Every Benefits — soporte de Pulse: support@everybenefits.com.",
       ],
@@ -1075,11 +1031,11 @@ const privacyTopicsEn: TopicDef[] = [
     sectionIds: ["use"],
   },
   {
-    id: "ai-cookies",
-    title: "Pulse AI & cookies",
-    blurb: "How AI conversations and necessary cookies work.",
+    id: "cookies",
+    title: "Cookies",
+    blurb: "Necessary cookies, locale preferences, and analytics identifiers.",
     illustration: "spark",
-    sectionIds: ["ai", "cookies"],
+    sectionIds: ["cookies"],
   },
   {
     id: "controls",
@@ -1127,11 +1083,11 @@ const privacyTopicsEs: TopicDef[] = [
     sectionIds: ["use"],
   },
   {
-    id: "ai-cookies",
-    title: "Pulse AI y cookies",
-    blurb: "Cómo funcionan las conversaciones de IA y las cookies necesarias.",
+    id: "cookies",
+    title: "Cookies",
+    blurb: "Cookies necesarias, preferencias de idioma e identificadores de analítica.",
     illustration: "spark",
-    sectionIds: ["ai", "cookies"],
+    sectionIds: ["cookies"],
   },
   {
     id: "controls",
@@ -1193,11 +1149,11 @@ const termsTopicsEn: TopicDef[] = [
     sectionIds: ["user-content", "feedback", "ip", "dmca", "third-parties"],
   },
   {
-    id: "ai-academy-tools",
-    title: "AI, Academy & tools",
-    blurb: "Educational AI, learning materials, practice tools, and betas.",
+    id: "academy-tools",
+    title: "Academy & tools",
+    blurb: "Learning materials, practice tools, and betas.",
     illustration: "spark",
-    sectionIds: ["pulse-ai", "academy", "tools", "beta"],
+    sectionIds: ["academy", "tools", "beta"],
   },
   {
     id: "liability",
@@ -1245,11 +1201,11 @@ const termsTopicsEs: TopicDef[] = [
     sectionIds: ["user-content", "feedback", "ip", "dmca", "third-parties"],
   },
   {
-    id: "ai-academy-tools",
-    title: "IA, Academia y herramientas",
-    blurb: "IA educativa, materiales de aprendizaje, práctica y betas.",
+    id: "academy-tools",
+    title: "Academia y herramientas",
+    blurb: "Materiales de aprendizaje, práctica y betas.",
     illustration: "spark",
-    sectionIds: ["pulse-ai", "academy", "tools", "beta"],
+    sectionIds: ["academy", "tools", "beta"],
   },
   {
     id: "liability",

@@ -42,20 +42,6 @@ export function IconChat({ filled, ...props }: ShellIconProps) {
   );
 }
 
-export function IconAi({ filled, ...props }: ShellIconProps) {
-  return (
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" {...props}>
-      <path
-        fill={filled ? "currentColor" : "none"}
-        stroke="currentColor"
-        strokeWidth={filled ? 0 : 1.8}
-        strokeLinejoin="round"
-        d="M12 3.5 13.8 9l5.7 1.2-4.5 3.8 1.4 5.7L12 16.8 7.6 19.7l1.4-5.7-4.5-3.8L10.2 9 12 3.5Z"
-      />
-    </svg>
-  );
-}
-
 export function IconSchool({ filled, ...props }: ShellIconProps) {
   return (
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" {...props}>

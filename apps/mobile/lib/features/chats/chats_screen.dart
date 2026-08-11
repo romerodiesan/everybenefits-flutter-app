@@ -100,7 +100,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   bool _canSwipe(ChatConversation chat) =>
-      !chat.isSupportChat && !chat.isDefaultAgentGroup;
+      !chat.isDefaultAgentGroup;
 
   Future<void> _togglePin(ChatConversation chat) async {
     final l10n = context.l10n;
@@ -304,15 +304,10 @@ class _ChatsScreenState extends State<ChatsScreen> {
   }
 
   int _inboxItemCount(ChatInboxSections sections) {
-    if (sections.support.isEmpty &&
-        sections.community.isEmpty &&
-        sections.pinned.isEmpty) {
+    if (sections.community.isEmpty && sections.pinned.isEmpty) {
       return sections.recent.length;
     }
     var count = 0;
-    if (sections.support.isNotEmpty) {
-      count += 1 + sections.support.length;
-    }
     if (sections.community.isNotEmpty) {
       count += 1 + sections.community.length;
     }
@@ -352,37 +347,16 @@ class _ChatsScreenState extends State<ChatsScreen> {
       );
     }
 
-    if (sections.support.isEmpty &&
-        sections.community.isEmpty &&
-        sections.pinned.isEmpty) {
+    if (sections.community.isEmpty && sections.pinned.isEmpty) {
       return row(sections.recent[index]);
     }
 
     var cursor = 0;
-    if (sections.support.isNotEmpty) {
-      if (index == cursor) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _SectionLabel(label: l10n.chatsSectionSupport),
-        );
-      }
-      cursor += 1;
-      if (index < cursor + sections.support.length) {
-        return row(
-          sections.support[index - cursor],
-          keyPrefix: 'support-',
-        );
-      }
-      cursor += sections.support.length;
-    }
 
     if (sections.community.isNotEmpty) {
       if (index == cursor) {
         return Padding(
-          padding: EdgeInsets.only(
-            top: sections.support.isEmpty ? 0 : 8,
-            bottom: 8,
-          ),
+          padding: const EdgeInsets.only(bottom: 8),
           child: _SectionLabel(label: l10n.chatsSectionCommunity),
         );
       }
@@ -400,9 +374,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       if (index == cursor) {
         return Padding(
           padding: EdgeInsets.only(
-            top: sections.support.isEmpty && sections.community.isEmpty
-                ? 0
-                : 8,
+            top: sections.community.isEmpty ? 0 : 8,
             bottom: 8,
           ),
           child: _SectionLabel(label: l10n.chatsSectionPinned),
@@ -412,7 +384,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
       if (index < cursor + sections.pinned.length) {
         return row(
           sections.pinned[index - cursor],
-          keyPrefix: 'pin-',
+          keyPrefix: 'pinned-',
         );
       }
       cursor += sections.pinned.length;
@@ -421,7 +393,12 @@ class _ChatsScreenState extends State<ChatsScreen> {
     if (sections.recent.isNotEmpty) {
       if (index == cursor) {
         return Padding(
-          padding: const EdgeInsets.only(top: 8, bottom: 8),
+          padding: EdgeInsets.only(
+            top: sections.community.isEmpty && sections.pinned.isEmpty
+                ? 0
+                : 8,
+            bottom: 8,
+          ),
           child: _SectionLabel(label: l10n.chatsSectionRecent),
         );
       }
@@ -530,15 +507,11 @@ class _ChatRow extends StatelessWidget {
     final hasUnread = unread > 0;
     final pinned = chat.isPinnedFor(viewerUid);
     final title = chat.titleFor(viewerUid, l10n: l10n);
-    final preview = chat.isSupportChat
-        ? (chat.lastMessage.isEmpty
-            ? l10n.chatsSupportBadge
-            : chat.lastMessage)
-        : chat.isDefaultAgentGroup && chat.lastMessage.isEmpty
-            ? l10n.chatsDefaultGroupBadge
-            : (chat.lastMessage.isEmpty
-                ? l10n.chatsNoMessagesYet
-                : chat.lastMessage);
+    final preview = chat.isDefaultAgentGroup && chat.lastMessage.isEmpty
+        ? l10n.chatsDefaultGroupBadge
+        : (chat.lastMessage.isEmpty
+            ? l10n.chatsNoMessagesYet
+            : chat.lastMessage);
 
     final tile = Material(
       color: colors.sheet,

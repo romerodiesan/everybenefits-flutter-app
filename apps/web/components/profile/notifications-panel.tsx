@@ -22,14 +22,12 @@ const PUSH_ROWS = [
   ["pushForumVotes", "notificationsPrefForumVotes"],
   ["pushForumNewThreads", "notificationsPrefForumNewThreads"],
   ["pushAcademy", "notificationsPrefAcademy"],
-  ["pushSupport", "notificationsPrefSupport"],
 ] as const;
 
 const IN_APP_ROWS = [
   ["inAppChats", "notificationsPrefChats"],
   ["inAppForums", "notificationsPrefForums"],
   ["inAppAcademy", "notificationsPrefAcademy"],
-  ["inAppSupport", "notificationsPrefSupport"],
 ] as const;
 
 const EMAIL_ROWS = [
@@ -38,7 +36,6 @@ const EMAIL_ROWS = [
   ["emailForumVotes", "notificationsPrefForumVotes"],
   ["emailForumNewThreads", "notificationsPrefForumNewThreads"],
   ["emailAcademy", "notificationsPrefAcademy"],
-  ["emailSupport", "notificationsPrefSupport"],
   ["emailProductUpdates", "notificationsPrefEmailProduct"],
 ] as const;
 

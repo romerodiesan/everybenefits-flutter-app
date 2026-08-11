@@ -33,7 +33,7 @@ class WelcomeScreen extends StatefulWidget {
 
 class _WelcomeScreenState extends State<WelcomeScreen>
     with TickerProviderStateMixin {
-  static const _storyCount = 4;
+  static const _storyCount = 3;
 
   late PageController _pageController;
   late final AnimationController _ambient;
@@ -213,20 +213,12 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                             active: _page == 1,
                           ),
                           _StoryPage(
-                            kind: OnboardingIllustrationKind.ai,
-                            title: l10n.onboardingAiTitle,
-                            body: l10n.onboardingAiBody,
-                            float: float,
-                            reveal: _reveal,
-                            active: _page == 2,
-                          ),
-                          _StoryPage(
                             kind: OnboardingIllustrationKind.academy,
                             title: l10n.onboardingAcademyTitle,
                             body: l10n.onboardingAcademyBody,
                             float: float,
                             reveal: _reveal,
-                            active: _page == 3,
+                            active: _page == 2,
                           ),
                           _AuthPage(
                             onSignIn: () => _open(

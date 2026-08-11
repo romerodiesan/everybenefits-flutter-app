@@ -1,5 +1,3 @@
-import 'dart:async';
-
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
@@ -7,25 +5,20 @@ import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/role_badge.dart';
-import '../../firebase/platform_config.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import 'widgets/profile_avatar.dart';
 
-/// Minimal admin surface: Pulse AI kill switch + promote students to agents.
+/// Minimal admin surface: promote students to agents.
 class AdminPromoteScreen extends StatefulWidget {
   const AdminPromoteScreen({
     super.key,
     required this.userRepository,
-    required this.adminUid,
     this.roleCallable,
-    this.platformConfig,
   });
 
   final UserRepository userRepository;
-  final String adminUid;
   final UserRoleCallable? roleCallable;
-  final PlatformConfig? platformConfig;
 
   @override
   State<AdminPromoteScreen> createState() => _AdminPromoteScreenState();
@@ -34,13 +27,9 @@ class AdminPromoteScreen extends StatefulWidget {
 class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
   late Future<List<UserProfile>> _future;
   final Set<String> _busyUids = {};
-  bool _aiBusy = false;
 
   UserRoleCallable get _callable =>
       widget.roleCallable ?? UserRoleCallable();
-
-  PlatformConfig get _platform =>
-      widget.platformConfig ?? PlatformConfig();
 
   @override
   void initState() {
@@ -50,25 +39,6 @@ class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
 
   Future<List<UserProfile>> _load() {
     return _callable.listStudentsForPromotion();
-  }
-
-  Future<void> _setAiEnabled(bool enabled) async {
-    if (_aiBusy) return;
-    setState(() => _aiBusy = true);
-    try {
-      await _platform.setPulseAiEnabled(
-        enabled: enabled,
-        adminUid: widget.adminUid,
-      );
-    } catch (error) {
-      if (!mounted) return;
-      final l10n = context.l10n;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.settingsAdminPromoteFailed('$error'))),
-      );
-    } finally {
-      if (mounted) setState(() => _aiBusy = false);
-    }
   }
 
   Future<void> _promote(UserProfile profile) async {
@@ -115,53 +85,6 @@ class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
               AppSpacing.sm,
-              AppSpacing.lg,
-              AppSpacing.md,
-            ),
-            child: StreamBuilder<bool>(
-              stream: _platform.watchPulseAiEnabled(),
-              initialData: true,
-              builder: (context, snapshot) {
-                final enabled = snapshot.data ?? false;
-                return DecoratedBox(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: colors.border),
-                    color: colors.glassFill,
-                  ),
-                  child: SwitchListTile.adaptive(
-                    contentPadding: const EdgeInsets.fromLTRB(16, 8, 12, 8),
-                    title: Text(
-                      l10n.settingsAdminPulseAi,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        l10n.settingsAdminPulseAiHint,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colors.muted,
-                        ),
-                      ),
-                    ),
-                    value: enabled,
-                    onChanged: _aiBusy
-                        ? null
-                        : (next) {
-                            PulseHaptics.selection();
-                            unawaited(_setAiEnabled(next));
-                          },
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              0,
               AppSpacing.lg,
               AppSpacing.sm,
             ),

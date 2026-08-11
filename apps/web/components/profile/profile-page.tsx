@@ -3,12 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useSearchParams } from "next/navigation";
-import { useRouter } from "@/i18n/navigation";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { headlineName } from "@/lib/display-name";
-import { getOrCreateSupportChat } from "@/lib/firebase/chats";
 import { signOutAndRedirect } from "@/lib/firebase/auth";
-import { can, canAccessSupport } from "@/lib/roles";
+import { can } from "@/lib/roles";
 import type { UserProfile } from "@/lib/types";
 import { Avatar, Badge, Button } from "@/components/ui/primitives";
 import {
@@ -141,7 +139,6 @@ const ICONS: Record<SettingsSection, React.ReactNode> = {
 export function ProfilePage() {
   const t = useTranslations();
   const locale = useLocale();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const { profile } = useAuth();
   // Always start at account on SSR/hydration; resolve the real section in
@@ -295,21 +292,6 @@ export function ProfilePage() {
               </p>
             )}
             <div className="mt-3 space-y-1.5">
-              {canAccessSupport(access, profile.isAnonymous) && (
-                <Button
-                  className="h-9 w-full text-xs"
-                  onClick={async () => {
-                    const chat = await getOrCreateSupportChat(
-                      profile,
-                      "Support Assistant",
-                      "Hi — how can we help?",
-                    );
-                    router.push(`/chats/${chat.id}`);
-                  }}
-                >
-                  {t("profileSupport")}
-                </Button>
-              )}
               <Button
                 variant="secondary"
                 className="h-9 w-full text-xs lg:hidden"

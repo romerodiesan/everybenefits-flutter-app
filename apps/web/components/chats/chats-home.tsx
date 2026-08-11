@@ -24,7 +24,6 @@ import {
   canCreateChatGroups,
   canConfigureGroupAutoJoin,
   canParticipateInChats,
-  canAccessSupport,
 } from "@/lib/roles";
 import {
   type ChatConversation,
@@ -143,17 +142,11 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
 
   const sections = useMemo(() => {
     if (!profile) return null;
-    const next = partitionChatInbox(chats, profile.uid);
-    if (!canAccessSupport(access, profile.isAnonymous)) {
-      return { ...next, support: [] as ChatConversation[] };
-    }
-    return next;
+    return partitionChatInbox(chats, profile.uid);
   }, [chats, profile]);
   const showSectionHeaders = Boolean(
     sections &&
-      (sections.support.length ||
-        sections.community.length ||
-        sections.pinned.length),
+      (sections.community.length || sections.pinned.length),
   );
 
   async function startDm(other: UserProfile) {
@@ -272,7 +265,6 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
         {items.map((chat) => {
           const active = selectedId === chat.id;
           const title = chatTitleFor(chat, profile!.uid, {
-            support: t("chatsSupport"),
             team: t("chatsTeam"),
           });
           const unread = chat.unreadCounts[profile!.uid] ?? 0;
@@ -390,7 +382,6 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
           )}
           {!displayInboxError && inboxReady && sections && showSectionHeaders && (
             <>
-              {renderList(sections.support, t("chatsSectionSupport"))}
               {renderList(sections.community, t("chatsSectionCommunity"))}
               {renderList(sections.pinned, t("chatsPinned"))}
               {renderList(sections.recent, t("chatsSectionRecent"))}

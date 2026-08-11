@@ -11,7 +11,6 @@ export {
   canParticipateInChats,
   canCreateChatGroups,
   canConfigureGroupAutoJoin,
-  canAccessSupport,
   canAccessAdmin,
   canManagePlatform,
   can,

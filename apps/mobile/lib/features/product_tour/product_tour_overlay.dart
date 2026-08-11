@@ -7,7 +7,7 @@ import '../../users/user_repository.dart';
 import '../../users/user_role.dart';
 import 'product_tour_prefs.dart';
 
-enum ProductTourStepId { welcome, community, chats, academy, ai, you }
+enum ProductTourStepId { welcome, community, chats, academy, you }
 
 class ProductTourTargets {
   const ProductTourTargets({
@@ -16,7 +16,6 @@ class ProductTourTargets {
     required this.chats,
     required this.academy,
     required this.profile,
-    this.ai,
   });
 
   final GlobalKey bar;
@@ -24,7 +23,6 @@ class ProductTourTargets {
   final GlobalKey chats;
   final GlobalKey academy;
   final GlobalKey profile;
-  final GlobalKey? ai;
 
   GlobalKey? keyFor(ProductTourStepId id) {
     return switch (id) {
@@ -32,7 +30,6 @@ class ProductTourTargets {
       ProductTourStepId.community => home,
       ProductTourStepId.chats => chats,
       ProductTourStepId.academy => academy,
-      ProductTourStepId.ai => ai,
       ProductTourStepId.you => profile,
     };
   }
@@ -45,14 +42,12 @@ class ProductTourOverlay extends StatefulWidget {
     required this.profile,
     required this.userRepository,
     required this.targets,
-    required this.pulseAiEnabled,
     this.onCompleted,
   });
 
   final UserProfile profile;
   final UserRepository userRepository;
   final ProductTourTargets targets;
-  final bool pulseAiEnabled;
   final ValueChanged<UserProfile>? onCompleted;
 
   @override
@@ -65,17 +60,13 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
   bool? _show;
   Rect? _hole;
 
-  List<ProductTourStepId> get _steps {
-    final all = <ProductTourStepId>[
-      ProductTourStepId.welcome,
-      ProductTourStepId.community,
-      ProductTourStepId.chats,
-      ProductTourStepId.academy,
-      if (widget.pulseAiEnabled) ProductTourStepId.ai,
-      ProductTourStepId.you,
-    ];
-    return all;
-  }
+  static const _steps = <ProductTourStepId>[
+    ProductTourStepId.welcome,
+    ProductTourStepId.community,
+    ProductTourStepId.chats,
+    ProductTourStepId.academy,
+    ProductTourStepId.you,
+  ];
 
   bool get _isAgent {
     final role = widget.profile.role;
@@ -111,20 +102,18 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile.productTourVersion !=
             widget.profile.productTourVersion ||
-        oldWidget.profile.profileCompleted != widget.profile.profileCompleted ||
-        oldWidget.pulseAiEnabled != widget.pulseAiEnabled) {
+        oldWidget.profile.profileCompleted != widget.profile.profileCompleted) {
       _loadGate();
     }
   }
 
   void _measure() {
     if (!mounted || _show != true) return;
-    final steps = _steps;
-    if (_page >= steps.length) {
-      setState(() => _page = steps.isEmpty ? 0 : steps.length - 1);
+    if (_page >= _steps.length) {
+      setState(() => _page = _steps.isEmpty ? 0 : _steps.length - 1);
       return;
     }
-    final key = widget.targets.keyFor(steps[_page]);
+    final key = widget.targets.keyFor(_steps[_page]);
     final ctx = key?.currentContext;
     final box = ctx?.findRenderObject() as RenderBox?;
     if (box == null || !box.hasSize) {
@@ -175,7 +164,6 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
       ProductTourStepId.community => l10n.tourCommunityTitle,
       ProductTourStepId.chats => l10n.tourChatsTitle,
       ProductTourStepId.academy => l10n.tourAcademyTitle,
-      ProductTourStepId.ai => l10n.tourAiTitle,
       ProductTourStepId.you => l10n.tourYouTitle,
     };
   }
@@ -186,7 +174,6 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
       ProductTourStepId.community => l10n.tourCommunityBody,
       ProductTourStepId.chats => l10n.tourChatsBody,
       ProductTourStepId.academy => l10n.tourAcademyBody,
-      ProductTourStepId.ai => l10n.tourAiBody,
       ProductTourStepId.you =>
         _isAgent ? l10n.tourYouBodyAgent : l10n.tourYouBody,
     };
@@ -199,10 +186,9 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
     final l10n = context.l10n;
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    final steps = _steps;
-    if (steps.isEmpty) return const SizedBox.shrink();
-    final step = steps[_page.clamp(0, steps.length - 1)];
-    final isLast = _page >= steps.length - 1;
+    if (_steps.isEmpty) return const SizedBox.shrink();
+    final step = _steps[_page.clamp(0, _steps.length - 1)];
+    final isLast = _page >= _steps.length - 1;
     final size = MediaQuery.sizeOf(context);
 
     final tipTop = () {
@@ -273,7 +259,7 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
                           ],
                         ),
                         Text(
-                          l10n.tourStep(_page + 1, steps.length),
+                          l10n.tourStep(_page + 1, _steps.length),
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -295,7 +281,7 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
                         const SizedBox(height: 14),
                         Row(
                           children: [
-                            for (var i = 0; i < steps.length; i++) ...[
+                            for (var i = 0; i < _steps.length; i++) ...[
                               AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),
                                 width: i == _page ? 18 : 7,
@@ -309,7 +295,7 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
                                   borderRadius: BorderRadius.circular(99),
                                 ),
                               ),
-                              if (i < steps.length - 1)
+                              if (i < _steps.length - 1)
                                 const SizedBox(width: 5),
                             ],
                             const Spacer(),

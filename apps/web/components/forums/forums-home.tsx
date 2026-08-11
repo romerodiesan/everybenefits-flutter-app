@@ -14,7 +14,6 @@ import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import type { DocumentSnapshot } from "firebase/firestore";
 import { Link, useRouter } from "@/i18n/navigation";
-import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import {
   castForumVote,
@@ -63,7 +62,6 @@ export function ForumsHome() {
   const searchParams = useSearchParams();
   const { profile } = useAuth();
   const access = useAccess();
-  const pulseAiEnabled = usePulseAiEnabled();
   const reduceMotion = useSafeReducedMotion();
   const [threads, setThreads] = useState<ForumThread[]>([]);
   const [mode, setMode] = useState<FeedMode>("fresh");
@@ -800,19 +798,7 @@ export function ForumsHome() {
                   </ActionButton>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-dashed border-glass-border/70 px-4 py-2 md:px-5">
-                  {pulseAiEnabled ? (
-                    <Link
-                      href="/ai"
-                      className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-muted transition hover:text-brand"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <IconSpark width={12} height={12} />
-                      {t("forumsAskAi")}
-                    </Link>
-                  ) : (
-                    <span />
-                  )}
+                <div className="flex items-center justify-end border-t border-dashed border-glass-border/70 px-4 py-2 md:px-5">
                   <Link
                     href={`/home/${thread.id}`}
                     className="text-[11px] font-bold text-brand opacity-100 transition lg:opacity-0 lg:group-hover:opacity-100"

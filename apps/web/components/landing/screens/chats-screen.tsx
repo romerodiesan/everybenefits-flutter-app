@@ -16,9 +16,7 @@ export function ChatsScreen() {
     [],
   );
   const showSectionHeaders = Boolean(
-    sections.support.length ||
-      sections.community.length ||
-      sections.pinned.length,
+    sections.community.length || sections.pinned.length,
   );
 
   function renderList(
@@ -35,7 +33,6 @@ export function ChatsScreen() {
         )}
         {items.map((chat) => {
           const title = chatTitleFor(chat, LANDING_VIEWER_UID, {
-            support: t("chatsSupport"),
             team: t("chatsTeam"),
           });
           const unread = chat.unreadCounts[LANDING_VIEWER_UID] ?? 0;
@@ -74,7 +71,6 @@ export function ChatsScreen() {
       <div className="min-h-0 flex-1 space-y-3 overflow-hidden px-2.5 py-2.5">
         {showSectionHeaders ? (
           <>
-            {renderList(sections.support, t("chatsSectionSupport"))}
             {renderList(sections.community, t("chatsSectionCommunity"))}
             {renderList(sections.pinned, t("chatsPinned"))}
             {renderList(sections.recent, t("chatsSectionRecent"))}

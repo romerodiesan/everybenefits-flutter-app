@@ -54,9 +54,9 @@ void main() {
     expect(forum.kind, NotificationTargetKind.forum);
     expect(forum.id, 'abc');
 
-    final chat = notificationTargetFor(_item(href: '/chats/support_u1'));
+    final chat = notificationTargetFor(_item(href: '/chats/chat_u1'));
     expect(chat.kind, NotificationTargetKind.chat);
-    expect(chat.id, 'support_u1');
+    expect(chat.id, 'chat_u1');
 
     final course = notificationTargetFor(_item(href: '/academy/c1'));
     expect(course.kind, NotificationTargetKind.academy);

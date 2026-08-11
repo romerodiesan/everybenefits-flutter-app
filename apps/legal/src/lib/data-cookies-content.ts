@@ -10,13 +10,13 @@ const dataEnDraft: LegalDocDraft = {
   kind: "data",
   title: "Data Use",
   summary:
-    "This Data Use notice explains how Pulse processes personal and technical data day to day — what we collect for product features, how AI and analytics fit in, and the choices you have to limit or request changes.",
+    "This Data Use notice explains how Pulse processes personal and technical data day to day — what we collect for product features, how analytics fit in, and the choices you have to limit or request changes.",
   sections: [
     {
       id: "overview",
       title: "1. Overview",
       paragraphs: [
-        "Every Benefits operates Pulse for US insurance professionals. Data use on Pulse is limited to operating community, messaging, Academy, practice tools, Pulse AI, security, and optional product analytics.",
+        "Every Benefits operates Pulse for US insurance professionals. Data use on Pulse is limited to operating community, messaging, Academy, practice tools, security, and optional product analytics.",
         "This notice complements our Privacy Policy. If there is a conflict, the Privacy Policy controls for personal information rights and disclosures.",
       ],
     },
@@ -29,7 +29,6 @@ const dataEnDraft: LegalDocDraft = {
         "Professional profile: NPN, agency affiliation, role, and US address fields required for certain agent-class profiles.",
         "Community and chat content you submit, including metadata such as timestamps and participants.",
         "Learning activity: enrollments, progress, completions, and practice-tool interactions.",
-        "Pulse AI prompts, responses, feedback, and retrieval context needed to answer.",
         "Technical logs: device/browser, IP, approximate location from IP, performance and security signals.",
         "Optional analytics events when you opt in; crash diagnostics on mobile release builds.",
       ],
@@ -41,7 +40,6 @@ const dataEnDraft: LegalDocDraft = {
       bullets: [
         "Authenticate you, enforce roles, and keep sessions secure (including MFA where enabled).",
         "Deliver forums, chats, notifications, Academy, and practice tools.",
-        "Ground Pulse AI answers in approved community, Academy, and curated official sources.",
         "Detect abuse, spam, fraud, and security threats.",
         "Diagnose crashes and reliability issues.",
         "Improve product quality when you opt into analytics.",
@@ -49,17 +47,8 @@ const dataEnDraft: LegalDocDraft = {
       ],
     },
     {
-      id: "ai-data",
-      title: "4. AI data use",
-      paragraphs: [
-        "When you use Pulse AI, prompts and related context may be processed by Every Benefits systems and model/gateway providers solely to generate responses, apply rate limits, and enforce safety filters.",
-        "We do not use your Pulse AI conversations to train third-party foundation models for unrelated advertising. Do not submit client PHI, SSNs, payment card data, or other sensitive third-party data into AI or public forums.",
-        "AI outputs are educational only — not legal, compliance, tax, or personalized insurance advice.",
-      ],
-    },
-    {
       id: "analytics",
-      title: "5. Analytics and diagnostics",
+      title: "4. Analytics and diagnostics",
       paragraphs: [
         "Product analytics (Firebase Analytics) is off by default. You can enable or disable it in Profile / Account → Privacy (web) or Settings → Privacy (mobile).",
         "Mobile crash diagnostics (Firebase Crashlytics) in release builds help us fix crashes. They are separate from marketing analytics and are not used to build advertising profiles.",
@@ -68,7 +57,7 @@ const dataEnDraft: LegalDocDraft = {
     },
     {
       id: "choices",
-      title: "6. Your data choices",
+      title: "5. Your data choices",
       paragraphs: [
         "In-product controls let you manage directory visibility, direct messages, searchability by email/NPN, what appears in search results, and analytics opt-in.",
         "You may also request access, correction, deletion, or portability of personal information by emailing support@everybenefits.com with “Privacy Request” in the subject line.",
@@ -77,16 +66,16 @@ const dataEnDraft: LegalDocDraft = {
     },
     {
       id: "retention",
-      title: "7. Retention and deletion",
+      title: "6. Retention and deletion",
       paragraphs: [
         "We keep account and profile data while your account is active and as needed for security, disputes, and legal requirements.",
-        "Community content may remain for thread integrity after some deletion requests. AI history is kept for in-product history and abuse investigation within operational limits. Security logs and crash reports are retained for limited diagnostic periods.",
+        "Community content may remain for thread integrity after some deletion requests. Security logs and crash reports are retained for limited diagnostic periods.",
         "When data is no longer needed, we delete or de-identify it. Residual copies may linger in encrypted backups until overwritten.",
       ],
     },
     {
       id: "contact",
-      title: "8. Contact",
+      title: "7. Contact",
       paragraphs: [
         "Questions about data use: support@everybenefits.com.",
         "See also our Privacy Policy, Cookies notice, and Terms of Use.",
@@ -99,13 +88,13 @@ const dataEsDraft: LegalDocDraft = {
   kind: "data",
   title: "Uso de datos",
   summary:
-    "Este aviso de Uso de datos explica cómo Pulse trata datos personales y técnicos en el día a día — qué recopilamos para las funciones del producto, cómo encajan la IA y la analítica, y las opciones que tienes para limitar o solicitar cambios.",
+    "Este aviso de Uso de datos explica cómo Pulse trata datos personales y técnicos en el día a día — qué recopilamos para las funciones del producto, cómo encaja la analítica, y las opciones que tienes para limitar o solicitar cambios.",
   sections: [
     {
       id: "overview",
       title: "1. Resumen",
       paragraphs: [
-        "Every Benefits opera Pulse para profesionales de seguros en EE. UU. El uso de datos en Pulse se limita a operar comunidad, mensajería, Academia, herramientas de práctica, Pulse AI, seguridad y analítica de producto opcional.",
+        "Every Benefits opera Pulse para profesionales de seguros en EE. UU. El uso de datos en Pulse se limita a operar comunidad, mensajería, Academia, herramientas de práctica, seguridad y analítica de producto opcional.",
         "Este aviso complementa nuestra Política de privacidad. Si hay conflicto, prevalece la Política de privacidad respecto de derechos y divulgaciones de información personal.",
       ],
     },
@@ -118,7 +107,6 @@ const dataEsDraft: LegalDocDraft = {
         "Perfil profesional: NPN, afiliación de agencia, rol y dirección en EE. UU. requerida para ciertos perfiles de clase agente.",
         "Contenido de comunidad y chat que envías, incluidos metadatos como marcas de tiempo y participantes.",
         "Actividad de aprendizaje: inscripciones, progreso, finalizaciones e interacciones con herramientas de práctica.",
-        "Prompts, respuestas, comentarios y contexto de recuperación de Pulse AI necesarios para responder.",
         "Registros técnicos: dispositivo/navegador, IP, ubicación aproximada, señales de rendimiento y seguridad.",
         "Eventos de analítica opcionales cuando optas por activarlos; diagnósticos de fallos en builds móviles de producción.",
       ],
@@ -130,7 +118,6 @@ const dataEsDraft: LegalDocDraft = {
       bullets: [
         "Autenticarte, aplicar roles y mantener sesiones seguras (incluida MFA cuando esté habilitada).",
         "Ofrecer foros, chats, notificaciones, Academia y herramientas de práctica.",
-        "Anclar respuestas de Pulse AI en conocimiento comunitario, Academia y fuentes oficiales curadas.",
         "Detectar abusos, spam, fraude y amenazas de seguridad.",
         "Diagnosticar fallos y problemas de confiabilidad.",
         "Mejorar la calidad del producto cuando activas la analítica.",
@@ -138,17 +125,8 @@ const dataEsDraft: LegalDocDraft = {
       ],
     },
     {
-      id: "ai-data",
-      title: "4. Uso de datos de IA",
-      paragraphs: [
-        "Cuando usas Pulse AI, los prompts y el contexto relacionado pueden procesarse en sistemas de Every Benefits y por proveedores de modelos/gateway únicamente para generar respuestas, aplicar límites de uso y filtros de seguridad.",
-        "No usamos tus conversaciones de Pulse AI para entrenar modelos fundacionales de terceros con fines publicitarios no relacionados. No envíes PHI de clientes, SSN, datos de tarjetas u otros datos sensibles de terceros a la IA o a foros públicos.",
-        "Las salidas de IA son solo educativas — no asesoría legal, de cumplimiento, fiscal ni recomendaciones personalizadas de seguros.",
-      ],
-    },
-    {
       id: "analytics",
-      title: "5. Analítica y diagnósticos",
+      title: "4. Analítica y diagnósticos",
       paragraphs: [
         "La analítica de producto (Firebase Analytics) está desactivada por defecto. Puedes activarla o desactivarla en Perfil / Cuenta → Privacidad (web) o Ajustes → Privacidad (móvil).",
         "Los diagnósticos de fallos móviles (Firebase Crashlytics) en builds de producción nos ayudan a corregir caídas. Son independientes de la analítica de marketing y no se usan para perfiles publicitarios.",
@@ -157,7 +135,7 @@ const dataEsDraft: LegalDocDraft = {
     },
     {
       id: "choices",
-      title: "6. Tus opciones de datos",
+      title: "5. Tus opciones de datos",
       paragraphs: [
         "Los controles en el producto te permiten gestionar visibilidad en el directorio, mensajes directos, búsqueda por correo/NPN, qué aparece en resultados y la analítica opcional.",
         "También puedes solicitar acceso, corrección, eliminación o portabilidad de información personal escribiendo a support@everybenefits.com con “Solicitud de privacidad” en el asunto.",
@@ -166,16 +144,16 @@ const dataEsDraft: LegalDocDraft = {
     },
     {
       id: "retention",
-      title: "7. Retención y eliminación",
+      title: "6. Retención y eliminación",
       paragraphs: [
         "Conservamos datos de cuenta y perfil mientras la cuenta esté activa y según sea necesario por seguridad, disputas y requisitos legales.",
-        "El contenido comunitario puede permanecer por integridad de hilos tras algunas solicitudes de eliminación. El historial de IA se conserva para el historial en el producto e investigación de abusos dentro de límites operativos. Los registros de seguridad y reportes de fallos se retienen por periodos diagnósticos limitados.",
+        "El contenido comunitario puede permanecer por integridad de hilos tras algunas solicitudes de eliminación. Los registros de seguridad y reportes de fallos se retienen por periodos diagnósticos limitados.",
         "Cuando los datos ya no sean necesarios, los eliminamos o desidentificamos. Pueden quedar copias residuales en respaldos cifrados hasta que se sobrescriban.",
       ],
     },
     {
       id: "contact",
-      title: "8. Contacto",
+      title: "7. Contacto",
       paragraphs: [
         "Preguntas sobre uso de datos: support@everybenefits.com.",
         "Consulta también nuestra Política de privacidad, el aviso de Cookies y los Términos de uso.",
@@ -239,7 +217,7 @@ const cookiesEnDraft: LegalDocDraft = {
       id: "third-parties",
       title: "6. Third-party technologies",
       paragraphs: [
-        "Pulse relies on infrastructure providers (for example Google Firebase / Google Cloud) that may set cookies or local identifiers needed to deliver authentication, hosting, analytics (if opted in), crash reporting, and AI gateway features.",
+        "Pulse relies on infrastructure providers (for example Google Firebase / Google Cloud) that may set cookies or local identifiers needed to deliver authentication, hosting, analytics (if opted in), and crash reporting.",
         "Those providers process data under our instructions and their own service terms. We do not embed third-party social advertising pixels on Pulse marketing surfaces for cross-site ads.",
       ],
     },
@@ -317,7 +295,7 @@ const cookiesEsDraft: LegalDocDraft = {
       id: "third-parties",
       title: "6. Tecnologías de terceros",
       paragraphs: [
-        "Pulse depende de proveedores de infraestructura (por ejemplo Google Firebase / Google Cloud) que pueden establecer cookies o identificadores locales necesarios para autenticación, hosting, analítica (si la activas), reportes de fallos y funciones de gateway de IA.",
+        "Pulse depende de proveedores de infraestructura (por ejemplo Google Firebase / Google Cloud) que pueden establecer cookies o identificadores locales necesarios para autenticación, hosting, analítica (si la activas), y reportes de fallos.",
         "Esos proveedores tratan datos bajo nuestras instrucciones y sus propios términos de servicio. No incrustamos píxeles publicitarios sociales de terceros en superficies de marketing de Pulse para anuncios entre sitios.",
       ],
     },
@@ -356,11 +334,11 @@ const dataTopicsEn: TopicDef[] = [
     sectionIds: ["purposes"],
   },
   {
-    id: "ai-analytics",
-    title: "AI & analytics",
-    blurb: "Pulse AI processing, optional analytics, and crash diagnostics.",
+    id: "analytics",
+    title: "Analytics",
+    blurb: "Optional analytics and crash diagnostics.",
     illustration: "spark",
-    sectionIds: ["ai-data", "analytics"],
+    sectionIds: ["analytics"],
   },
   {
     id: "choices-retention",
@@ -387,11 +365,11 @@ const dataTopicsEs: TopicDef[] = [
     sectionIds: ["purposes"],
   },
   {
-    id: "ai-analytics",
-    title: "IA y analítica",
-    blurb: "Procesamiento de Pulse AI, analítica opcional y diagnósticos de fallos.",
+    id: "analytics",
+    title: "Analítica",
+    blurb: "Analítica opcional y diagnósticos de fallos.",
     illustration: "spark",
-    sectionIds: ["ai-data", "analytics"],
+    sectionIds: ["analytics"],
   },
   {
     id: "choices-retention",

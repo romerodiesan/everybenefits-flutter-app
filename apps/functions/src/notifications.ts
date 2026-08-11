@@ -7,10 +7,9 @@ export type NotificationType =
   | "forum_reply"
   | "forum_vote"
   | "forum_new_thread"
-  | "course_published"
-  | "support_message";
+  | "course_published";
 
-export type NotificationChannel = "chats" | "forums" | "academy" | "support";
+export type NotificationChannel = "chats" | "forums" | "academy";
 
 export type NotifyPayload = {
   type: NotificationType;
@@ -32,7 +31,6 @@ const TYPE_CHANNEL: Record<NotificationType, NotificationChannel> = {
   forum_vote: "forums",
   forum_new_thread: "forums",
   course_published: "academy",
-  support_message: "support",
 };
 
 const FORUM_TYPES = new Set<NotificationType>([
@@ -48,20 +46,17 @@ export type NotificationPrefs = {
   pushChats: boolean;
   pushForums: boolean;
   pushAcademy: boolean;
-  pushSupport: boolean;
   pushForumVotes: boolean;
   pushForumReplies: boolean;
   pushForumNewThreads: boolean;
   inAppChats: boolean;
   inAppForums: boolean;
   inAppAcademy: boolean;
-  inAppSupport: boolean;
   emailChats: boolean;
   emailForumReplies: boolean;
   emailForumVotes: boolean;
   emailForumNewThreads: boolean;
   emailAcademy: boolean;
-  emailSupport: boolean;
   emailProductUpdates: boolean;
 };
 
@@ -78,21 +73,18 @@ export function readPrefsFromData(
     pushChats: p.pushChats !== false,
     pushForums,
     pushAcademy: p.pushAcademy !== false,
-    pushSupport: p.pushSupport !== false,
     pushForumVotes: p.pushForumVotes !== false && pushForums,
     pushForumReplies: p.pushForumReplies !== false && pushForums,
     pushForumNewThreads: p.pushForumNewThreads !== false && pushForums,
     inAppChats: p.inAppChats !== false,
     inAppForums: p.inAppForums !== false,
     inAppAcademy: p.inAppAcademy !== false,
-    inAppSupport: p.inAppSupport !== false,
-    // Email defaults off except support (actionable).
+    // Email defaults off.
     emailChats: p.emailChats === true,
     emailForumReplies: p.emailForumReplies === true,
     emailForumVotes: p.emailForumVotes === true,
     emailForumNewThreads: p.emailForumNewThreads === true,
     emailAcademy: p.emailAcademy === true,
-    emailSupport: p.emailSupport !== false,
     emailProductUpdates: p.emailProductUpdates === true,
   };
 }
@@ -115,8 +107,6 @@ function channelAllowsInApp(
       return prefs.inAppForums;
     case "academy":
       return prefs.inAppAcademy;
-    case "support":
-      return prefs.inAppSupport;
   }
 }
 
@@ -135,8 +125,6 @@ function channelAllowsPush(
       return prefs.pushForums;
     case "academy":
       return prefs.pushAcademy;
-    case "support":
-      return prefs.pushSupport;
   }
 }
 
@@ -154,8 +142,6 @@ function channelAllowsEmail(
       return prefs.emailForumReplies;
     case "academy":
       return prefs.emailAcademy;
-    case "support":
-      return prefs.emailSupport;
   }
 }
 
@@ -172,7 +158,7 @@ export function groupKeyFor(
   if (type === "forum_reply") {
     return ref.threadId ? `forum_reply:${ref.threadId}` : null;
   }
-  if (type === "chat_message" || type === "support_message") {
+  if (type === "chat_message") {
     return ref.chatId ? `${type}:${ref.chatId}` : null;
   }
   return null;
@@ -217,10 +203,9 @@ function aggregatedCopy(
           : `${who} replied to a thread you follow`,
     };
   }
-  if (type === "chat_message" || type === "support_message") {
-    const label = type === "support_message" ? "Support" : "Chat";
+  if (type === "chat_message") {
     return {
-      title: count > 1 ? `${label} · ${count} messages` : label,
+      title: count > 1 ? `Chat · ${count} messages` : "Chat",
       body: preview?.trim() || fallbackBody || "You have a new message",
     };
   }
@@ -245,7 +230,7 @@ export async function notifyUser(
   payload: NotifyPayload,
   options?: { chatIdForDebounce?: string },
 ): Promise<void> {
-  if (!uid || uid === "support-ai") return;
+  if (!uid) return;
 
   const channel = TYPE_CHANNEL[payload.type];
   const prefs = await readPrefs(uid);
@@ -373,7 +358,7 @@ export async function notifyUser(
   const pushAllowed =
     channelAllowsPush(prefs, payload.type) && !payload.silent;
 
-  // Debounce noisy chat/support pushes (inbox already updated).
+  // Debounce noisy chat pushes (inbox already updated).
   const debounceKey =
     groupKey ??
     (options?.chatIdForDebounce
@@ -382,8 +367,7 @@ export async function notifyUser(
   const shouldSkipPush =
     !pushAllowed ||
     (Boolean(debounceKey) &&
-      (payload.type === "chat_message" ||
-        payload.type === "support_message") &&
+      payload.type === "chat_message" &&
       (await shouldDebouncePush(uid, debounceKey!)));
 
   if (!shouldSkipPush) {

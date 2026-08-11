@@ -13,16 +13,13 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "eval:ai": "vitest run lib/ai/evals"
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@ai-sdk/react": "~4.0.51",
     "@pulse/chrome": "workspace:*",
     "@pulse/firebase-web": "workspace:*",
     "@pulse/shared": "workspace:*",
     "@pulse/sso": "workspace:*",
-    "ai": "~7.0.48",
     "firebase": "~12.17.0",
     "firebase-admin": "~14.2.0",
     "motion": "~12.43.0",

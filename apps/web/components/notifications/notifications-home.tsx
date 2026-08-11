@@ -47,7 +47,6 @@ const FILTERS: {
   { id: "chats", labelKey: "notificationsFilterChats" },
   { id: "forums", labelKey: "notificationsFilterForums" },
   { id: "academy", labelKey: "notificationsFilterAcademy" },
-  { id: "support", labelKey: "notificationsFilterSupport" },
 ];
 
 export function NotificationsHome() {

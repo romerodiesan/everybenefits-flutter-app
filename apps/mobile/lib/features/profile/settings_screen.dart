@@ -195,7 +195,6 @@ class SettingsScreen extends StatelessWidget {
                   MaterialPageRoute<void>(
                     builder: (_) => AdminPromoteScreen(
                       userRepository: userRepository,
-                      adminUid: profile.uid,
                     ),
                   ),
                 );

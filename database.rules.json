@@ -7,22 +7,12 @@
       "$chatId": {
         // Allow missing nodes so clients can probe before create (null).
         // Existing chats still require membership.
+        // Chat documents are created via Admin SDK callables only.
         ".read": "auth != null && (
           !data.exists()
           || data.child('members').child(auth.uid).val() === true
         )",
-
-        // Client may only create their own support thread.
-        // DMs and groups are created via Admin SDK callables.
-        ".write": "auth != null
-          && !data.exists()
-          && newData.child('createdBy').val() === auth.uid
-          && newData.child('members').child(auth.uid).val() === true
-          && newData.child('isDefaultAgentGroup').val() !== true
-          && newData.child('isSupportChat').val() === true
-          && newData.child('isGroup').val() === true
-          && $chatId === ('support_' + auth.uid)
-          && newData.child('members').child('support-ai').val() === true",
+        ".write": false,
 
         // lastMessage* — Admin SDK only (syncChatMetadataOnMessage / callables).
         "unreadCounts": {
@@ -60,14 +50,11 @@
         ".read": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
         ".indexOn": ["createdAt"],
         "$messageId": {
-          // Members may only post as themselves. Bot replies ('support-ai')
-          // are written by the postSupportAiMessage callable with the Admin
-          // SDK, which bypasses these rules — a client can never impersonate.
+          // Members may only post as themselves.
           ".write": "auth != null
             && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
             && !data.exists()
             && newData.child('senderId').val() === auth.uid
-            && newData.child('isAi').val() !== true
             && newData.child('body').isString()
             && newData.child('body').val().length > 0
             && newData.child('body').val().length <= 4000
@@ -79,7 +66,6 @@
               ".write": "auth != null
                 && auth.uid === $uid
                 && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
-                && root.child('chats').child($chatId).child('isSupportChat').val() !== true
                 && (!newData.exists() || newData.isString())"
             }
           }

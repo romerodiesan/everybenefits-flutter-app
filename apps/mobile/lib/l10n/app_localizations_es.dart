@@ -18,9 +18,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get navChats => 'Chats';
 
   @override
-  String get navAi => 'IA';
-
-  @override
   String get navAcademy => 'Academia';
 
   @override
@@ -33,23 +30,18 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fabNewChat => 'Nuevo chat';
 
   @override
-  String get fabNewConversation => 'Nueva conversación';
-
-  @override
   String get fabSearchCourses => 'Buscar cursos';
 
   @override
   String get fabEditProfile => 'Editar perfil';
 
   @override
-  String get fabSupport => 'Soporte';
-
   @override
   String get supportSheetTitle => 'Soporte';
 
   @override
   String get supportSheetBody =>
-      '¿Necesitas ayuda con tu cuenta o la app? Abre el chat de soporte: un asistente responde al momento y nuestro equipo puede unirse.';
+      '¿Necesitas ayuda con tu cuenta o la app? Escríbenos por correo y nuestro equipo te responderá.';
 
   @override
   String get supportSheetEmail => 'support@everybenefits.com';
@@ -66,25 +58,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get supportSheetClose => 'Cerrar';
 
   @override
-  String get supportSheetOpenChat => 'Abrir chat de soporte';
-
   @override
-  String get supportChatAiName => 'Asistente de soporte';
-
   @override
-  String get supportChatWelcome =>
-      '¡Hola! Soy el asistente de soporte. Cuéntame qué necesitas — un compañero humano puede unirse a este chat cuando haga falta.';
-
   @override
-  String get supportChatAiReply =>
-      'Gracias por los detalles. Estoy aquí para ayudarte mientras un compañero humano revisa este hilo.';
-
   @override
-  String get supportChatSubtitle => 'Soporte AI + humano';
-
   @override
-  String get supportChatOpening => 'Abriendo chat de soporte…';
-
   @override
   String get editProfileNameFrozen => 'Tu nombre queda bloqueado tras el alta.';
 
@@ -149,13 +127,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get onboardingChatsBody =>
       'Mensajes directos y grupos de equipo reúnen mentoría y coordinación diaria en un solo lugar.';
-
-  @override
-  String get onboardingAiTitle => 'Un asistente a tu lado';
-
-  @override
-  String get onboardingAiBody =>
-      'Pulse AI responde cuando necesitas una ayuda rápida — beneficios, cursos o contexto de la comunidad.';
 
   @override
   String get onboardingAcademyTitle => 'Sube de nivel';
@@ -1050,8 +1021,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatsSectionCommunity => 'Comunidad';
 
   @override
-  String get chatsSectionSupport => 'Soporte';
-
   @override
   String get chatsDefaultGroupBadge => 'Comunidad';
 
@@ -1059,11 +1028,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatsDefaultGroupTitle => 'Equipo';
 
   @override
-  String get chatsSupportTitle => 'Soporte';
-
   @override
-  String get chatsSupportBadge => 'AI + humano';
-
   @override
   String get chatsNoMessagesYet => 'Sin mensajes todavía';
 
@@ -1183,161 +1148,6 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get weekdaySun => 'Dom';
-
-  @override
-  String get aiNewConversation => 'Nueva conversación';
-
-  @override
-  String get aiHistoryTooltip => 'Historial';
-
-  @override
-  String get aiNewTooltip => 'Nueva';
-
-  @override
-  String get aiThinking => 'Trabajando…';
-
-  @override
-  String get aiInputHint =>
-      'Pregunta sobre productos, licencias, cumplimiento o ventas…';
-
-  @override
-  String get aiEmptyPrompt => '¿En qué estás trabajando?';
-
-  @override
-  String get aiEmptySubtitle =>
-      'Pregunta lo que necesites sobre el negocio de seguros en EE. UU. Pulse AI busca en respuestas aceptadas del foro, en la academia y en fuentes oficiales, y te muestra de dónde salió cada dato.';
-
-  @override
-  String get aiSuggestion1 =>
-      '¿Qué cambia para un cliente durante el AEP de Medicare?';
-
-  @override
-  String get aiSuggestion2 => '¿Cómo manejo la objeción “lo tengo que pensar”?';
-
-  @override
-  String get aiSuggestion3 =>
-      '¿Qué necesito para obtener licencia en otro estado?';
-
-  @override
-  String get aiSuggestion4 =>
-      'Explica en qué se diferencia un IUL de un whole life';
-
-  @override
-  String get aiSources => 'Fuentes';
-
-  @override
-  String get aiDisclaimer =>
-      'Pulse AI puede equivocarse. Las reglas cambian por estado y aseguradora: verifica antes de asesorar a un cliente.';
-
-  @override
-  String get aiActivityForum => 'Buscando respuestas aceptadas';
-
-  @override
-  String get aiActivityAcademy => 'Buscando en la academia';
-
-  @override
-  String get aiActivityOfficial => 'Revisando fuentes oficiales';
-
-  @override
-  String get aiActivityWeb => 'Revisando sitios oficiales';
-
-  @override
-  String get aiActivityProfile => 'Revisando tu aprendizaje';
-
-  @override
-  String aiActivityResults(int count) {
-    return '$count encontrados';
-  }
-
-  @override
-  String get aiActivityNone => 'sin resultados';
-
-  @override
-  String get aiActivityFailed => 'falló';
-
-  @override
-  String get aiSourceForum => 'Respuesta de la comunidad';
-
-  @override
-  String get aiSourceCourse => 'Curso';
-
-  @override
-  String get aiSourcePath => 'Ruta de aprendizaje';
-
-  @override
-  String get aiSourceLesson => 'Lección';
-
-  @override
-  String get aiSourceOfficial => 'Fuente oficial';
-
-  @override
-  String get aiSourceMissing => 'Esa fuente ya no está disponible.';
-
-  @override
-  String get aiNoticeCompliance =>
-      'Información educativa, no asesoría legal. Revisa la póliza, las reglas de tu estado o tu equipo de cumplimiento antes de actuar.';
-
-  @override
-  String get aiNoticeLegal =>
-      'Pulse AI explica cómo funcionan en general la ley y la regulación de seguros, pero nunca asesora sobre tu caso concreto.';
-
-  @override
-  String get aiNoticeScope =>
-      'Pulse AI solo cubre la industria de seguros de EE. UU. y el negocio asegurador.';
-
-  @override
-  String get aiNoticeNoSources =>
-      'Ninguna fuente indexada respalda esta respuesta: tómala como conocimiento general del sector y verifícala antes de actuar.';
-
-  @override
-  String get aiFeedbackUp => 'Útil';
-
-  @override
-  String get aiFeedbackDown => 'No útil';
-
-  @override
-  String get aiHistoryEmpty => 'Aún no hay conversaciones.';
-
-  @override
-  String get aiUntitled => 'Conversación sin título';
-
-  @override
-  String get aiDeleteChat => 'Eliminar conversación';
-
-  @override
-  String get aiError => 'Pulse AI tuvo un error. Inténtalo de nuevo.';
-
-  @override
-  String get aiStop => 'Detener';
-
-  @override
-  String get aiSignInRequired =>
-      'Inicia sesión con una cuenta completa para usar Pulse AI.';
-
-  @override
-  String get aiLoading => 'Cargando conversación…';
-
-  @override
-  String get aiAssistantSubtitle => 'Impulsado por el agente Every Benefits';
-
-  @override
-  String get aiStatusOnline => 'En línea';
-
-  @override
-  String get aiSettings => 'Ajustes';
-
-  @override
-  String get aiSettingsTitle => 'Ajustes de IA';
-
-  @override
-  String get aiModelSection => 'Modelo';
-
-  @override
-  String get aiModelName => 'Pulse AI';
-
-  @override
-  String get aiModelSubtitle =>
-      'El agente Every Benefits busca en foros, cursos de la academia y fuentes oficiales de reguladores.';
 
   @override
   String get academyTitle => 'Academia';
@@ -1756,15 +1566,7 @@ class AppLocalizationsEs extends AppLocalizations {
   String get settingsAdmin => 'Admin';
 
   @override
-  String get settingsAdminHint =>
-      'Promueve estudiantes a agentes y gestiona funciones de la plataforma.';
-
-  @override
-  String get settingsAdminPulseAi => 'Pulse AI';
-
-  @override
-  String get settingsAdminPulseAiHint =>
-      'Si está desactivado, los miembros no pueden abrir ni chatear con Pulse AI.';
+  String get settingsAdminHint => 'Promueve estudiantes a agentes.';
 
   @override
   String get settingsAdminPromote => 'Promover a agente';
@@ -1779,9 +1581,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String settingsAdminPromoteFailed(String error) {
     return 'No se pudo promover: $error';
   }
-
-  @override
-  String get aiDisabled => 'Pulse AI no está disponible temporalmente.';
 
   @override
   String get settingsAppearance => 'Apariencia';
@@ -1852,8 +1651,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get notificationsPrefAcademy => 'Novedades de academia';
 
   @override
-  String get notificationsPrefSupport => 'Respuestas de soporte';
-
   @override
   String get notificationsPrefsHint =>
       'Elige qué alertas llegan como push en este dispositivo.';
@@ -1960,7 +1757,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tourWelcomeBody =>
-      'Foros, chats, academia y Pulse AI — rediseñados para sentirse más rápidos y claros. Este tour rápido te muestra qué puedes hacer.';
+      'Foros, chats y academia — rediseñados para sentirse más rápidos y claros. Este tour rápido te muestra qué puedes hacer.';
 
   @override
   String get tourCommunityTitle => 'Pregunta a la red';
@@ -1974,7 +1771,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get tourChatsBody =>
-      'Escribe a compañeros, crea grupos o abre Soporte cuando lo necesites. Las insignias de no leídos te mantienen al día.';
+      'Escribe a compañeros y crea grupos. Las insignias de no leídos te mantienen al día.';
 
   @override
   String get tourAcademyTitle => 'Aprende a tu ritmo';
@@ -1982,13 +1779,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get tourAcademyBody =>
       'Explora cursos y rutas publicados, retoma donde lo dejaste y sigue tu progreso en Academia.';
-
-  @override
-  String get tourAiTitle => 'Pregunta a Pulse AI';
-
-  @override
-  String get tourAiBody =>
-      'Tu asistente en la app para dudas del oficio — con contexto de la comunidad cuando esté disponible.';
 
   @override
   String get tourYouTitle => 'Tu espacio';

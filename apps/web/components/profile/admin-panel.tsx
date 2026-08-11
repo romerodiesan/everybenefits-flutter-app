@@ -8,32 +8,19 @@ import {
   setUserApproval,
   setUserRole,
 } from "@/lib/firebase/functions";
-import {
-  setPulseAiEnabled,
-  watchPulseAiEnabled,
-} from "@/lib/firebase/platform-config";
 import { headlineName } from "@/lib/display-name";
-import { useAuth, useAccess } from "@/lib/providers/auth-provider";
-import { can, canManagePlatform } from "@/lib/roles";
+import { useAccess } from "@/lib/providers/auth-provider";
+import { can } from "@/lib/roles";
 import type { UserProfile } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
-import {
-  SettingsPanelShell,
-  SettingsRow,
-  Toggle,
-} from "@/components/profile/settings-nav";
+import { SettingsPanelShell } from "@/components/profile/settings-nav";
 
 export function AdminPanel() {
   const t = useTranslations();
-  const { profile } = useAuth();
   const access = useAccess();
-  const canManageAi =
-    canManagePlatform(access) || can(access, "platform.settings.write");
   const canPromote = can(access, "admin.users.update");
   const [students, setStudents] = useState<UserProfile[]>([]);
   const [pending, setPending] = useState<UserProfile[]>([]);
-  const [aiEnabled, setAiEnabled] = useState(true);
-  const [aiBusy, setAiBusy] = useState(false);
 
   useEffect(() => {
     listPendingApprovals()
@@ -46,46 +33,11 @@ export function AdminPanel() {
     }
   }, [canPromote]);
 
-  useEffect(() => {
-    if (!canManageAi) return;
-    return watchPulseAiEnabled(setAiEnabled);
-  }, [canManageAi]);
-
-  const toggleAi = async () => {
-    if (!profile || aiBusy || !canManageAi) return;
-    const next = !aiEnabled;
-    setAiEnabled(next);
-    setAiBusy(true);
-    try {
-      await setPulseAiEnabled(next, profile.uid);
-    } catch {
-      setAiEnabled(!next);
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
   return (
     <SettingsPanelShell
       title={t("profileAdmin")}
       subtitle={t("profileAdminHint")}
     >
-      {canManageAi && (
-        <div className="mb-6 border-b border-glass-border pb-4">
-          <SettingsRow
-            label={t("adminPulseAi")}
-            hint={t("adminPulseAiHint")}
-          >
-            <Toggle
-              checked={aiEnabled}
-              disabled={aiBusy}
-              onChange={() => void toggleAi()}
-              label={t("adminPulseAi")}
-            />
-          </SettingsRow>
-        </div>
-      )}
-
       <p className="mb-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted">
         {t("approvalSectionTitle")}
       </p>

@@ -194,39 +194,6 @@ void main() {
     });
   });
 
-  group('getOrCreateSupportChat', () {
-    test('creates a hybrid support thread and reuses it', () async {
-      final me = _user('me', name: 'María', role: UserRole.student);
-      final first = await repo.getOrCreateSupportChat(me: me);
-      expect(first.id, 'support_me');
-      expect(first.isSupportChat, isTrue);
-      expect(first.isGroup, isTrue);
-      expect(
-        first.memberIds,
-        containsAll(['me', ChatConversation.supportAiUid]),
-      );
-      expect(first.titleFor('me'), isNotEmpty);
-
-      final second = await repo.getOrCreateSupportChat(me: me);
-      expect(second.id, first.id);
-      expect(store.chats.length, 1);
-    });
-
-    test('sendMessage then sendSupportAiReply appends AI bubble', () async {
-      final me = _user('me', name: 'María');
-      final chat = await repo.getOrCreateSupportChat(me: me);
-      await repo.sendMessage(chatId: chat.id, body: 'Need help', author: me);
-      final ai = await repo.sendSupportAiReply(
-        chatId: chat.id,
-        body: 'Thanks — a teammate can jump in too.',
-      );
-      expect(ai.senderId, ChatConversation.supportAiUid);
-      expect(ai.isAi, isTrue);
-      expect(ai.isMine('me'), isFalse);
-      expect(store.messages[chat.id]!.length, 2);
-    });
-  });
-
   group('toggleReaction', () {
     test('sets and clears a reaction for the viewer', () async {
       final me = _user('me');
@@ -262,32 +229,6 @@ void main() {
       );
       expect(store.messages[chat.id]!.first.reactions['other'], '❤️');
     });
-
-    test('rejects reactions on support chat', () async {
-      final me = _user('me', name: 'María');
-      final chat = await repo.getOrCreateSupportChat(me: me);
-      final msg = await repo.sendMessage(
-        chatId: chat.id,
-        body: 'Need help',
-        author: me,
-      );
-
-      expect(
-        () => repo.toggleReaction(
-          chatId: chat.id,
-          messageId: msg.id,
-          uid: me.uid,
-          emoji: '👍',
-        ),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            contains('soporte'),
-          ),
-        ),
-      );
-    });
   });
 
   group('hideChatForMe', () {
@@ -306,13 +247,8 @@ void main() {
       expect(again.any((c) => c.id == chat.id), isTrue);
     });
 
-    test('rejects support and default community chats', () async {
+    test('rejects default community chats', () async {
       final me = _user('me', name: 'María', role: UserRole.agent);
-      final support = await repo.getOrCreateSupportChat(me: me);
-      expect(
-        () => repo.hideChatForMe(chatId: support.id, uid: me.uid),
-        throwsA(isA<StateError>()),
-      );
 
       final community = await store.createChat(
         ChatConversation(
@@ -328,7 +264,6 @@ void main() {
           unreadCounts: {me.uid: 0},
           pinnedBy: const {},
           isDefaultAgentGroup: true,
-          isSupportChat: false,
         ),
       );
       expect(

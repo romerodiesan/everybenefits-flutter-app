@@ -225,7 +225,6 @@ export type ChatConversation = {
   createdAt: number;
   createdBy: string;
   isDefaultAgentGroup: boolean;
-  isSupportChat: boolean;
   /** Roles that auto-join when a user is approved. Empty = none. */
   autoJoinRoles: UserRole[];
 };
@@ -238,11 +237,9 @@ export type ChatMessage = {
   senderName: string;
   createdAt: number;
   sharedPost?: SharedPostPreview | null;
-  isAi?: boolean;
   reactions?: Record<string, string>;
 };
 
-export const SUPPORT_AI_UID = "support-ai";
 export const AGENTS_DEFAULT_ID = "agents-default";
 
 export const FORUM_TAGS = [

@@ -1,30 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useTranslations } from "next-intl";
-import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { useAccess } from "@/lib/providers/auth-provider";
 import { canManagePlatform } from "@/lib/roles";
-import {
-  setPulseAiEnabled,
-  watchPulseAiEnabled,
-} from "@/lib/firebase/platform-config";
 import { useRouter } from "@/i18n/navigation";
 
 export function SettingsHome() {
   const t = useTranslations();
   const router = useRouter();
-  const { profile } = useAuth();
   const access = useAccess();
   const isAdmin = canManagePlatform(access);
-  const [aiEnabled, setAiEnabled] = useState(false);
-  const [aiBusy, setAiBusy] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) {
       router.replace("/");
-      return;
     }
-    return watchPulseAiEnabled(setAiEnabled);
   }, [isAdmin, router]);
 
   if (!isAdmin) return null;
@@ -37,41 +28,9 @@ export function SettingsHome() {
         </h1>
         <p className="mt-1 text-sm text-muted">{t("settingsSubtitle")}</p>
       </header>
-
-      <div className="studio-panel flex items-center justify-between gap-4 rounded-2xl p-5">
-        <div>
-          <p className="font-semibold">{t("adminPulseAi")}</p>
-          <p className="mt-1 text-sm text-muted">{t("adminPulseAiHint")}</p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={aiEnabled}
-          disabled={aiBusy || !profile}
-          onClick={async () => {
-            if (!profile || aiBusy) return;
-            const next = !aiEnabled;
-            setAiEnabled(next);
-            setAiBusy(true);
-            try {
-              await setPulseAiEnabled(next, profile.uid);
-            } catch {
-              setAiEnabled(!next);
-            } finally {
-              setAiBusy(false);
-            }
-          }}
-          className={`relative h-7 w-12 rounded-full transition ${
-            aiEnabled ? "bg-brand" : "bg-ink/20 dark:bg-white/20"
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 left-0.5 h-6 w-6 rounded-full bg-white shadow transition-transform duration-200 ease-out ${
-              aiEnabled ? "translate-x-5" : "translate-x-0"
-            }`}
-          />
-        </button>
-      </div>
+      <p className="rounded-2xl border border-dashed border-hairline bg-panel/40 px-4 py-8 text-center text-sm text-muted">
+        {t("settingsEmpty")}
+      </p>
     </div>
   );
 }

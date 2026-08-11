@@ -9,7 +9,6 @@ import {
 import { motion } from "motion/react";
 import { useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
-import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { useAlerts } from "@/lib/providers/alert-provider";
 import {
@@ -53,7 +52,6 @@ import {
   IconComment,
   IconHeart,
   IconShare,
-  IconSpark,
   LikeBurst,
 } from "@/components/forums/forum-ui";
 
@@ -62,7 +60,6 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
   const router = useRouter();
   const { profile } = useAuth();
   const alerts = useAlerts();
-  const pulseAiEnabled = usePulseAiEnabled();
   const reduceMotion = useSafeReducedMotion();
   const { isSaved: saved, toggle: toggleSave } = useSavedThread(threadId);
   const [thread, setThread] = useState<ForumThread | null>(null);
@@ -488,15 +485,6 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                   <IconShare />
                   {t("forumsShare")}
                 </ActionButton>
-              )}
-              {pulseAiEnabled && (
-                <Link
-                  href="/ai"
-                  className="flex flex-1 items-center justify-center gap-1.5 rounded-xl py-2.5 text-[13px] font-semibold text-muted transition hover:bg-brand/[0.06] hover:text-brand"
-                >
-                  <IconSpark />
-                  AI
-                </Link>
               )}
             </div>
           )}

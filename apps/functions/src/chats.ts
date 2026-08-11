@@ -16,8 +16,6 @@ import {
   DEFAULT_AGENT_GROUP_ID,
   MAX_GROUP_MEMBERS,
   MAX_ROLE_SEED_MEMBERS,
-  MAX_SUPPORT_MESSAGE_CHARS,
-  SUPPORT_AI_UID,
 } from "./constants";
 import {
   headlineName,
@@ -32,8 +30,7 @@ export function chatInboxRow(
   chat: Record<string, unknown>,
   uid: string,
 ) {
-  const members = Object.keys((chat.members ?? {}) as Record<string, unknown>)
-    .filter((memberId) => memberId !== SUPPORT_AI_UID);
+  const members = Object.keys((chat.members ?? {}) as Record<string, unknown>);
   const unreadCounts =
     (chat.unreadCounts ?? {}) as Record<string, unknown>;
   const pinnedBy = (chat.pinnedBy ?? {}) as Record<string, unknown>;
@@ -54,7 +51,6 @@ export function chatInboxRow(
     createdAt: Number(chat.createdAt ?? 0),
     createdBy: String(chat.createdBy ?? ""),
     isDefaultAgentGroup: chat.isDefaultAgentGroup === true,
-    isSupportChat: chat.isSupportChat === true,
     autoJoinRoles,
   };
 }
@@ -255,11 +251,8 @@ export const syncChatInbox = onValueWritten(
     const beforeMembers = Object.keys(
       (before.members ?? {}) as Record<string, unknown>,
     );
-    const members = Object.keys((after.members ?? {}) as Record<string, unknown>)
-      .filter((uid) => uid !== SUPPORT_AI_UID);
-    const removed = beforeMembers.filter(
-      (uid) => uid !== SUPPORT_AI_UID && !members.includes(uid),
-    );
+    const members = Object.keys((after.members ?? {}) as Record<string, unknown>);
+    const removed = beforeMembers.filter((uid) => !members.includes(uid));
     const updates: Record<string, unknown> = {};
 
     for (const uid of removed) updates[`userChats/${uid}/${chatId}`] = null;
@@ -278,7 +271,6 @@ export const syncChatInbox = onValueWritten(
       return;
     }
     const preview = String(after.lastMessage ?? "").slice(0, 120);
-    const isSupport = after.isSupportChat === true;
     const beforeUnread =
       (before.unreadCounts ?? {}) as Record<string, unknown>;
     const afterUnread =
@@ -296,8 +288,8 @@ export const syncChatInbox = onValueWritten(
         await notifyUser(
           uid,
           {
-            type: isSupport ? "support_message" : "chat_message",
-            title: isSupport ? "Support" : "New message",
+            type: "chat_message",
+            title: "New message",
             body: preview || "You have a new message",
             href: `/chats/${chatId}`,
             deepLink: `pulse://chats/${chatId}`,
@@ -337,16 +329,12 @@ export const syncChatMetadataOnMessage = onValueCreated(
     const chat = chatSnap.val() as Record<string, unknown> | null;
     if (!chat?.members || typeof chat.members !== "object") return;
     const members = chat.members as Record<string, unknown>;
-    if (members[senderId] !== true && senderId !== SUPPORT_AI_UID) return;
+    if (members[senderId] !== true) return;
 
     const unreadCounts: Record<string, number> = {
       ...((chat.unreadCounts ?? {}) as Record<string, number>),
     };
     for (const memberId of Object.keys(members)) {
-      if (memberId === SUPPORT_AI_UID) {
-        unreadCounts[memberId] = 0;
-        continue;
-      }
       unreadCounts[memberId] =
         memberId === senderId ? 0 : (unreadCounts[memberId] ?? 0) + 1;
     }
@@ -366,7 +354,7 @@ export const syncChatMetadataOnMessage = onValueCreated(
 export const createDm = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "createDm");
   const otherUid = String(request.data?.otherUid ?? "").trim();
-  if (!otherUid || otherUid === uid || otherUid === SUPPORT_AI_UID) {
+  if (!otherUid || otherUid === uid) {
     throw new HttpsError("invalid-argument", "Valid recipient required.");
   }
 
@@ -433,7 +421,6 @@ export const createDm = onCall(callableOpts, async (request) => {
     createdAt: now,
     createdBy: uid,
     isDefaultAgentGroup: false,
-    isSupportChat: false,
     autoJoinRoles: {},
   };
 
@@ -518,8 +505,7 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     );
   }
 
-  const explicitIds = [...new Set([uid, ...requested])]
-    .filter((id) => id && id !== SUPPORT_AI_UID);
+  const explicitIds = [...new Set([uid, ...requested])].filter(Boolean);
 
   const roleUsers = await collectUsersByRoles(seedRoles, MAX_ROLE_SEED_MEMBERS);
   const truncated =
@@ -587,7 +573,6 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     createdAt: now,
     createdBy: uid,
     isDefaultAgentGroup: false,
-    isSupportChat: false,
     autoJoinRoles: autoJoinRolesMap,
   };
 
@@ -644,51 +629,4 @@ export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
 
   await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
   return { ok: true, uid: targetUid, chatId: DEFAULT_AGENT_GROUP_ID };
-});
-
-/**
- * Writes an automated reply from the support bot.
- *
- * RTDB rules deny clients any write whose `senderId` is not their own uid, so
- * this callable is the only path that can post as `support-ai`. A caller may
- * only trigger it inside their own support thread.
- */
-export const postSupportAiMessage = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "postSupportAiMessage");
-  const chatId = String(request.data?.chatId ?? "");
-  const body = String(request.data?.body ?? "").trim();
-  const senderName = "Pulse Support";
-
-  if (chatId !== `support_${uid}`) {
-    throw new HttpsError("permission-denied", "Not your support chat.");
-  }
-  if (!body) {
-    throw new HttpsError("invalid-argument", "Message body is required.");
-  }
-  if (body.length > MAX_SUPPORT_MESSAGE_CHARS) {
-    throw new HttpsError("invalid-argument", "Message is too long.");
-  }
-
-  const chatRef = rtdb.ref(`chats/${chatId}`);
-  const chatSnap = await chatRef.get();
-  const chat = chatSnap.val();
-  if (!chat || chat.isSupportChat !== true) {
-    throw new HttpsError("not-found", "Support chat not found.");
-  }
-  if (chat.members?.[uid] !== true) {
-    throw new HttpsError("permission-denied", "Not a member of this chat.");
-  }
-
-  const now = Date.now();
-  const messageRef = rtdb.ref(`messages/${chatId}`).push();
-  await messageRef.set({
-    body,
-    senderId: SUPPORT_AI_UID,
-    senderName: senderName || "Support",
-    createdAt: now,
-    sharedPost: null,
-    isAi: true,
-  });
-  // Chat summary + unreadCounts: syncChatMetadataOnMessage (Admin).
-  return { id: messageRef.key, createdAt: now };
 });

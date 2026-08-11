@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
-import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canAccessTools } from "@/lib/roles";
 import { AGENT_TOOLS } from "@/lib/tools/catalog";
@@ -25,7 +24,6 @@ export function CommandPalette({
   const router = useRouter();
   const { profile } = useAuth();
   const access = useAccess();
-  const pulseAiEnabled = usePulseAiEnabled();
   const [query, setQuery] = useState("");
   const activeQuery = open ? query : "";
   const toolsAllowed = profile ? canAccessTools(access) : false;
@@ -47,19 +45,12 @@ export function CommandPalette({
         label: t("navChats"),
         run: () => router.push("/chats"),
       },
+      {
+        id: "academy",
+        label: t("navAcademy"),
+        run: () => router.push("/academy"),
+      },
     ];
-    if (pulseAiEnabled) {
-      items.push({
-        id: "ai",
-        label: t("navAi"),
-        run: () => router.push("/ai"),
-      });
-    }
-    items.push({
-      id: "academy",
-      label: t("navAcademy"),
-      run: () => router.push("/academy"),
-    });
     if (toolsAllowed) {
       for (const tool of AGENT_TOOLS) {
         items.push({
@@ -82,7 +73,7 @@ export function CommandPalette({
       },
     );
     return items;
-  }, [pulseAiEnabled, toolsAllowed, router, t]);
+  }, [toolsAllowed, router, t]);
 
   const filtered = commands.filter((c) =>
     c.label.toLowerCase().includes(activeQuery.trim().toLowerCase()),

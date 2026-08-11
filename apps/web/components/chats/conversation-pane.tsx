@@ -151,11 +151,10 @@ export function ConversationPane({
   }
 
   const title = chatTitleFor(chat, profile.uid, {
-    support: t("chatsSupport"),
     team: t("chatsTeam"),
   });
   const pinned = Boolean(chat.pinnedBy[profile.uid]);
-  const canPin = !chat.isSupportChat && !chat.isDefaultAgentGroup;
+  const canPin = !chat.isDefaultAgentGroup;
 
   async function onSend(e: FormEvent) {
     e.preventDefault();
@@ -227,14 +226,13 @@ export function ConversationPane({
       <div className="flex-1 space-y-2 overflow-y-auto p-3">
         {messages.map((message) => {
           const mine = message.senderId === profile.uid;
-          const canReact = !chat.isSupportChat;
           return (
             <div
               key={message.id}
               className={`flex ${mine ? "justify-end" : "justify-start"}`}
             >
               <div className="flex max-w-[88%] items-end gap-1.5">
-                {canReact && mine && (
+                {mine && (
                   <AddReactionButton
                     chatId={chatId}
                     message={message}
@@ -273,16 +271,14 @@ export function ConversationPane({
                       </p>
                     )}
                   </div>
-                  {canReact && (
-                    <ReactionChips
+                  <ReactionChips
                       chatId={chatId}
                       message={message}
                       uid={profile.uid}
                       mine={mine}
                     />
-                  )}
                 </div>
-                {canReact && !mine && (
+                {!mine && (
                   <AddReactionButton
                     chatId={chatId}
                     message={message}

@@ -114,17 +114,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         author: widget.profile,
       );
       _controller.clear();
-      if (widget.chat.isSupportChat) {
-        await _repo.sendSupportAiReply(
-          chatId: widget.chat.id,
-          body: l10n.supportChatAiReply,
-          aiName: l10n.supportChatAiName,
-        );
-        await _repo.markRead(
-          chatId: widget.chat.id,
-          uid: widget.profile.uid,
-        );
-      }
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_scrollController.hasClients) return;
         _scrollController.animateTo(
@@ -239,13 +228,11 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             ),
                           ),
                           Text(
-                            chat.isSupportChat
-                                ? l10n.supportChatSubtitle
-                                : chat.isDefaultAgentGroup
-                                    ? l10n.chatsDefaultGroupBadge
-                                    : (chat.isGroup
-                                        ? l10n.chatTypeGroup
-                                        : l10n.chatTypePrivate),
+                            chat.isDefaultAgentGroup
+                                ? l10n.chatsDefaultGroupBadge
+                                : (chat.isGroup
+                                    ? l10n.chatTypeGroup
+                                    : l10n.chatTypePrivate),
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: colors.muted,
                               fontWeight: FontWeight.w600,
@@ -320,7 +307,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                             !mine &&
                             msg.senderName.trim().isNotEmpty;
 
-                        final reactionsEnabled = !widget.chat.isSupportChat;
+                        final reactionsEnabled = true;
 
                         return _MessageRow(
                           key: ValueKey(msg.id),

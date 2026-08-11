@@ -23,7 +23,6 @@ class ProfileScreen extends StatefulWidget {
     required this.authService,
     required this.userRepository,
     required this.profile,
-    this.onOpenSupportChat,
     this.notificationUnread = 0,
     this.onOpenNotifications,
   });
@@ -31,7 +30,6 @@ class ProfileScreen extends StatefulWidget {
   final AuthService authService;
   final UserRepository userRepository;
   final UserProfile profile;
-  final Future<void> Function()? onOpenSupportChat;
   final int notificationUnread;
   final VoidCallback? onOpenNotifications;
 
@@ -253,17 +251,6 @@ class ProfileScreenState extends State<ProfileScreen> {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.lg),
-                if (widget.onOpenSupportChat != null) ...[
-                  FilledButton.icon(
-                    onPressed: () async {
-                      Navigator.pop(sheetContext);
-                      await widget.onOpenSupportChat!();
-                    },
-                    icon: const Icon(Icons.chat_rounded),
-                    label: Text(l10n.supportSheetOpenChat),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                ],
                 OutlinedButton(
                   onPressed: () => Navigator.pop(sheetContext),
                   child: Text(l10n.supportSheetClose),

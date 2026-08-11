@@ -5,7 +5,7 @@ import { getAuth, type Auth } from "firebase-admin/auth";
 import { getAppCheck, type AppCheck } from "firebase-admin/app-check";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
 
-const APP_NAME = "pulse-ai";
+const APP_NAME = "pulse-web";
 
 /**
  * Service account JSON, either inline or base64 encoded. On Vercel the inline

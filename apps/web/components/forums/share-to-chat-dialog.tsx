@@ -112,7 +112,6 @@ export function ShareToChatDialog({
           )}
           {chats.map((chat) => {
             const title = chatTitleFor(chat, profile.uid, {
-              support: t("chatsSupport"),
               team: t("chatsTeam"),
             });
             return (

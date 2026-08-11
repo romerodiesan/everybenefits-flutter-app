@@ -54,32 +54,27 @@ class NotificationPrefs {
     this.pushChats = true,
     this.pushForums = true,
     this.pushAcademy = true,
-    this.pushSupport = true,
   });
 
   final bool pushChats;
   final bool pushForums;
   final bool pushAcademy;
-  final bool pushSupport;
 
   Map<String, bool> toMap() => {
         'pushChats': pushChats,
         'pushForums': pushForums,
         'pushAcademy': pushAcademy,
-        'pushSupport': pushSupport,
       };
 
   NotificationPrefs copyWith({
     bool? pushChats,
     bool? pushForums,
     bool? pushAcademy,
-    bool? pushSupport,
   }) {
     return NotificationPrefs(
       pushChats: pushChats ?? this.pushChats,
       pushForums: pushForums ?? this.pushForums,
       pushAcademy: pushAcademy ?? this.pushAcademy,
-      pushSupport: pushSupport ?? this.pushSupport,
     );
   }
 
@@ -88,7 +83,6 @@ class NotificationPrefs {
       pushChats: data?['pushChats'] != false,
       pushForums: data?['pushForums'] != false,
       pushAcademy: data?['pushAcademy'] != false,
-      pushSupport: data?['pushSupport'] != false,
     );
   }
 }

@@ -8,7 +8,7 @@ import 'firebase_emulators.dart';
 ///
 /// Kept as a no-op so call sites do not need special-casing. Re-enable later by
 /// activating providers here and setting FUNCTIONS_ENFORCE_APP_CHECK /
-/// PULSE_SSO_REQUIRE_APP_CHECK / PULSE_AI_REQUIRE_APP_CHECK to true.
+/// PULSE_SSO_REQUIRE_APP_CHECK to true.
 Future<void> activateFirebaseAppCheck() async {
   try {
     await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);

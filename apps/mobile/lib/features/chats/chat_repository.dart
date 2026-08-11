@@ -57,16 +57,6 @@ abstract class ChatStore {
 
   Future<ChatMessage> addMessage(ChatMessage message);
 
-  /// Posts an automated reply as `support-ai`.
-  ///
-  /// Database rules only accept messages whose `senderId` is the caller's own
-  /// uid, so this goes through a trusted callable instead of a direct write.
-  Future<ChatMessage> addSupportAiMessage({
-    required String chatId,
-    required String body,
-    required String senderName,
-  });
-
   /// Sets or clears `messages/{chatId}/{messageId}/reactions/{uid}`.
   Future<void> setMessageReaction({
     required String chatId,
@@ -308,7 +298,7 @@ class RtdbChatStore implements ChatStore {
 
   @override
   Future<ChatConversation> createChat(ChatConversation chat) async {
-    if (chat.isGroup && !chat.isSupportChat) {
+    if (chat.isGroup) {
       final result = await _functions.httpsCallable('createGroupChat').call(
         <String, dynamic>{
           'title': chat.title,
@@ -343,38 +333,51 @@ class RtdbChatStore implements ChatStore {
         createdAt: createdAt,
         createdBy: chat.createdBy,
         isDefaultAgentGroup: false,
-        isSupportChat: false,
       );
     }
-    final ref = chat.id.isEmpty
-        ? _root.child('chats').push()
-        : _root.child('chats/${chat.id}');
-    final id = ref.key!;
-    final saved = ChatConversation(
-      id: id,
-      memberIds: chat.memberIds,
-      memberNames: chat.memberNames,
-      isGroup: chat.isGroup,
-      title: chat.title,
-      dmKey: chat.dmKey,
-      lastMessage: chat.lastMessage,
-      lastMessageAt: chat.lastMessageAt,
-      lastMessageSenderId: chat.lastMessageSenderId,
-      unreadCounts: chat.unreadCounts,
-      pinnedBy: chat.pinnedBy,
-      createdAt: chat.createdAt,
-      createdBy: chat.createdBy,
-      isDefaultAgentGroup: chat.isDefaultAgentGroup,
-      isSupportChat: chat.isSupportChat,
-    );
 
-    final updates = <String, Object?>{
-      'chats/$id': saved.toRtdbMap(),
-    };
-    final at = saved.lastMessageAt.toUtc().millisecondsSinceEpoch;
-    updates['userChats/${saved.createdBy}/$id'] = {'lastMessageAt': at};
-    await _root.update(updates);
-    return saved;
+    final otherUid = chat.memberIds.firstWhere(
+      (id) => id != chat.createdBy,
+      orElse: () => '',
+    );
+    if (otherUid.isEmpty) {
+      throw StateError('Valid recipient required.');
+    }
+    final result = await _functions.httpsCallable('createDm').call(
+      <String, dynamic>{'otherUid': otherUid},
+    );
+    final data = _asStringKeyedMap(result.data);
+    final chatId = '${data['chatId'] ?? chat.dmKey ?? ''}'.trim();
+    if (chatId.isEmpty) {
+      throw StateError('No se pudo crear el chat.');
+    }
+    final createdAtMs = data['createdAt'] is num
+        ? (data['createdAt'] as num).toInt()
+        : DateTime.now().millisecondsSinceEpoch;
+    final createdAt = DateTime.fromMillisecondsSinceEpoch(createdAtMs);
+    final memberIds = (data['memberIds'] is List)
+        ? (data['memberIds'] as List).map((e) => '$e').toList()
+        : List<String>.from(chat.memberIds);
+    final memberNames = data['memberNames'] is Map
+        ? _asStringKeyedMap(data['memberNames'])
+            .map((k, v) => MapEntry(k, '$v'))
+        : Map<String, String>.from(chat.memberNames);
+    return ChatConversation(
+      id: chatId,
+      memberIds: memberIds..sort(),
+      memberNames: memberNames,
+      isGroup: false,
+      title: null,
+      dmKey: chat.dmKey ?? chatId,
+      lastMessage: '',
+      lastMessageAt: createdAt,
+      lastMessageSenderId: null,
+      unreadCounts: {for (final id in memberIds) id: 0},
+      pinnedBy: const {},
+      createdAt: createdAt,
+      createdBy: chat.createdBy,
+      isDefaultAgentGroup: false,
+    );
   }
 
   @override
@@ -439,34 +442,6 @@ class RtdbChatStore implements ChatStore {
       'chatId': message.chatId,
       'createdAt': message.createdAt,
     });
-  }
-
-  @override
-  Future<ChatMessage> addSupportAiMessage({
-    required String chatId,
-    required String body,
-    required String senderName,
-  }) async {
-    final result = await _functions.httpsCallable('postSupportAiMessage').call(
-      <String, dynamic>{
-        'chatId': chatId,
-        'body': body,
-        'senderName': senderName,
-      },
-    );
-    final data = _asStringKeyedMap(result.data);
-    return ChatMessage(
-      id: '${data['id'] ?? ''}',
-      chatId: chatId,
-      body: body,
-      senderId: ChatConversation.supportAiUid,
-      senderName: senderName,
-      createdAt: DateTime.fromMillisecondsSinceEpoch(
-        _readMillis(data['createdAt']),
-        isUtc: true,
-      ),
-      isAi: true,
-    );
   }
 
   @override
@@ -600,89 +575,8 @@ class ChatRepository {
       unreadCounts: {for (final p in all) p.uid: 0},
       pinnedBy: const {},
       isDefaultAgentGroup: false,
-      isSupportChat: false,
     );
     return _store.createChat(chat);
-  }
-
-  /// One hybrid support thread per user (AI assistant + human agents).
-  Future<ChatConversation> getOrCreateSupportChat({
-    required UserProfile me,
-    String aiName = 'Support Assistant',
-    String? welcomeMessage,
-  }) async {
-    _ensureCanChat(me);
-    if (!canAccessSupport(me.role, isAnonymous: me.isAnonymous)) {
-      throw StateError('Support is not available for this account');
-    }
-    final id = supportChatIdFor(me.uid);
-    // Probe via userChats (always readable by owner). Reading chats/$id when
-    // missing is denied by membership rules and surfaces as permission-denied.
-    if (await _store.hasUserChatIndex(uid: me.uid, chatId: id)) {
-      final existing = await _store.watchChat(id).first;
-      if (existing != null) return existing;
-    }
-
-    final now = _clock();
-    final chat = await _store.createChat(
-      ChatConversation(
-        id: id,
-        memberIds: [me.uid, ChatConversation.supportAiUid]..sort(),
-        memberNames: {
-          me.uid: me.headlineName,
-          ChatConversation.supportAiUid: aiName,
-        },
-        isGroup: true,
-        title: 'Support',
-        lastMessage: '',
-        lastMessageAt: now,
-        createdAt: now,
-        createdBy: me.uid,
-        unreadCounts: {
-          me.uid: 0,
-          ChatConversation.supportAiUid: 0,
-        },
-        pinnedBy: const {},
-        isDefaultAgentGroup: false,
-        isSupportChat: true,
-      ),
-    );
-
-    final welcome = welcomeMessage?.trim();
-    if (welcome != null && welcome.isNotEmpty) {
-      await sendSupportAiReply(
-        chatId: chat.id,
-        body: welcome,
-        aiName: aiName,
-      );
-      return (await _store.watchChat(chat.id).first) ?? chat;
-    }
-    return chat;
-  }
-
-  /// Posts an automated support reply as the synthetic AI member.
-  ///
-  /// The write itself happens server-side: clients are not allowed to author
-  /// messages under another sender id.
-  Future<ChatMessage> sendSupportAiReply({
-    required String chatId,
-    required String body,
-    String aiName = 'Support Assistant',
-  }) async {
-    final text = body.trim();
-    if (text.isEmpty) {
-      throw ArgumentError('Write a message.');
-    }
-    final chat = await _requireChat(chatId);
-    if (!chat.isSupportChat) {
-      throw StateError('Not a support chat.');
-    }
-
-    return _store.addSupportAiMessage(
-      chatId: chatId,
-      body: text,
-      senderName: aiName,
-    );
   }
 
   Future<ChatMessage> sendMessage({
@@ -741,7 +635,7 @@ class ChatRepository {
     required bool pinned,
   }) async {
     final chat = await _requireChat(chatId);
-    if (chat.isSupportChat || chat.isDefaultAgentGroup) {
+    if (chat.isDefaultAgentGroup) {
       throw StateError('Este chat no se puede fijar.');
     }
     if (!chat.memberIds.contains(uid)) {
@@ -765,7 +659,7 @@ class ChatRepository {
     required String uid,
   }) async {
     final chat = await _requireChat(chatId);
-    if (chat.isSupportChat || chat.isDefaultAgentGroup) {
+    if (chat.isDefaultAgentGroup) {
       throw StateError('Este chat no se puede eliminar.');
     }
     if (!chat.memberIds.contains(uid)) {
@@ -787,9 +681,6 @@ class ChatRepository {
     required String emoji,
   }) async {
     final chat = await _requireChat(chatId);
-    if (chat.isSupportChat) {
-      throw StateError('Las reacciones no están permitidas en soporte.');
-    }
     if (!chat.memberIds.contains(uid)) {
       throw StateError('No eres miembro de este chat.');
     }

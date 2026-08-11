@@ -3,7 +3,6 @@
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
-import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import { canAccessTools } from "@/lib/roles";
 import type { ForumThread } from "@/lib/types";
 import { useSavedThreadIds } from "@/lib/saved-threads";
@@ -29,7 +28,6 @@ export function FeedSideRail({
   const { profile } = useAuth();
   const access = useAccess();
   const savedIds = useSavedThreadIds();
-  const pulseAiEnabled = usePulseAiEnabled();
   const showTools = profile && canAccessTools(access);
 
   const topicList: TopicStat[] = topics
@@ -126,17 +124,6 @@ export function FeedSideRail({
         <section className="feed-rail-card">
           <h2 className="feed-rail-title">{t("forumsRailShortcuts")}</h2>
           <div className="mt-2.5 space-y-1">
-            {pulseAiEnabled && (
-              <Link
-                href="/ai"
-                className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold transition hover:bg-brand/8 hover:text-brand"
-              >
-                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-brand/12 text-brand">
-                  ✦
-                </span>
-                {t("forumsRailAskAi")}
-              </Link>
-            )}
             <Link
               href="/academy"
               className="flex items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold transition hover:bg-brand/8 hover:text-brand"

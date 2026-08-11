@@ -1,5 +1,4 @@
 import {
-  IconAi,
   IconBell,
   IconChat,
   IconHome,
@@ -14,7 +13,6 @@ export type ShellNavItem = {
   key:
     | "navHome"
     | "navChats"
-    | "navAi"
     | "navAcademy"
     | "navNotifications"
     | "navProfile";
@@ -35,7 +33,6 @@ export const NAV: ShellNavItem[] = [
     Icon: IconChat,
     badge: "unread",
   },
-  { href: "/ai", key: "navAi", Icon: IconAi },
   { href: "/academy", key: "navAcademy", Icon: IconSchool },
   {
     href: "/notifications",

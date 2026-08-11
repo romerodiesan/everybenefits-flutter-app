@@ -1,4 +1,3 @@
-import type { PulseSource } from "@/lib/ai/types";
 import type {
   ChatConversation,
   Course,
@@ -88,7 +87,6 @@ export const LANDING_CHATS: ChatConversation[] = [
     createdAt: Date.now() - 86_400_000,
     createdBy: LANDING_VIEWER_UID,
     isDefaultAgentGroup: false,
-    isSupportChat: false,
     autoJoinRoles: [],
   },
   {
@@ -110,28 +108,6 @@ export const LANDING_CHATS: ChatConversation[] = [
     createdAt: Date.now() - 7 * 86_400_000,
     createdBy: "u1",
     isDefaultAgentGroup: false,
-    isSupportChat: false,
-    autoJoinRoles: [],
-  },
-  {
-    id: "c3",
-    memberIds: [LANDING_VIEWER_UID, "support-ai"],
-    memberNames: {
-      [LANDING_VIEWER_UID]: "You",
-      "support-ai": "Support",
-    },
-    isGroup: false,
-    title: "Support",
-    dmKey: null,
-    lastMessage: "Hi — how can we help?",
-    lastMessageAt: Date.now() - 2 * 86_400_000,
-    lastMessageSenderId: "support-ai",
-    unreadCounts: { [LANDING_VIEWER_UID]: 0 },
-    pinnedBy: {},
-    createdAt: Date.now() - 14 * 86_400_000,
-    createdBy: "support-ai",
-    isDefaultAgentGroup: false,
-    isSupportChat: true,
     autoJoinRoles: [],
   },
 ];
@@ -188,23 +164,3 @@ export const LANDING_COURSE_PROGRESS: Record<string, number> = {
   "course-ma": 0.72,
   "course-close": 0.18,
 };
-
-export const LANDING_AI_USER =
-  "Write a 30-second Medicare intro for a door knock.";
-
-export const LANDING_AI_REPLY =
-  "Hi, I’m a licensed agent with Every Benefits. I help neighbors compare Medicare options at no cost — want a quick look at what fits your doctors and budget? [S1]";
-
-export const LANDING_AI_SOURCES: PulseSource[] = [
-  {
-    ref: "S1",
-    type: "accepted_forum_answer",
-    title: "Clean Medicare door intro",
-    excerpt:
-      "Keep it under 30 seconds, name your license, and lead with choice — not a pitch.",
-    sourceId: "t2",
-    parentId: "t2",
-    url: "/home/t2",
-    publisher: null,
-  },
-];

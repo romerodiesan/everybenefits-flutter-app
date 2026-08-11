@@ -20,15 +20,13 @@ import type {
   UserProfile,
   UserRole,
 } from "../types";
-import { AGENTS_DEFAULT_ID, SUPPORT_AI_UID } from "../types";
-import { dmKeyFor, supportChatIdFor } from "../chat-ids";
+import { AGENTS_DEFAULT_ID } from "../types";
+import { dmKeyFor } from "../chat-ids";
 import { headlineName } from "../display-name";
 import {
   parseRole,
   canCreateChatGroups,
-  canAccessSupport,
 } from "../roles";
-import { postSupportAiMessage } from "./functions";
 
 const REBUILD_SESSION_KEY = "pulse:rebuild-inbox-once";
 
@@ -104,8 +102,6 @@ function stringMap(raw: unknown): Record<string, string> {
 
 export function chatFrom(id: string, data: Record<string, unknown>): ChatConversation {
   const members = boolMap(data.members);
-  const isSupportChat =
-    Boolean(data.isSupportChat) || id.startsWith("support_");
   const isDefaultAgentGroup =
     Boolean(data.isDefaultAgentGroup) || id === AGENTS_DEFAULT_ID;
   const autoJoinRaw = asMap(data.autoJoinRoles);
@@ -127,7 +123,6 @@ export function chatFrom(id: string, data: Record<string, unknown>): ChatConvers
     createdAt: Number(data.createdAt ?? 0),
     createdBy: String(data.createdBy ?? ""),
     isDefaultAgentGroup,
-    isSupportChat,
     autoJoinRoles,
   };
 }
@@ -148,33 +143,7 @@ function messageFrom(
     senderName: String(data.senderName ?? ""),
     createdAt: Number(data.createdAt ?? 0),
     sharedPost: shared,
-    isAi: Boolean(data.isAi),
     reactions: stringMap(data.reactions),
-  };
-}
-
-function chatToRtdb(chat: ChatConversation) {
-  return {
-    members: Object.fromEntries(chat.memberIds.map((id) => [id, true])),
-    memberCount: chat.memberIds.length,
-    memberNames: chat.memberNames,
-    isGroup: chat.isGroup,
-    title: chat.title,
-    dmKey: chat.dmKey,
-    lastMessage: chat.lastMessage,
-    lastMessageAt: chat.lastMessageAt,
-    lastMessageSenderId: chat.lastMessageSenderId,
-    unreadCounts: chat.unreadCounts,
-    pinnedBy: Object.fromEntries(
-      Object.entries(chat.pinnedBy).filter(([, v]) => v),
-    ),
-    createdAt: chat.createdAt,
-    createdBy: chat.createdBy,
-    isDefaultAgentGroup: chat.isDefaultAgentGroup,
-    isSupportChat: chat.isSupportChat,
-    autoJoinRoles: Object.fromEntries(
-      (chat.autoJoinRoles ?? []).map((role) => [role, true]),
-    ),
   };
 }
 
@@ -306,43 +275,6 @@ export function watchMessages(
   );
 }
 
-async function createChat(chat: ChatConversation): Promise<ChatConversation> {
-  const db = getFirebaseRtdb();
-  const id =
-    chat.id ||
-    push(ref(db, "chats")).key ||
-    `${Date.now()}`;
-  const saved = { ...chat, id };
-  const rtdbChat = chatToRtdb(saved);
-  // Creator inbox only — RTDB rules deny writing other users' indexes.
-  // syncChatInbox backfills everyone else after the chat write.
-  const updates: Record<string, unknown> = {
-    [`chats/${id}`]: rtdbChat,
-    [`userChats/${saved.createdBy}/${id}`]: {
-      chatId: id,
-      memberIds: saved.memberIds.filter((uid) => uid !== SUPPORT_AI_UID),
-      memberNames: saved.memberNames,
-      isGroup: saved.isGroup,
-      title: saved.title,
-      dmKey: saved.dmKey,
-      lastMessage: saved.lastMessage,
-      lastMessageAt: saved.lastMessageAt,
-      lastMessageSenderId: saved.lastMessageSenderId,
-      unreadCount: 0,
-      pinned: false,
-      createdAt: saved.createdAt,
-      createdBy: saved.createdBy,
-      isDefaultAgentGroup: saved.isDefaultAgentGroup,
-      isSupportChat: saved.isSupportChat,
-      autoJoinRoles: Object.fromEntries(
-        (saved.autoJoinRoles ?? []).map((role) => [role, true]),
-      ),
-    },
-  };
-  await update(ref(db), updates);
-  return saved;
-}
-
 export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
   if (me.uid === other.uid) throw new Error("Cannot chat with yourself");
   if (me.isAnonymous || other.isAnonymous) {
@@ -389,7 +321,6 @@ export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
     createdAt,
     createdBy: me.uid,
     isDefaultAgentGroup: false,
-    isSupportChat: false,
     autoJoinRoles: [],
   } satisfies ChatConversation;
 }
@@ -460,72 +391,9 @@ export async function createGroupChat(input: {
     createdAt,
     createdBy: input.creator.uid,
     isDefaultAgentGroup: false,
-    isSupportChat: false,
     autoJoinRoles,
   };
   if (result?.truncated === true) chat.truncated = true;
-  return chat;
-}
-
-async function ensureUserChatIndex(
-  uid: string,
-  chatId: string,
-  lastMessageAt: number,
-) {
-  await update(ref(getFirebaseRtdb()), {
-    [`userChats/${uid}/${chatId}/lastMessageAt`]: lastMessageAt,
-  });
-}
-
-export async function getOrCreateSupportChat(
-  me: UserProfile,
-  aiName: string,
-  welcomeMessage?: string,
-) {
-  if (!canAccessSupport(me.role, me.isAnonymous)) {
-    throw new Error("Support is not available for this account");
-  }
-  const id = supportChatIdFor(me.uid);
-  const db = getFirebaseRtdb();
-
-  // Prefer chats/$id: the inbox row can be missing (hidden/cleared) while the
-  // support thread still exists — recreating is denied by create-only rules.
-  const existing = await get(ref(db, `chats/${id}`));
-  if (existing.exists()) {
-    const chat = chatFrom(id, asMap(existing.val()));
-    await ensureUserChatIndex(me.uid, id, chat.lastMessageAt);
-    return chat;
-  }
-
-  const now = Date.now();
-  const chat = await createChat({
-    id,
-    memberIds: [me.uid, SUPPORT_AI_UID].sort(),
-    memberNames: {
-      [me.uid]: headlineName(me),
-      [SUPPORT_AI_UID]: aiName,
-    },
-    isGroup: true,
-    title: "Support",
-    dmKey: null,
-    lastMessage: "",
-    lastMessageAt: now,
-    lastMessageSenderId: null,
-    unreadCounts: { [me.uid]: 0, [SUPPORT_AI_UID]: 0 },
-    pinnedBy: {},
-    createdAt: now,
-    createdBy: me.uid,
-    isDefaultAgentGroup: false,
-    isSupportChat: true,
-    autoJoinRoles: [],
-  });
-  if (welcomeMessage?.trim()) {
-    await postSupportAiMessage({
-      chatId: chat.id,
-      body: welcomeMessage.trim(),
-      senderName: aiName,
-    });
-  }
   return chat;
 }
 
@@ -534,7 +402,6 @@ export async function sendMessage(input: {
   body: string;
   author: UserProfile;
   sharedPost?: SharedPostPreview | null;
-  isAi?: boolean;
   /** When RTDB get hangs, use this membership snapshot to still write. */
   knownChat?: ChatConversation | null;
 }) {
@@ -573,7 +440,6 @@ export async function sendMessage(input: {
     senderName: headlineName(input.author),
     createdAt: now,
     sharedPost: input.sharedPost ?? null,
-    isAi: input.isAi ?? false,
     reactions: {},
   };
   await raceTimeout(
@@ -583,7 +449,6 @@ export async function sendMessage(input: {
       senderName: message.senderName,
       createdAt: now,
       sharedPost: message.sharedPost ?? null,
-      isAi: message.isAi ?? false,
     }),
     12_000,
     "Send timed out",
@@ -613,13 +478,10 @@ export async function setPinned(chatId: string, uid: string, pinned: boolean) {
 }
 
 export async function hideChatForMe(chatId: string, uid: string) {
-  if (chatId === supportChatIdFor(uid) || chatId.startsWith("support_")) {
-    throw new Error("Support chat cannot be hidden.");
-  }
   const chatSnap = await get(ref(getFirebaseRtdb(), `chats/${chatId}`));
   if (chatSnap.exists()) {
     const chat = chatFrom(chatId, asMap(chatSnap.val()));
-    if (chat.isSupportChat || chat.isDefaultAgentGroup) {
+    if (chat.isDefaultAgentGroup) {
       throw new Error("This chat cannot be hidden.");
     }
   }
@@ -643,9 +505,8 @@ export async function setReaction(input: {
 export function chatTitleFor(
   chat: ChatConversation,
   viewerUid: string,
-  labels: { support: string; team: string },
+  labels: { team: string },
 ) {
-  if (chat.isSupportChat) return chat.title?.trim() || labels.support;
   if (chat.isDefaultAgentGroup) return chat.title?.trim() || labels.team;
   if (chat.isGroup && chat.title?.trim()) return chat.title.trim();
   const other = chat.memberIds.find((id) => id !== viewerUid);
@@ -653,9 +514,8 @@ export function chatTitleFor(
   return chat.title || "Chat";
 }
 
-/** Inbox buckets matching Flutter: support → community → pinned → recent. */
+/** Inbox buckets matching Flutter: community → pinned → recent. */
 export type ChatInboxSections = {
-  support: ChatConversation[];
   community: ChatConversation[];
   pinned: ChatConversation[];
   recent: ChatConversation[];
@@ -665,14 +525,11 @@ export function partitionChatInbox(
   chats: ChatConversation[],
   viewerUid: string,
 ): ChatInboxSections {
-  const support: ChatConversation[] = [];
   const community: ChatConversation[] = [];
   const pinned: ChatConversation[] = [];
   const recent: ChatConversation[] = [];
   for (const chat of chats) {
-    if (chat.isSupportChat) {
-      support.push(chat);
-    } else if (chat.isDefaultAgentGroup) {
+    if (chat.isDefaultAgentGroup) {
       community.push(chat);
     } else if (chat.pinnedBy[viewerUid]) {
       pinned.push(chat);
@@ -680,5 +537,5 @@ export function partitionChatInbox(
       recent.push(chat);
     }
   }
-  return { support, community, pinned, recent };
+  return { community, pinned, recent };
 }

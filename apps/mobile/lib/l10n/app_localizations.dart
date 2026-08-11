@@ -116,12 +116,6 @@ abstract class AppLocalizations {
   /// **'Chats'**
   String get navChats;
 
-  /// No description provided for @navAi.
-  ///
-  /// In en, this message translates to:
-  /// **'AI'**
-  String get navAi;
-
   /// No description provided for @navAcademy.
   ///
   /// In en, this message translates to:
@@ -146,12 +140,6 @@ abstract class AppLocalizations {
   /// **'New chat'**
   String get fabNewChat;
 
-  /// No description provided for @fabNewConversation.
-  ///
-  /// In en, this message translates to:
-  /// **'New conversation'**
-  String get fabNewConversation;
-
   /// No description provided for @fabSearchCourses.
   ///
   /// In en, this message translates to:
@@ -164,12 +152,6 @@ abstract class AppLocalizations {
   /// **'Edit profile'**
   String get fabEditProfile;
 
-  /// No description provided for @fabSupport.
-  ///
-  /// In en, this message translates to:
-  /// **'Support'**
-  String get fabSupport;
-
   /// No description provided for @supportSheetTitle.
   ///
   /// In en, this message translates to:
@@ -179,7 +161,7 @@ abstract class AppLocalizations {
   /// No description provided for @supportSheetBody.
   ///
   /// In en, this message translates to:
-  /// **'Need help with your account or the app? Start a support chat — an assistant replies right away and our team can join.'**
+  /// **'Need help with your account or the app? Email us and our team will get back to you.'**
   String get supportSheetBody;
 
   /// No description provided for @supportSheetEmail.
@@ -205,42 +187,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Close'**
   String get supportSheetClose;
-
-  /// No description provided for @supportSheetOpenChat.
-  ///
-  /// In en, this message translates to:
-  /// **'Open support chat'**
-  String get supportSheetOpenChat;
-
-  /// No description provided for @supportChatAiName.
-  ///
-  /// In en, this message translates to:
-  /// **'Support Assistant'**
-  String get supportChatAiName;
-
-  /// No description provided for @supportChatWelcome.
-  ///
-  /// In en, this message translates to:
-  /// **'Hi! I’m the support assistant. Tell me what you need — a teammate can join this chat anytime.'**
-  String get supportChatWelcome;
-
-  /// No description provided for @supportChatAiReply.
-  ///
-  /// In en, this message translates to:
-  /// **'Thanks for the details. I’m here to help while a human teammate reviews this thread.'**
-  String get supportChatAiReply;
-
-  /// No description provided for @supportChatSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'AI + human support'**
-  String get supportChatSubtitle;
-
-  /// No description provided for @supportChatOpening.
-  ///
-  /// In en, this message translates to:
-  /// **'Opening support chat…'**
-  String get supportChatOpening;
 
   /// No description provided for @editProfileNameFrozen.
   ///
@@ -367,18 +313,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Direct messages and team groups keep mentorship and daily coordination in one place.'**
   String get onboardingChatsBody;
-
-  /// No description provided for @onboardingAiTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'An assistant on call'**
-  String get onboardingAiTitle;
-
-  /// No description provided for @onboardingAiBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Pulse AI is ready when you need a quick answer — benefits, courses, or community context.'**
-  String get onboardingAiBody;
 
   /// No description provided for @onboardingAcademyTitle.
   ///
@@ -2030,12 +1964,6 @@ abstract class AppLocalizations {
   /// **'Community'**
   String get chatsSectionCommunity;
 
-  /// No description provided for @chatsSectionSupport.
-  ///
-  /// In en, this message translates to:
-  /// **'Support'**
-  String get chatsSectionSupport;
-
   /// No description provided for @chatsDefaultGroupBadge.
   ///
   /// In en, this message translates to:
@@ -2047,18 +1975,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Team'**
   String get chatsDefaultGroupTitle;
-
-  /// No description provided for @chatsSupportTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Support'**
-  String get chatsSupportTitle;
-
-  /// No description provided for @chatsSupportBadge.
-  ///
-  /// In en, this message translates to:
-  /// **'AI + human'**
-  String get chatsSupportBadge;
 
   /// No description provided for @chatsNoMessagesYet.
   ///
@@ -2293,288 +2209,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sun'**
   String get weekdaySun;
-
-  /// No description provided for @aiNewConversation.
-  ///
-  /// In en, this message translates to:
-  /// **'New conversation'**
-  String get aiNewConversation;
-
-  /// No description provided for @aiHistoryTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'History'**
-  String get aiHistoryTooltip;
-
-  /// No description provided for @aiNewTooltip.
-  ///
-  /// In en, this message translates to:
-  /// **'New'**
-  String get aiNewTooltip;
-
-  /// No description provided for @aiThinking.
-  ///
-  /// In en, this message translates to:
-  /// **'Working on it…'**
-  String get aiThinking;
-
-  /// No description provided for @aiInputHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask about products, licensing, compliance or sales…'**
-  String get aiInputHint;
-
-  /// No description provided for @aiEmptyPrompt.
-  ///
-  /// In en, this message translates to:
-  /// **'What are you working on?'**
-  String get aiEmptyPrompt;
-
-  /// No description provided for @aiEmptySubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask anything about the US insurance business. Pulse AI searches accepted forum answers, the academy and official regulator sources, then shows you exactly where each answer came from.'**
-  String get aiEmptySubtitle;
-
-  /// No description provided for @aiSuggestion1.
-  ///
-  /// In en, this message translates to:
-  /// **'What changes for a client during Medicare AEP?'**
-  String get aiSuggestion1;
-
-  /// No description provided for @aiSuggestion2.
-  ///
-  /// In en, this message translates to:
-  /// **'How do I handle the “I need to think about it” objection?'**
-  String get aiSuggestion2;
-
-  /// No description provided for @aiSuggestion3.
-  ///
-  /// In en, this message translates to:
-  /// **'What do I need to get licensed in another state?'**
-  String get aiSuggestion3;
-
-  /// No description provided for @aiSuggestion4.
-  ///
-  /// In en, this message translates to:
-  /// **'Explain how an IUL differs from whole life'**
-  String get aiSuggestion4;
-
-  /// No description provided for @aiSources.
-  ///
-  /// In en, this message translates to:
-  /// **'Sources'**
-  String get aiSources;
-
-  /// No description provided for @aiDisclaimer.
-  ///
-  /// In en, this message translates to:
-  /// **'Pulse AI can be wrong. Rules vary by state and carrier — verify before you advise a client.'**
-  String get aiDisclaimer;
-
-  /// No description provided for @aiActivityForum.
-  ///
-  /// In en, this message translates to:
-  /// **'Searching accepted answers'**
-  String get aiActivityForum;
-
-  /// No description provided for @aiActivityAcademy.
-  ///
-  /// In en, this message translates to:
-  /// **'Searching the academy'**
-  String get aiActivityAcademy;
-
-  /// No description provided for @aiActivityOfficial.
-  ///
-  /// In en, this message translates to:
-  /// **'Checking official sources'**
-  String get aiActivityOfficial;
-
-  /// No description provided for @aiActivityWeb.
-  ///
-  /// In en, this message translates to:
-  /// **'Checking official sites'**
-  String get aiActivityWeb;
-
-  /// No description provided for @aiActivityProfile.
-  ///
-  /// In en, this message translates to:
-  /// **'Reviewing your learning'**
-  String get aiActivityProfile;
-
-  /// No description provided for @aiActivityResults.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} found'**
-  String aiActivityResults(int count);
-
-  /// No description provided for @aiActivityNone.
-  ///
-  /// In en, this message translates to:
-  /// **'nothing found'**
-  String get aiActivityNone;
-
-  /// No description provided for @aiActivityFailed.
-  ///
-  /// In en, this message translates to:
-  /// **'failed'**
-  String get aiActivityFailed;
-
-  /// No description provided for @aiSourceForum.
-  ///
-  /// In en, this message translates to:
-  /// **'Community answer'**
-  String get aiSourceForum;
-
-  /// No description provided for @aiSourceCourse.
-  ///
-  /// In en, this message translates to:
-  /// **'Course'**
-  String get aiSourceCourse;
-
-  /// No description provided for @aiSourcePath.
-  ///
-  /// In en, this message translates to:
-  /// **'Learning path'**
-  String get aiSourcePath;
-
-  /// No description provided for @aiSourceLesson.
-  ///
-  /// In en, this message translates to:
-  /// **'Lesson'**
-  String get aiSourceLesson;
-
-  /// No description provided for @aiSourceOfficial.
-  ///
-  /// In en, this message translates to:
-  /// **'Official source'**
-  String get aiSourceOfficial;
-
-  /// No description provided for @aiSourceMissing.
-  ///
-  /// In en, this message translates to:
-  /// **'That source is no longer available.'**
-  String get aiSourceMissing;
-
-  /// No description provided for @aiNoticeCompliance.
-  ///
-  /// In en, this message translates to:
-  /// **'Educational information, not legal advice. Check the policy wording, your state\'s rules or your compliance team before you act.'**
-  String get aiNoticeCompliance;
-
-  /// No description provided for @aiNoticeLegal.
-  ///
-  /// In en, this message translates to:
-  /// **'Pulse AI explains how insurance law and regulation generally work, but never advises on your specific case.'**
-  String get aiNoticeLegal;
-
-  /// No description provided for @aiNoticeScope.
-  ///
-  /// In en, this message translates to:
-  /// **'Pulse AI only covers the US insurance industry and the business of insurance.'**
-  String get aiNoticeScope;
-
-  /// No description provided for @aiNoticeNoSources.
-  ///
-  /// In en, this message translates to:
-  /// **'No indexed source backed this answer, so treat it as general industry knowledge and verify before acting.'**
-  String get aiNoticeNoSources;
-
-  /// No description provided for @aiFeedbackUp.
-  ///
-  /// In en, this message translates to:
-  /// **'Helpful'**
-  String get aiFeedbackUp;
-
-  /// No description provided for @aiFeedbackDown.
-  ///
-  /// In en, this message translates to:
-  /// **'Not helpful'**
-  String get aiFeedbackDown;
-
-  /// No description provided for @aiHistoryEmpty.
-  ///
-  /// In en, this message translates to:
-  /// **'No conversations yet.'**
-  String get aiHistoryEmpty;
-
-  /// No description provided for @aiUntitled.
-  ///
-  /// In en, this message translates to:
-  /// **'Untitled conversation'**
-  String get aiUntitled;
-
-  /// No description provided for @aiDeleteChat.
-  ///
-  /// In en, this message translates to:
-  /// **'Delete conversation'**
-  String get aiDeleteChat;
-
-  /// No description provided for @aiError.
-  ///
-  /// In en, this message translates to:
-  /// **'Pulse AI hit an error. Try again.'**
-  String get aiError;
-
-  /// No description provided for @aiStop.
-  ///
-  /// In en, this message translates to:
-  /// **'Stop'**
-  String get aiStop;
-
-  /// No description provided for @aiSignInRequired.
-  ///
-  /// In en, this message translates to:
-  /// **'Sign in with a complete account to use Pulse AI.'**
-  String get aiSignInRequired;
-
-  /// No description provided for @aiLoading.
-  ///
-  /// In en, this message translates to:
-  /// **'Loading conversation…'**
-  String get aiLoading;
-
-  /// No description provided for @aiAssistantSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Powered by the Every Benefits agent'**
-  String get aiAssistantSubtitle;
-
-  /// No description provided for @aiStatusOnline.
-  ///
-  /// In en, this message translates to:
-  /// **'Online'**
-  String get aiStatusOnline;
-
-  /// No description provided for @aiSettings.
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get aiSettings;
-
-  /// No description provided for @aiSettingsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'AI settings'**
-  String get aiSettingsTitle;
-
-  /// No description provided for @aiModelSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Model'**
-  String get aiModelSection;
-
-  /// No description provided for @aiModelName.
-  ///
-  /// In en, this message translates to:
-  /// **'Pulse AI'**
-  String get aiModelName;
-
-  /// No description provided for @aiModelSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'The Every Benefits agent searches forums, academy courses, and official regulator sources.'**
-  String get aiModelSubtitle;
 
   /// No description provided for @academyTitle.
   ///
@@ -3305,20 +2939,8 @@ abstract class AppLocalizations {
   /// No description provided for @settingsAdminHint.
   ///
   /// In en, this message translates to:
-  /// **'Promote students to agents and manage platform features.'**
+  /// **'Promote students to agents.'**
   String get settingsAdminHint;
-
-  /// No description provided for @settingsAdminPulseAi.
-  ///
-  /// In en, this message translates to:
-  /// **'Pulse AI'**
-  String get settingsAdminPulseAi;
-
-  /// No description provided for @settingsAdminPulseAiHint.
-  ///
-  /// In en, this message translates to:
-  /// **'When off, members cannot open or chat with Pulse AI.'**
-  String get settingsAdminPulseAiHint;
 
   /// No description provided for @settingsAdminPromote.
   ///
@@ -3343,12 +2965,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Couldn\'t promote: {error}'**
   String settingsAdminPromoteFailed(String error);
-
-  /// No description provided for @aiDisabled.
-  ///
-  /// In en, this message translates to:
-  /// **'Pulse AI is temporarily unavailable.'**
-  String get aiDisabled;
 
   /// No description provided for @settingsAppearance.
   ///
@@ -3475,12 +3091,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Academy updates'**
   String get notificationsPrefAcademy;
-
-  /// No description provided for @notificationsPrefSupport.
-  ///
-  /// In en, this message translates to:
-  /// **'Support replies'**
-  String get notificationsPrefSupport;
 
   /// No description provided for @notificationsPrefsHint.
   ///
@@ -3665,7 +3275,7 @@ abstract class AppLocalizations {
   /// No description provided for @tourWelcomeBody.
   ///
   /// In en, this message translates to:
-  /// **'Forums, chats, academy, and Pulse AI — rebuilt to feel faster and clearer. Here’s a quick tour of what you can do.'**
+  /// **'Forums, chats, and academy — rebuilt to feel faster and clearer. Here’s a quick tour of what you can do.'**
   String get tourWelcomeBody;
 
   /// No description provided for @tourCommunityTitle.
@@ -3689,7 +3299,7 @@ abstract class AppLocalizations {
   /// No description provided for @tourChatsBody.
   ///
   /// In en, this message translates to:
-  /// **'Message classmates, start group chats, or open Support when you need a hand. Unread badges keep you current.'**
+  /// **'Message classmates and start group chats. Unread badges keep you current.'**
   String get tourChatsBody;
 
   /// No description provided for @tourAcademyTitle.
@@ -3703,18 +3313,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Browse published courses and paths, resume where you left off, and track progress from Academy.'**
   String get tourAcademyBody;
-
-  /// No description provided for @tourAiTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Ask Pulse AI'**
-  String get tourAiTitle;
-
-  /// No description provided for @tourAiBody.
-  ///
-  /// In en, this message translates to:
-  /// **'Your in-app assistant for insurance craft questions — grounded in community context when available.'**
-  String get tourAiBody;
 
   /// No description provided for @tourYouTitle.
   ///
