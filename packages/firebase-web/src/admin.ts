@@ -285,6 +285,11 @@ export type AdminRepository = {
     updated: number;
     done: boolean;
   }>;
+  uploadOrgLogo: (input: {
+    orgNodeId: string;
+    contentType: string;
+    bytesBase64: string;
+  }) => Promise<{ downloadUrl: string; path: string } | null>;
   setUserRole: (uid: string, role: UserRole | string) => Promise<void>;
   listRoles: (filters?: ListRolesFilters) => Promise<ListRolesResult>;
   createRole: (input: {
@@ -475,6 +480,17 @@ export function createAdminRepository(functions: Functions): AdminRepository {
         scanned: Number(data?.scanned ?? 0),
         updated: Number(data?.updated ?? 0),
         done: data?.done !== false,
+      };
+    },
+    async uploadOrgLogo(input) {
+      const data = await callCloudFunction<{
+        downloadUrl?: string;
+        path?: string;
+      }>(functions, "uploadOrgLogo", input);
+      if (!data?.downloadUrl) return null;
+      return {
+        downloadUrl: String(data.downloadUrl),
+        path: String(data.path ?? ""),
       };
     },
     async setUserRole(uid, role) {

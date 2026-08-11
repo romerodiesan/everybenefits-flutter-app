@@ -228,6 +228,15 @@ function createAdminRepository(functions) {
                 done: data?.done !== false,
             };
         },
+        async uploadOrgLogo(input) {
+            const data = await callCloudFunction(functions, "uploadOrgLogo", input);
+            if (!data?.downloadUrl)
+                return null;
+            return {
+                downloadUrl: String(data.downloadUrl),
+                path: String(data.path ?? ""),
+            };
+        },
         async setUserRole(uid, role) {
             await callCloudFunction(functions, "setUserRole", { uid, role });
         },

@@ -354,6 +354,8 @@ export function OrganizationsHome() {
         invalidate.invalidateAgencies(),
         invalidate.invalidateInsights(),
       ]);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : String(err));
     } finally {
       setBusy(false);
     }

@@ -1,5 +1,7 @@
 import { FieldValue, type DocumentData } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { randomUUID } from "node:crypto";
 import {
   DEFAULT_ORG_ROOT_NAME,
   ORG_OWNER_UIDS_CAP,
@@ -604,5 +606,63 @@ export const migrateSubAgenciesToAgencies = onCall(
       updated,
       done: snap.size < 500,
     };
+  },
+);
+
+const ORG_LOGO_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
+
+/**
+ * Upload agency/matrix logo via Admin SDK (bypasses Storage rules).
+ * Client Storage writes that depend on firestore.get() often fail closed as 403.
+ */
+export const uploadOrgLogo = onCall(
+  { ...callableOpts, memory: "512MiB", timeoutSeconds: 60 },
+  async (request) => {
+    await requireOrgAdmin(request, "uploadOrgLogo", true);
+    const orgNodeId = String(request.data?.orgNodeId ?? "").trim();
+    if (!orgNodeId || orgNodeId.length > 128) {
+      throw new HttpsError("invalid-argument", "orgNodeId required.");
+    }
+    const nodeSnap = await db.doc(`orgNodes/${orgNodeId}`).get();
+    if (!nodeSnap.exists) {
+      throw new HttpsError("not-found", "Org node not found.");
+    }
+
+    const contentType = String(request.data?.contentType ?? "image/jpeg").trim();
+    if (!ORG_LOGO_TYPES.has(contentType)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Logo must be JPEG, PNG, or WebP.",
+      );
+    }
+
+    const base64 = String(request.data?.bytesBase64 ?? "");
+    if (!base64 || base64.length > 7_000_000) {
+      throw new HttpsError("invalid-argument", "Logo payload missing or too large.");
+    }
+    const buffer = Buffer.from(base64, "base64");
+    if (!buffer.length || buffer.length >= 5 * 1024 * 1024) {
+      throw new HttpsError("invalid-argument", "Logo must be under 5MB.");
+    }
+
+    const path = `org-logos/${orgNodeId}.jpg`;
+    const token = randomUUID();
+    const file = getStorage().bucket().file(path);
+    await file.save(buffer, {
+      resumable: false,
+      contentType,
+      metadata: {
+        contentType,
+        metadata: { firebaseStorageDownloadTokens: token },
+      },
+    });
+
+    const bucket = file.bucket.name;
+    const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodeURIComponent(path)}?alt=media&token=${token}`;
+    return { downloadUrl, path };
   },
 );

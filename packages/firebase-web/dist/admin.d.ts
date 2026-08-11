@@ -138,6 +138,14 @@ export type AdminRepository = {
         updated: number;
         done: boolean;
     }>;
+    uploadOrgLogo: (input: {
+        orgNodeId: string;
+        contentType: string;
+        bytesBase64: string;
+    }) => Promise<{
+        downloadUrl: string;
+        path: string;
+    } | null>;
     setUserRole: (uid: string, role: UserRole | string) => Promise<void>;
     listRoles: (filters?: ListRolesFilters) => Promise<ListRolesResult>;
     createRole: (input: {

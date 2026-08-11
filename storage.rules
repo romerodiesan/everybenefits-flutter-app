@@ -91,13 +91,15 @@ service firebase.storage {
     }
 
     // Agency / matrix logos: org-logos/{orgNodeId}.jpg
+    // Prefer Admin uploadOrgLogo callable (avoids firestore.get fail-closed).
+    // Direct client writes: platform roles only, single Firestore get.
     match /org-logos/{fileName} {
-      allow read: if isRegisteredMember();
+      allow read: if isSignedIn();
       allow write: if isSignedIn()
-        && isAccountActive()
-        && callerRole() in ['admin', 'system']
         && request.resource.size < 5 * 1024 * 1024
-        && isAllowedImageType();
+        && isAllowedImageType()
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
+          .data.role in ['admin', 'system', 'manager'];
     }
 
     // Course covers and lesson videos: /courses/{courseId}/...
