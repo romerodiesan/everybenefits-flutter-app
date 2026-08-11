@@ -9,6 +9,7 @@ export type UserRole =
   | "guest"
   | "student"
   | "agent"
+  | "agency_owner"
   | "instructor"
   | "manager"
   | "admin"
@@ -19,6 +20,7 @@ export const ALL_ROLES: readonly UserRole[] = [
   "guest",
   "student",
   "agent",
+  "agency_owner",
   "instructor",
   "manager",
   "admin",
@@ -30,6 +32,7 @@ export const SYSTEM_ROLE_IDS = [
   "system",
   "admin",
   "manager",
+  "agency_owner",
   "agent",
   "student",
 ] as const satisfies readonly UserRole[];
@@ -47,6 +50,7 @@ export const LEGACY_ROLE_IDS = [
 export const GROUP_SEED_ROLES = [
   "student",
   "agent",
+  "agency_owner",
   "instructor",
   "manager",
   "admin",

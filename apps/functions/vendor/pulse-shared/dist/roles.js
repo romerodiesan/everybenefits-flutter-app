@@ -25,6 +25,7 @@ exports.ALL_ROLES = [
     "guest",
     "student",
     "agent",
+    "agency_owner",
     "instructor",
     "manager",
     "admin",
@@ -35,6 +36,7 @@ exports.SYSTEM_ROLE_IDS = [
     "system",
     "admin",
     "manager",
+    "agency_owner",
     "agent",
     "student",
 ];
@@ -50,6 +52,7 @@ exports.LEGACY_ROLE_IDS = [
 exports.GROUP_SEED_ROLES = [
     "student",
     "agent",
+    "agency_owner",
     "instructor",
     "manager",
     "admin",

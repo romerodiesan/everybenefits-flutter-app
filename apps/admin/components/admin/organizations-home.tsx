@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useTranslations } from "next-intl";
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
+import type { AdminUserRow } from "@pulse/firebase-web";
 import type { OrgNode } from "@pulse/shared";
+import { ORG_OWNER_UIDS_CAP } from "@pulse/shared";
 import { canManagePlatform } from "@/lib/roles";
 import {
   BULK_MAX_SELECTED,
@@ -14,7 +16,12 @@ import {
 } from "@/lib/bulk-selection";
 import { useAccess } from "@/lib/providers/auth-provider";
 import { getAdminRepository } from "@/lib/repositories/admin-repository";
-import { ORG_DEPTH_TYPE, type OrgNodeType } from "@/lib/types";
+import { uploadOrgLogo } from "@/lib/firebase/org";
+import {
+  ORG_DEPTH_TYPE,
+  isValidChildType,
+  type OrgNodeType,
+} from "@/lib/types";
 import { Button, Input, Label, SearchInput } from "@/components/ui/primitives";
 import { Drawer } from "@/components/ui/drawer";
 import { DataTable } from "@/components/ui/data-table";
@@ -32,9 +39,9 @@ import {
   fetchOrgChildren,
   useAdminAgenciesQuery,
   useInvalidateAdminQueries,
-  useOrgNodesByTypeQuery,
   useOrgRootsQuery,
 } from "@/lib/hooks/use-admin-queries";
+
 type TreeNodeState = OrgNode & {
   childrenLoaded?: boolean;
   children?: TreeNodeState[];
@@ -57,6 +64,32 @@ function toTreeNodes(nodes: OrgNode[]): TreeNodeState[] {
     childrenLoaded: false,
     expanded: false,
   }));
+}
+
+function suggestedChildType(parent: OrgNode): OrgNodeType | null {
+  if (parent.type === "agency" || parent.type === "sub_agency") {
+    return "agency";
+  }
+  if (parent.depth >= 7) return null;
+  const next = ORG_DEPTH_TYPE[(parent.depth + 1) as 2 | 3 | 4 | 5 | 6 | 7];
+  if (!next) return null;
+  if (next === "sub_agency") return "agency";
+  return isValidChildType(parent.type, next) ? next : null;
+}
+
+function emptyAgencyForm() {
+  return {
+    name: "",
+    parentId: "",
+    email: "",
+    paymentsEmail: "",
+    npn: "",
+    agencyLicense: "",
+    ein: "",
+    logoUrl: null as string | null,
+    ownerUids: [] as string[],
+    ownerLabels: {} as Record<string, string>,
+  };
 }
 
 export function OrganizationsHome() {
@@ -86,18 +119,21 @@ export function OrganizationsHome() {
   const [includeInactive, setIncludeInactive] = useState(false);
   const [agencyDrawer, setAgencyDrawer] = useState(false);
   const [agencyEdit, setAgencyEdit] = useState<OrgNode | null>(null);
-  const [agencyName, setAgencyName] = useState("");
-  const [agencyParentId, setAgencyParentId] = useState("");
+  const [agencyForm, setAgencyForm] = useState(emptyAgencyForm);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [ownerSearch, setOwnerSearch] = useState("");
+  const debouncedOwnerSearch = useDebounced(ownerSearch.trim(), 300);
+  const [ownerHits, setOwnerHits] = useState<AdminUserRow[]>([]);
   const [agencySelection, setAgencySelection] = useState<RowSelectionState>({});
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
 
-  const regionsQuery = useOrgNodesByTypeQuery(
-    "region",
-    200,
-    tab === "agencies" || agencyDrawer,
+  const parentsQuery = useAdminAgenciesQuery(
+    { pageSize: 200, includeInactive: false },
+    agencyDrawer && !agencyEdit,
   );
-  const regions = regionsQuery.data ?? [];
+  const parentOptions = parentsQuery.data?.agencies ?? [];
+
   const agenciesQuery = useAdminAgenciesQuery(
     {
       pageSize: agencyPageSize,
@@ -126,7 +162,6 @@ export function OrganizationsHome() {
     return applyUi(base);
   }, [rootsQuery.data, treeUi]);
 
-  // Prefetch first-level children so expanding roots feels instant.
   useEffect(() => {
     const nodes = rootsQuery.data ?? [];
     for (const node of nodes.slice(0, 8)) {
@@ -139,6 +174,28 @@ export function OrganizationsHome() {
     setAgencyStack([null]);
     setAgencySelection({});
   }, [debouncedAgencyQuery, agencyPageSize, includeInactive]);
+
+  useEffect(() => {
+    if (!agencyDrawer || !debouncedOwnerSearch) {
+      setOwnerHits([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const result = await repo.listUsers({
+          query: debouncedOwnerSearch,
+          pageSize: 8,
+        });
+        if (!cancelled) setOwnerHits(result.users);
+      } catch {
+        if (!cancelled) setOwnerHits([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [agencyDrawer, debouncedOwnerSearch, repo]);
 
   const selectedAgencyIds = selectedIdsFromState(agencySelection);
 
@@ -189,7 +246,11 @@ export function OrganizationsHome() {
     if (node.expanded) {
       setTreeUi((prev) => ({
         ...prev,
-        [node.id]: { ...prev[node.id], expanded: false, children: prev[node.id]?.children },
+        [node.id]: {
+          ...prev[node.id],
+          expanded: false,
+          children: prev[node.id]?.children,
+        },
       }));
       return;
     }
@@ -218,11 +279,87 @@ export function OrganizationsHome() {
     setDrawerOpen(true);
   };
 
-  const childType: OrgNodeType | null = selected
-    ? selected.depth < 7
-      ? ORG_DEPTH_TYPE[(selected.depth + 1) as 2 | 3 | 4 | 5 | 6 | 7]
-      : null
-    : null;
+  const openAgencyCreate = () => {
+    setAgencyEdit(null);
+    setAgencyForm(emptyAgencyForm());
+    setLogoFile(null);
+    setOwnerSearch("");
+    setAgencyDrawer(true);
+  };
+
+  const openAgencyEdit = (agency: OrgNode) => {
+    setAgencyEdit(agency);
+    const labels: Record<string, string> = {};
+    for (const uid of agency.ownerUids ?? []) {
+      labels[uid] = uid.slice(0, 8);
+    }
+    setAgencyForm({
+      name: agency.name,
+      parentId: agency.parentId ?? "",
+      email: agency.email ?? "",
+      paymentsEmail: agency.paymentsEmail ?? "",
+      npn: agency.npn ?? "",
+      agencyLicense: agency.agencyLicense ?? "",
+      ein: agency.ein ?? "",
+      logoUrl: agency.logoUrl,
+      ownerUids: [...(agency.ownerUids ?? [])],
+      ownerLabels: labels,
+    });
+    setLogoFile(null);
+    setOwnerSearch("");
+    setAgencyDrawer(true);
+  };
+
+  const saveAgency = async () => {
+    const name = agencyForm.name.trim();
+    if (!name) return;
+    if (!agencyEdit && !agencyForm.parentId) return;
+    setBusy(true);
+    try {
+      const profile = {
+        email: agencyForm.email.trim() || null,
+        paymentsEmail: agencyForm.paymentsEmail.trim() || null,
+        npn: agencyForm.npn.trim() || null,
+        agencyLicense: agencyForm.agencyLicense.trim() || null,
+        ein: agencyForm.ein.trim() || null,
+        ownerUids: agencyForm.ownerUids,
+        logoUrl: agencyForm.logoUrl,
+      };
+
+      if (agencyEdit) {
+        let logoUrl = profile.logoUrl;
+        if (logoFile) {
+          logoUrl = await uploadOrgLogo(agencyEdit.id, logoFile);
+        }
+        await repo.updateOrgNode({
+          id: agencyEdit.id,
+          name,
+          ...profile,
+          logoUrl,
+        });
+      } else {
+        const created = await repo.createOrgNode({
+          name,
+          type: "agency",
+          parentId: agencyForm.parentId,
+          ...profile,
+        });
+        if (created && logoFile) {
+          const logoUrl = await uploadOrgLogo(created.id, logoFile);
+          await repo.updateOrgNode({ id: created.id, logoUrl });
+        }
+      }
+      setAgencyDrawer(false);
+      await Promise.all([
+        invalidate.invalidateAgencies(),
+        invalidate.invalidateInsights(),
+      ]);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const childType = selected ? suggestedChildType(selected) : null;
 
   const renderTree = (nodes: TreeNodeState[], depth = 0): ReactNode => (
     <ul
@@ -267,7 +404,7 @@ export function OrganizationsHome() {
           node.children?.length === 0 ? (
             <p
               className="px-3 py-2 text-xs text-muted"
-              style={{ paddingLeft: `${1.6 + depth * 0.9}rem` }}
+              style={{ paddingLeft: `${1.75 + depth * 0.9}rem` }}
             >
               {t("orgNoChildren")}
             </p>
@@ -283,7 +420,28 @@ export function OrganizationsHome() {
         id: "name",
         header: t("orgName"),
         cell: ({ row }) => (
-          <span className="font-semibold">{row.original.name}</span>
+          <div className="flex items-center gap-2.5">
+            {row.original.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={row.original.logoUrl}
+                alt=""
+                className="h-8 w-8 rounded-lg object-cover"
+              />
+            ) : (
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink/5 text-[10px] font-bold text-muted">
+                {row.original.name.slice(0, 2).toUpperCase()}
+              </span>
+            )}
+            <div className="min-w-0">
+              <p className="truncate font-semibold">{row.original.name}</p>
+              {row.original.email ? (
+                <p className="truncate text-[11px] text-muted">
+                  {row.original.email}
+                </p>
+              ) : null}
+            </div>
+          </div>
         ),
       },
       {
@@ -316,11 +474,7 @@ export function OrganizationsHome() {
             <RowActions>
               <RowActionButton
                 variant="secondary"
-                onClick={() => {
-                  setAgencyEdit(agency);
-                  setAgencyName(agency.name);
-                  setAgencyDrawer(true);
-                }}
+                onClick={() => openAgencyEdit(agency)}
               >
                 {t("usersEdit")}
               </RowActionButton>
@@ -375,16 +529,7 @@ export function OrganizationsHome() {
           </Button>
         ) : null}
         {isAdmin && tab === "agencies" ? (
-          <Button
-            onClick={() => {
-              setAgencyEdit(null);
-              setAgencyName("");
-              setAgencyParentId(regions[0]?.id ?? "");
-              setAgencyDrawer(true);
-            }}
-          >
-            {t("orgCreateAgency")}
-          </Button>
+          <Button onClick={openAgencyCreate}>{t("orgCreateAgency")}</Button>
         ) : null}
       </header>
 
@@ -633,33 +778,10 @@ export function OrganizationsHome() {
             <Button
               disabled={
                 busy ||
-                !agencyName.trim() ||
-                (!agencyEdit && !agencyParentId)
+                !agencyForm.name.trim() ||
+                (!agencyEdit && !agencyForm.parentId)
               }
-              onClick={async () => {
-                setBusy(true);
-                try {
-                  if (agencyEdit) {
-                    await repo.updateOrgNode({
-                      id: agencyEdit.id,
-                      name: agencyName.trim(),
-                    });
-                  } else {
-                    await repo.createOrgNode({
-                      name: agencyName.trim(),
-                      type: "agency",
-                      parentId: agencyParentId,
-                    });
-                  }
-                  setAgencyDrawer(false);
-                  await Promise.all([
-                    invalidate.invalidateAgencies(),
-                    invalidate.invalidateInsights(),
-                  ]);
-                } finally {
-                  setBusy(false);
-                }
-              }}
+              onClick={() => void saveAgency()}
             >
               {t("usersSave")}
             </Button>
@@ -670,27 +792,205 @@ export function OrganizationsHome() {
           <div>
             <Label>{t("orgName")}</Label>
             <Input
-              value={agencyName}
-              onChange={(e) => setAgencyName(e.target.value)}
+              value={agencyForm.name}
+              onChange={(e) =>
+                setAgencyForm((f) => ({ ...f, name: e.target.value }))
+              }
             />
           </div>
           {!agencyEdit ? (
             <div>
               <Label>{t("orgParentRegion")}</Label>
+              <p className="mb-1 text-[11px] text-muted">{t("orgParentHint")}</p>
               <select
                 className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm text-ink"
-                value={agencyParentId}
-                onChange={(e) => setAgencyParentId(e.target.value)}
+                value={agencyForm.parentId}
+                onChange={(e) =>
+                  setAgencyForm((f) => ({ ...f, parentId: e.target.value }))
+                }
               >
                 <option value="">{t("none")}</option>
-                {regions.map((r) => (
+                {parentOptions.map((r) => (
                   <option key={r.id} value={r.id}>
-                    {r.name}
+                    {r.type === "organization"
+                      ? `${r.name} (${t("orgType_organization")})`
+                      : r.name}
                   </option>
                 ))}
               </select>
             </div>
           ) : null}
+
+          <div>
+            <Label>{t("orgLogo")}</Label>
+            <div className="mt-1 flex items-center gap-3">
+              {agencyForm.logoUrl || logoFile ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={
+                    logoFile
+                      ? URL.createObjectURL(logoFile)
+                      : (agencyForm.logoUrl ?? "")
+                  }
+                  alt=""
+                  className="h-12 w-12 rounded-xl object-cover"
+                />
+              ) : (
+                <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-ink/5 text-xs text-muted">
+                  —
+                </span>
+              )}
+              <label className="cursor-pointer text-sm font-medium text-brand">
+                {t("orgLogoUpload")}
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0] ?? null;
+                    setLogoFile(file);
+                  }}
+                />
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <Label>{t("orgEmail")}</Label>
+            <Input
+              type="email"
+              value={agencyForm.email}
+              onChange={(e) =>
+                setAgencyForm((f) => ({ ...f, email: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <Label>{t("orgPaymentsEmail")}</Label>
+            <Input
+              type="email"
+              value={agencyForm.paymentsEmail}
+              onChange={(e) =>
+                setAgencyForm((f) => ({
+                  ...f,
+                  paymentsEmail: e.target.value,
+                }))
+              }
+            />
+          </div>
+          <div>
+            <Label>{t("orgNpn")}</Label>
+            <Input
+              value={agencyForm.npn}
+              onChange={(e) =>
+                setAgencyForm((f) => ({ ...f, npn: e.target.value }))
+              }
+            />
+          </div>
+          <div>
+            <Label>{t("orgAgencyLicense")}</Label>
+            <Input
+              value={agencyForm.agencyLicense}
+              onChange={(e) =>
+                setAgencyForm((f) => ({
+                  ...f,
+                  agencyLicense: e.target.value,
+                }))
+              }
+            />
+          </div>
+          <div>
+            <Label>{t("orgEin")}</Label>
+            <Input
+              value={agencyForm.ein}
+              onChange={(e) =>
+                setAgencyForm((f) => ({ ...f, ein: e.target.value }))
+              }
+              placeholder="XX-XXXXXXX"
+            />
+          </div>
+
+          <div className="space-y-2 border-t border-glass-border pt-3">
+            <Label>{t("orgOwners")}</Label>
+            {agencyForm.ownerUids.length === 0 ? (
+              <p className="text-xs text-muted">{t("orgOwnersEmpty")}</p>
+            ) : (
+              <ul className="flex flex-wrap gap-1.5">
+                {agencyForm.ownerUids.map((uid) => (
+                  <li
+                    key={uid}
+                    className="flex items-center gap-1 rounded-full border border-glass-border bg-sheet px-2.5 py-1 text-xs"
+                  >
+                    <span className="max-w-[10rem] truncate">
+                      {agencyForm.ownerLabels[uid] ?? uid.slice(0, 8)}
+                    </span>
+                    <button
+                      type="button"
+                      className="text-muted hover:text-ink"
+                      aria-label="Remove"
+                      onClick={() =>
+                        setAgencyForm((f) => ({
+                          ...f,
+                          ownerUids: f.ownerUids.filter((id) => id !== uid),
+                        }))
+                      }
+                    >
+                      ×
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {agencyForm.ownerUids.length < ORG_OWNER_UIDS_CAP ? (
+              <>
+                <SearchInput
+                  value={ownerSearch}
+                  onChange={(e) => setOwnerSearch(e.target.value)}
+                  placeholder={t("orgOwnersSearch")}
+                  aria-label={t("orgOwnersSearch")}
+                />
+                {ownerHits.length > 0 ? (
+                  <ul className="max-h-40 overflow-auto rounded-xl border border-glass-border">
+                    {ownerHits
+                      .filter((u) => !agencyForm.ownerUids.includes(u.uid))
+                      .map((u) => {
+                        const label =
+                          u.displayName?.trim() ||
+                          u.email?.trim() ||
+                          u.uid.slice(0, 8);
+                        return (
+                          <li key={u.uid}>
+                            <button
+                              type="button"
+                              className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-ink/[0.04]"
+                              onClick={() => {
+                                setAgencyForm((f) => ({
+                                  ...f,
+                                  ownerUids: [...f.ownerUids, u.uid],
+                                  ownerLabels: {
+                                    ...f.ownerLabels,
+                                    [u.uid]: label,
+                                  },
+                                }));
+                                setOwnerSearch("");
+                                setOwnerHits([]);
+                              }}
+                            >
+                              <span className="font-medium">{label}</span>
+                              {u.email ? (
+                                <span className="text-[11px] text-muted">
+                                  {u.email}
+                                </span>
+                              ) : null}
+                            </button>
+                          </li>
+                        );
+                      })}
+                  </ul>
+                ) : null}
+              </>
+            ) : null}
+          </div>
         </div>
       </Drawer>
     </div>

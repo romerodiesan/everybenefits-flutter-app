@@ -20,5 +20,12 @@ exports.orgNodeFixtureSchema = zod_1.z.object({
     parentId: zod_1.z.string().nullable(),
     path: zod_1.z.array(zod_1.z.string()),
     managerUids: zod_1.z.array(zod_1.z.string()),
+    ownerUids: zod_1.z.array(zod_1.z.string()).default([]),
+    logoUrl: zod_1.z.string().nullable().default(null),
+    email: zod_1.z.string().nullable().default(null),
+    paymentsEmail: zod_1.z.string().nullable().default(null),
+    npn: zod_1.z.string().nullable().default(null),
+    agencyLicense: zod_1.z.string().nullable().default(null),
+    ein: zod_1.z.string().nullable().default(null),
     active: zod_1.z.boolean(),
 });

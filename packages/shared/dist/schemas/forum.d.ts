@@ -12,6 +12,7 @@ export declare const forumThreadFixtureSchema: z.ZodObject<{
         guest: "guest";
         system: "system";
         manager: "manager";
+        agency_owner: "agency_owner";
         agent: "agent";
         student: "student";
         instructor: "instructor";
@@ -35,6 +36,7 @@ export declare const forumReplyFixtureSchema: z.ZodObject<{
         guest: "guest";
         system: "system";
         manager: "manager";
+        agency_owner: "agency_owner";
         agent: "agent";
         student: "student";
         instructor: "instructor";

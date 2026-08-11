@@ -87,6 +87,7 @@
   "roleGuest": "Guest",
   "roleStudent": "Student",
   "roleAgent": "Agent",
+  "roleAgencyOwner": "Agency owner",
   "roleInstructor": "Instructor",
   "roleManager": "Manager",
   "roleAdmin": "Admin",

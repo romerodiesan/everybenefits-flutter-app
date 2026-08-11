@@ -78,9 +78,9 @@ export type RoleDocInput = {
 /** Slugs that may never be assigned or edited via Admin callables. */
 export declare const SYSTEM_MEGA_ROLE_ID: "system";
 /** Product system roles editable only by `system`. */
-export declare const SYSTEM_EDITABLE_ROLE_IDS: readonly ["admin", "manager", "agent", "student"];
+export declare const SYSTEM_EDITABLE_ROLE_IDS: readonly ["admin", "manager", "agency_owner", "agent", "student"];
 /** All built-in role document ids (seeded, non-deletable). */
-export declare const BUILTIN_ROLE_IDS: readonly ["system", "admin", "manager", "agent", "student", "instructor", "guest"];
+export declare const BUILTIN_ROLE_IDS: readonly ["system", "admin", "manager", "agency_owner", "agent", "student", "instructor", "guest"];
 export type BuiltinRoleId = (typeof BUILTIN_ROLE_IDS)[number];
 export declare function isBuiltinRoleId(id: string): id is BuiltinRoleId;
 export declare function isSystemEditableRoleId(id: string): boolean;

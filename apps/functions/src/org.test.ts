@@ -3,9 +3,13 @@ import { isValidChildType, depthForType } from "@pulse/shared";
 import { buildOrgNodePath } from "./org-helpers";
 
 describe("org helpers", () => {
-  it("validates child types by depth", () => {
+  it("validates child types with agency-under-agency rules", () => {
     expect(isValidChildType("organization", "division")).toBe(true);
-    expect(isValidChildType("organization", "agency")).toBe(false);
+    expect(isValidChildType("organization", "agency")).toBe(true);
+    expect(isValidChildType("region", "agency")).toBe(true);
+    expect(isValidChildType("agency", "agency")).toBe(true);
+    expect(isValidChildType("agency", "sub_agency")).toBe(false);
+    expect(isValidChildType("organization", "sub_agency")).toBe(false);
     expect(depthForType("team")).toBe(6);
   });
 

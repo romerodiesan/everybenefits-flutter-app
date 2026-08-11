@@ -512,6 +512,7 @@ export const SYSTEM_MEGA_ROLE_ID = "system" as const;
 export const SYSTEM_EDITABLE_ROLE_IDS = [
   "admin",
   "manager",
+  "agency_owner",
   "agent",
   "student",
 ] as const;
@@ -521,6 +522,7 @@ export const BUILTIN_ROLE_IDS = [
   SYSTEM_MEGA_ROLE_ID,
   "admin",
   "manager",
+  "agency_owner",
   "agent",
   "student",
   "instructor",
@@ -629,6 +631,20 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "apps.studio.access",
     "apps.admin.access",
   ],
+  agency_owner: [
+    "org.tree.read",
+    "org.agency.update",
+    "academy.enroll",
+    "academy.progress.read",
+    "tools.access",
+    "tools.quotes.run",
+    "license.profile.required",
+    "license.profile.manage",
+    "forums.participate",
+    "chats.participate",
+    "chats.groups.default.join",
+    "apps.web.access",
+  ],
   agent: [
     "academy.enroll",
     "academy.progress.read",
@@ -699,6 +715,15 @@ export const DEFAULT_ROLE_META: Record<
     description: "Admin portal access without full platform ops.",
     category: "staff",
     sortOrder: 20,
+    locked: false,
+    editableBySystemOnly: true,
+  },
+  agency_owner: {
+    name: "Agency owner",
+    description:
+      "Owns one or more agencies; future agency-management app access.",
+    category: "sales",
+    sortOrder: 25,
     locked: false,
     editableBySystemOnly: true,
   },

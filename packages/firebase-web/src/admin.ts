@@ -152,6 +152,12 @@ export function mapAdminUserRow(entry: Record<string, unknown>): AdminUserRow {
   };
 }
 
+function stringOrNull(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
 export function mapOrgNode(entry: Record<string, unknown>): OrgNode {
   const type = parseOrgNodeType(entry.type) ?? "organization";
   const depth = Number(entry.depth);
@@ -165,6 +171,15 @@ export function mapOrgNode(entry: Record<string, unknown>): OrgNode {
     managerUids: Array.isArray(entry.managerUids)
       ? entry.managerUids.map(String)
       : [],
+    ownerUids: Array.isArray(entry.ownerUids)
+      ? entry.ownerUids.map(String).filter(Boolean)
+      : [],
+    logoUrl: stringOrNull(entry.logoUrl),
+    email: stringOrNull(entry.email),
+    paymentsEmail: stringOrNull(entry.paymentsEmail),
+    npn: stringOrNull(entry.npn),
+    agencyLicense: stringOrNull(entry.agencyLicense),
+    ein: stringOrNull(entry.ein),
     active: entry.active !== false,
   };
 }
@@ -240,17 +255,36 @@ export type AdminRepository = {
     name: string;
     type: OrgNodeType;
     parentId: string;
+    logoUrl?: string | null;
+    ownerUids?: string[];
+    email?: string | null;
+    paymentsEmail?: string | null;
+    npn?: string | null;
+    agencyLicense?: string | null;
+    ein?: string | null;
   }) => Promise<OrgNode | null>;
   updateOrgNode: (input: {
     id: string;
     name?: string;
     active?: boolean;
     managerUids?: string[];
+    logoUrl?: string | null;
+    ownerUids?: string[];
+    email?: string | null;
+    paymentsEmail?: string | null;
+    npn?: string | null;
+    agencyLicense?: string | null;
+    ein?: string | null;
   }) => Promise<OrgNode | null>;
   assignUserToOrgNode: (
     uid: string,
     orgNodeId: string | null,
   ) => Promise<void>;
+  migrateSubAgenciesToAgencies: () => Promise<{
+    scanned: number;
+    updated: number;
+    done: boolean;
+  }>;
   setUserRole: (uid: string, role: UserRole | string) => Promise<void>;
   listRoles: (filters?: ListRolesFilters) => Promise<ListRolesResult>;
   createRole: (input: {
@@ -266,8 +300,7 @@ export type AdminRepository = {
     name?: string;
     description?: string;
     category?: RoleCategory;
-    permissions?: string[];
-    active?: boolean;
+    permissions?: string[];    active?: boolean;
     sortOrder?: number;
   }) => Promise<RoleDoc | null>;
   deleteRole: (id: string, hard?: boolean) => Promise<void>;
@@ -431,6 +464,18 @@ export function createAdminRepository(functions: Functions): AdminRepository {
         uid,
         orgNodeId,
       });
+    },
+    async migrateSubAgenciesToAgencies() {
+      const data = await callCloudFunction<{
+        scanned?: number;
+        updated?: number;
+        done?: boolean;
+      }>(functions, "migrateSubAgenciesToAgencies", {});
+      return {
+        scanned: Number(data?.scanned ?? 0),
+        updated: Number(data?.updated ?? 0),
+        done: data?.done !== false,
+      };
     },
     async setUserRole(uid, role) {
       await callCloudFunction(functions, "setUserRole", { uid, role });

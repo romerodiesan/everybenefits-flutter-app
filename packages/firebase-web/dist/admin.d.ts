@@ -111,14 +111,33 @@ export type AdminRepository = {
         name: string;
         type: OrgNodeType;
         parentId: string;
+        logoUrl?: string | null;
+        ownerUids?: string[];
+        email?: string | null;
+        paymentsEmail?: string | null;
+        npn?: string | null;
+        agencyLicense?: string | null;
+        ein?: string | null;
     }) => Promise<OrgNode | null>;
     updateOrgNode: (input: {
         id: string;
         name?: string;
         active?: boolean;
         managerUids?: string[];
+        logoUrl?: string | null;
+        ownerUids?: string[];
+        email?: string | null;
+        paymentsEmail?: string | null;
+        npn?: string | null;
+        agencyLicense?: string | null;
+        ein?: string | null;
     }) => Promise<OrgNode | null>;
     assignUserToOrgNode: (uid: string, orgNodeId: string | null) => Promise<void>;
+    migrateSubAgenciesToAgencies: () => Promise<{
+        scanned: number;
+        updated: number;
+        done: boolean;
+    }>;
     setUserRole: (uid: string, role: UserRole | string) => Promise<void>;
     listRoles: (filters?: ListRolesFilters) => Promise<ListRolesResult>;
     createRole: (input: {
@@ -140,6 +159,15 @@ export type AdminRepository = {
     }) => Promise<RoleDoc | null>;
     deleteRole: (id: string, hard?: boolean) => Promise<void>;
     seedSystemRoles: () => Promise<ListRolesResult>;
+    backfillUserSearchFields: (input?: {
+        pageSize?: number;
+        pageToken?: string | null;
+    }) => Promise<{
+        scanned: number;
+        updated: number;
+        done: boolean;
+        nextPageToken: string | null;
+    }>;
 };
 export declare function createAdminRepository(functions: Functions): AdminRepository;
 //# sourceMappingURL=admin.d.ts.map

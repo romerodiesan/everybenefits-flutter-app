@@ -203,6 +203,7 @@
   "errorPageRetry": "Try again",
   "roleStudent": "Student",
   "roleAgent": "Agent",
+  "roleAgencyOwner": "Agency owner",
   "roleGuest": "Guest",
   "roleInstructor": "Instructor",
   "roleManager": "Manager",

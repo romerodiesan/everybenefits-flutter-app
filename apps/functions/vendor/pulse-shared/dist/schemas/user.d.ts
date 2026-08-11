@@ -4,6 +4,7 @@ export declare const userRoleSchema: z.ZodEnum<{
     guest: "guest";
     system: "system";
     manager: "manager";
+    agency_owner: "agency_owner";
     agent: "agent";
     student: "student";
     instructor: "instructor";
@@ -29,6 +30,7 @@ export declare const userProfileFixtureSchema: z.ZodObject<{
         guest: "guest";
         system: "system";
         manager: "manager";
+        agency_owner: "agency_owner";
         agent: "agent";
         student: "student";
         instructor: "instructor";

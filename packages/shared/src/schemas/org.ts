@@ -19,6 +19,13 @@ export const orgNodeFixtureSchema = z.object({
   parentId: z.string().nullable(),
   path: z.array(z.string()),
   managerUids: z.array(z.string()),
+  ownerUids: z.array(z.string()).default([]),
+  logoUrl: z.string().nullable().default(null),
+  email: z.string().nullable().default(null),
+  paymentsEmail: z.string().nullable().default(null),
+  npn: z.string().nullable().default(null),
+  agencyLicense: z.string().nullable().default(null),
+  ein: z.string().nullable().default(null),
   active: z.boolean(),
 });
 

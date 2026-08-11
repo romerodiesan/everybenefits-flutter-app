@@ -43,6 +43,7 @@ const ROLE_KEYS: Record<UserRole, string> = {
   guest: "roleGuest",
   student: "roleStudent",
   agent: "roleAgent",
+  agency_owner: "roleAgencyOwner",
   instructor: "roleInstructor",
   manager: "roleManager",
   admin: "roleAdmin",

@@ -90,6 +90,16 @@ service firebase.storage {
         && isAllowedImageType();
     }
 
+    // Agency / matrix logos: org-logos/{orgNodeId}.jpg
+    match /org-logos/{fileName} {
+      allow read: if isRegisteredMember();
+      allow write: if isSignedIn()
+        && isAccountActive()
+        && callerRole() in ['admin', 'system']
+        && request.resource.size < 5 * 1024 * 1024
+        && isAllowedImageType();
+    }
+
     // Course covers and lesson videos: /courses/{courseId}/...
     match /courses/{courseId}/{allPaths=**} {
       allow read: if canReadCourseFiles(courseId);

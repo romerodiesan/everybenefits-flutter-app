@@ -2,12 +2,16 @@ import { FieldValue, type DocumentData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import {
   DEFAULT_ORG_ROOT_NAME,
+  ORG_OWNER_UIDS_CAP,
   canAccessAdmin,
   canManagePlatform,
   depthForType,
   isUserAssignableOrgType,
   isValidChildType,
   parseOrgNodeType,
+  validateEin,
+  validateNpn,
+  validateOptionalEmail,
 } from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import { requireCaller } from "./auth";
@@ -17,6 +21,15 @@ import { loadPermissionsForUid } from "./permissions";
 export { buildOrgNodePath, serializeOrgNode } from "./org-helpers";
 
 const ORG_ROOT_ID = "root";
+
+/** Roles we may promote to / demote from agency_owner. */
+const OWNER_PROMOTABLE = new Set([
+  "student",
+  "agent",
+  "guest",
+  "agency_owner",
+]);
+const PRIVILEGED_ROLES = new Set(["admin", "system", "manager"]);
 
 async function requireOrgAdmin(
   request: { auth?: { uid: string } },
@@ -31,6 +44,143 @@ async function requireOrgAdmin(
   return uid;
 }
 
+function emptyAgencyProfile() {
+  return {
+    ownerUids: [] as string[],
+    logoUrl: null as string | null,
+    email: null as string | null,
+    paymentsEmail: null as string | null,
+    npn: null as string | null,
+    agencyLicense: null as string | null,
+    ein: null as string | null,
+  };
+}
+
+function parseOwnerUids(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return [
+    ...new Set(raw.map(String).map((s) => s.trim()).filter(Boolean)),
+  ].slice(0, ORG_OWNER_UIDS_CAP);
+}
+
+function parseAgencyProfileFields(data: Record<string, unknown> | undefined) {
+  const out: Record<string, unknown> = {};
+  if (!data) return out;
+
+  if ("logoUrl" in data) {
+    const v = data.logoUrl;
+    if (v === null || v === "") out.logoUrl = null;
+    else if (typeof v === "string" && v.trim().startsWith("http") && v.length < 2000) {
+      out.logoUrl = v.trim();
+    } else {
+      throw new HttpsError("invalid-argument", "Invalid logoUrl.");
+    }
+  }
+
+  if ("email" in data) {
+    const email = validateOptionalEmail(
+      data.email === null ? "" : String(data.email ?? ""),
+    );
+    if (!email.ok) throw new HttpsError("invalid-argument", "Invalid email.");
+    out.email = email.value;
+  }
+
+  if ("paymentsEmail" in data) {
+    const email = validateOptionalEmail(
+      data.paymentsEmail === null ? "" : String(data.paymentsEmail ?? ""),
+    );
+    if (!email.ok) {
+      throw new HttpsError("invalid-argument", "Invalid paymentsEmail.");
+    }
+    out.paymentsEmail = email.value;
+  }
+
+  if ("npn" in data) {
+    const raw = data.npn === null ? "" : String(data.npn ?? "");
+    if (!raw.trim()) {
+      out.npn = null;
+    } else {
+      const npn = validateNpn(raw);
+      if (!npn.ok) throw new HttpsError("invalid-argument", "Invalid NPN.");
+      out.npn = npn.value;
+    }
+  }
+
+  if ("agencyLicense" in data) {
+    const v = data.agencyLicense;
+    if (v === null || v === "") out.agencyLicense = null;
+    else if (typeof v === "string" && v.trim().length <= 120) {
+      out.agencyLicense = v.trim();
+    } else {
+      throw new HttpsError("invalid-argument", "Invalid agencyLicense.");
+    }
+  }
+
+  if ("ein" in data) {
+    const ein = validateEin(data.ein === null ? "" : String(data.ein ?? ""));
+    if (!ein.ok) throw new HttpsError("invalid-argument", "Invalid EIN.");
+    out.ein = ein.value;
+  }
+
+  if ("ownerUids" in data) {
+    out.ownerUids = parseOwnerUids(data.ownerUids);
+  }
+
+  return out;
+}
+
+async function syncAgencyOwners(opts: {
+  orgNodeId: string;
+  agencyName: string;
+  previous: string[];
+  next: string[];
+}) {
+  const prev = new Set(opts.previous);
+  const next = new Set(opts.next);
+  const added = [...next].filter((uid) => !prev.has(uid));
+  const removed = [...prev].filter((uid) => !next.has(uid));
+  if (added.length === 0 && removed.length === 0) return;
+
+  const batch = db.batch();
+  let ops = 0;
+
+  for (const uid of added) {
+    const ref = db.doc(`users/${uid}`);
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    const data = snap.data() ?? {};
+    const role = String(data.role ?? "guest");
+    if (PRIVILEGED_ROLES.has(role)) continue;
+    if (!OWNER_PROMOTABLE.has(role) && role !== "agency_owner") continue;
+    const patch: Record<string, unknown> = {
+      role: "agency_owner",
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+    if (!data.orgNodeId) {
+      patch.orgNodeId = opts.orgNodeId;
+      patch.agency = opts.agencyName;
+    }
+    batch.set(ref, patch, { merge: true });
+    ops += 1;
+  }
+
+  for (const uid of removed) {
+    const ref = db.doc(`users/${uid}`);
+    const snap = await ref.get();
+    if (!snap.exists) continue;
+    const role = String(snap.data()?.role ?? "");
+    if (role !== "agency_owner") continue;
+    batch.set(
+      ref,
+      { role: "agent", updatedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    ops += 1;
+  }
+
+  if (ops > 0) await batch.commit();
+}
+
 export const ensureOrgRoot = onCall(callableOpts, async (request) => {
   await requireOrgAdmin(request, "ensureOrgRoot", true);
   const preferredRef = db.doc(`orgNodes/${ORG_ROOT_ID}`);
@@ -39,8 +189,6 @@ export const ensureOrgRoot = onCall(callableOpts, async (request) => {
     return { node: serializeOrgNode(ORG_ROOT_ID, preferredSnap.data() ?? {}) };
   }
 
-  // Prefer an existing organization root (parentId == null) over creating a
-  // second empty "Every Benefits" matrix next to a migrated tree.
   const existingRoots = await db
     .collection("orgNodes")
     .where("parentId", "==", null)
@@ -61,6 +209,7 @@ export const ensureOrgRoot = onCall(callableOpts, async (request) => {
     parentId: null as string | null,
     path: buildOrgNodePath([], ORG_ROOT_ID),
     managerUids: [] as string[],
+    ...emptyAgencyProfile(),
     active: true,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
@@ -84,7 +233,6 @@ export const listOrgSubtree = onCall(callableOpts, async (request) => {
       ? null
       : String(request.data.parentId);
 
-  // Escape hatch for rare tooling — hard-capped; prefer lazy parentId loads.
   if (fullTree) {
     const snap = await db.collection("orgNodes").limit(500).get();
     const nodes = snap.docs
@@ -93,7 +241,6 @@ export const listOrgSubtree = onCall(callableOpts, async (request) => {
     return { nodes };
   }
 
-  // Lazy: null parentId → roots only (parentId == null).
   const snap = await db
     .collection("orgNodes")
     .where("parentId", "==", parentId)
@@ -106,10 +253,7 @@ export const listOrgSubtree = onCall(callableOpts, async (request) => {
 });
 
 /**
- * Paginated assignable agencies for Admin.
- * Includes the matrix (`organization`, e.g. Every Benefits) plus `agency` /
- * `sub_agency` — agents may belong to the root as well as downline agencies.
- * Soft-deleted = active:false. Sorts in memory so no type+name index is required.
+ * Paginated assignable agencies for Admin (matrix + agencies + legacy sub_agency).
  */
 export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
   await requireOrgAdmin(request, "listAgenciesForAdmin");
@@ -138,7 +282,6 @@ export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
     .map((doc) => serializeOrgNode(doc.id, doc.data()))
     .filter((node) => includeInactive || node.active)
     .sort((a, b) => {
-      // Matrix first, then agencies / sub-agencies alphabetically.
       if (a.type !== b.type) {
         const rank = (t: string) =>
           t === "organization" ? 0 : t === "agency" ? 1 : 2;
@@ -155,7 +298,9 @@ export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
 
   let start = 0;
   if (pageToken) {
-    const idx = agencies.findIndex((node) => node.id === pageToken || node.name === pageToken);
+    const idx = agencies.findIndex(
+      (node) => node.id === pageToken || node.name === pageToken,
+    );
     start = idx >= 0 ? idx + 1 : 0;
   }
   const page = agencies.slice(start, start + pageSize);
@@ -177,6 +322,12 @@ export const createOrgNode = onCall(callableOpts, async (request) => {
   if (!type) {
     throw new HttpsError("invalid-argument", "Invalid org node type.");
   }
+  if (type === "sub_agency") {
+    throw new HttpsError(
+      "invalid-argument",
+      "Use type agency under another agency instead of sub_agency.",
+    );
+  }
   if (!parentId) {
     throw new HttpsError("invalid-argument", "parentId required.");
   }
@@ -197,22 +348,46 @@ export const createOrgNode = onCall(callableOpts, async (request) => {
     throw new HttpsError("failed-precondition", "Parent node is inactive.");
   }
 
+  const profile = parseAgencyProfileFields(
+    request.data as Record<string, unknown>,
+  );
+  const ownerUids = Array.isArray(profile.ownerUids)
+    ? (profile.ownerUids as string[])
+    : [];
+
   const ref = db.collection("orgNodes").doc();
   const parentPath = Array.isArray(parentData.path)
     ? parentData.path.map(String)
     : [parentId];
+  const parentDepth = Number(parentData.depth);
+  const depth =
+    Number.isFinite(parentDepth) && parentDepth >= 1
+      ? Math.min(7, Math.floor(parentDepth) + 1)
+      : depthForType(type);
+
   const payload = {
     name,
     type,
-    depth: depthForType(type),
+    depth,
     parentId,
     path: buildOrgNodePath(parentPath, ref.id),
     managerUids: [] as string[],
+    ...emptyAgencyProfile(),
+    ...profile,
+    ownerUids,
     active: true,
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };
   await ref.set(payload);
+  if (ownerUids.length > 0) {
+    await syncAgencyOwners({
+      orgNodeId: ref.id,
+      agencyName: name,
+      previous: [],
+      next: ownerUids,
+    });
+  }
   const { bumpOrgNodeCreated } = await import("./platform-stats");
   await bumpOrgNodeCreated();
   return {
@@ -231,6 +406,7 @@ export const updateOrgNode = onCall(callableOpts, async (request) => {
   const ref = db.doc(`orgNodes/${id}`);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError("not-found", "Org node not found.");
+  const prev = snap.data() ?? {};
 
   const updates: Record<string, unknown> = {
     updatedAt: FieldValue.serverTimestamp(),
@@ -251,7 +427,29 @@ export const updateOrgNode = onCall(callableOpts, async (request) => {
     ].slice(0, 50);
   }
 
+  Object.assign(
+    updates,
+    parseAgencyProfileFields(request.data as Record<string, unknown>),
+  );
+
   await ref.update(updates);
+
+  if (Array.isArray(updates.ownerUids)) {
+    const previous = Array.isArray(prev.ownerUids)
+      ? prev.ownerUids.map(String)
+      : [];
+    const agencyName =
+      typeof updates.name === "string"
+        ? String(updates.name)
+        : String(prev.name ?? "");
+    await syncAgencyOwners({
+      orgNodeId: id,
+      agencyName,
+      previous,
+      next: updates.ownerUids as string[],
+    });
+  }
+
   const after = await ref.get();
   return { node: serializeOrgNode(id, after.data() ?? {}) };
 });
@@ -293,7 +491,7 @@ export const assignUserToOrgNode = onCall(callableOpts, async (request) => {
   return { ok: true, uid, orgNodeId };
 });
 
-/** Flat list by org type (e.g. regions for agency parent picker). */
+/** Flat list by org type (e.g. regions / agencies for parent pickers). */
 export const listOrgNodesByType = onCall(callableOpts, async (request) => {
   await requireOrgAdmin(request, "listOrgNodesByType");
   const type = parseOrgNodeType(request.data?.type);
@@ -305,7 +503,6 @@ export const listOrgNodesByType = onCall(callableOpts, async (request) => {
     Math.min(200, Math.round(Number(request.data?.pageSize ?? 100))),
   );
   const includeInactive = request.data?.includeInactive === true;
-  // Avoid requiring the type+name composite index (sort in memory).
   const snap = await db
     .collection("orgNodes")
     .where("type", "==", type)
@@ -323,8 +520,6 @@ export const listOrgNodesByType = onCall(callableOpts, async (request) => {
 
 /**
  * Public-to-signed-in list of active assignable agencies for profile completion.
- * Includes the matrix organization (Every Benefits) plus agency / sub_agency.
- * Returns id + name only (no managers / path).
  */
 export const listAgenciesForProfile = onCall(callableOpts, async (request) => {
   await requireCaller(request, "listAgenciesForProfile");
@@ -367,3 +562,47 @@ export const listAgenciesForProfile = onCall(callableOpts, async (request) => {
 
   return { agencies };
 });
+
+/** One-shot: rewrite legacy `sub_agency` nodes to `agency`. */
+export const migrateSubAgenciesToAgencies = onCall(
+  { ...callableOpts, timeoutSeconds: 300 },
+  async (request) => {
+    await requireOrgAdmin(request, "migrateSubAgenciesToAgencies", true);
+    const snap = await db
+      .collection("orgNodes")
+      .where("type", "==", "sub_agency")
+      .limit(500)
+      .get();
+
+    let updated = 0;
+    let batch = db.batch();
+    let ops = 0;
+    const flush = async () => {
+      if (ops === 0) return;
+      await batch.commit();
+      batch = db.batch();
+      ops = 0;
+    };
+
+    for (const doc of snap.docs) {
+      batch.set(
+        doc.ref,
+        {
+          type: "agency",
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      ops += 1;
+      updated += 1;
+      if (ops >= 400) await flush();
+    }
+    await flush();
+
+    return {
+      scanned: snap.size,
+      updated,
+      done: snap.size < 500,
+    };
+  },
+);

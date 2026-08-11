@@ -95,6 +95,7 @@ export {
   listAgenciesForProfile,
   listAgenciesForAdmin,
   listOrgNodesByType,
+  migrateSubAgenciesToAgencies,
 } from "./org";
 
 export {

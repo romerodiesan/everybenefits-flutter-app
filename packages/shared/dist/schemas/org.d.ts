@@ -24,6 +24,13 @@ export declare const orgNodeFixtureSchema: z.ZodObject<{
     parentId: z.ZodNullable<z.ZodString>;
     path: z.ZodArray<z.ZodString>;
     managerUids: z.ZodArray<z.ZodString>;
+    ownerUids: z.ZodDefault<z.ZodArray<z.ZodString>>;
+    logoUrl: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    email: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    paymentsEmail: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    npn: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    agencyLicense: z.ZodDefault<z.ZodNullable<z.ZodString>>;
+    ein: z.ZodDefault<z.ZodNullable<z.ZodString>>;
     active: z.ZodBoolean;
 }, z.core.$strip>;
 export type OrgNodeFixture = z.infer<typeof orgNodeFixtureSchema>;

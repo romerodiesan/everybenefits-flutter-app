@@ -64,6 +64,48 @@ export function SettingsHome() {
     }
   }
 
+  async function runMigrateSubAgencies() {
+    setBusy(true);
+    setError(null);
+    setMessage(t("settingsMigrateSubAgenciesRunning"));
+    try {
+      const repo = getAdminRepository();
+      let scanned = 0;
+      let updated = 0;
+      for (let i = 0; i < 20; i += 1) {
+        const page = await repo.migrateSubAgenciesToAgencies();
+        scanned += page.scanned;
+        updated += page.updated;
+        if (page.done) break;
+      }
+      setMessage(
+        t("settingsMigrateSubAgenciesDone", { scanned, updated }),
+      );
+    } catch {
+      setError(t("settingsMigrateSubAgenciesError"));
+      setMessage(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function runSeedRoles() {
+    setBusy(true);
+    setError(null);
+    setMessage(t("settingsSeedRolesRunning"));
+    try {
+      const result = await getAdminRepository().seedSystemRoles();
+      setMessage(
+        t("settingsSeedRolesDone", { count: result.roles.length }),
+      );
+    } catch {
+      setError(t("settingsSeedRolesError"));
+      setMessage(null);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
       <header>
@@ -90,12 +132,51 @@ export function SettingsHome() {
               ? t("settingsSearchBackfillRunning")
               : t("settingsSearchBackfillAction")}
           </Button>
+        </div>
+      </section>
+
+      <section className="studio-panel space-y-3 rounded-2xl p-4 sm:p-5">
+        <h2 className="text-sm font-semibold tracking-tight">
+          {t("settingsSeedRolesTitle")}
+        </h2>
+        <p className="text-sm text-muted">{t("settingsSeedRolesBody")}</p>
+        <Button
+          type="button"
+          disabled={busy}
+          onClick={() => void runSeedRoles()}
+        >
+          {busy ? t("settingsSeedRolesRunning") : t("settingsSeedRolesAction")}
+        </Button>
+      </section>
+
+      <section className="studio-panel space-y-3 rounded-2xl p-4 sm:p-5">
+        <h2 className="text-sm font-semibold tracking-tight">
+          {t("settingsMigrateSubAgenciesTitle")}
+        </h2>
+        <p className="text-sm text-muted">
+          {t("settingsMigrateSubAgenciesBody")}
+        </p>
+        <Button
+          type="button"
+          disabled={busy}
+          onClick={() => void runMigrateSubAgencies()}
+        >
+          {busy
+            ? t("settingsMigrateSubAgenciesRunning")
+            : t("settingsMigrateSubAgenciesAction")}
+        </Button>
+      </section>
+
+      {(message || error) && (
+        <div className="space-y-1">
           {message ? (
-            <p className="text-xs text-muted">{message}</p>
+            <p className="text-xs text-muted" role="status">
+              {message}
+            </p>
           ) : null}
           {error ? <p className="text-xs text-red-600">{error}</p> : null}
         </div>
-      </section>
+      )}
     </div>
   );
 }

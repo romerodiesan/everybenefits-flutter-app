@@ -76,6 +76,12 @@ function mapAdminUserRow(entry) {
         createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
     };
 }
+function stringOrNull(value) {
+    if (typeof value !== "string")
+        return null;
+    const trimmed = value.trim();
+    return trimmed || null;
+}
 function mapOrgNode(entry) {
     const type = (0, shared_1.parseOrgNodeType)(entry.type) ?? "organization";
     const depth = Number(entry.depth);
@@ -89,6 +95,15 @@ function mapOrgNode(entry) {
         managerUids: Array.isArray(entry.managerUids)
             ? entry.managerUids.map(String)
             : [],
+        ownerUids: Array.isArray(entry.ownerUids)
+            ? entry.ownerUids.map(String).filter(Boolean)
+            : [],
+        logoUrl: stringOrNull(entry.logoUrl),
+        email: stringOrNull(entry.email),
+        paymentsEmail: stringOrNull(entry.paymentsEmail),
+        npn: stringOrNull(entry.npn),
+        agencyLicense: stringOrNull(entry.agencyLicense),
+        ein: stringOrNull(entry.ein),
         active: entry.active !== false,
     };
 }
@@ -170,30 +185,15 @@ function createAdminRepository(functions) {
             }
         },
         async listAgencies(opts) {
-            try {
-                const data = await callCloudFunction(functions, "listAgenciesForAdmin", opts ?? {});
-                return {
-                    agencies: (data?.agencies ?? []).map(mapOrgNode).filter((n) => n.id),
-                    nextPageToken: data?.nextPageToken ?? null,
-                };
-            }
-            catch (error) {
-                if (error instanceof FunctionsUnavailableError) {
-                    return { agencies: [], nextPageToken: null };
-                }
-                throw error;
-            }
+            const data = await callCloudFunction(functions, "listAgenciesForAdmin", opts ?? {});
+            return {
+                agencies: (data?.agencies ?? []).map(mapOrgNode).filter((n) => n.id),
+                nextPageToken: data?.nextPageToken ?? null,
+            };
         },
         async listOrgNodesByType(type, pageSize = 100) {
-            try {
-                const data = await callCloudFunction(functions, "listOrgNodesByType", { type, pageSize });
-                return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
-            }
-            catch (error) {
-                if (error instanceof FunctionsUnavailableError)
-                    return [];
-                throw error;
-            }
+            const data = await callCloudFunction(functions, "listOrgNodesByType", { type, pageSize });
+            return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
         },
         async ensureOrgRoot() {
             try {
@@ -219,6 +219,14 @@ function createAdminRepository(functions) {
                 uid,
                 orgNodeId,
             });
+        },
+        async migrateSubAgenciesToAgencies() {
+            const data = await callCloudFunction(functions, "migrateSubAgenciesToAgencies", {});
+            return {
+                scanned: Number(data?.scanned ?? 0),
+                updated: Number(data?.updated ?? 0),
+                done: data?.done !== false,
+            };
         },
         async setUserRole(uid, role) {
             await callCloudFunction(functions, "setUserRole", { uid, role });
@@ -254,6 +262,18 @@ function createAdminRepository(functions) {
             const data = await callCloudFunction(functions, "seedSystemRoles", {});
             return {
                 roles: (data?.roles ?? []).map(mapRoleDoc).filter((r) => r.id),
+            };
+        },
+        async backfillUserSearchFields(input) {
+            const data = await callCloudFunction(functions, "backfillUserSearchFields", {
+                pageSize: input?.pageSize,
+                pageToken: input?.pageToken ?? undefined,
+            });
+            return {
+                scanned: Number(data?.scanned ?? 0),
+                updated: Number(data?.updated ?? 0),
+                done: Boolean(data?.done),
+                nextPageToken: data?.nextPageToken ?? null,
             };
         },
     };

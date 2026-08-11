@@ -14,6 +14,7 @@
   "roleGuest": "Invitado",
   "roleStudent": "Estudiante",
   "roleAgent": "Agente",
+  "roleAgencyOwner": "Dueño de agencia",
   "roleInstructor": "Instructor",
   "roleManager": "Manager",
   "roleAdmin": "Admin",
