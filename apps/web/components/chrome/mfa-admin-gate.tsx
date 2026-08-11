@@ -8,15 +8,14 @@ import { usingFirebaseEmulators } from "@/lib/firebase/auth";
 import { canAccessAdmin } from "@/lib/roles";
 import { Link } from "@/i18n/navigation";
 import { Panel } from "@/components/ui/primitives";
-import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
 
 /**
  * Managers/admins must enroll at least one MFA factor before using the shell.
  * Account → Security stays reachable so they can enroll.
  * Skipped on Auth emulator: TOTP is unsupported and SMS is awkward locally.
  *
- * Boot skeleton only when auth/profile are missing — never tear down chrome
- * while an existing profile is revalidating (same idea as AdminShell).
+ * Unauthenticated / still-booting visitors must reach AppShell so it can
+ * redirect to login — never trap them on a permanent boot skeleton here.
  */
 export function MfaAdminGate({ children }: { children: React.ReactNode }) {
   const t = useTranslations();
@@ -25,8 +24,9 @@ export function MfaAdminGate({ children }: { children: React.ReactNode }) {
   const emulators = usingFirebaseEmulators();
   const access = useAccess();
 
+  // AppShell owns boot UI + unauthenticated redirect.
   if (loading || !user || !profile) {
-    return <AppShellSkeleton />;
+    return children;
   }
 
   const needsMfa =

@@ -15,8 +15,11 @@ import {
 } from "@/lib/bulk-selection";
 import { headlineName } from "@/lib/roles";
 import type { UserProfile } from "@/lib/types";
-import { Button } from "@/components/ui/primitives";
 import { DataTable } from "@/components/ui/data-table";
+import {
+  BulkActionButton,
+  BulkBarShell,
+} from "@/components/ui/bulk-action-bar";
 import {
   RoleBadge,
   RowActionButton,
@@ -142,42 +145,34 @@ export function ApprovalsHome() {
   );
 
   const bulkBar = (
-    <>
-      <span className="text-sm font-semibold text-ink">
-        {t("bulkSelected", { count: selectedIds.length })}
-      </span>
-      {selectedIds.length >= BULK_MAX_SELECTED ? (
-        <span className="text-xs text-muted">
-          {t("bulkMaxSelected", { max: BULK_MAX_SELECTED })}
-        </span>
-      ) : null}
-      <Button
-        className="h-8 px-3 text-xs"
+    <BulkBarShell
+      selectedCount={selectedIds.length}
+      selectedLabel={t("bulkSelectedLabel")}
+      maxHint={
+        selectedIds.length >= BULK_MAX_SELECTED
+          ? t("bulkMaxSelected", { max: BULK_MAX_SELECTED })
+          : null
+      }
+      busy={bulkBusy}
+      busyLabel={t("bulkBusy")}
+      clearLabel={t("bulkClear")}
+      onClear={() => setRowSelection({})}
+    >
+      <BulkActionButton
+        variant="primary"
         disabled={bulkBusy}
         onClick={() => void runBulk("approved")}
       >
         {t("bulkApprove")}
-      </Button>
-      <Button
+      </BulkActionButton>
+      <BulkActionButton
         variant="danger"
-        className="h-8 px-3 text-xs"
         disabled={bulkBusy}
         onClick={() => void runBulk("rejected")}
       >
         {t("bulkReject")}
-      </Button>
-      <Button
-        variant="ghost"
-        className="h-8 px-3 text-xs"
-        disabled={bulkBusy}
-        onClick={() => setRowSelection({})}
-      >
-        {t("bulkClear")}
-      </Button>
-      {bulkBusy ? (
-        <span className="text-xs text-muted">{t("bulkBusy")}</span>
-      ) : null}
-    </>
+      </BulkActionButton>
+    </BulkBarShell>
   );
 
   return (

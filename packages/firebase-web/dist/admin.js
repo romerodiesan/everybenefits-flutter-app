@@ -129,6 +129,21 @@ function createAdminRepository(functions) {
         async reactivateUser(uid) {
             await callCloudFunction(functions, "adminReactivateUser", { uid });
         },
+        async bulkSetUserApproval(uids, status) {
+            return await callCloudFunction(functions, "bulkSetUserApproval", { uids, status });
+        },
+        async bulkSetUserAccountStatus(uids, status) {
+            return await callCloudFunction(functions, "bulkSetUserAccountStatus", { uids, status });
+        },
+        async bulkSetUserRole(uids, role) {
+            return await callCloudFunction(functions, "bulkSetUserRole", { uids, role });
+        },
+        async bulkAssignUsersToOrgNode(uids, orgNodeId) {
+            return await callCloudFunction(functions, "bulkAssignUsersToOrgNode", { uids, orgNodeId });
+        },
+        async bulkSetOrgNodesActive(ids, active) {
+            return await callCloudFunction(functions, "bulkSetOrgNodesActive", { ids, active });
+        },
         async getInsights() {
             try {
                 return await callCloudFunction(functions, "getAdminInsights", {});

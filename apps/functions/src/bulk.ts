@@ -20,8 +20,15 @@ export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
   await requirePermission(actorUid, "admin.approvals.decide");
   const uids = parseBulkIds(request.data?.uids, "uids");
   const status = String(request.data?.status ?? "");
-  if (status !== "approved" && status !== "rejected") {
-    throw new HttpsError("invalid-argument", "status must be approved or rejected");
+  if (
+    status !== "approved" &&
+    status !== "rejected" &&
+    status !== "pending"
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      "status must be approved, rejected, or pending",
+    );
   }
 
   const result = emptyBulkResult();
@@ -47,7 +54,7 @@ export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
       });
       await bumpApprovalChange(
         typeof prevApproval === "string" ? prevApproval : undefined,
-        status,
+        status as "approved" | "rejected" | "pending",
       );
       if (status === "approved") {
         const data = target.data();
@@ -59,6 +66,154 @@ export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
           data?.isAnonymous === true,
         );
       }
+      result.succeeded.push(targetUid);
+    } catch (error) {
+      result.failed.push({
+        id: targetUid,
+        code: "internal",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return finalizeBulkResult(result);
+});
+
+/**
+ * Bulk role assignment (same rules as setUserRole per uid).
+ */
+export const bulkSetUserRole = onCall(callableOpts, async (request) => {
+  const actorUid = await requireCaller(request, "bulkSetUserRole");
+  await requirePermission(actorUid, "platform.manage");
+  const uids = parseBulkIds(request.data?.uids, "uids");
+  const roleRaw = String(request.data?.role ?? "").trim();
+  if (!roleRaw) {
+    throw new HttpsError("invalid-argument", "role required");
+  }
+  const { assertAssignableRoleId } = await import("./role-management");
+  const { belongsInDefaultAgentGroup } = await import("@pulse/shared");
+  const { addAgentToDefaultGroup } = await import("./chats");
+  const role = await assertAssignableRoleId(roleRaw);
+
+  const result = emptyBulkResult();
+  const { bumpUserRoleChange, parseStoredRole } = await import(
+    "./platform-stats"
+  );
+
+  for (const targetUid of uids) {
+    try {
+      const target = await db.doc(`users/${targetUid}`).get();
+      if (!target.exists) {
+        result.failed.push({
+          id: targetUid,
+          code: "not-found",
+          message: "User not found.",
+        });
+        continue;
+      }
+      const currentRole = String(target.data()?.role ?? "");
+      if (currentRole === "system") {
+        result.failed.push({
+          id: targetUid,
+          code: "permission-denied",
+          message: "Cannot change a System user via Admin.",
+        });
+        continue;
+      }
+      if (currentRole === "agent" && (role === "student" || role === "guest")) {
+        result.failed.push({
+          id: targetUid,
+          code: "failed-precondition",
+          message: "Cannot downgrade an agent to student or guest.",
+        });
+        continue;
+      }
+
+      await db.doc(`users/${targetUid}`).update({
+        role,
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      await bumpUserRoleChange(parseStoredRole(currentRole), parseRole(role));
+
+      if (belongsInDefaultAgentGroup(role)) {
+        await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
+      }
+
+      const approvalStatus = String(
+        target.data()?.approvalStatus ?? "approved",
+      );
+      await ensureAutoJoinMemberships(
+        targetUid,
+        parseRole(role),
+        approvalStatus,
+        headlineName({ ...target.data(), role }),
+        target.data()?.isAnonymous === true,
+      );
+      result.succeeded.push(targetUid);
+    } catch (error) {
+      result.failed.push({
+        id: targetUid,
+        code: "internal",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  return finalizeBulkResult(result);
+});
+
+/**
+ * Bulk agency / org assignment (same as assignUserToOrgNode per uid).
+ */
+export const bulkAssignUsersToOrgNode = onCall(callableOpts, async (request) => {
+  const actorUid = await requireCaller(request, "bulkAssignUsersToOrgNode");
+  const { permissions } = await loadPermissionsForUid(actorUid);
+  const { canManagePlatform } = await import("@pulse/shared");
+  if (!canManagePlatform(permissions)) {
+    throw new HttpsError("permission-denied", "Admin access required.");
+  }
+
+  const uids = parseBulkIds(request.data?.uids, "uids");
+  const orgNodeIdRaw = request.data?.orgNodeId;
+  const orgNodeId =
+    orgNodeIdRaw === null || orgNodeIdRaw === undefined || orgNodeIdRaw === ""
+      ? null
+      : String(orgNodeIdRaw).trim() || null;
+
+  let agencyName: string | null = null;
+  if (orgNodeId) {
+    const node = await db.doc(`orgNodes/${orgNodeId}`).get();
+    if (!node.exists) {
+      throw new HttpsError("not-found", "Org node not found.");
+    }
+    if (node.data()?.active === false) {
+      throw new HttpsError("failed-precondition", "Org node is inactive.");
+    }
+    if (typeof node.data()?.name === "string") {
+      agencyName = String(node.data()?.name);
+    }
+  }
+
+  const result = emptyBulkResult();
+
+  for (const targetUid of uids) {
+    try {
+      const userRef = db.doc(`users/${targetUid}`);
+      const userSnap = await userRef.get();
+      if (!userSnap.exists) {
+        result.failed.push({
+          id: targetUid,
+          code: "not-found",
+          message: "User not found.",
+        });
+        continue;
+      }
+      const updates: Record<string, unknown> = {
+        orgNodeId,
+        agency: agencyName,
+        updatedAt: FieldValue.serverTimestamp(),
+      };
+      await userRef.update(updates);
       result.succeeded.push(targetUid);
     } catch (error) {
       result.failed.push({

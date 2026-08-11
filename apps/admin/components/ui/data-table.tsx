@@ -12,9 +12,7 @@ import {
 } from "@tanstack/react-table";
 import { Button } from "@/components/ui/primitives";
 import { DataTableSkeleton } from "@/components/ui/data-table-skeleton";
-
-const CHECKBOX_CLASS =
-  "h-4 w-4 cursor-pointer rounded border-glass-border accent-brand";
+import { TableCheckbox } from "@/components/ui/table-checkbox";
 
 export type DataTableProps<T> = {
   columns: ColumnDef<T, unknown>[];
@@ -75,25 +73,17 @@ export function DataTable<T>({
     if (!enableRowSelection) return null;
     return {
       id: "__select",
-      size: 40,
+      size: 44,
       header: ({ table }) => (
-        <input
-          type="checkbox"
-          className={CHECKBOX_CLASS}
+        <TableCheckbox
           aria-label="Select all on page"
           checked={table.getIsAllPageRowsSelected()}
-          ref={(el) => {
-            if (el) {
-              el.indeterminate = table.getIsSomePageRowsSelected();
-            }
-          }}
+          indeterminate={table.getIsSomePageRowsSelected()}
           onChange={table.getToggleAllPageRowsSelectedHandler()}
         />
       ),
       cell: ({ row }) => (
-        <input
-          type="checkbox"
-          className={CHECKBOX_CLASS}
+        <TableCheckbox
           aria-label="Select row"
           checked={row.getIsSelected()}
           disabled={!row.getCanSelect()}
@@ -146,21 +136,21 @@ export function DataTable<T>({
       ) : null}
 
       {bulkBar && selectedCount > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 border-b border-glass-border bg-brand/[0.06] px-3 py-2.5 sm:px-4">
+        <div className="border-b border-brand/15 bg-gradient-to-r from-brand/[0.09] via-brand/[0.05] to-transparent px-3 py-3 sm:px-4">
           {bulkBar}
         </div>
       ) : null}
 
       <div className="relative max-h-[min(70vh,44rem)] overflow-auto">
-        <table className="w-full min-w-[48rem] border-separate border-spacing-0 text-left text-sm">
+        <table className="w-full min-w-[40rem] border-separate border-spacing-0 text-left text-xs">
           <thead className="sticky top-0 z-10">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className={`border-b border-glass-border bg-sheet/95 py-2.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted backdrop-blur-sm ${
-                      header.id === "__select" ? "w-10 px-3" : "px-4"
+                    className={`border-b border-glass-border bg-sheet/95 py-1.5 text-[10px] font-bold uppercase tracking-[0.1em] text-muted backdrop-blur-sm ${
+                      header.id === "__select" ? "w-9 px-1" : "px-3"
                     }`}
                   >
                     {header.isPlaceholder
@@ -179,30 +169,34 @@ export function DataTable<T>({
               <DataTableSkeleton columns={colCount} rows={skeletonRows} />
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={colCount} className="px-4 py-14 text-center">
-                  <p className="text-sm font-semibold text-ink">
+                <td colSpan={colCount} className="px-3 py-10 text-center">
+                  <p className="text-xs font-semibold text-ink">
                     {emptyTitle ?? emptyMessage}
                   </p>
                   {emptyHint ? (
-                    <p className="mx-auto mt-1 max-w-sm text-xs text-muted">
+                    <p className="mx-auto mt-1 max-w-sm text-[11px] text-muted">
                       {emptyHint}
                     </p>
                   ) : null}
                 </td>
               </tr>
             ) : (
-              rows.map((row: Row<T>) => (
+              rows.map((row: Row<T>, rowIndex) => (
                 <tr
                   key={row.id}
                   className={`transition-colors hover:bg-ink/[0.03] dark:hover:bg-white/[0.035] ${
                     row.getIsSelected() ? "bg-brand/[0.04]" : ""
+                  } ${
+                    rowIndex < rows.length - 1
+                      ? "shadow-[inset_0_-1px_0_0_var(--glass-border)]"
+                      : ""
                   }`}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <td
                       key={cell.id}
-                      className={`border-b border-glass-border/70 py-2 align-middle last:border-b-0 ${
-                        cell.column.id === "__select" ? "w-10 px-3" : "px-4"
+                      className={`py-1.5 align-middle ${
+                        cell.column.id === "__select" ? "w-9 px-1" : "px-3"
                       }`}
                     >
                       {flexRender(
@@ -219,11 +213,11 @@ export function DataTable<T>({
       </div>
 
       {showPagination ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-glass-border px-3 py-2.5 sm:px-4">
-          <div className="flex items-center gap-2 text-xs text-muted">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-glass-border px-3 py-1.5">
+          <div className="flex items-center gap-2 text-[11px] text-muted">
             <span>{rowsLabel}</span>
             <select
-              className="h-8 rounded-lg border border-glass-border bg-transparent px-2 text-xs text-ink"
+              className="h-7 rounded-md border border-glass-border bg-transparent px-1.5 text-[11px] text-ink"
               value={pageSize}
               onChange={(e) => onPageSizeChange?.(Number(e.target.value))}
               disabled={!onPageSizeChange}
@@ -235,10 +229,10 @@ export function DataTable<T>({
               ))}
             </select>
           </div>
-          <div className="flex gap-1.5">
+          <div className="flex gap-1">
             <Button
               variant="secondary"
-              className="h-8 px-3 text-xs"
+              className="h-7 rounded-lg px-2.5 text-[11px]"
               disabled={!canPreviousPage || loading}
               onClick={onPreviousPage}
             >
@@ -246,7 +240,7 @@ export function DataTable<T>({
             </Button>
             <Button
               variant="secondary"
-              className="h-8 px-3 text-xs"
+              className="h-7 rounded-lg px-2.5 text-[11px]"
               disabled={!canNextPage || loading}
               onClick={onNextPage}
             >

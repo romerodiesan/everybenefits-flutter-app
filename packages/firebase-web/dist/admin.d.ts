@@ -44,6 +44,16 @@ export type ListRolesFilters = {
 export type ListRolesResult = {
     roles: RoleDoc[];
 };
+export type BulkFailure = {
+    id: string;
+    code: string;
+    message: string;
+};
+export type BulkResult = {
+    ok: boolean;
+    succeeded: string[];
+    failed: BulkFailure[];
+};
 export declare function mapAdminUserRow(entry: Record<string, unknown>): AdminUserRow;
 export declare function mapOrgNode(entry: Record<string, unknown>): OrgNode;
 export type AdminUserFilters = {
@@ -79,6 +89,11 @@ export type AdminRepository = {
     }) => Promise<AdminUserRow | null>;
     deactivateUser: (uid: string) => Promise<void>;
     reactivateUser: (uid: string) => Promise<void>;
+    bulkSetUserApproval: (uids: string[], status: "pending" | "approved" | "rejected") => Promise<BulkResult>;
+    bulkSetUserAccountStatus: (uids: string[], status: "active" | "deactivated") => Promise<BulkResult>;
+    bulkSetUserRole: (uids: string[], role: string) => Promise<BulkResult>;
+    bulkAssignUsersToOrgNode: (uids: string[], orgNodeId: string | null) => Promise<BulkResult>;
+    bulkSetOrgNodesActive: (ids: string[], active: boolean) => Promise<BulkResult>;
     getInsights: () => Promise<AdminInsights | null>;
     listOrgSubtree: (parentId?: string | null, opts?: {
         full?: boolean;

@@ -14,10 +14,10 @@ export function DataTableSkeleton({
           {Array.from({ length: columns }).map((__, colIdx) => (
             <td
               key={colIdx}
-              className="border-b border-glass-border/70 px-4 py-2.5"
+              className="border-b border-glass-border/70 px-3 py-1.5"
             >
               <div
-                className="h-3.5 animate-pulse rounded-md bg-ink/[0.06] dark:bg-white/[0.08]"
+                className="h-3 animate-pulse rounded-md bg-ink/[0.06] dark:bg-white/[0.08]"
                 style={{
                   width: `${50 + ((rowIdx + colIdx) % 5) * 8}%`,
                 }}

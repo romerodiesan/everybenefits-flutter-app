@@ -205,11 +205,16 @@ export type AdminRepository = {
   reactivateUser: (uid: string) => Promise<void>;
   bulkSetUserApproval: (
     uids: string[],
-    status: "approved" | "rejected",
+    status: "pending" | "approved" | "rejected",
   ) => Promise<BulkResult>;
   bulkSetUserAccountStatus: (
     uids: string[],
     status: "active" | "deactivated",
+  ) => Promise<BulkResult>;
+  bulkSetUserRole: (uids: string[], role: string) => Promise<BulkResult>;
+  bulkAssignUsersToOrgNode: (
+    uids: string[],
+    orgNodeId: string | null,
   ) => Promise<BulkResult>;
   bulkSetOrgNodesActive: (
     ids: string[],
@@ -323,6 +328,20 @@ export function createAdminRepository(functions: Functions): AdminRepository {
         functions,
         "bulkSetUserAccountStatus",
         { uids, status },
+      );
+    },
+    async bulkSetUserRole(uids, role) {
+      return await callCloudFunction<BulkResult>(
+        functions,
+        "bulkSetUserRole",
+        { uids, role },
+      );
+    },
+    async bulkAssignUsersToOrgNode(uids, orgNodeId) {
+      return await callCloudFunction<BulkResult>(
+        functions,
+        "bulkAssignUsersToOrgNode",
+        { uids, orgNodeId },
       );
     },
     async bulkSetOrgNodesActive(ids, active) {

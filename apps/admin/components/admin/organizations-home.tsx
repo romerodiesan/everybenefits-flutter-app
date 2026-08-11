@@ -19,6 +19,10 @@ import { Button, Input, Label, SearchInput } from "@/components/ui/primitives";
 import { Drawer } from "@/components/ui/drawer";
 import { DataTable } from "@/components/ui/data-table";
 import {
+  BulkActionButton,
+  BulkBarShell,
+} from "@/components/ui/bulk-action-bar";
+import {
   RowActionButton,
   RowActions,
   StatusBadge,
@@ -425,42 +429,34 @@ export function OrganizationsHome() {
             }}
             bulkBar={
               isAdmin ? (
-                <>
-                  <span className="text-sm font-semibold text-ink">
-                    {t("bulkSelected", { count: selectedAgencyIds.length })}
-                  </span>
-                  {selectedAgencyIds.length >= BULK_MAX_SELECTED ? (
-                    <span className="text-xs text-muted">
-                      {t("bulkMaxSelected", { max: BULK_MAX_SELECTED })}
-                    </span>
-                  ) : null}
-                  <Button
-                    className="h-8 px-3 text-xs"
+                <BulkBarShell
+                  selectedCount={selectedAgencyIds.length}
+                  selectedLabel={t("bulkSelectedLabel")}
+                  maxHint={
+                    selectedAgencyIds.length >= BULK_MAX_SELECTED
+                      ? t("bulkMaxSelected", { max: BULK_MAX_SELECTED })
+                      : null
+                  }
+                  busy={bulkBusy}
+                  busyLabel={t("bulkBusy")}
+                  clearLabel={t("bulkClear")}
+                  onClear={() => setAgencySelection({})}
+                >
+                  <BulkActionButton
+                    variant="primary"
                     disabled={bulkBusy}
                     onClick={() => void runAgencyBulk(true)}
                   >
                     {t("bulkActivate")}
-                  </Button>
-                  <Button
+                  </BulkActionButton>
+                  <BulkActionButton
                     variant="danger"
-                    className="h-8 px-3 text-xs"
                     disabled={bulkBusy}
                     onClick={() => void runAgencyBulk(false)}
                   >
                     {t("bulkDeactivate")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    className="h-8 px-3 text-xs"
-                    disabled={bulkBusy}
-                    onClick={() => setAgencySelection({})}
-                  >
-                    {t("bulkClear")}
-                  </Button>
-                  {bulkBusy ? (
-                    <span className="text-xs text-muted">{t("bulkBusy")}</span>
-                  ) : null}
-                </>
+                  </BulkActionButton>
+                </BulkBarShell>
               ) : undefined
             }
             pageSize={agencyPageSize}

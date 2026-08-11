@@ -18,7 +18,7 @@ export async function setUserApproval(
 
 export async function bulkSetUserApproval(
   uids: string[],
-  status: "approved" | "rejected",
+  status: "pending" | "approved" | "rejected",
 ) {
   return await callCloudFunction<{
     ok: boolean;

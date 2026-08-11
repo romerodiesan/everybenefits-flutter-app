@@ -12,17 +12,14 @@ import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { useThemeSettings } from "@/lib/providers/theme-provider";
 import { signOutAndRedirect, hasPasswordProvider } from "@/lib/firebase/auth";
-import { getOrCreateSupportChat } from "@/lib/firebase/chats";
 import { markFeedSeen } from "@/lib/firebase/notifications";
 import { headlineName } from "@/lib/display-name";
-import { canAccessTools, canAccessSupport, isUserApproved, needsProfileCompletion } from "@/lib/roles";
+import { canAccessTools, isUserApproved, needsProfileCompletion } from "@/lib/roles";
 import { hasTrustedShellCache } from "@/lib/profile-cache";
 import { nextQuery, resolvePostAuthDestination } from "@/lib/auth-redirect";
-import { mapCallableError } from "@/lib/firebase/callable-errors";
 
 import { AGENT_TOOLS } from "@/lib/tools/catalog";
 import { AppSwitcher } from "@/components/chrome/app-switcher";
-import { usePulseAiEnabled } from "@/lib/hooks/use-pulse-ai-enabled";
 import type { UserRole } from "@/lib/types";
 import { Button } from "@/components/ui/primitives";
 import { AccountGate } from "@/components/chrome/account-gate";
@@ -30,7 +27,6 @@ import { PendingApprovalGate } from "@/components/chrome/pending-approval-gate";
 import { AppShellSkeleton } from "@/components/chrome/app-shell-skeleton";
 import { LegalLinks } from "@/components/chrome/legal-links";
 import {
-  IconChat,
   IconCommand,
   IconMoon,
   IconSun,
@@ -111,9 +107,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, profile, permissions, loading, profileLoading, refreshProfile } = useAuth();
-  const pulseAiEnabled = usePulseAiEnabled();
-  const [supportBusy, setSupportBusy] = useState(false);
-  const [supportError, setSupportError] = useState<string | null>(null);
   const [cmdOpen, setCmdOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [mobileToolsOpen, setMobileToolsOpen] = useState(false);
@@ -121,10 +114,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     useShellStats(profile);
 
   const access = useAccess();
-  const navItems = useMemo(
-    () => NAV.filter((item) => item.href !== "/ai" || pulseAiEnabled),
-    [pulseAiEnabled],
-  );
+  const navItems = NAV;
   const toolsAllowed = Boolean(profile && canAccessTools(access));
   const toolsActive = pathname === "/tools" || pathname.startsWith("/tools/");
 
@@ -143,7 +133,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   // Incomplete registration — only after Firestore profile is confirmed.
   useEffect(() => {
-    if (loading || profileLoading) return;
+    if (loading) return;
     if (!user) {
       const search =
         typeof window !== "undefined" ? window.location.search : "";
@@ -158,6 +148,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       router.replace(`/login${nextQuery(next)}`);
       return;
     }
+    // Wait for profile hydrate before deciding set-password / complete-profile.
+    if (profileLoading) return;
     const dest = resolvePostAuthDestination({
       user,
       profile,
@@ -194,38 +186,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-
-  const openSupport = async () => {
-    if (
-      !profile ||
-      supportBusy ||
-      !canAccessSupport(access, profile.isAnonymous)
-    ) {
-      return;
-    }
-    setSupportBusy(true);
-    setSupportError(null);
-    try {
-      const chat = await getOrCreateSupportChat(
-        profile,
-        "Support Assistant",
-        "Hi — how can we help?",
-      );
-      router.push(`/chats/${chat.id}`);
-    } catch (error) {
-      console.error(error);
-      setSupportError(
-        mapCallableError(error, {
-          generic: t("errorGeneric"),
-          auth: t("errorAuth"),
-          permissionDenied: t("errorGeneric"),
-          dmBlocked: t("privacyDmBlocked"),
-        }),
-      );
-    } finally {
-      setSupportBusy(false);
-    }
-  };
 
   if (loading || !user) {
     return <AppShellSkeleton />;
@@ -332,11 +292,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                         ? "nav-chats"
                         : item.href === "/academy"
                           ? "nav-academy"
-                          : item.href === "/ai"
-                            ? "nav-ai"
-                            : item.href === "/account"
-                              ? "nav-profile"
-                              : undefined
+                          : item.href === "/account"
+                            ? "nav-profile"
+                            : undefined
                   }
                   aria-current={active ? "page" : undefined}
                   className={`group relative flex items-center gap-2.5 rounded-xl px-2.5 py-2.5 text-sm font-medium transition duration-200 ${
@@ -436,21 +394,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
 
         <div className="mt-auto space-y-2.5 border-t border-glass-border px-2.5 py-3">
-          {supportError ? (
-            <p className="px-2.5 text-xs text-red-400">{supportError}</p>
-          ) : null}
-          {canAccessSupport(access, profile.isAnonymous) && (
-            <button
-              type="button"
-              disabled={supportBusy}
-              onClick={() => void openSupport()}
-              className="flex w-full items-center gap-2 rounded-xl px-2.5 py-2 text-sm font-medium text-muted transition hover:bg-ink/[0.04] hover:text-ink disabled:opacity-60 dark:hover:bg-white/[0.05]"
-            >
-              <IconChat width={18} height={18} />
-              {t("navSupport")}
-            </button>
-          )}
-
           <button
             type="button"
             onClick={() => setCmdOpen(true)}
@@ -552,11 +495,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                         ? "nav-chats"
                         : item.href === "/academy"
                           ? "nav-academy"
-                          : item.href === "/ai"
-                            ? "nav-ai"
-                            : item.href === "/account"
-                              ? "nav-profile"
-                              : undefined
+                          : item.href === "/account"
+                            ? "nav-profile"
+                            : undefined
                   }
                   className={`relative flex h-10 flex-1 items-center justify-center gap-1 rounded-xl transition ${
                     active
@@ -651,25 +592,11 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
-      {canAccessSupport(access, profile.isAnonymous) && !onChats && (
-        <button
-          type="button"
-          disabled={supportBusy}
-          aria-label={t("profileSupport")}
-          title={t("chatsSupport")}
-          onClick={() => void openSupport()}
-          className="fixed z-50 flex h-12 w-12 items-center justify-center rounded-full bg-brand text-on-brand shadow-lg transition hover:brightness-110 disabled:opacity-60 right-4 bottom-[calc(52px+env(safe-area-inset-bottom,0px)+12px)] lg:hidden"
-        >
-          <IconChat filled width={22} height={22} />
-        </button>
-      )}
-
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
       <ProductTour
         profile={profile}
         permissions={permissions}
         profileReady={!profileLoading}
-        pulseAiEnabled={pulseAiEnabled}
         onCompleted={() => {
           void refreshProfile();
         }}

@@ -22,13 +22,16 @@
   },
   "peerDependencies": {
     "next-intl": "^4.0.0",
-    "react": "^19.0.0"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@pulse/typescript-config": "workspace:*",
     "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
     "next-intl": "~4.13.4",
     "react": "19.2.8",
+    "react-dom": "19.2.8",
     "typescript": "^5.9.3"
   }
 }

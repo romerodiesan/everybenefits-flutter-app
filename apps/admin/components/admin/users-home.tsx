@@ -17,6 +17,11 @@ import { ALL_ROLES, type UserRole } from "@/lib/types";
 import { Button, SearchInput } from "@/components/ui/primitives";
 import { DataTable } from "@/components/ui/data-table";
 import {
+  BulkBarShell,
+  BulkField,
+  BulkSelect,
+} from "@/components/ui/bulk-action-bar";
+import {
   RoleBadge,
   RowActionButton,
   RowActions,
@@ -29,6 +34,7 @@ import {
 } from "@/components/admin/user-form-drawer";
 import {
   useAdminAgenciesQuery,
+  useAdminRolesQuery,
   useAdminUsersQuery,
   useInvalidateAdminQueries,
 } from "@/lib/hooks/use-admin-queries";
@@ -108,6 +114,9 @@ export function UsersHome() {
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [bulkBusy, setBulkBusy] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<string | null>(null);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkAgency, setBulkAgency] = useState("");
+  const [bulkRole, setBulkRole] = useState("");
 
   const filters = useMemo(
     () => ({
@@ -121,21 +130,36 @@ export function UsersHome() {
   );
 
   const usersQuery = useAdminUsersQuery(filters);
+  const selectedIds = selectedIdsFromState(rowSelection);
+  const enableBulk = canDecideApprovals || isAdmin;
+  const bulkActive = selectedIds.length > 0;
+
+  useEffect(() => {
+    if (bulkActive && isAdmin) setLoadAgencies(true);
+  }, [bulkActive, isAdmin]);
+
   const agenciesQuery = useAdminAgenciesQuery(
     { pageSize: 100 },
     loadAgencies || drawerOpen,
   );
+  const rolesQuery = useAdminRolesQuery(
+    { includeInactive: false, includeSystem: false },
+    bulkActive && isAdmin,
+  );
+  const agencies = agenciesQuery.data?.agencies ?? [];
+  const assignableRoles = rolesQuery.data?.roles ?? [];
 
   useEffect(() => {
     setPageToken(null);
     setTokenStack([null]);
     setRowSelection({});
+    setBulkStatus("");
+    setBulkAgency("");
+    setBulkRole("");
   }, [debouncedQuery, role, approvalStatus, pageSize]);
 
   const users = usersQuery.data?.users ?? [];
   const nextPageToken = usersQuery.data?.nextPageToken ?? null;
-  const selectedIds = selectedIdsFromState(rowSelection);
-  const enableBulk = canDecideApprovals || isAdmin;
 
   const openCreate = () => {
     setLoadAgencies(true);
@@ -204,6 +228,9 @@ export function UsersHome() {
         }),
       );
       setRowSelection({});
+      setBulkStatus("");
+      setBulkAgency("");
+      setBulkRole("");
       await Promise.all([
         invalidate.invalidateUsers(),
         invalidate.invalidateApprovals(),
@@ -214,6 +241,66 @@ export function UsersHome() {
     } finally {
       setBulkBusy(false);
     }
+  };
+
+  const onBulkStatusChange = (value: string) => {
+    setBulkStatus(value);
+    if (!value) return;
+    if (value === "rejected") {
+      if (
+        !window.confirm(
+          t("bulkConfirmReject", { count: selectedIds.length }),
+        )
+      ) {
+        setBulkStatus("");
+        return;
+      }
+    }
+    if (
+      value === "pending" ||
+      value === "approved" ||
+      value === "rejected"
+    ) {
+      void runBulk(() =>
+        getAdminRepository().bulkSetUserApproval(
+          selectedIds,
+          value,
+        ),
+      );
+      return;
+    }
+    if (value === "active" || value === "deactivated") {
+      if (value === "deactivated") {
+        if (
+          !window.confirm(
+            t("bulkConfirmDeactivate", { count: selectedIds.length }),
+          )
+        ) {
+          setBulkStatus("");
+          return;
+        }
+      }
+      void runBulk(() =>
+        getAdminRepository().bulkSetUserAccountStatus(selectedIds, value),
+      );
+    }
+  };
+
+  const onBulkAgencyChange = (value: string) => {
+    setBulkAgency(value);
+    if (value === "") return;
+    const orgNodeId = value === "__none__" ? null : value;
+    void runBulk(() =>
+      getAdminRepository().bulkAssignUsersToOrgNode(selectedIds, orgNodeId),
+    );
+  };
+
+  const onBulkRoleChange = (value: string) => {
+    setBulkRole(value);
+    if (!value) return;
+    void runBulk(() =>
+      getAdminRepository().bulkSetUserRole(selectedIds, value),
+    );
   };
 
   const columns = useMemo<ColumnDef<AdminUserRow, unknown>[]>(
@@ -375,108 +462,87 @@ export function UsersHome() {
   );
 
   const bulkBar = (
-    <>
-      <span className="text-sm font-semibold text-ink">
-        {t("bulkSelected", { count: selectedIds.length })}
-      </span>
-      {selectedIds.length >= BULK_MAX_SELECTED ? (
-        <span className="text-xs text-muted">
-          {t("bulkMaxSelected", { max: BULK_MAX_SELECTED })}
-        </span>
-      ) : null}
-      {canDecideApprovals ? (
-        <>
-          <Button
-            className="h-8 px-3 text-xs"
+    <BulkBarShell
+      selectedCount={selectedIds.length}
+      selectedLabel={t("bulkSelectedLabel")}
+      maxHint={
+        selectedIds.length >= BULK_MAX_SELECTED
+          ? t("bulkMaxSelected", { max: BULK_MAX_SELECTED })
+          : null
+      }
+      busy={bulkBusy}
+      busyLabel={t("bulkBusy")}
+      clearLabel={t("bulkClear")}
+      onClear={() => {
+        setRowSelection({});
+        setBulkStatus("");
+        setBulkAgency("");
+        setBulkRole("");
+      }}
+    >
+      {canDecideApprovals || isAdmin ? (
+        <BulkField label={t("bulkFieldStatus")}>
+          <BulkSelect
+            value={bulkStatus}
             disabled={bulkBusy}
-            onClick={() =>
-              void runBulk(() =>
-                getAdminRepository().bulkSetUserApproval(
-                  selectedIds,
-                  "approved",
-                ),
-              )
-            }
+            aria-label={t("bulkChangeStatus")}
+            onChange={(e) => onBulkStatusChange(e.target.value)}
           >
-            {t("bulkApprove")}
-          </Button>
-          <Button
-            variant="danger"
-            className="h-8 px-3 text-xs"
-            disabled={bulkBusy}
-            onClick={() => {
-              if (
-                !window.confirm(
-                  t("bulkConfirmReject", { count: selectedIds.length }),
-                )
-              ) {
-                return;
-              }
-              void runBulk(() =>
-                getAdminRepository().bulkSetUserApproval(
-                  selectedIds,
-                  "rejected",
-                ),
-              );
-            }}
-          >
-            {t("bulkReject")}
-          </Button>
-        </>
+            <option value="">{t("bulkChangeStatus")}</option>
+            {canDecideApprovals ? (
+              <optgroup label={t("colApproval")}>
+                <option value="pending">{t("approvalStatusPending")}</option>
+                <option value="approved">{t("approvalStatusApproved")}</option>
+                <option value="rejected">{t("approvalStatusRejected")}</option>
+              </optgroup>
+            ) : null}
+            {isAdmin ? (
+              <optgroup label={t("colAccount")}>
+                <option value="active">{t("usersReactivate")}</option>
+                <option value="deactivated">{t("usersDeactivate")}</option>
+              </optgroup>
+            ) : null}
+          </BulkSelect>
+        </BulkField>
       ) : null}
       {isAdmin ? (
         <>
-          <Button
-            variant="secondary"
-            className="h-8 px-3 text-xs"
-            disabled={bulkBusy}
-            onClick={() =>
-              void runBulk(() =>
-                getAdminRepository().bulkSetUserAccountStatus(
-                  selectedIds,
-                  "active",
-                ),
-              )
-            }
-          >
-            {t("bulkReactivate")}
-          </Button>
-          <Button
-            variant="danger"
-            className="h-8 px-3 text-xs"
-            disabled={bulkBusy}
-            onClick={() => {
-              if (
-                !window.confirm(
-                  t("bulkConfirmDeactivate", { count: selectedIds.length }),
-                )
-              ) {
-                return;
-              }
-              void runBulk(() =>
-                getAdminRepository().bulkSetUserAccountStatus(
-                  selectedIds,
-                  "deactivated",
-                ),
-              );
-            }}
-          >
-            {t("bulkDeactivate")}
-          </Button>
+          <BulkField label={t("bulkFieldAgency")}>
+            <BulkSelect
+              value={bulkAgency}
+              disabled={bulkBusy}
+              aria-label={t("bulkChangeAgency")}
+              onChange={(e) => onBulkAgencyChange(e.target.value)}
+            >
+              <option value="">{t("bulkChangeAgency")}</option>
+              <option value="__none__">{t("bulkNoAgency")}</option>
+              {agencies.map((agency) => (
+                <option key={agency.id} value={agency.id}>
+                  {agency.name}
+                </option>
+              ))}
+            </BulkSelect>
+          </BulkField>
+          <BulkField label={t("bulkFieldRole")}>
+            <BulkSelect
+              value={bulkRole}
+              disabled={bulkBusy}
+              aria-label={t("bulkChangeRole")}
+              onChange={(e) => onBulkRoleChange(e.target.value)}
+            >
+              <option value="">{t("bulkChangeRole")}</option>
+              {assignableRoles.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {ROLE_KEYS[r.id as UserRole]
+                    ? t(ROLE_KEYS[r.id as UserRole])
+                    : r.name}
+                </option>
+              ))}
+            </BulkSelect>
+          </BulkField>
         </>
       ) : null}
-      <Button
-        variant="ghost"
-        className="h-8 px-3 text-xs"
-        disabled={bulkBusy}
-        onClick={() => setRowSelection({})}
-      >
-        {t("bulkClear")}
-      </Button>
-      {bulkBusy ? (
-        <span className="text-xs text-muted">{t("bulkBusy")}</span>
-      ) : null}
-    </>
+    </BulkBarShell>
   );
 
   return (
