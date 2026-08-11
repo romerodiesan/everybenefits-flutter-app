@@ -14,7 +14,7 @@ import {
 } from "firebase/storage";
 import { updateProfile, type User } from "firebase/auth";
 import { mapUserProfile, toDate } from "@pulse/firebase-web";
-import { displayNameSearchFields } from "@pulse/shared";
+import { userSearchIndexFields } from "@pulse/shared";
 import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
 import { listPublicProfiles, searchDirectory as searchDirectoryFn } from "./functions";
 import type { UserProfile } from "../types";
@@ -65,19 +65,17 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   if (snap.exists()) {
     const data = snap.data() as Record<string, unknown>;
     const profile = profileFromData(user.uid, data);
-    const search = displayNameSearchFields(profile.displayName);
-    const emailLower = profile.email?.toLowerCase() ?? null;
+    const search = userSearchIndexFields(profile.displayName, profile.email);
     const tokens = Array.isArray(data.nameTokens)
       ? data.nameTokens.map(String)
       : [];
     const needsSearchBackfill =
       data.displayNameLower !== search.displayNameLower ||
-      data.emailLower !== emailLower ||
+      data.emailLower !== search.emailLower ||
       JSON.stringify(tokens) !== JSON.stringify(search.nameTokens);
     if (needsSearchBackfill) {
       await updateDoc(refDoc, {
         ...search,
-        emailLower,
         updatedAt: serverTimestamp(),
       });
     }
@@ -113,8 +111,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   await setDoc(refDoc, {
     uid: profile.uid,
     email: profile.email,
-    emailLower: profile.email?.toLowerCase() ?? null,
-    ...displayNameSearchFields(profile.displayName),
+    ...userSearchIndexFields(profile.displayName, profile.email),
     photoUrl: profile.photoUrl,
     role: profile.role,
     isAnonymous: profile.isAnonymous,
@@ -202,12 +199,14 @@ export async function updateUserProfile(
     } else if (key === "phoneVerified") {
       data[key] = Boolean(value);
     } else if (key === "displayName") {
-      const fields = displayNameSearchFields(
+      const fields = userSearchIndexFields(
         typeof value === "string" ? value : null,
+        profile.email,
       );
       data.displayName = fields.displayName;
       data.displayNameLower = fields.displayNameLower;
       data.nameTokens = fields.nameTokens;
+      data.emailLower = fields.emailLower;
     } else {
       data[key] = value;
     }

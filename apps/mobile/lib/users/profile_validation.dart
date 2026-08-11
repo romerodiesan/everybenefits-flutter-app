@@ -60,16 +60,58 @@ String composeDisplayName(String givenName, String familyName) {
   );
 }
 
-/// Lowercased name tokens for Firestore `array-contains` directory search.
-List<String> nameSearchTokens(String? displayName) {
-  final parts = (displayName ?? '')
-      .trim()
-      .toLowerCase()
-      .split(RegExp(r'\s+'))
-      .map((part) => part.replaceAll(RegExp(r'[^a-z0-9áéíóúüñ]'), ''))
-      .where((part) => part.isNotEmpty)
-      .toList();
-  return [...{...parts}];
+/// Lowercased edge-prefix tokens for Firestore `array-contains` search.
+List<String> nameSearchTokens(String? displayName, [String? email]) {
+  const minLen = 2;
+  const maxLen = 40;
+  const cap = 120;
+  final tokens = <String>{};
+
+  String fold(String raw) {
+    return raw
+        .toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n');
+  }
+
+  void addWord(String word) {
+    final cleaned = fold(word).replaceAll(RegExp(r'[^a-z0-9]'), '');
+    if (cleaned.isEmpty) return;
+    if (cleaned.length < minLen) {
+      tokens.add(cleaned);
+      return;
+    }
+    final end = cleaned.length > maxLen ? maxLen : cleaned.length;
+    for (var i = minLen; i <= end; i++) {
+      tokens.add(cleaned.substring(0, i));
+      if (tokens.length >= cap) return;
+    }
+  }
+
+  for (final part in (displayName ?? '').trim().split(RegExp(r'\s+'))) {
+    if (part.isEmpty) continue;
+    addWord(part);
+    if (tokens.length >= cap) break;
+  }
+
+  final mail = email?.trim().toLowerCase();
+  if (mail != null && mail.isNotEmpty && tokens.length < cap) {
+    final local = mail.split('@').first;
+    addWord(local);
+    final emailKey = fold(mail).replaceAll(RegExp(r'[^a-z0-9@.]'), '');
+    final end = emailKey.length > maxLen ? maxLen : emailKey.length;
+    for (var i = minLen; i <= end; i++) {
+      tokens.add(emailKey.substring(0, i));
+      if (tokens.length >= cap) break;
+    }
+  }
+
+  return tokens.toList();
 }
 
 enum DisplayNameIssue { empty, tooShort, needLastName, emailAsName }

@@ -4,7 +4,7 @@ import {
 } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { canParticipateInChats, parseRole } from "@pulse/shared";
+import { canParticipateInChats, normalizeSearchQueryToken, parseRole, userSearchIndexFields } from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import { isUserApprovedForJoin, requireCaller } from "./auth";
 
@@ -42,6 +42,29 @@ export const syncPublicProfile = onDocumentWritten(
     }
     const data = after.data() ?? {};
     const privacy = readPrivacy(data.privacy);
+
+    // Keep searchable fields indexed for Admin / Chats (self-heal legacy docs).
+    const search = userSearchIndexFields(
+      typeof data.displayName === "string" ? data.displayName : null,
+      typeof data.email === "string" ? data.email : null,
+    );
+    const existingTokens = Array.isArray(data.nameTokens)
+      ? data.nameTokens.map(String)
+      : [];
+    const searchStale =
+      data.displayNameLower !== search.displayNameLower ||
+      data.emailLower !== search.emailLower ||
+      JSON.stringify(existingTokens) !== JSON.stringify(search.nameTokens);
+    if (searchStale) {
+      await after.ref.set(
+        {
+          ...search,
+          updatedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+    }
+
     await ref.set({
       uid,
       displayName:
@@ -121,11 +144,14 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     Math.min(40, Math.round(Number(request.data?.limit ?? 40))),
   );
   const q = rawQuery.toLowerCase();
+  const folded = normalizeSearchQueryToken(rawQuery);
   const npnDigits = rawQuery.replace(/\D/g, "");
   const looksEmail = q.includes("@");
   const looksNpn = npnDigits.length >= 5 && /^\d[\d\s-]*$/.test(rawQuery);
-  const token = q.split(/\s+/).filter(Boolean)[0] ?? q;
-  const end = `${q}\uf8ff`;
+  const token =
+    folded.split(/[@.\s]+/).filter(Boolean)[0] ?? folded;
+  const rangeKey = folded || q;
+  const end = `${rangeKey}\uf8ff`;
 
   const matched = new Map<string, Record<string, unknown>>();
 
@@ -157,10 +183,10 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     looksEmail
       ? db.collection("users").where("email", "==", q).limit(limit).get()
       : Promise.resolve(null),
-    looksEmail
+    looksEmail && rangeKey
       ? db
           .collection("users")
-          .where("emailLower", ">=", q)
+          .where("emailLower", ">=", rangeKey)
           .where("emailLower", "<=", end)
           .orderBy("emailLower", "asc")
           .limit(limit)
@@ -169,17 +195,19 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     looksNpn
       ? db.collection("users").where("npn", "==", npnDigits).limit(limit).get()
       : Promise.resolve(null),
-    db
-      .collection("users")
-      .where("displayNameLower", ">=", q)
-      .where("displayNameLower", "<=", end)
-      .orderBy("displayNameLower", "asc")
-      .limit(limit)
-      .get(),
-    !looksEmail
+    rangeKey
       ? db
           .collection("users")
-          .where("emailLower", ">=", q)
+          .where("displayNameLower", ">=", rangeKey)
+          .where("displayNameLower", "<=", end)
+          .orderBy("displayNameLower", "asc")
+          .limit(limit)
+          .get()
+      : Promise.resolve(null),
+    !looksEmail && rangeKey
+      ? db
+          .collection("users")
+          .where("emailLower", ">=", rangeKey)
           .where("emailLower", "<=", end)
           .orderBy("emailLower", "asc")
           .limit(limit)

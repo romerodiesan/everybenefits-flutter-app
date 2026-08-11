@@ -11,6 +11,7 @@ import { getFirebaseDb } from "./client";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
 import { parseRole } from "../roles";
+import { userSearchIndexFields } from "@pulse/shared";
 
 function toDate(value: unknown): Date | null {
   if (!value) return null;
@@ -117,9 +118,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   await setDoc(refDoc, {
     uid: profile.uid,
     email: profile.email,
-    emailLower: profile.email?.toLowerCase() ?? null,
-    displayName: profile.displayName,
-    displayNameLower: profile.displayName?.trim().toLowerCase() || null,
+    ...userSearchIndexFields(profile.displayName, profile.email),
     photoUrl: profile.photoUrl,
     role: profile.role,
     isAnonymous: profile.isAnonymous,

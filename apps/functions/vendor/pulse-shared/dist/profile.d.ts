@@ -16,12 +16,31 @@ export declare function splitDisplayName(raw: string): {
     familyName: string;
 };
 export declare function composeDisplayName(givenName: string, familyName: string): string;
-/** Lowercased name tokens for Firestore `array-contains` directory search. */
-export declare function nameSearchTokens(displayName: string | null | undefined): string[];
-/** Fields to keep in sync whenever displayName changes. */
-export declare function displayNameSearchFields(displayName: string | null | undefined): {
+/** Fold accents and lowercase for Firestore search keys. */
+export declare function foldSearchText(raw: string): string;
+/**
+ * Edge prefixes for `array-contains` search ("gar" → Gabriela Garrido).
+ * Accent-insensitive; strips punctuation.
+ */
+export declare function edgeSearchPrefixes(raw: string, minLen?: number, maxLen?: number): string[];
+/**
+ * Search tokens for Firestore `array-contains` (name parts + email local-part).
+ * Stores edge prefixes so partial typing works at 10k+ users without a full scan.
+ */
+export declare function nameSearchTokens(displayName: string | null | undefined, email?: string | null): string[];
+/** Normalize a user-typed query token for `nameTokens` lookup. */
+export declare function normalizeSearchQueryToken(raw: string): string;
+/** Fields to keep in sync whenever displayName / email changes. */
+export declare function displayNameSearchFields(displayName: string | null | undefined, email?: string | null): {
     displayName: string | null;
     displayNameLower: string | null;
+    nameTokens: string[];
+};
+/** Full user search index payload (name + emailLower). */
+export declare function userSearchIndexFields(displayName: string | null | undefined, email?: string | null): {
+    displayName: string | null;
+    displayNameLower: string | null;
+    emailLower: string | null;
     nameTokens: string[];
 };
 export type DisplayNameIssue = "empty" | "too_short" | "need_last_name" | "email_as_name";

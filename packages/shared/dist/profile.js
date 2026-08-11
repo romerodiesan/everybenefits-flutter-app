@@ -8,8 +8,12 @@ exports.looksLikeEmailName = looksLikeEmailName;
 exports.normalizePersonName = normalizePersonName;
 exports.splitDisplayName = splitDisplayName;
 exports.composeDisplayName = composeDisplayName;
+exports.foldSearchText = foldSearchText;
+exports.edgeSearchPrefixes = edgeSearchPrefixes;
 exports.nameSearchTokens = nameSearchTokens;
+exports.normalizeSearchQueryToken = normalizeSearchQueryToken;
 exports.displayNameSearchFields = displayNameSearchFields;
+exports.userSearchIndexFields = userSearchIndexFields;
 exports.validateGivenName = validateGivenName;
 exports.validateFamilyName = validateFamilyName;
 exports.validateDisplayName = validateDisplayName;
@@ -77,23 +81,90 @@ function splitDisplayName(raw) {
 function composeDisplayName(givenName, familyName) {
     return normalizePersonName([givenName.trim(), familyName.trim()].filter(Boolean).join(" "));
 }
-/** Lowercased name tokens for Firestore `array-contains` directory search. */
-function nameSearchTokens(displayName) {
-    const parts = String(displayName ?? "")
-        .trim()
-        .toLowerCase()
-        .split(/\s+/)
-        .map((part) => part.replace(/[^a-z0-9áéíóúüñ]/gi, ""))
-        .filter((part) => part.length >= 1);
-    return [...new Set(parts)];
+const SEARCH_PREFIX_MIN = 2;
+const SEARCH_PREFIX_MAX_LEN = 40;
+const SEARCH_TOKEN_CAP = 120;
+/** Fold accents and lowercase for Firestore search keys. */
+function foldSearchText(raw) {
+    return raw
+        .normalize("NFD")
+        .replace(/\p{M}/gu, "")
+        .toLowerCase();
 }
-/** Fields to keep in sync whenever displayName changes. */
-function displayNameSearchFields(displayName) {
+/**
+ * Edge prefixes for `array-contains` search ("gar" → Gabriela Garrido).
+ * Accent-insensitive; strips punctuation.
+ */
+function edgeSearchPrefixes(raw, minLen = SEARCH_PREFIX_MIN, maxLen = SEARCH_PREFIX_MAX_LEN) {
+    const cleaned = foldSearchText(raw).replace(/[^a-z0-9]/g, "");
+    if (!cleaned)
+        return [];
+    if (cleaned.length < minLen)
+        return [cleaned];
+    const out = [];
+    const end = Math.min(cleaned.length, maxLen);
+    for (let i = minLen; i <= end; i++) {
+        out.push(cleaned.slice(0, i));
+    }
+    return out;
+}
+/**
+ * Search tokens for Firestore `array-contains` (name parts + email local-part).
+ * Stores edge prefixes so partial typing works at 10k+ users without a full scan.
+ */
+function nameSearchTokens(displayName, email) {
+    const tokens = new Set();
+    const addWord = (word) => {
+        for (const prefix of edgeSearchPrefixes(word)) {
+            tokens.add(prefix);
+            if (tokens.size >= SEARCH_TOKEN_CAP)
+                return;
+        }
+    };
+    for (const part of String(displayName ?? "")
+        .trim()
+        .split(/\s+/)) {
+        if (!part)
+            continue;
+        addWord(part);
+        if (tokens.size >= SEARCH_TOKEN_CAP)
+            break;
+    }
+    if (email && tokens.size < SEARCH_TOKEN_CAP) {
+        const lower = String(email).trim().toLowerCase();
+        if (lower) {
+            const local = lower.split("@")[0] ?? "";
+            addWord(local);
+            // Allow typing into the full address from the start (mggl2804@gmai…).
+            const emailKey = foldSearchText(lower).replace(/[^a-z0-9@.]/g, "");
+            for (let i = SEARCH_PREFIX_MIN; i <= Math.min(emailKey.length, SEARCH_PREFIX_MAX_LEN); i++) {
+                tokens.add(emailKey.slice(0, i));
+                if (tokens.size >= SEARCH_TOKEN_CAP)
+                    break;
+            }
+        }
+    }
+    return [...tokens];
+}
+/** Normalize a user-typed query token for `nameTokens` lookup. */
+function normalizeSearchQueryToken(raw) {
+    return foldSearchText(raw).replace(/[^a-z0-9@.]/g, "");
+}
+/** Fields to keep in sync whenever displayName / email changes. */
+function displayNameSearchFields(displayName, email) {
     const trimmed = typeof displayName === "string" ? displayName.trim() || null : null;
     return {
         displayName: trimmed,
-        displayNameLower: trimmed?.toLowerCase() || null,
-        nameTokens: nameSearchTokens(trimmed),
+        displayNameLower: trimmed ? foldSearchText(trimmed) : null,
+        nameTokens: nameSearchTokens(trimmed, email),
+    };
+}
+/** Full user search index payload (name + emailLower). */
+function userSearchIndexFields(displayName, email) {
+    const emailTrimmed = typeof email === "string" ? email.trim() || null : null;
+    return {
+        ...displayNameSearchFields(displayName, emailTrimmed),
+        emailLower: emailTrimmed ? foldSearchText(emailTrimmed) : null,
     };
 }
 function validateGivenName(raw) {

@@ -7,8 +7,10 @@ import {
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import {
   ALL_ROLES,
-  displayNameSearchFields,
+  foldSearchText,
+  normalizeSearchQueryToken,
   parseRole,
+  userSearchIndexFields,
   type UserRole,
 } from "@pulse/shared";
 import { admin, db, callableOpts } from "./init";
@@ -103,24 +105,31 @@ async function collectUserSearchDocs(
     matched.set(id, data);
   };
 
-  const { start, end } = prefixRange(query);
-  const token = query.split(/\s+/).filter(Boolean)[0] ?? query;
+  // Prefer accent-folded keys (displayNameLower / emailLower / nameTokens).
+  const folded = normalizeSearchQueryToken(query);
+  const rangeKey = folded || query;
+  const { start, end } = prefixRange(rangeKey);
+  const token = folded.split(/[@.\s]+/).filter(Boolean)[0] ?? folded;
 
   const snaps = await Promise.all([
-    db
-      .collection("users")
-      .where("displayNameLower", ">=", start)
-      .where("displayNameLower", "<=", end)
-      .orderBy("displayNameLower", "asc")
-      .limit(limit)
-      .get(),
-    db
-      .collection("users")
-      .where("emailLower", ">=", start)
-      .where("emailLower", "<=", end)
-      .orderBy("emailLower", "asc")
-      .limit(limit)
-      .get(),
+    rangeKey
+      ? db
+          .collection("users")
+          .where("displayNameLower", ">=", start)
+          .where("displayNameLower", "<=", end)
+          .orderBy("displayNameLower", "asc")
+          .limit(limit)
+          .get()
+      : Promise.resolve(null),
+    rangeKey
+      ? db
+          .collection("users")
+          .where("emailLower", ">=", start)
+          .where("emailLower", "<=", end)
+          .orderBy("emailLower", "asc")
+          .limit(limit)
+          .get()
+      : Promise.resolve(null),
     token.length >= 2
       ? db
           .collection("users")
@@ -183,7 +192,9 @@ export const listUsersForAdmin = onCall(callableOpts, async (request) => {
   let rows: ReturnType<typeof mapAdminUserRow>[] = [];
 
   if (query) {
-    const matched = await collectUserSearchDocs(query, Math.min(200, pageSize * 4));
+    // Fetch a wider candidate set; filters below refine. Scales via indexes,
+    // not by scanning the users collection.
+    const matched = await collectUserSearchDocs(query, Math.min(300, pageSize * 8));
     rows = [...matched.entries()].map(([id, data]) =>
       mapAdminUserRow(id, data),
     );
@@ -212,16 +223,23 @@ export const listUsersForAdmin = onCall(callableOpts, async (request) => {
     if (orgNodeId && row.orgNodeId !== orgNodeId) return false;
     if (roleFilter && row.role !== roleFilter) return false;
     if (query) {
-      const name = (row.displayName ?? "").toLowerCase();
-      const email = (row.email ?? "").toLowerCase();
+      const qFold = normalizeSearchQueryToken(query);
+      const name = foldSearchText(row.displayName ?? "");
+      const email = foldSearchText(row.email ?? "");
       const npn = (row.npn ?? "").toLowerCase();
       const hay = `${name} ${email} ${npn}`;
       const tokens = name.split(/\s+/).filter(Boolean);
       const hit =
-        hay.includes(query) ||
-        name.startsWith(query) ||
-        email.startsWith(query) ||
-        tokens.some((t) => t.startsWith(query) || t.includes(query));
+        !qFold ||
+        hay.includes(qFold) ||
+        name.startsWith(qFold) ||
+        email.startsWith(qFold) ||
+        tokens.some(
+          (t) =>
+            t.startsWith(qFold) ||
+            t.includes(qFold) ||
+            normalizeSearchQueryToken(t).startsWith(qFold),
+        );
       if (!hit) return false;
     }
     return true;
@@ -375,8 +393,7 @@ export const adminCreateUser = onCall(callableOpts, async (request) => {
   const payload = {
     uid: user.uid,
     email,
-    emailLower: email,
-    ...displayNameSearchFields(displayName || null),
+    ...userSearchIndexFields(displayName || null, email),
     photoUrl: null,
     role,
     isAnonymous: false,
@@ -429,7 +446,13 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
 
   if (typeof request.data?.displayName === "string") {
     const displayName = request.data.displayName.trim();
-    Object.assign(updates, displayNameSearchFields(displayName));
+    const emailForTokens =
+      typeof request.data?.email === "string"
+        ? request.data.email.trim().toLowerCase()
+        : typeof snap.data()?.email === "string"
+          ? String(snap.data()?.email)
+          : null;
+    Object.assign(updates, userSearchIndexFields(displayName, emailForTokens));
     authUpdates.displayName = displayName || undefined;
   }
   if (typeof request.data?.email === "string") {
@@ -438,7 +461,13 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
       throw new HttpsError("invalid-argument", "Valid email required.");
     }
     updates.email = email;
-    updates.emailLower = email;
+    const nameForTokens =
+      typeof updates.displayName === "string"
+        ? String(updates.displayName)
+        : typeof snap.data()?.displayName === "string"
+          ? String(snap.data()?.displayName)
+          : null;
+    Object.assign(updates, userSearchIndexFields(nameForTokens, email));
     authUpdates.email = email;
   }
   if (typeof request.data?.role === "string") {
@@ -618,19 +647,16 @@ export const backfillUserSearchFields = onCall(
     for (const doc of snap.docs) {
       scanned += 1;
       const data = doc.data();
-      const search = displayNameSearchFields(
+      const search = userSearchIndexFields(
         typeof data.displayName === "string" ? data.displayName : null,
+        typeof data.email === "string" ? data.email : null,
       );
-      const emailLower =
-        typeof data.email === "string"
-          ? data.email.trim().toLowerCase() || null
-          : null;
       const existingTokens = Array.isArray(data.nameTokens)
         ? data.nameTokens.map(String)
         : [];
       const needsUpdate =
         data.displayNameLower !== search.displayNameLower ||
-        data.emailLower !== emailLower ||
+        data.emailLower !== search.emailLower ||
         JSON.stringify(existingTokens) !== JSON.stringify(search.nameTokens);
 
       if (!needsUpdate) continue;
@@ -639,7 +665,6 @@ export const backfillUserSearchFields = onCall(
         doc.ref,
         {
           ...search,
-          emailLower,
           updatedAt: FieldValue.serverTimestamp(),
         },
         { merge: true },

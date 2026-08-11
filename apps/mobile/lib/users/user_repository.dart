@@ -44,13 +44,23 @@ class FirestoreUserProfileStore implements UserProfileStore {
     final displayName = profile.displayName?.trim();
     final normalized =
         displayName == null || displayName.isEmpty ? null : displayName;
+    final email = profile.email?.trim();
+    final foldedName = normalized
+        ?.toLowerCase()
+        .replaceAll('á', 'a')
+        .replaceAll('é', 'e')
+        .replaceAll('í', 'i')
+        .replaceAll('ó', 'o')
+        .replaceAll('ú', 'u')
+        .replaceAll('ü', 'u')
+        .replaceAll('ñ', 'n');
     return {
       'uid': profile.uid,
       'email': profile.email,
-      'emailLower': profile.email?.trim().toLowerCase(),
+      'emailLower': email?.toLowerCase(),
       'displayName': normalized,
-      'displayNameLower': normalized?.toLowerCase(),
-      'nameTokens': nameSearchTokens(normalized),
+      'displayNameLower': foldedName,
+      'nameTokens': nameSearchTokens(normalized, email),
       'photoUrl': profile.photoUrl,
       'role': profile.role.wireValue,
       'isAnonymous': profile.isAnonymous,

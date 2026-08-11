@@ -7,7 +7,7 @@ import {
   type Unsubscribe,
 } from "firebase/firestore";
 import { type User } from "firebase/auth";
-import { displayNameSearchFields } from "@pulse/shared";
+import { userSearchIndexFields } from "@pulse/shared";
 import { getFirebaseDb } from "./client";
 import { listPublicProfiles } from "./functions";
 import type { UserProfile } from "../types";
@@ -118,8 +118,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   await setDoc(refDoc, {
     uid: profile.uid,
     email: profile.email,
-    emailLower: profile.email?.toLowerCase() ?? null,
-    ...displayNameSearchFields(profile.displayName),
+    ...userSearchIndexFields(profile.displayName, profile.email),
     photoUrl: profile.photoUrl,
     role: profile.role,
     isAnonymous: profile.isAnonymous,
