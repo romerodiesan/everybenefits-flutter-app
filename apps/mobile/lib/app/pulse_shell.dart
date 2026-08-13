@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../auth/auth.dart';
+import '../features/chats/chat_models.dart';
 import '../features/chats/chat_repository.dart';
 import '../features/chats/chats_screen.dart';
 import '../features/forums/forum_models.dart';

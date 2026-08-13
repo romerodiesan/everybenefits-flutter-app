@@ -77,6 +77,7 @@ class FirestoreUserProfileStore implements UserProfileStore {
       'addressState': profile.addressState,
       'addressZip': profile.addressZip,
       'agency': profile.agency,
+      'orgNodeId': profile.orgNodeId,
       'updatedAt': FieldValue.serverTimestamp(),
     };
   }
@@ -103,8 +104,13 @@ class FirestoreUserProfileStore implements UserProfileStore {
 
   @override
   Future<void> create(UserProfile profile) async {
+    // approvalStatus / accountStatus are set only on create — rules freeze
+    // them for client updates (server/callables own lifecycle fields).
     await _users.doc(profile.uid).set({
       ..._payload(profile),
+      'accountStatus': profile.accountStatus,
+      if (profile.approvalStatus != null)
+        'approvalStatus': profile.approvalStatus,
       'createdAt': FieldValue.serverTimestamp(),
     });
   }

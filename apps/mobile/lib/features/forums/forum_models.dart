@@ -49,6 +49,9 @@ enum RelevanceVote {
 
 enum ForumSort { recent, relevant }
 
+/// Home feed segment control (matches Pulse web).
+enum ForumFeedMode { fresh, pulse, saved }
+
 class ForumThread {
   const ForumThread({
     required this.id,
@@ -65,6 +68,7 @@ class ForumThread {
     required this.lastReplyAt,
     this.authorPhotoUrl,
     this.acceptedReplyId,
+    this.interactorCount = 0,
   });
 
   final String id;
@@ -82,6 +86,8 @@ class ForumThread {
   final DateTime updatedAt;
   final DateTime lastReplyAt;
   final String? acceptedReplyId;
+  /// Unique interactors (author + voters + reply authors) for Spotlight reach.
+  final int interactorCount;
 
   ForumThread copyWith({
     List<String>? tags,
@@ -93,6 +99,7 @@ class ForumThread {
     DateTime? lastReplyAt,
     String? authorPhotoUrl,
     String? acceptedReplyId,
+    int? interactorCount,
     bool clearAcceptedReplyId = false,
   }) {
     return ForumThread(
@@ -112,6 +119,7 @@ class ForumThread {
       acceptedReplyId: clearAcceptedReplyId
           ? null
           : (acceptedReplyId ?? this.acceptedReplyId),
+      interactorCount: interactorCount ?? this.interactorCount,
     );
   }
 
@@ -126,6 +134,7 @@ class ForumThread {
       'authorRole': authorRole.wireValue,
       'replyCount': replyCount,
       'score': score,
+      'interactorCount': interactorCount,
       'acceptedReplyId': acceptedReplyId,
       'createdAt': createdAt.toUtc().toIso8601String(),
       'updatedAt': updatedAt.toUtc().toIso8601String(),
@@ -146,6 +155,7 @@ class ForumThread {
       authorRole: UserRole.parse(data['authorRole'] as String?),
       replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
       score: (data['score'] as num?)?.toInt() ?? 0,
+      interactorCount: (data['interactorCount'] as num?)?.toInt() ?? 0,
       acceptedReplyId: data['acceptedReplyId'] as String?,
       createdAt: _readForumDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readForumDate(data['updatedAt']) ?? DateTime.now().toUtc(),
@@ -255,18 +265,6 @@ class ForumThreadPage {
   final Object? nextCursor;
 
   bool get hasMore => nextCursor != null;
-}
-
-bool canParticipateInForums({
-  required UserRole role,
-  required bool isAnonymous,
-}) {
-  if (isAnonymous || role == UserRole.guest) return false;
-  return role == UserRole.student ||
-      role == UserRole.agent ||
-      role == UserRole.instructor ||
-      role == UserRole.manager ||
-      role == UserRole.admin;
 }
 
 /// Aggregate relevance for a discovery tag chip in the feed.

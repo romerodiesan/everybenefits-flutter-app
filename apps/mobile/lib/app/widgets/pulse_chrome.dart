@@ -321,7 +321,6 @@ class PulseTabBar extends StatelessWidget {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
     final bottom = systemBottomInset(context);
-    final wide = MediaQuery.sizeOf(context).width >= 390;
 
     return Material(
       type: MaterialType.transparency,
@@ -368,13 +367,12 @@ class PulseTabBar extends StatelessWidget {
                       children: [
                         for (var i = 0; i < items.length; i++)
                           Expanded(
-                            flex: wide && i == selectedIndex ? 16 : 12,
                             child: KeyedSubtree(
                               key: items[i].tourKey,
                               child: _PulseTab(
                                 item: items[i],
                                 selected: i == selectedIndex,
-                                showLabel: wide && i == selectedIndex,
+                                showLabel: false,
                                 brand: brand,
                                 onTap: () => _selectIndex(i),
                               ),

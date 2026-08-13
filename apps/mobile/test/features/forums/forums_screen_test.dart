@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:every_benefits/app/theme.dart';
 import 'package:every_benefits/features/chats/chat_models.dart';
@@ -9,6 +10,9 @@ import 'package:every_benefits/features/chats/chat_repository.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/forums/forums_screen.dart';
+import 'package:every_benefits/features/forums/saved_threads.dart';
+import 'package:every_benefits/features/promo/memory_promo_banner_store.dart';
+import 'package:every_benefits/features/promo/promo_banner_repository.dart';
 import 'package:every_benefits/l10n/app_localizations.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_role.dart';
@@ -88,6 +92,15 @@ class _MemoryForumStore implements ForumStore {
     required List<String> threadIds,
   }) async =>
       {for (final id in threadIds) id: RelevanceVote.none};
+
+  @override
+  Future<List<ForumThread>> fetchThreadsByIds(List<String> ids) async {
+    final byId = {for (final t in seed) t.id: t};
+    return [
+      for (final id in ids)
+        if (byId.containsKey(id)) byId[id]!,
+    ];
+  }
 
   @override
   Future<ForumThread> createThread({
@@ -207,13 +220,34 @@ Widget _wrap(Widget child) {
   );
 }
 
+ForumsScreen _screen({
+  required UserProfile profile,
+  required ForumRepository forumRepository,
+  ChatRepository? chatRepository,
+}) {
+  return ForumsScreen(
+    profile: profile,
+    forumRepository: forumRepository,
+    chatRepository: chatRepository,
+    savedThreads: SavedThreadsStore(),
+    promoBannerRepository: PromoBannerRepository(
+      store: MemoryPromoBannerStore(),
+    ),
+    audienceSizeFetcher: () async => 0,
+  );
+}
+
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
+
   testWidgets('shows feed cards, composer and FAB for agents', (tester) async {
     final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
 
     await tester.pumpWidget(
       _wrap(
-        ForumsScreen(
+        _screen(
           profile: _profile(role: UserRole.agent),
           forumRepository: repo,
         ),
@@ -229,6 +263,9 @@ void main() {
     expect(find.byType(FloatingActionButton), findsOneWidget);
     expect(find.byTooltip('Search questions'), findsOneWidget);
     expect(find.text('Mine'), findsOneWidget);
+    expect(find.text('Fresh'), findsOneWidget);
+    expect(find.text('Pulse'), findsOneWidget);
+    expect(find.text('Saved'), findsOneWidget);
   });
 
   testWidgets('guest is read-only without composer or FAB', (tester) async {
@@ -236,7 +273,7 @@ void main() {
 
     await tester.pumpWidget(
       _wrap(
-        ForumsScreen(
+        _screen(
           profile: _profile(role: UserRole.guest, anonymous: true),
           forumRepository: repo,
         ),
@@ -264,7 +301,7 @@ void main() {
 
     await tester.pumpWidget(
       _wrap(
-        ForumsScreen(
+        _screen(
           profile: _profile(role: UserRole.agent),
           forumRepository: repo,
         ),
@@ -288,7 +325,7 @@ void main() {
 
     await tester.pumpWidget(
       _wrap(
-        ForumsScreen(
+        _screen(
           profile: _profile(role: UserRole.agent),
           forumRepository: repo,
         ),
@@ -333,7 +370,7 @@ void main() {
 
     await tester.pumpWidget(
       _wrap(
-        ForumsScreen(
+        _screen(
           profile: _profile(role: UserRole.agent),
           forumRepository: repo,
           chatRepository: chats,

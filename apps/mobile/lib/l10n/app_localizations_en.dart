@@ -36,7 +36,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get fabEditProfile => 'Edit profile';
 
   @override
-  @override
   String get supportSheetTitle => 'Support';
 
   @override
@@ -56,12 +55,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get supportSheetClose => 'Close';
 
-  @override
-  @override
-  @override
-  @override
-  @override
-  @override
   @override
   String get editProfileNameFrozen => 'Your name is locked after setup.';
 
@@ -674,6 +667,37 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forumsFilterRecent => 'Recent';
 
   @override
+  String get forumsModeFresh => 'Fresh';
+
+  @override
+  String get forumsModePulse => 'Pulse';
+
+  @override
+  String get forumsModeSaved => 'Saved';
+
+  @override
+  String get forumsSpotlight => 'Spotlight';
+
+  @override
+  String get forumsJoinThread => 'Join the thread';
+
+  @override
+  String get forumsSavedEmptyTitle => 'Nothing saved yet';
+
+  @override
+  String get forumsSavedEmptySubtitle =>
+      'Bookmark threads you want to revisit — they\'ll show up here.';
+
+  @override
+  String get forumsSaveThread => 'Save thread';
+
+  @override
+  String get forumsUnsaveThread => 'Remove bookmark';
+
+  @override
+  String get promoBannerDismiss => 'Dismiss promotion';
+
+  @override
   String get forumsClearFilters => 'Clear';
 
   @override
@@ -1029,14 +1053,11 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsSectionCommunity => 'Community';
 
   @override
-  @override
   String get chatsDefaultGroupBadge => 'Community';
 
   @override
   String get chatsDefaultGroupTitle => 'Team';
 
-  @override
-  @override
   @override
   String get chatsNoMessagesYet => 'No messages yet';
 
@@ -1652,7 +1673,6 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get notificationsPrefAcademy => 'Academy updates';
 
-  @override
   @override
   String get notificationsPrefsHint =>
       'Choose which alerts arrive as push on this device.';

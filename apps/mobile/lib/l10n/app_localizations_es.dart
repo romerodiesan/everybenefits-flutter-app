@@ -36,7 +36,6 @@ class AppLocalizationsEs extends AppLocalizations {
   String get fabEditProfile => 'Editar perfil';
 
   @override
-  @override
   String get supportSheetTitle => 'Soporte';
 
   @override
@@ -57,12 +56,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get supportSheetClose => 'Cerrar';
 
-  @override
-  @override
-  @override
-  @override
-  @override
-  @override
   @override
   String get editProfileNameFrozen => 'Tu nombre queda bloqueado tras el alta.';
 
@@ -679,6 +672,37 @@ class AppLocalizationsEs extends AppLocalizations {
   String get forumsFilterRecent => 'Recientes';
 
   @override
+  String get forumsModeFresh => 'Nuevo';
+
+  @override
+  String get forumsModePulse => 'Pulse';
+
+  @override
+  String get forumsModeSaved => 'Guardados';
+
+  @override
+  String get forumsSpotlight => 'Destacado';
+
+  @override
+  String get forumsJoinThread => 'Unirse al hilo';
+
+  @override
+  String get forumsSavedEmptyTitle => 'Nada guardado aún';
+
+  @override
+  String get forumsSavedEmptySubtitle =>
+      'Guarda hilos para volver después — aparecerán aquí.';
+
+  @override
+  String get forumsSaveThread => 'Guardar hilo';
+
+  @override
+  String get forumsUnsaveThread => 'Quitar de guardados';
+
+  @override
+  String get promoBannerDismiss => 'Cerrar promoción';
+
+  @override
   String get forumsClearFilters => 'Limpiar';
 
   @override
@@ -1037,14 +1061,11 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatsSectionCommunity => 'Comunidad';
 
   @override
-  @override
   String get chatsDefaultGroupBadge => 'Comunidad';
 
   @override
   String get chatsDefaultGroupTitle => 'Equipo';
 
-  @override
-  @override
   @override
   String get chatsNoMessagesYet => 'Sin mensajes todavía';
 
@@ -1666,7 +1687,6 @@ class AppLocalizationsEs extends AppLocalizations {
   @override
   String get notificationsPrefAcademy => 'Novedades de academia';
 
-  @override
   @override
   String get notificationsPrefsHint =>
       'Elige qué alertas llegan como push en este dispositivo.';

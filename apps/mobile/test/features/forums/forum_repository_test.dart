@@ -156,6 +156,14 @@ class FakeForumStore implements ForumStore {
   }
 
   @override
+  Future<List<ForumThread>> fetchThreadsByIds(List<String> ids) async {
+    return [
+      for (final id in ids)
+        if (threads.containsKey(id)) threads[id]!,
+    ];
+  }
+
+  @override
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,
@@ -174,6 +182,7 @@ class FakeForumStore implements ForumStore {
       authorRole: author.role,
       replyCount: 0,
       score: 0,
+      interactorCount: 0,
       createdAt: now,
       updatedAt: now,
       lastReplyAt: now,

@@ -16,19 +16,23 @@ class FeedPostCard extends StatelessWidget {
     required this.thread,
     required this.onTap,
     this.liked = false,
+    this.saved = false,
     this.onLike,
     this.onComment,
     this.onTagTap,
     this.onShare,
+    this.onToggleSave,
   });
 
   final ForumThread thread;
   final VoidCallback onTap;
   final bool liked;
+  final bool saved;
   final VoidCallback? onLike;
   final VoidCallback? onComment;
   final ValueChanged<String>? onTagTap;
   final VoidCallback? onShare;
+  final VoidCallback? onToggleSave;
 
   @override
   Widget build(BuildContext context) {
@@ -74,6 +78,25 @@ class FeedPostCard extends StatelessWidget {
                     dense: true,
                   ),
                 ),
+                if (onToggleSave != null)
+                  IconButton(
+                    tooltip: saved
+                        ? context.l10n.forumsUnsaveThread
+                        : context.l10n.forumsSaveThread,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                    onPressed: onToggleSave,
+                    icon: Icon(
+                      saved
+                          ? Icons.bookmark_rounded
+                          : Icons.bookmark_border_rounded,
+                      size: 20,
+                      color: saved
+                          ? AppColors.brandOf(context)
+                          : colors.muted,
+                    ),
+                  ),
                 if (thread.score != 0)
                   Padding(
                     padding: const EdgeInsets.only(left: 4),

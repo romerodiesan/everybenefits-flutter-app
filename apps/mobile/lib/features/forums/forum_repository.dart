@@ -53,6 +53,9 @@ abstract class ForumStore {
     required List<String> threadIds,
   });
 
+  /// Fetch threads by id (Saved feed). Missing docs are omitted.
+  Future<List<ForumThread>> fetchThreadsByIds(List<String> ids);
+
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,
@@ -252,6 +255,31 @@ class FirestoreForumStore implements ForumStore {
   }
 
   @override
+  Future<List<ForumThread>> fetchThreadsByIds(List<String> ids) async {
+    if (ids.isEmpty) return const [];
+    final unique = ids.toSet().toList();
+    final out = <ForumThread>[];
+    // Firestore whereIn limit is 30; chunk if needed.
+    const chunkSize = 30;
+    for (var i = 0; i < unique.length; i += chunkSize) {
+      final chunk = unique.sublist(
+        i,
+        i + chunkSize > unique.length ? unique.length : i + chunkSize,
+      );
+      final snap = await _threads.where(FieldPath.documentId, whereIn: chunk).get();
+      for (final doc in snap.docs) {
+        out.add(ForumThread.fromMap(doc.id, doc.data()));
+      }
+    }
+    // Preserve saved-list order.
+    final byId = {for (final t in out) t.id: t};
+    return [
+      for (final id in ids)
+        if (byId.containsKey(id)) byId[id]!,
+    ];
+  }
+
+  @override
   Stream<RelevanceVote> watchThreadVote({
     required String threadId,
     required String uid,
@@ -295,6 +323,7 @@ class FirestoreForumStore implements ForumStore {
       authorRole: author.role,
       replyCount: 0,
       score: 0,
+      interactorCount: 0,
       createdAt: now,
       updatedAt: now,
       lastReplyAt: now,
@@ -309,6 +338,7 @@ class FirestoreForumStore implements ForumStore {
       'authorRole': thread.authorRole.wireValue,
       'replyCount': 0,
       'score': 0,
+      'interactorCount': 0,
       'acceptedReplyId': null,
       'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
@@ -573,6 +603,9 @@ class ForumRepository {
     required List<String> threadIds,
   }) =>
       _store.fetchThreadVotes(uid: uid, threadIds: threadIds);
+
+  Future<List<ForumThread>> fetchThreadsByIds(List<String> ids) =>
+      _store.fetchThreadsByIds(ids);
 
   Future<ForumThread> createThread({
     required List<String> tags,

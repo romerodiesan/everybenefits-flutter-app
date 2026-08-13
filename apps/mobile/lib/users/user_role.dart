@@ -61,7 +61,10 @@ bool canAccessTools(UserRole role) {
 }
 
 /// `forums.participate`
-bool canParticipateInForums(UserRole role, {required bool isAnonymous}) {
+bool canParticipateInForums({
+  required UserRole role,
+  required bool isAnonymous,
+}) {
   if (isAnonymous || role == UserRole.guest) return false;
   return role == UserRole.student ||
       role == UserRole.agent ||

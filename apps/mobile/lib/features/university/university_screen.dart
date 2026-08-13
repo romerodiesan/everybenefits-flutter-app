@@ -15,6 +15,9 @@ import 'learning_path_screen.dart';
 import 'my_learning_screen.dart';
 import 'path_detail_screen.dart';
 import '../notifications/notification_bell_button.dart';
+import '../promo/promo_banner_models.dart';
+import '../promo/promo_banner_repository.dart';
+import '../promo/widgets/promo_banner_slot.dart';
 import 'widgets/course_card.dart';
 import 'widgets/course_cover.dart';
 import 'widgets/course_manage_menu.dart';
@@ -25,12 +28,14 @@ class UniversityScreen extends StatefulWidget {
     super.key,
     required this.profile,
     this.courseRepository,
+    this.promoBannerRepository,
     this.notificationUnread = 0,
     this.onOpenNotifications,
   });
 
   final UserProfile profile;
   final CourseRepository? courseRepository;
+  final PromoBannerRepository? promoBannerRepository;
   final int notificationUnread;
   final VoidCallback? onOpenNotifications;
 
@@ -273,6 +278,14 @@ class _UniversityScreenState extends State<UniversityScreen> {
             pulseShellListBottomPad(context, hasFab: true),
           ),
           children: [
+            PromoBannerSlot(
+              surface: PromoBannerSurface.academy,
+              profile: widget.profile,
+              repository: widget.promoBannerRepository,
+              courseRepository: _repository,
+              padding: EdgeInsets.zero,
+            ),
+            const SizedBox(height: AppSpacing.md),
             Row(
               children: [
                 Expanded(

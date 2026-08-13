@@ -14,7 +14,12 @@ class MagicLinkEmailStore {
   static const _legacyPrefsKey = 'pending_magic_link_email';
 
   static const FlutterSecureStorage _secure = FlutterSecureStorage(
-    aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    // v11+: Jetpack EncryptedSharedPreferences is gone. Default ciphers are
+    // RSA-OAEP + AES-GCM; migrateOnAlgorithmChange handles leftover v9 data.
+    aOptions: AndroidOptions(
+      migrateOnAlgorithmChange: true,
+      migrateWithBackup: true,
+    ),
   );
 
   static Future<void> save(String email) async {

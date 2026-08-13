@@ -442,6 +442,10 @@ class _EmptyForumStore implements ForumStore {
       {for (final id in threadIds) id: RelevanceVote.none};
 
   @override
+  Future<List<ForumThread>> fetchThreadsByIds(List<String> ids) async =>
+      const [];
+
+  @override
   Future<ForumThread> createThread({
     required List<String> tags,
     required String title,

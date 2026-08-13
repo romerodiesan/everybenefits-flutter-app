@@ -116,6 +116,17 @@ void main() {
       expect(profile.displayName, 'Ada');
       expect(profile.profileCompleted, isFalse);
       expect(profile.agency, kDefaultAgency);
+      expect(profile.approvalStatus, 'pending');
+    });
+
+    test('creates guest with approved approvalStatus', () async {
+      when(() => user.uid).thenReturn('anon-2');
+      when(() => user.isAnonymous).thenReturn(true);
+      when(() => user.email).thenReturn(null);
+      when(() => user.displayName).thenReturn(null);
+
+      final profile = await repository.ensureProfile(user);
+      expect(profile.approvalStatus, 'approved');
     });
 
     test('returns existing profile without overwriting role', () async {

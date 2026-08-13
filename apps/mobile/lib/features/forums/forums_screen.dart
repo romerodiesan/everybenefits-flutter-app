@@ -8,24 +8,35 @@ import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
-import 'create_thread_screen.dart';
-import 'forum_models.dart';
-import 'forum_repository.dart';
 import '../chats/chat_repository.dart';
 import '../notifications/notification_bell_button.dart';
+import '../promo/promo_banner_models.dart';
+import '../promo/promo_banner_repository.dart';
+import '../promo/widgets/promo_banner_slot.dart';
+import 'create_thread_screen.dart';
+import 'forum_audience.dart';
+import 'forum_models.dart';
+import 'forum_repository.dart';
+import 'forum_spotlight.dart';
+import 'saved_threads.dart';
 import 'thread_detail_screen.dart';
 import 'widgets/feed_composer_bar.dart';
 import 'widgets/feed_post_card.dart';
+import 'widgets/forum_feed_mode_bar.dart';
 import 'widgets/forum_filter_chip.dart';
+import 'widgets/forum_spotlight_card.dart';
 import 'widgets/share_to_chat_sheet.dart';
 
-/// Community home — searchable Q&A feed with relevance sorting.
+/// Community home — searchable Q&A feed with Fresh / Pulse / Saved modes.
 class ForumsScreen extends StatefulWidget {
   const ForumsScreen({
     super.key,
     required this.profile,
     this.forumRepository,
     this.chatRepository,
+    this.savedThreads,
+    this.promoBannerRepository,
+    this.audienceSizeFetcher,
     this.embeddedInShell = false,
     this.notificationUnread = 0,
     this.onOpenNotifications,
@@ -34,6 +45,10 @@ class ForumsScreen extends StatefulWidget {
   final UserProfile profile;
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
+  final SavedThreadsStore? savedThreads;
+  final PromoBannerRepository? promoBannerRepository;
+  /// Injected in tests; production hits `platformStats/overview`.
+  final Future<int> Function()? audienceSizeFetcher;
   final bool embeddedInShell;
   final int notificationUnread;
   final VoidCallback? onOpenNotifications;
@@ -45,6 +60,8 @@ class ForumsScreen extends StatefulWidget {
 class ForumsScreenState extends State<ForumsScreen> {
   late final ForumRepository _repository =
       widget.forumRepository ?? ForumRepository();
+  late final SavedThreadsStore _saved =
+      widget.savedThreads ?? SavedThreadsStore();
   final _searchController = TextEditingController();
 
   List<ForumThread> _threads = const [];
@@ -55,9 +72,10 @@ class ForumsScreenState extends State<ForumsScreen> {
   String? _error;
   String? _selectedTag;
   bool _mineOnly = false;
-  ForumSort _sort = ForumSort.recent;
+  ForumFeedMode _mode = ForumFeedMode.fresh;
   String _query = '';
   bool _searchOpen = false;
+  int _audienceSize = 0;
 
   /// Threads used to rank discovery tags (kept when filtering by tag / mine).
   List<ForumThread> _tagCatalog = const [];
@@ -66,6 +84,8 @@ class ForumsScreenState extends State<ForumsScreen> {
   Map<String, RelevanceVote> _threadVotes = {};
   String? _threadVoteKey;
 
+  ForumSort get _sort =>
+      _mode == ForumFeedMode.pulse ? ForumSort.relevant : ForumSort.recent;
 
   bool get _canPost => canParticipateInForums(
         role: widget.profile.role,
@@ -74,14 +94,39 @@ class ForumsScreenState extends State<ForumsScreen> {
 
   bool get _isSearching => _query.trim().isNotEmpty;
 
+  bool get _isSavedMode => _mode == ForumFeedMode.saved;
+
   @override
   void initState() {
     super.initState();
-    _reload();
+    _saved.addListener(_onSavedChanged);
+    _boot();
+  }
+
+  Future<void> _boot() async {
+    await _saved.warm();
+    final fetch = widget.audienceSizeFetcher ?? fetchForumAudienceSize;
+    try {
+      _audienceSize = await fetch();
+    } catch (_) {
+      _audienceSize = 0;
+    }
+    if (!mounted) return;
+    await _reload();
+  }
+
+  void _onSavedChanged() {
+    if (!mounted) return;
+    if (_isSavedMode) {
+      _reload();
+    } else {
+      setState(() {});
+    }
   }
 
   @override
   void dispose() {
+    _saved.removeListener(_onSavedChanged);
     _searchController.dispose();
     super.dispose();
   }
@@ -96,19 +141,39 @@ class ForumsScreenState extends State<ForumsScreen> {
       _hasMore = false;
     });
     try {
-      final page = await _repository.queryThreads(
-        tag: _selectedTag,
-        authorId: _mineOnly ? widget.profile.uid : null,
-        sort: _sort,
-      );
-      if (!mounted) return;
-      setState(() {
-        _threads = page.threads;
-        _cursor = page.nextCursor;
-        _hasMore = page.hasMore;
-        _loading = false;
-        _refreshTagCatalog();
-      });
+      if (_isSavedMode) {
+        final ids = (await _saved.readIds()).toList();
+        final threads = await _repository.fetchThreadsByIds(ids);
+        // Drop bookmarks for deleted threads.
+        final found = threads.map((t) => t.id).toSet();
+        for (final id in ids) {
+          if (!found.contains(id)) {
+            await _saved.remove(id);
+          }
+        }
+        if (!mounted) return;
+        setState(() {
+          _threads = threads;
+          _cursor = null;
+          _hasMore = false;
+          _loading = false;
+          _refreshTagCatalog();
+        });
+      } else {
+        final page = await _repository.queryThreads(
+          tag: _selectedTag,
+          authorId: _mineOnly ? widget.profile.uid : null,
+          sort: _sort,
+        );
+        if (!mounted) return;
+        setState(() {
+          _threads = page.threads;
+          _cursor = page.nextCursor;
+          _hasMore = page.hasMore;
+          _loading = false;
+          _refreshTagCatalog();
+        });
+      }
       _ensureThreadVotes();
     } catch (error) {
       if (!mounted) return;
@@ -120,7 +185,7 @@ class ForumsScreenState extends State<ForumsScreen> {
   }
 
   Future<void> _loadMore() async {
-    if (_loadingMore || !_hasMore || _loading) return;
+    if (_isSavedMode || _loadingMore || !_hasMore || _loading) return;
     setState(() => _loadingMore = true);
     try {
       final page = await _repository.queryThreads(
@@ -165,36 +230,48 @@ class ForumsScreenState extends State<ForumsScreen> {
   void _setSelectedTag(String? tag) {
     if (_selectedTag == tag) return;
     setState(() => _selectedTag = tag);
-    _reload();
+    if (!_isSavedMode) _reload();
   }
 
   void _setMineOnly(bool value) {
     if (_mineOnly == value) return;
     setState(() => _mineOnly = value);
-    _reload();
+    if (!_isSavedMode) _reload();
   }
 
-  void _setSort(ForumSort value) {
-    if (_sort == value) return;
-    setState(() => _sort = value);
+  void _setMode(ForumFeedMode value) {
+    if (_mode == value) return;
+    setState(() => _mode = value);
     _reload();
   }
 
   Future<void> _softRefresh() async {
     try {
-      final page = await _repository.queryThreads(
-        tag: _selectedTag,
-        authorId: _mineOnly ? widget.profile.uid : null,
-        sort: _sort,
-      );
-      if (!mounted) return;
-      setState(() {
-        _threads = page.threads;
-        _cursor = page.nextCursor;
-        _hasMore = page.hasMore;
-        _refreshTagCatalog();
-      });
-      _threadVoteKey = null; // Re-fetch: votes may have changed in detail.
+      if (_isSavedMode) {
+        final ids = (await _saved.readIds()).toList();
+        final threads = await _repository.fetchThreadsByIds(ids);
+        if (!mounted) return;
+        setState(() {
+          _threads = threads;
+          _cursor = null;
+          _hasMore = false;
+          _refreshTagCatalog();
+        });
+      } else {
+        final page = await _repository.queryThreads(
+          tag: _selectedTag,
+          authorId: _mineOnly ? widget.profile.uid : null,
+          sort: _sort,
+        );
+        if (!mounted) return;
+        setState(() {
+          _threads = page.threads;
+          _cursor = page.nextCursor;
+          _hasMore = page.hasMore;
+          _refreshTagCatalog();
+        });
+      }
+      _threadVoteKey = null;
       _ensureThreadVotes();
     } catch (_) {
       // Keep current list on background refresh failure.
@@ -270,6 +347,11 @@ class ForumsScreenState extends State<ForumsScreen> {
     }
   }
 
+  Future<void> _toggleSave(ForumThread thread) async {
+    PulseHaptics.selection();
+    await _saved.toggle(thread.id);
+  }
+
   Future<void> openCreate() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -307,6 +389,12 @@ class ForumsScreenState extends State<ForumsScreen> {
       query: _query,
       sort: _sort,
     );
+    final spotlight = (!_isSavedMode && !_loading)
+        ? pickForumSpotlight(visible, _audienceSize)
+        : null;
+    final feedThreads = spotlight == null
+        ? visible
+        : visible.where((t) => t.id != spotlight.id).toList();
 
     return PulseScaffold(
       appBar: AppBar(
@@ -358,22 +446,6 @@ class ForumsScreenState extends State<ForumsScreen> {
               _searchOpen ? Icons.close_rounded : Icons.search_rounded,
             ),
           ),
-          PopupMenuButton<ForumSort>(
-            tooltip: l10n.forumsSortTooltip,
-            initialValue: _sort,
-            onSelected: _setSort,
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                value: ForumSort.recent,
-                child: Text(l10n.forumsSortRecent),
-              ),
-              PopupMenuItem(
-                value: ForumSort.relevant,
-                child: Text(l10n.forumsSortRelevant),
-              ),
-            ],
-            icon: const Icon(Icons.sort_rounded),
-          ),
           if (widget.onOpenNotifications != null)
             NotificationBellButton(
               unreadCount: widget.notificationUnread,
@@ -395,120 +467,121 @@ class ForumsScreenState extends State<ForumsScreen> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (_selectedTag != null || _mineOnly || _isSearching)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                4,
-                AppSpacing.md,
-                0,
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      _activeFilterLabel(l10n),
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colors.muted,
-                        fontWeight: FontWeight.w500,
+          ForumFeedModeBar(mode: _mode, onChanged: _setMode),
+          if (!_isSavedMode) ...[
+            if (_selectedTag != null || _mineOnly || _isSearching)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  4,
+                  AppSpacing.md,
+                  0,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        _activeFilterLabel(l10n),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.muted,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
                     ),
-                  ),
-                  if (_selectedTag != null || _mineOnly)
-                    TextButton(
-                      onPressed: () {
-                        setState(() {
-                          _selectedTag = null;
-                          _mineOnly = false;
-                        });
-                        _reload();
-                      },
-                      style: TextButton.styleFrom(
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                    if (_selectedTag != null || _mineOnly)
+                      TextButton(
+                        onPressed: () {
+                          setState(() {
+                            _selectedTag = null;
+                            _mineOnly = false;
+                          });
+                          _reload();
+                        },
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                        ),
+                        child: Text(l10n.forumsClearFilters),
                       ),
-                      child: Text(l10n.forumsClearFilters),
-                    ),
-                ],
-              ),
-            ),
-          Padding(
-            padding: const EdgeInsets.only(top: 6, bottom: 2),
-            child: SizedBox(
-              height: 40,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                children: [
-                  ForumFilterChip(
-                    label: l10n.forumsFilterMine,
-                    leading: Icons.person_outline_rounded,
-                    selected: _mineOnly,
-                    onTap: () => _setMineOnly(!_mineOnly),
-                  ),
-                  const SizedBox(width: 8),
-                  ForumFilterChip(
-                    label: _sort == ForumSort.relevant
-                        ? l10n.forumsFilterRelevant
-                        : l10n.forumsFilterRecent,
-                    leading: Icons.swap_vert_rounded,
-                    selected: false,
-                    onTap: () {
-                      _setSort(
-                        _sort == ForumSort.recent
-                            ? ForumSort.relevant
-                            : ForumSort.recent,
-                      );
-                    },
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 10),
-                    child: VerticalDivider(
-                      width: 1,
-                      thickness: 1,
-                      indent: 8,
-                      endIndent: 8,
-                      color: colors.border,
-                    ),
-                  ),
-                  for (final tag in _rankedTags) ...[
-                    ForumFilterChip(
-                      label: tag.tag,
-                      showHash: true,
-                      selected: _selectedTag == tag.tag,
-                      onTap: () {
-                        _setSelectedTag(
-                          _selectedTag == tag.tag ? null : tag.tag,
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 8),
                   ],
-                ],
+                ),
               ),
-            ),
-          ),
-          if (_canPost)
-            FeedComposerBar(
-              profile: widget.profile,
-              onTap: openCreate,
-            )
-          else
             Padding(
-              padding: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.md,
-                AppSpacing.sm,
-              ),
-              child: Text(
-                l10n.forumsReadOnlyBanner,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.muted,
-                  fontSize: 13,
+              padding: const EdgeInsets.only(top: 6, bottom: 2),
+              child: SizedBox(
+                height: 40,
+                child: ListView(
+                  scrollDirection: Axis.horizontal,
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+                  children: [
+                    ForumFilterChip(
+                      label: l10n.forumsFilterMine,
+                      leading: Icons.person_outline_rounded,
+                      selected: _mineOnly,
+                      onTap: () => _setMineOnly(!_mineOnly),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      child: VerticalDivider(
+                        width: 1,
+                        thickness: 1,
+                        indent: 8,
+                        endIndent: 8,
+                        color: colors.border,
+                      ),
+                    ),
+                    for (final tag in _rankedTags) ...[
+                      ForumFilterChip(
+                        label: tag.tag,
+                        showHash: true,
+                        selected: _selectedTag == tag.tag,
+                        onTap: () {
+                          _setSelectedTag(
+                            _selectedTag == tag.tag ? null : tag.tag,
+                          );
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                  ],
                 ),
               ),
             ),
+            if (_canPost)
+              FeedComposerBar(
+                profile: widget.profile,
+                onTap: openCreate,
+              )
+            else
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                ),
+                child: Text(
+                  l10n.forumsReadOnlyBanner,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.muted,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            PromoBannerSlot(
+              surface: PromoBannerSurface.home,
+              profile: widget.profile,
+              repository: widget.promoBannerRepository,
+              forumRepository: _repository,
+              chatRepository: widget.chatRepository,
+            ),
+            if (spotlight != null)
+              ForumSpotlightCard(
+                thread: spotlight,
+                onTap: () => _openThread(spotlight),
+              ),
+          ],
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
@@ -520,7 +593,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                           ? 'error'
                           : (_threads.isEmpty ? 'empty' : 'feed')),
                 ),
-                child: _buildFeed(context, l10n, visible),
+                child: _buildFeed(context, l10n, feedThreads),
               ),
             ),
           ),
@@ -558,14 +631,18 @@ class ForumsScreenState extends State<ForumsScreen> {
     if (_threads.isEmpty) {
       return EmptyState(
         mark: 'P',
-        title: _mineOnly
-            ? l10n.forumsEmptyMineTitle
-            : l10n.forumsEmptyFeedTitle,
-        subtitle: _mineOnly
-            ? l10n.forumsEmptyMineSubtitle
-            : l10n.forumsEmptyFeedSubtitle,
-        actionLabel: _canPost ? l10n.fabNewQuestion : null,
-        onAction: _canPost ? openCreate : null,
+        title: _isSavedMode
+            ? l10n.forumsSavedEmptyTitle
+            : (_mineOnly
+                ? l10n.forumsEmptyMineTitle
+                : l10n.forumsEmptyFeedTitle),
+        subtitle: _isSavedMode
+            ? l10n.forumsSavedEmptySubtitle
+            : (_mineOnly
+                ? l10n.forumsEmptyMineSubtitle
+                : l10n.forumsEmptyFeedSubtitle),
+        actionLabel: !_isSavedMode && _canPost ? l10n.fabNewQuestion : null,
+        onAction: !_isSavedMode && _canPost ? openCreate : null,
       );
     }
     if (visible.isEmpty) {
@@ -578,7 +655,7 @@ class ForumsScreenState extends State<ForumsScreen> {
       );
     }
 
-    final showLoadMore = _hasMore && !_isSearching;
+    final showLoadMore = !_isSavedMode && _hasMore && !_isSearching;
     final double bottomPad = widget.embeddedInShell
         ? pulseShellListBottomPad(context, hasFab: _canPost)
         : (_canPost ? 88.0 : AppSpacing.xl);
@@ -618,8 +695,10 @@ class ForumsScreenState extends State<ForumsScreen> {
             onTap: () => _openThread(thread),
             liked: (_threadVotes[thread.id] ?? RelevanceVote.none) ==
                 RelevanceVote.up,
+            saved: _saved.isSavedSync(thread.id),
             onLike: () => _toggleLike(thread),
             onComment: () => _openThread(thread),
+            onToggleSave: () => _toggleSave(thread),
             onShare: () {
               PulseHaptics.light();
               showShareToChatSheet(

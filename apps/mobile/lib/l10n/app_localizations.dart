@@ -1340,6 +1340,66 @@ abstract class AppLocalizations {
   /// **'Recent'**
   String get forumsFilterRecent;
 
+  /// No description provided for @forumsModeFresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Fresh'**
+  String get forumsModeFresh;
+
+  /// No description provided for @forumsModePulse.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse'**
+  String get forumsModePulse;
+
+  /// No description provided for @forumsModeSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved'**
+  String get forumsModeSaved;
+
+  /// No description provided for @forumsSpotlight.
+  ///
+  /// In en, this message translates to:
+  /// **'Spotlight'**
+  String get forumsSpotlight;
+
+  /// No description provided for @forumsJoinThread.
+  ///
+  /// In en, this message translates to:
+  /// **'Join the thread'**
+  String get forumsJoinThread;
+
+  /// No description provided for @forumsSavedEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing saved yet'**
+  String get forumsSavedEmptyTitle;
+
+  /// No description provided for @forumsSavedEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bookmark threads you want to revisit — they\'ll show up here.'**
+  String get forumsSavedEmptySubtitle;
+
+  /// No description provided for @forumsSaveThread.
+  ///
+  /// In en, this message translates to:
+  /// **'Save thread'**
+  String get forumsSaveThread;
+
+  /// No description provided for @forumsUnsaveThread.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove bookmark'**
+  String get forumsUnsaveThread;
+
+  /// No description provided for @promoBannerDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Dismiss promotion'**
+  String get promoBannerDismiss;
+
   /// No description provided for @forumsClearFilters.
   ///
   /// In en, this message translates to:
