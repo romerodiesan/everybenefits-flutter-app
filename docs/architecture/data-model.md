@@ -13,7 +13,7 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `users/{uid}/fcmTokens/{id}` | Push tokens |
 | `users/{uid}/notificationState/{id}` | Read/cursor state |
 | `publicProfiles/{uid}` | Directory-safe public card (synced by Functions) |
-| `threads/{threadId}` | Forum threads |
+| `threads/{threadId}` | Forum threads (`interactorCount` = unique author/voters/repliers). Spotlight: ≥80% active users + absolute floors (min audience 25). Hot: ≥35% reach + floors. |
 | `threads/{threadId}/replies/{replyId}` | Replies |
 | `threads/{threadId}/votes/{uid}` | Thread votes |
 | `threads/{threadId}/participants/{uid}` | Notify targets |
@@ -25,10 +25,16 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `analyticsDedupe/{id}` | Client event idempotency (Functions-only) |
 | `analyticsViewerDays/{id}` | Approximate unique viewers (Functions-only) |
 | `paths/{pathId}` | Learning paths |
-| `orgNodes/{id}` | Org hierarchy (Admin); mutations via Functions |
-| `paymentsParticipants/{id}` | Override economic participants (`agency` \| `agent` only) |
-| `businessRelationships/{id}` | Temporal upline→downline edges; type derived from participant pair |
-| `contractTerms/{id}` | Contract levels (e.g. PMPM) by participant + scope |
+| `orgNodes/{id}` | Org hierarchy (Admin + Payments identity SoT per ADR-008) |
+| `paymentsParticipants/{id}` | **Legacy** economic participants — deprecated for new Commission Runs |
+| `businessRelationships/{id}` | **Legacy** upline edges — hierarchy now from orgNodes/users for new runs |
+| `contractTerms/{id}` | Contract levels (e.g. PMPM) by participant + scope; may be materialized from a plan |
+| `compensationTiers/{id}` | Named **override** PMPM level templates for plans (not commission) |
+| `agentRateGroups/{id}` | Agent cohorts for shared plan slots |
+| `compensationPlans/{id}` | Reusable multi-carrier compensation packages |
+| `planAssignments/{id}` | Plan apply targets (agencies / agents) + pay mode |
+| `paymentRouting/{id}` | **Legacy** remittance map by participant id |
+| `agencyPayModes/{orgNodeId}` | ADR-008 agency pay mode (`direct` \| `through_agency`) |
 | `carriers/{id}` | Carrier catalog (`market`: aca \| medicare \| life) |
 | `carrierStateRates/{id}` | Per-state platform-owner intake: commission + override (`flat` \| `percent`); one active row per carrier+state |
 | `statements/{id}` | Imported carrier/FMO statements |
@@ -36,10 +42,27 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `overrideRuns/{id}` | Calculation run metadata |
 | `overrideAllocations/{id}` | Per-participant override portions for a run |
 | `reconciliationItems/{id}` | Expected vs received diffs for a run |
+| `commissionRuns/{id}` | Commission run workflow (ADR-008) |
+| `commissionSourceFiles/{id}` | Uploaded source files for a run |
+| `commissionImportProfiles/{id}` | Column mapping profiles |
+| `commissionTransactions/{id}` | Normalized lines (cents; commission + override streams) |
+| `commissionRules/{id}` | Compensation rules (`stream`: commission \| override) |
+| `commissionRuleVersions/{id}` | Immutable rule snapshots |
+| `commissionValidationIssues/{id}` | Validation / reconciliation issues |
+| `commissionCalculations/{id}` | Versioned calculation attempts |
+| `commissionAllocations/{id}` | Per-party allocations + breakdown |
+| `commissionStatements/{id}` | Generated recipient statements |
+| `commissionStatementVersions/{id}` | Statement artifact versions |
+| `commissionNotifications/{id}` | Email notification batch rows |
+| `commissionAuditEvents/{id}` | Commission module audit trail |
+| `commissionSettings/{id}` | Tolerances / defaults |
 | `functionUsage/{id}` | Callable rate / usage counters |
 | `ssoHandoffs/{code}` | Cross-app SSO codes (60s TTL; configure Firestore TTL on `expiresAt`) |
 | `ssoRateLimit/{id}` | SSO abuse counters (configure Firestore TTL on `expiresAt`) |
 | `platformConfig/{id}` | Platform settings |
+| `promoBanners/{id}` | In-app promotional banners (`type`, `format`, `surface`, dismissible/CTA/image toggles, localized copy; Admin-managed). Multiple active banners on the same surface rotate in a Pulse carousel. |
+
+**Payments access:** payments-admin clients may **read** economic / commission collections via Firestore rules (`canAccessPaymentsData`). All **writes** go through Cloud Functions / Admin SDK. Identity for new Commission Runs is Pulse `orgNodes` + `users` ([ADR-008](ADR-008-commission-runs.md)); both **commission** and **override** streams are first-class. Recipient statements in Pulse use scoped callables + `commission.statements.self`, not broad client reads.
 
 Legacy note: some chat-related docs may appear under Firestore `chats/**` rules; **live chat traffic is RTDB** (below).
 

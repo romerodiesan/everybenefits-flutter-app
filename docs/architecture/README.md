@@ -68,6 +68,7 @@ See [ADR-003](ADR-003-trusted-boundary.md).
 | [ADR-003](ADR-003-trusted-boundary.md) | Rules vs Functions vs Next API |
 | [ADR-005](ADR-005-security-ops.md) | App Check, CORS, ops checklist |
 | [ADR-006](ADR-006-auth-hub.md) | Pulse auth hub; Firebase IdP; `@pulse/sso` protocol |
-| [ADR-007](ADR-007-payments-overrides.md) | Payments app + override distribution domain |
+| [ADR-007](ADR-007-payments-overrides.md) | Payments app + override domain (identity superseded by ADR-008) |
+| [ADR-008](ADR-008-commission-runs.md) | Commission Runs: Pulse identity, pay mode, commission + override |
 
 Also: [data-model.md](data-model.md), [creator-analytics.md](creator-analytics.md), [environments.md](environments.md), [flutter-di.md](flutter-di.md).

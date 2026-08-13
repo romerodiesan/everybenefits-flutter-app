@@ -2,25 +2,27 @@
 
 ## Status
 
-Accepted
+Accepted — **identity / sync portions superseded by [ADR-008](ADR-008-commission-runs.md)**
 
 ## Context
 
-Pulse Admin models an operational org tree (`orgNodes`) with fixed depth and users attached via `orgNodeId`. ACA override economics require a different graph: participants (agency or agent), temporal business relationships (including Agent→Agent and Agency→Agency), contract levels, carrier markets with per-state rates, statement ingest, and expected-vs-received reconciliation. Forcing that into `orgNodes` would break Admin and still could not represent agent-as-upline recipients.
+Pulse Admin models an operational org tree (`orgNodes`) with fixed depth and users attached via `orgNodeId`. ACA override economics require participants (agency or agent), temporal relationships, contract levels, carrier markets with per-state rates, statement ingest, and expected-vs-received reconciliation.
 
 ## Decision
 
 - Ship a dedicated Next.js app **`apps/payments`** (port 3004, domain `payments.everybenefits.us`) gated by `apps.payments.access` / `platform.manage` (platform admins).
 - Auth via Pulse hub + `@pulse/sso` (ADR-006); register in `PULSE_APPS` as `"payments"`.
 - Domain types and pure calculation live in **`@pulse/shared`** (`payments/*`). Mutations and statement/calc orchestration live in **Cloud Functions** (ADR-003).
-- Economic source of truth is **`paymentsParticipants` + `businessRelationships` + `contractTerms`**, not `orgNodes`. Optional `linkedOrgNodeId` is a UX bridge only.
-- **Participants** are only `agency` | `agent`. A “sub-agency” is an agency that is downline of another agency (`agency_agency`). Carriers are **not** participants; they live in `carriers/{id}` with a `market` (`aca` | `medicare` | `life`) and optional `carrierStateRates/{id}` (one active row per state with **commission** and **override** intake for the platform-owner / matriz agency — not downline distribution).
-- **Relationships** are always **upline → downline** (authority only downward). `relationshipType` is **derived** from participant types (`agency_agency` | `agency_agent` | `agent_agent`); the admin does not pick a free enum. Cycles in the upline chain are rejected.
-- Out of scope for v1: agent base-commission payroll UI; agency-leader authz for managing their own downline (platform admins only in the UI today).
+- **Identity (superseded):** ADR-007 originally synced `orgNodes`/`users` → `paymentsParticipants`. **ADR-008:** Payments uses Pulse identity directly (`PartyRef`); no sync for new Commission Runs.
+- **Override calc** remains first-class (hierarchy spread). ADR-008 adds a parallel **commission** stream in the same module.
+- Carriers are **not** parties; they live in `carriers/{id}` with a `market` and **`code` exactly 4 digits**. `carrierStateRates/{id}` holds commission + override intake.
+- **Contract levels / compensation plans** remain an authoring path for override ladders (`contractTerms` materialization) until fully absorbed into `commissionRules`.
+- **Pay mode** (`direct` | `through_agency`) is remittance routing — see ADR-008 `agencyPayModes`.
+- Out of scope: live Google Sheets OAuth; payouts (ACH/Stripe); volume-based tiers (unless added later).
 
 ## Consequences
 
-- Pulse Admin `orgNodes` remain for learning/community ops until a future convergence.
-- Override math must never key off `users.agency` or `orgNodes.type`.
-- New Firestore collections are Admin-SDK write / payments-admin read.
-- Calc may resolve carrier **override** intake from `carrierStateRates.overrideRate` when a statement line omits `carrierRate`. Commission on the carrier row is catalog-only in v1.
+- See **ADR-008** for Commission Run workflow, cents money, and portal in Pulse.
+- Legacy `paymentsParticipants` / sync hooks are deprecated for new features; do not expand them.
+- Override hierarchy business rules (upline spread; writing producer not allocated own-book override by default) remain unless product changes them explicitly.
+- **Read policy:** payments-admin clients may **read** economic / commission collections via `canAccessPaymentsData`. All **writes** are Functions / Admin SDK only.
