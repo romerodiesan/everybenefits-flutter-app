@@ -113,7 +113,8 @@ export function resolveContractRate(
 
 /**
  * Resolve carrier override intake for a state from carrierStateRates.
- * Uses overrideRate when unit is flat (dollar amount for the override stack).
+ * Uses overrideRate when unit is pmpm or flat (dollar amount for the override
+ * stack; both multiply by member months in allocateLineOverrides).
  * Percent is catalog-only for the calc engine in v1.
  */
 export function resolveCarrierStateRate(
@@ -127,9 +128,16 @@ export function resolveCarrierStateRate(
   const candidates = rates.filter((r) => {
     if (!r.active || r.carrierId !== carrierId) return false;
     if (r.state.toUpperCase() !== stateCode) return false;
-    return r.overrideRateUnit === "flat";
+    return (
+      r.overrideRateUnit === "pmpm" || r.overrideRateUnit === "flat"
+    );
   });
   if (candidates.length === 0) return null;
+  // Prefer pmpm when multiple active rows somehow match.
+  candidates.sort((a, b) => {
+    const rank = (u: string) => (u === "pmpm" ? 0 : 1);
+    return rank(a.overrideRateUnit) - rank(b.overrideRateUnit);
+  });
   return candidates[0]!.overrideRate;
 }
 

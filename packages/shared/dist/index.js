@@ -22,4 +22,5 @@ __exportStar(require("./csp"), exports);
 __exportStar(require("./profile"), exports);
 __exportStar(require("./org"), exports);
 __exportStar(require("./payments"), exports);
+__exportStar(require("./banners"), exports);
 __exportStar(require("./schemas/index"), exports);

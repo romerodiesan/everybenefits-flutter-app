@@ -169,12 +169,37 @@ export function canAccessAdmin(roleOrPermissions: RoleOrPermissions) {
   );
 }
 
-/** Override Management portal — platform admins only (not managers by default). */
+/** Override / Commission Management portal — platform admins only (not managers by default). */
 export function canAccessPayments(roleOrPermissions: RoleOrPermissions) {
   return (
     can(roleOrPermissions, "apps.payments.access") ||
     can(roleOrPermissions, "platform.manage")
   );
+}
+
+/**
+ * Granular commission ops. `apps.payments.access` / `platform.manage` imply
+ * `commission.view`. Mutating ops require the explicit key (or platform.manage).
+ */
+export function hasCommissionPermission(
+  roleOrPermissions: RoleOrPermissions,
+  key:
+    | "commission.view"
+    | "commission.upload"
+    | "commission.resolve"
+    | "commission.calculate"
+    | "commission.approve"
+    | "commission.publish"
+    | "commission.manageRules"
+    | "commission.manageImportProfiles"
+    | "commission.viewAudit"
+    | "commission.statements.self",
+) {
+  if (can(roleOrPermissions, "platform.manage")) return true;
+  if (key === "commission.view" && canAccessPayments(roleOrPermissions)) {
+    return true;
+  }
+  return can(roleOrPermissions, key);
 }
 
 export function canManagePlatform(roleOrPermissions: RoleOrPermissions) {

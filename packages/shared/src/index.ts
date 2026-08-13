@@ -6,4 +6,5 @@ export * from "./csp";
 export * from "./profile";
 export * from "./org";
 export * from "./payments";
+export * from "./banners";
 export * from "./schemas/index";

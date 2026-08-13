@@ -14,6 +14,7 @@ exports.forumThreadFixtureSchema = zod_1.z.object({
     authorRole: user_1.userRoleSchema,
     replyCount: zod_1.z.number().int().nonnegative(),
     score: zod_1.z.number().int(),
+    interactorCount: zod_1.z.number().int().nonnegative().optional(),
     acceptedReplyId: zod_1.z.string().nullable(),
     createdAt: zod_1.z.string().datetime().nullable(),
     updatedAt: zod_1.z.string().datetime().nullable(),

@@ -21,7 +21,7 @@ export const RATE_UNITS = ["pmpm", "flat", "percent"] as const;
 export type RateUnit = (typeof RATE_UNITS)[number];
 
 /** Units allowed on carrier state intake (commission / override). */
-export const CARRIER_RATE_UNITS = ["flat", "percent"] as const;
+export const CARRIER_RATE_UNITS = ["pmpm", "flat", "percent"] as const;
 export type CarrierRateUnit = (typeof CARRIER_RATE_UNITS)[number];
 
 export const CARRIER_MARKETS = ["aca", "medicare", "life"] as const;
@@ -50,6 +50,10 @@ export type PaymentsParticipant = {
   updatedAt?: string;
 };
 
+/** How a business relationship was created. */
+export const RELATIONSHIP_SOURCES = ["manual", "org_hierarchy"] as const;
+export type RelationshipSource = (typeof RELATIONSHIP_SOURCES)[number];
+
 export type BusinessRelationship = {
   id: string;
   /** Party that owns / defines the relationship (authority downward). */
@@ -64,12 +68,15 @@ export type BusinessRelationship = {
   /** Optional retention fraction of the spread at this edge (0–1). Default 0. */
   retentionFraction: number;
   notes: string | null;
+  /** Derived from org tree when `org_hierarchy`. */
+  source: RelationshipSource;
   active: boolean;
 };
 
 export type ContractTerm = {
   id: string;
   participantId: string;
+  /** Required on create/update; legacy rows may still be null until edited. */
   carrierId: string | null;
   states: string[];
   productCodes: string[];
@@ -78,6 +85,111 @@ export type ContractTerm = {
   effectiveFrom: string;
   effectiveTo: string | null;
   active: boolean;
+  /** Set when materialized from a compensation plan. */
+  sourcePlanId?: string | null;
+  sourceAssignmentId?: string | null;
+};
+
+/** Named PMPM **override** level templates (not commission; not volume thresholds). */
+export const COMPENSATION_TIER_KINDS = ["agency", "agent", "generic"] as const;
+export type CompensationTierKind = (typeof COMPENSATION_TIER_KINDS)[number];
+
+export type CompensationTier = {
+  id: string;
+  name: string;
+  /** Override contract level (PMPM) used in the spread ladder. */
+  rate: number;
+  rateUnit: RateUnit;
+  kind: CompensationTierKind;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/** Cohort of agent participants that share a plan slot rate. */
+export type AgentRateGroup = {
+  id: string;
+  name: string;
+  memberParticipantIds: string[];
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/** Remittance routing — does not change override spread math. */
+export const PAY_MODES = ["direct", "through_agency"] as const;
+export type PayMode = (typeof PAY_MODES)[number];
+
+export const PLAN_SLOT_ROLES = [
+  "agency_root",
+  "agency_child",
+  "agent_default",
+  "agent_group",
+  "agent_override",
+] as const;
+export type PlanSlotRole = (typeof PLAN_SLOT_ROLES)[number];
+
+export type CompensationPlanSlot = {
+  role: PlanSlotRole;
+  /** Prefer tier catalog; when null, use `rate`. */
+  tierId: string | null;
+  rate: number | null;
+  rateUnit: RateUnit;
+  /** Required when role is agent_group. */
+  agentRateGroupId: string | null;
+  /** Required when role is agent_override. */
+  participantIds: string[];
+};
+
+export type CompensationPlan = {
+  id: string;
+  name: string;
+  /** Empty = choose carriers at apply time. */
+  carrierIds: string[];
+  slots: CompensationPlanSlot[];
+  payModeDefault: PayMode;
+  /** Used when payMode is through_agency (0–1). */
+  retentionFractionDefault: number;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type PlanAssignmentAgentPayOverride = {
+  participantId: string;
+  payMode: PayMode;
+};
+
+export type PlanAssignment = {
+  id: string;
+  planId: string;
+  agencyParticipantIds: string[];
+  /** Expand to child agencies via agency_agency edges. */
+  includeDescendantAgencies: boolean;
+  /** Extra agents beyond those under selected agencies. */
+  agentParticipantIds: string[];
+  /** null = use plan default. */
+  payMode: PayMode | null;
+  retentionFraction: number | null;
+  agentPayModeOverrides: PlanAssignmentAgentPayOverride[];
+  /** null = use plan effectiveFrom. */
+  effectiveFrom: string | null;
+  active: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/** Denormalized remittance map keyed by agent participant id. */
+export type PaymentRouting = {
+  id: string;
+  participantId: string;
+  payMode: PayMode;
+  payeeParticipantId: string;
+  planId: string | null;
+  assignmentId: string | null;
+  updatedAt?: string;
 };
 
 export type Carrier = {
@@ -172,6 +284,15 @@ export type OverrideRun = {
   receivedTotal: number;
   differenceTotal: number;
   createdBy: string;
+};
+
+/** Slim home-dashboard payload — counts + recent runs only. */
+export type PaymentsOverview = {
+  carriers: { active: number };
+  statements: {
+    total: number;
+    imported: number;
+  };
 };
 
 /** Map legacy participant type strings onto the current enum. */

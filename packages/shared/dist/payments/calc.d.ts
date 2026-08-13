@@ -15,7 +15,8 @@ export declare function isRelationshipActive(rel: BusinessRelationship, scope: C
 export declare function resolveContractRate(terms: readonly ContractTerm[], participantId: string, scope: CalcScope): number | null;
 /**
  * Resolve carrier override intake for a state from carrierStateRates.
- * Uses overrideRate when unit is flat (dollar amount for the override stack).
+ * Uses overrideRate when unit is pmpm or flat (dollar amount for the override
+ * stack; both multiply by member months in allocateLineOverrides).
  * Percent is catalog-only for the calc engine in v1.
  */
 export declare function resolveCarrierStateRate(rates: readonly CarrierStateRate[], carrierId: string | null, state: string | null, _asOf: string): number | null;

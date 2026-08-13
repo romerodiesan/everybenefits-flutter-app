@@ -12,6 +12,7 @@ export const forumThreadFixtureSchema = z.object({
   authorRole: userRoleSchema,
   replyCount: z.number().int().nonnegative(),
   score: z.number().int(),
+  interactorCount: z.number().int().nonnegative().optional(),
   acceptedReplyId: z.string().nullable(),
   createdAt: z.string().datetime().nullable(),
   updatedAt: z.string().datetime().nullable(),

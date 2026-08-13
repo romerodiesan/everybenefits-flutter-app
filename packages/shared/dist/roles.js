@@ -16,6 +16,7 @@ exports.canParticipateInForums = canParticipateInForums;
 exports.canParticipateInChats = canParticipateInChats;
 exports.canAccessAdmin = canAccessAdmin;
 exports.canAccessPayments = canAccessPayments;
+exports.hasCommissionPermission = hasCommissionPermission;
 exports.canManagePlatform = canManagePlatform;
 exports.canModerateForums = canModerateForums;
 exports.canAccessStudio = canAccessStudio;
@@ -134,10 +135,22 @@ function canAccessAdmin(roleOrPermissions) {
     return ((0, permissions_1.can)(roleOrPermissions, "admin.access") ||
         (0, permissions_1.can)(roleOrPermissions, "apps.admin.access"));
 }
-/** Override Management portal — platform admins only (not managers by default). */
+/** Override / Commission Management portal — platform admins only (not managers by default). */
 function canAccessPayments(roleOrPermissions) {
     return ((0, permissions_1.can)(roleOrPermissions, "apps.payments.access") ||
         (0, permissions_1.can)(roleOrPermissions, "platform.manage"));
+}
+/**
+ * Granular commission ops. `apps.payments.access` / `platform.manage` imply
+ * `commission.view`. Mutating ops require the explicit key (or platform.manage).
+ */
+function hasCommissionPermission(roleOrPermissions, key) {
+    if ((0, permissions_1.can)(roleOrPermissions, "platform.manage"))
+        return true;
+    if (key === "commission.view" && canAccessPayments(roleOrPermissions)) {
+        return true;
+    }
+    return (0, permissions_1.can)(roleOrPermissions, key);
 }
 function canManagePlatform(roleOrPermissions) {
     return (0, permissions_1.can)(roleOrPermissions, "platform.manage");
