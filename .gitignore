@@ -124,6 +124,10 @@ test/rules/package-lock.json
 # Cloud Functions
 apps/functions/node_modules/
 apps/functions/lib/
+apps/functions/src/**/*.js
+apps/functions/src/**/*.js.map
+apps/functions/src/**/*.d.ts
+apps/functions/src/**/*.d.ts.map
 
 # Next.js apps
 apps/web/node_modules/
@@ -136,6 +140,23 @@ apps/studio/.env*.local
 apps/admin/node_modules/
 apps/admin/.next/
 apps/admin/.env*.local
+
+# Accidental tsc emit of next.config.ts → next.config.js (breaks next-intl CJS interop)
+apps/*/next.config.js
+# Accidental tsc emit beside TypeScript sources (never commit)
+apps/**/proxy.js
+apps/web/**/*.js
+apps/admin/**/*.js
+apps/studio/**/*.js
+apps/payments/**/*.js
+apps/legal/**/*.js
+!apps/*/scripts/**
+!apps/*/public/**
+!apps/*/test/stubs/**
+packages/*/src/**/*.js
+packages/*/src/**/*.js.map
+packages/*/src/**/*.d.ts
+packages/*/src/**/*.d.ts.map
 
 # Flutter mobile
 apps/mobile/.dart_tool/
