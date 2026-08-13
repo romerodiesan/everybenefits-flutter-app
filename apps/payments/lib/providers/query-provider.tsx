@@ -5,20 +5,11 @@ import {
   QueryClient,
   QueryClientProvider,
 } from "@tanstack/react-query";
+import { createPulseQueryClientOptions } from "@pulse/firebase-web";
 
 export function AdminQueryProvider({ children }: { children: ReactNode }) {
   const [client] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: {
-          queries: {
-            staleTime: 45_000,
-            gcTime: 5 * 60_000,
-            refetchOnWindowFocus: false,
-            retry: 1,
-          },
-        },
-      }),
+    () => new QueryClient(createPulseQueryClientOptions()),
   );
   return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 }

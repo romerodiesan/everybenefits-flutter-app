@@ -7,13 +7,21 @@ import type { Carrier, CarrierMarket } from "@pulse/shared";
 import { CARRIER_MARKETS } from "@pulse/shared";
 import {
   deleteCarrier,
-  listCarriers,
+  importCarrierStateRates,
   upsertCarrier,
 } from "@/lib/firebase/functions";
+import { useCarriers, useInvalidatePayments } from "@/lib/payments-queries";
+import {
+  downloadCarrierRatesTemplate,
+  parseCarrierRatesFile,
+  sanitizeCarrierRatesRows,
+} from "@/lib/carrier-rates-import";
 import { Link } from "@/i18n/navigation";
 import { Button, SearchInput } from "@/components/ui/primitives";
 import { DataTable } from "@/components/ui/data-table";
 import { useAlerts } from "@/lib/providers/alert-provider";
+
+const CARRIER_CODE_RE = /^\d{4}$/;
 
 const FILTER_SELECT_CLASS =
   "h-8 w-full min-w-[9.5rem] rounded-lg border border-glass-border bg-transparent px-2.5 text-xs text-ink outline-none focus:border-brand focus:ring-2 focus:ring-brand/15";
@@ -60,7 +68,8 @@ function marketLabel(
 export default function CarriersPage() {
   const t = useTranslations();
   const alerts = useAlerts();
-  const [rows, setRows] = useState<Carrier[]>([]);
+  const { data: rows = [], isLoading, isFetching, isError, refetch } = useCarriers();
+  const inv = useInvalidatePayments();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [rowBusy, setRowBusy] = useState<string | null>(null);
@@ -71,6 +80,10 @@ export default function CarriersPage() {
   const [marketFilter, setMarketFilter] = useState<CarrierMarket | "">("");
   const [pageSize, setPageSize] = useState(25);
   const [pageIndex, setPageIndex] = useState(0);
+  const [importBusy, setImportBusy] = useState(false);
+  const [importSummary, setImportSummary] = useState<string | null>(null);
+
+  const codeValid = CARRIER_CODE_RE.test(code.trim());
 
   const filteredRows = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -100,15 +113,8 @@ export default function CarriersPage() {
     setBusy(true);
     setError(null);
     try {
-      const carriers = await listCarriers();
-      setRows(
-        carriers
-          .filter((c) => c.active !== false)
-          .map((c) => ({
-            ...c,
-            market: carrierMarket(c.market),
-          })),
-      );
+      await refetch();
+      await inv.invalidatePlanWorkspace();
     } catch {
       setError(t("errorGeneric"));
     } finally {
@@ -190,13 +196,12 @@ export default function CarriersPage() {
     [t, busy, rowBusy],
   );
 
-  useEffect(() => {
-    void reload();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   async function onCreate(e: React.FormEvent) {
     e.preventDefault();
+    if (!codeValid) {
+      setError(t("carrierCodeInvalid"));
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -216,6 +221,38 @@ export default function CarriersPage() {
     }
   }
 
+  async function onImportFile(file: File | null) {
+    if (!file) return;
+    setImportBusy(true);
+    setError(null);
+    setImportSummary(null);
+    try {
+      const rows = sanitizeCarrierRatesRows(await parseCarrierRatesFile(file));
+      if (rows.length === 0) {
+        setError(t("carrierRatesImportEmpty"));
+        return;
+      }
+      const result = await importCarrierStateRates(rows);
+      setImportSummary(
+        t("carrierRatesImportDone", {
+          imported: result.imported,
+          updated: result.updated,
+          created: result.carriersCreated,
+          errors: result.errors.length,
+        }),
+      );
+      await reload();
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message.trim()
+          ? err.message
+          : t("carrierRatesImportFailed");
+      setError(message);
+    } finally {
+      setImportBusy(false);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-6 lg:p-10">
       <header>
@@ -223,60 +260,101 @@ export default function CarriersPage() {
         <p className="mt-2 text-sm text-muted">{t("carriersSubtitle")}</p>
       </header>
 
-      <form
-        onSubmit={onCreate}
-        className="studio-panel grid gap-2 p-3 sm:grid-cols-4"
-      >
-        <label className="block text-xs">
-          <span className="text-muted">{t("name")}</span>
-          <input
-            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-          />
-        </label>
-        <label className="block text-xs">
-          <span className="text-muted">{t("code")}</span>
-          <input
-            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
-            value={code}
-            onChange={(e) => setCode(e.target.value)}
-            required
-          />
-        </label>
-        <label className="block text-xs">
-          <span className="text-muted">{t("market")}</span>
-          <select
-            className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
-            value={market}
-            onChange={(e) => setMarket(e.target.value as CarrierMarket)}
-          >
-            {CARRIER_MARKETS.map((m) => (
-              <option key={m} value={m}>
-                {marketLabel(t, m)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="flex items-end">
+      <form onSubmit={onCreate} className="studio-panel space-y-3 p-4">
+        <div className="grid gap-3 sm:grid-cols-3">
+          <label className="block text-xs">
+            <span className="text-muted">{t("name")}</span>
+            <input
+              className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </label>
+          <label className="block text-xs">
+            <span className="text-muted">{t("code")}</span>
+            <input
+              className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
+              value={code}
+              inputMode="numeric"
+              maxLength={4}
+              pattern="\d{4}"
+              placeholder="1001"
+              onChange={(e) =>
+                setCode(e.target.value.replace(/\D/g, "").slice(0, 4))
+              }
+              required
+            />
+            {!codeValid && code.length > 0 ? (
+              <span className="mt-1 block text-[10px] text-red-600">
+                {t("carrierCodeInvalid")}
+              </span>
+            ) : null}
+          </label>
+          <label className="block text-xs">
+            <span className="text-muted">{t("market")}</span>
+            <select
+              className="mt-1 h-8 w-full rounded-lg border border-glass-border bg-sheet px-2.5 text-xs"
+              value={market}
+              onChange={(e) => setMarket(e.target.value as CarrierMarket)}
+            >
+              {CARRIER_MARKETS.map((m) => (
+                <option key={m} value={m}>
+                  {marketLabel(t, m)}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-glass-border pt-3">
           <Button
             type="submit"
             size="sm"
             className="px-3"
-            disabled={busy || !name.trim() || !code.trim()}
+            disabled={busy || !name.trim() || !codeValid}
           >
             {t("create")}
           </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={importBusy}
+              onClick={() => downloadCarrierRatesTemplate()}
+            >
+              {t("carrierRatesDownloadTemplate")}
+            </Button>
+            <label className="inline-flex h-8 cursor-pointer items-center rounded-lg border border-glass-border bg-sheet px-2.5 text-xs font-semibold text-ink transition hover:bg-white/[0.04]">
+              {importBusy ? t("loading") : t("carrierRatesUpload")}
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls,text/csv"
+                className="hidden"
+                disabled={importBusy}
+                onChange={(e) => {
+                  const file = e.target.files?.[0] ?? null;
+                  e.target.value = "";
+                  void onImportFile(file);
+                }}
+              />
+            </label>
+          </div>
         </div>
       </form>
 
-      {error ? <p className="text-sm text-red-600">{error}</p> : null}
+      {importSummary ? (
+        <p className="text-xs text-emerald-700">{importSummary}</p>
+      ) : null}
+
+      {error || isError ? (
+        <p className="text-sm text-red-600">{error ?? t("errorGeneric")}</p>
+      ) : null}
 
       <DataTable
         columns={columns}
         data={pagedRows}
-        loading={busy && rows.length === 0}
+        loading={(isLoading || busy) && rows.length === 0}
         isFetching={busy && rows.length > 0}
         emptyTitle={
           rows.length > 0 && filteredRows.length === 0

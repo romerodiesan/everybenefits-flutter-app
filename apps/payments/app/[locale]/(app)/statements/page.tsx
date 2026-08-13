@@ -2,13 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "@/i18n/navigation";
 import type { Statement } from "@pulse/shared";
-import {
-  importStatement,
-  listStatements,
-  runOverrideCalculation,
-} from "@/lib/firebase/functions";
+import { importStatement, listStatements } from "@/lib/firebase/functions";
 import { Button } from "@/components/ui/primitives";
 
 const SAMPLE_LINES = `[
@@ -26,7 +21,6 @@ const SAMPLE_LINES = `[
 
 export default function StatementsPage() {
   const t = useTranslations();
-  const router = useRouter();
   const [rows, setRows] = useState<Statement[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -66,18 +60,6 @@ export default function StatementsPage() {
         lines,
       });
       await reload();
-    } catch {
-      setError(t("errorGeneric"));
-      setBusy(false);
-    }
-  }
-
-  async function onRun(statementId: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await runOverrideCalculation(statementId);
-      router.push(`/runs/${result.runId}`);
     } catch {
       setError(t("errorGeneric"));
       setBusy(false);
@@ -144,19 +126,18 @@ export default function StatementsPage() {
       {error ? <p className="text-sm text-red-600">{error}</p> : null}
 
       <div className="studio-panel overflow-x-auto">
-        <table className="w-full min-w-[40rem] text-left text-sm">
+        <table className="w-full min-w-[32rem] text-left text-sm">
           <thead className="border-b border-glass-border text-muted">
             <tr>
               <th className="px-4 py-3 font-medium">{t("label")}</th>
               <th className="px-4 py-3 font-medium">{t("status")}</th>
               <th className="px-4 py-3 font-medium">Lines</th>
-              <th className="px-4 py-3 font-medium" />
             </tr>
           </thead>
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td className="px-4 py-6 text-muted" colSpan={4}>
+                <td className="px-4 py-6 text-muted" colSpan={3}>
                   {busy ? t("loading") : t("empty")}
                 </td>
               </tr>
@@ -166,17 +147,6 @@ export default function StatementsPage() {
                   <td className="px-4 py-3 font-medium">{row.label}</td>
                   <td className="px-4 py-3">{row.status}</td>
                   <td className="px-4 py-3">{row.lineCount}</td>
-                  <td className="px-4 py-3 text-right">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={busy}
-                      onClick={() => void onRun(row.id)}
-                    >
-                      {t("runCalculation")}
-                    </Button>
-                  </td>
                 </tr>
               ))
             )}

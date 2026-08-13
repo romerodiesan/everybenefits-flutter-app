@@ -149,22 +149,6 @@ function IconPeople({ filled, ...props }: IconProps) {
   );
 }
 
-function IconLink({ filled, ...props }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" {...props}>
-      <path
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill={filled ? "currentColor" : "none"}
-        fillOpacity={filled ? 0.12 : 0}
-        d="M10 13a5 5 0 0 0 7.07 0l1.41-1.41a5 5 0 0 0-7.07-7.07L10 5.93M14 11a5 5 0 0 0-7.07 0L5.52 12.4a5 5 0 1 0 7.07 7.07L14 18.07"
-      />
-    </svg>
-  );
-}
-
 function IconRates({ filled, ...props }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
@@ -289,22 +273,16 @@ export function PaymentsShell({ children }: { children: ReactNode }) {
         Icon: IconOverview,
       },
       {
-        href: "/participants",
-        label: t("navParticipants"),
-        match: (p: string) => p.startsWith("/participants"),
+        href: "/commission-runs",
+        label: t("navCommissionRuns"),
+        match: (p: string) => p.startsWith("/commission-runs"),
+        Icon: IconRuns,
+      },
+      {
+        href: "/agencies",
+        label: t("navAgencies"),
+        match: (p: string) => p.startsWith("/agencies"),
         Icon: IconPeople,
-      },
-      {
-        href: "/relationships",
-        label: t("navRelationships"),
-        match: (p: string) => p.startsWith("/relationships"),
-        Icon: IconLink,
-      },
-      {
-        href: "/contract-terms",
-        label: t("navContractTerms"),
-        match: (p: string) => p.startsWith("/contract-terms"),
-        Icon: IconRates,
       },
       {
         href: "/carriers",
@@ -313,16 +291,17 @@ export function PaymentsShell({ children }: { children: ReactNode }) {
         Icon: IconCarrier,
       },
       {
+        href: "/plans",
+        label: t("navPlans"),
+        match: (p: string) =>
+          p.startsWith("/plans") || p.startsWith("/contract-terms"),
+        Icon: IconRates,
+      },
+      {
         href: "/statements",
         label: t("navStatements"),
         match: (p: string) => p.startsWith("/statements"),
         Icon: IconStatement,
-      },
-      {
-        href: "/runs",
-        label: t("navRuns"),
-        match: (p: string) => p.startsWith("/runs"),
-        Icon: IconRuns,
       },
     ],
     [t],

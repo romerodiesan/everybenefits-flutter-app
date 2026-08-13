@@ -50,7 +50,7 @@ export function PageHeaderSkeleton({
 
 export function KpiGridSkeleton({ count = 4 }: { count?: number }) {
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       {Array.from({ length: count }).map((_, i) => (
         <div key={i} className="studio-panel space-y-3 rounded-2xl p-4">
           <div className="h-3 w-20 animate-pulse rounded bg-ink/[0.06] dark:bg-white/[0.06]" />

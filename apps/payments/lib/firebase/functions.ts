@@ -1,21 +1,25 @@
 import { callCloudFunction } from "@pulse/firebase-web";
 import { getFirebaseFunctions } from "./client";
 import type {
-  BusinessRelationship,
+  AgentRateGroup,
   Carrier,
   CarrierStateRate,
+  CompensationPlan,
+  CompensationTier,
   ContractTerm,
+  PayMode,
+  PaymentsOverview,
   PaymentsParticipant,
+  PlanAssignment,
   Statement,
   StatementLine,
-  OverrideRun,
 } from "@pulse/shared";
 
 export async function listCarriers(): Promise<Carrier[]> {
-  const data = await callCloudFunction<{ carriers?: Carrier[] }>(
+  const data = await callCloudFunction<{ carriers?: Carrier[]; nextCursor?: string | null }>(
     getFirebaseFunctions(),
     "listCarriers",
-    {},
+    { limit: 500 },
   );
   return data?.carriers ?? [];
 }
@@ -83,43 +87,26 @@ export async function listPaymentsParticipants(
 ): Promise<PaymentsParticipant[]> {
   const data = await callCloudFunction<{
     participants?: PaymentsParticipant[];
+    nextCursor?: string | null;
   }>(getFirebaseFunctions(), "listPaymentsParticipants", {
     includeInactive,
+    limit: 500,
   });
   return data?.participants ?? [];
 }
 
-export async function upsertPaymentsParticipant(
-  input: Partial<PaymentsParticipant> & { name: string; type: string },
-) {
-  const data = await callCloudFunction<{ participant: PaymentsParticipant }>(
-    getFirebaseFunctions(),
-    "upsertPaymentsParticipant",
-    input,
-  );
-  return data.participant;
-}
-
-export async function listBusinessRelationships(): Promise<
-  BusinessRelationship[]
-> {
-  const data = await callCloudFunction<{
-    relationships?: BusinessRelationship[];
-  }>(getFirebaseFunctions(), "listBusinessRelationships", {});
-  return data?.relationships ?? [];
-}
-
-export async function upsertBusinessRelationship(
-  input: Partial<BusinessRelationship> & {
-    uplineParticipantId: string;
-    downlineParticipantId: string;
-    effectiveFrom: string;
-  },
-) {
-  const data = await callCloudFunction<{
-    relationship: BusinessRelationship;
-  }>(getFirebaseFunctions(), "upsertBusinessRelationship", input);
-  return data.relationship;
+export async function importCarrierStateRates(
+  rows: Array<Record<string, unknown>>,
+): Promise<{
+  imported: number;
+  updated: number;
+  carriersCreated: number;
+  skipped: number;
+  errors: Array<{ row: number; message: string }>;
+}> {
+  return callCloudFunction(getFirebaseFunctions(), "importCarrierStateRates", {
+    rows,
+  });
 }
 
 export async function listContractTerms(
@@ -128,7 +115,10 @@ export async function listContractTerms(
   const data = await callCloudFunction<{ terms?: ContractTerm[] }>(
     getFirebaseFunctions(),
     "listContractTerms",
-    participantId ? { participantId } : {},
+    {
+      limit: 500,
+      ...(participantId ? { participantId } : {}),
+    },
   );
   return data?.terms ?? [];
 }
@@ -148,11 +138,190 @@ export async function upsertContractTerm(
   return data.term;
 }
 
+export async function listCompensationTiers(): Promise<CompensationTier[]> {
+  const data = await callCloudFunction<{ tiers?: CompensationTier[] }>(
+    getFirebaseFunctions(),
+    "listCompensationTiers",
+    {},
+  );
+  return data?.tiers ?? [];
+}
+
+export async function upsertCompensationTier(
+  input: Partial<CompensationTier> & { name: string; rate: number },
+) {
+  const data = await callCloudFunction<{ tier: CompensationTier }>(
+    getFirebaseFunctions(),
+    "upsertCompensationTier",
+    input,
+  );
+  return data.tier;
+}
+
+export async function deleteCompensationTier(id: string) {
+  await callCloudFunction<{ ok: true }>(
+    getFirebaseFunctions(),
+    "deleteCompensationTier",
+    { id },
+  );
+}
+
+export async function seedDefaultCompensationTiers(): Promise<{
+  seeded: number;
+  tiers: CompensationTier[];
+}> {
+  return callCloudFunction(
+    getFirebaseFunctions(),
+    "seedDefaultCompensationTiers",
+    {},
+  );
+}
+
+export async function listAgentRateGroups(): Promise<AgentRateGroup[]> {
+  const data = await callCloudFunction<{ groups?: AgentRateGroup[] }>(
+    getFirebaseFunctions(),
+    "listAgentRateGroups",
+    {},
+  );
+  return data?.groups ?? [];
+}
+
+export async function upsertAgentRateGroup(
+  input: Partial<AgentRateGroup> & { name: string },
+) {
+  const data = await callCloudFunction<{ group: AgentRateGroup }>(
+    getFirebaseFunctions(),
+    "upsertAgentRateGroup",
+    input,
+  );
+  return data.group;
+}
+
+export async function deleteAgentRateGroup(id: string) {
+  await callCloudFunction<{ ok: true }>(
+    getFirebaseFunctions(),
+    "deleteAgentRateGroup",
+    { id },
+  );
+}
+
+export async function listCompensationPlans(): Promise<CompensationPlan[]> {
+  const data = await callCloudFunction<{ plans?: CompensationPlan[] }>(
+    getFirebaseFunctions(),
+    "listCompensationPlans",
+    {},
+  );
+  return data?.plans ?? [];
+}
+
+export async function getPaymentsPlanWorkspace(): Promise<{
+  plans: CompensationPlan[];
+  tiers: CompensationTier[];
+  groups: AgentRateGroup[];
+  carriers: Carrier[];
+  participants: PaymentsParticipant[];
+}> {
+  return callCloudFunction(getFirebaseFunctions(), "getPaymentsPlanWorkspace", {});
+}
+
+export async function upsertCompensationPlan(
+  input: Partial<CompensationPlan> & {
+    name: string;
+    slots: CompensationPlan["slots"];
+    effectiveFrom: string;
+  },
+) {
+  const data = await callCloudFunction<{ plan: CompensationPlan }>(
+    getFirebaseFunctions(),
+    "upsertCompensationPlan",
+    input,
+  );
+  return data.plan;
+}
+
+export async function deleteCompensationPlan(id: string) {
+  await callCloudFunction<{ ok: true }>(
+    getFirebaseFunctions(),
+    "deleteCompensationPlan",
+    { id },
+  );
+}
+
+export async function listPlanAssignments(
+  planId?: string,
+): Promise<PlanAssignment[]> {
+  const data = await callCloudFunction<{ assignments?: PlanAssignment[] }>(
+    getFirebaseFunctions(),
+    "listPlanAssignments",
+    planId ? { planId } : {},
+  );
+  return data?.assignments ?? [];
+}
+
+export type CompensationPlanPreview = {
+  planId: string;
+  assignmentId: string;
+  carrierCount: number;
+  agencyCount: number;
+  agentCount: number;
+  termCount: number;
+  routingCount: number;
+  diff: { create: number; update: number; unchanged: number };
+  sampleTerms: Array<Record<string, unknown>>;
+  sampleRouting: Array<Record<string, unknown>>;
+  payMode: PayMode;
+  retentionFraction: number;
+};
+
+export async function previewCompensationPlan(input: {
+  planId: string;
+  assignmentId?: string | null;
+  agencyParticipantIds?: string[];
+  includeDescendantAgencies?: boolean;
+  agentParticipantIds?: string[];
+  carrierIds?: string[];
+  payMode?: PayMode | null;
+  retentionFraction?: number | null;
+  effectiveFrom?: string | null;
+}): Promise<CompensationPlanPreview> {
+  return callCloudFunction(
+    getFirebaseFunctions(),
+    "previewCompensationPlan",
+    input,
+  );
+}
+
+export async function applyCompensationPlan(input: {
+  planId: string;
+  assignmentId?: string | null;
+  agencyParticipantIds?: string[];
+  includeDescendantAgencies?: boolean;
+  agentParticipantIds?: string[];
+  carrierIds?: string[];
+  payMode?: PayMode | null;
+  retentionFraction?: number | null;
+  effectiveFrom?: string | null;
+}): Promise<{
+  planId: string;
+  assignmentId: string;
+  termCount: number;
+  routingCount: number;
+  agencyCount: number;
+  agentCount: number;
+  carrierCount: number;
+}> {
+  return callCloudFunction(
+    getFirebaseFunctions(),
+    "applyCompensationPlan",
+    input,
+  );
+}
+
 export async function listStatements(): Promise<Statement[]> {
   const data = await callCloudFunction<{ statements?: Statement[] }>(
     getFirebaseFunctions(),
     "listStatements",
-    {},
+    { limit: 100 },
   );
   return data?.statements ?? [];
 }
@@ -181,31 +350,71 @@ export async function importStatement(input: {
   );
 }
 
-export async function listOverrideRuns(
-  statementId?: string,
-): Promise<OverrideRun[]> {
-  const data = await callCloudFunction<{ runs?: OverrideRun[] }>(
+export async function getPaymentsOverview(): Promise<PaymentsOverview> {
+  return callCloudFunction<PaymentsOverview>(
     getFirebaseFunctions(),
-    "listOverrideRuns",
-    statementId ? { statementId } : {},
+    "getPaymentsOverview",
+    {},
   );
-  return data?.runs ?? [];
 }
 
-export async function getOverrideRun(runId: string) {
-  return callCloudFunction<{
-    run: OverrideRun;
-    allocations: Array<Record<string, unknown>>;
-    reconciliation: Array<Record<string, unknown>>;
-  }>(getFirebaseFunctions(), "getOverrideRun", { runId });
+export async function createCommissionRun(input: {
+  name: string;
+  periodStart: string;
+  periodEnd: string;
+}) {
+  return callCloudFunction<{ run: import("@pulse/shared").CommissionRun }>(
+    getFirebaseFunctions(),
+    "createCommissionRun",
+    input,
+  );
 }
 
-export async function runOverrideCalculation(statementId: string) {
+export async function listCommissionRuns(input?: {
+  limit?: number;
+  cursor?: string | null;
+  status?: string;
+}) {
   return callCloudFunction<{
-    runId: string;
-    expectedTotal: number;
-    receivedTotal: number;
-    differenceTotal: number;
-    allocationCount: number;
-  }>(getFirebaseFunctions(), "runOverrideCalculationFn", { statementId });
+    runs: import("@pulse/shared").CommissionRun[];
+    nextCursor: string | null;
+  }>(getFirebaseFunctions(), "listCommissionRuns", input ?? {});
+}
+
+export async function getCommissionRun(runId: string) {
+  return callCloudFunction<{ run: import("@pulse/shared").CommissionRun }>(
+    getFirebaseFunctions(),
+    "getCommissionRun",
+    { runId },
+  );
+}
+
+export async function listCommissionParties(input?: {
+  kind?: "agency" | "agent" | "all";
+  query?: string;
+  limit?: number;
+}) {
+  return callCloudFunction<{
+    parties: import("@pulse/shared").CommissionPartySummary[];
+    nextCursor: string | null;
+  }>(getFirebaseFunctions(), "listCommissionParties", input ?? {});
+}
+
+export async function getAgencyPayMode(orgNodeId: string) {
+  return callCloudFunction<{
+    orgNodeId: string;
+    payMode: import("@pulse/shared").PayMode;
+    isDefault: boolean;
+  }>(getFirebaseFunctions(), "getAgencyPayMode", { orgNodeId });
+}
+
+export async function setAgencyPayMode(
+  orgNodeId: string,
+  payMode: import("@pulse/shared").PayMode,
+) {
+  return callCloudFunction<{
+    orgNodeId: string;
+    payMode: import("@pulse/shared").PayMode;
+    isDefault: boolean;
+  }>(getFirebaseFunctions(), "setAgencyPayMode", { orgNodeId, payMode });
 }
