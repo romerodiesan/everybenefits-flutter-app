@@ -19,6 +19,7 @@ export declare const forumThreadFixtureSchema: z.ZodObject<{
     }>;
     replyCount: z.ZodNumber;
     score: z.ZodNumber;
+    interactorCount: z.ZodOptional<z.ZodNumber>;
     acceptedReplyId: z.ZodNullable<z.ZodString>;
     createdAt: z.ZodNullable<z.ZodString>;
     updatedAt: z.ZodNullable<z.ZodString>;

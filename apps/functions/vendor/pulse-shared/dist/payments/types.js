@@ -7,7 +7,7 @@
  * that is downline of another agency via a business relationship.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.OVERRIDE_RUN_STATUSES = exports.STATEMENT_SOURCES = exports.CARRIER_MARKETS = exports.CARRIER_RATE_UNITS = exports.RATE_UNITS = exports.RELATIONSHIP_TYPES = exports.PARTICIPANT_TYPES = void 0;
+exports.PLAN_SLOT_ROLES = exports.PAY_MODES = exports.COMPENSATION_TIER_KINDS = exports.RELATIONSHIP_SOURCES = exports.OVERRIDE_RUN_STATUSES = exports.STATEMENT_SOURCES = exports.CARRIER_MARKETS = exports.CARRIER_RATE_UNITS = exports.RATE_UNITS = exports.RELATIONSHIP_TYPES = exports.PARTICIPANT_TYPES = void 0;
 exports.normalizeParticipantType = normalizeParticipantType;
 exports.deriveRelationshipType = deriveRelationshipType;
 exports.wouldCreateRelationshipCycle = wouldCreateRelationshipCycle;
@@ -20,7 +20,7 @@ exports.RELATIONSHIP_TYPES = [
 ];
 exports.RATE_UNITS = ["pmpm", "flat", "percent"];
 /** Units allowed on carrier state intake (commission / override). */
-exports.CARRIER_RATE_UNITS = ["flat", "percent"];
+exports.CARRIER_RATE_UNITS = ["pmpm", "flat", "percent"];
 exports.CARRIER_MARKETS = ["aca", "medicare", "life"];
 exports.STATEMENT_SOURCES = ["carrier", "fmo", "manual"];
 exports.OVERRIDE_RUN_STATUSES = [
@@ -28,6 +28,19 @@ exports.OVERRIDE_RUN_STATUSES = [
     "running",
     "completed",
     "failed",
+];
+/** How a business relationship was created. */
+exports.RELATIONSHIP_SOURCES = ["manual", "org_hierarchy"];
+/** Named PMPM **override** level templates (not commission; not volume thresholds). */
+exports.COMPENSATION_TIER_KINDS = ["agency", "agent", "generic"];
+/** Remittance routing — does not change override spread math. */
+exports.PAY_MODES = ["direct", "through_agency"];
+exports.PLAN_SLOT_ROLES = [
+    "agency_root",
+    "agency_child",
+    "agent_default",
+    "agent_group",
+    "agent_override",
 ];
 /** Map legacy participant type strings onto the current enum. */
 function normalizeParticipantType(value) {

@@ -567,10 +567,23 @@ export async function ensureThreadParticipant(
   uid: string,
 ): Promise<void> {
   if (!threadId || !uid) return;
-  await db.doc(`threads/${threadId}/participants/${uid}`).set(
-    { uid, joinedAt: FieldValue.serverTimestamp() },
-    { merge: true },
-  );
+  const threadRef = db.doc(`threads/${threadId}`);
+  const partRef = db.doc(`threads/${threadId}/participants/${uid}`);
+  await db.runTransaction(async (tx) => {
+    const existing = await tx.get(partRef);
+    if (existing.exists) return;
+    const thread = await tx.get(threadRef);
+    if (!thread.exists) return;
+    tx.set(
+      partRef,
+      { uid, joinedAt: FieldValue.serverTimestamp() },
+      { merge: true },
+    );
+    tx.update(threadRef, {
+      interactorCount: FieldValue.increment(1),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
 }
 
 export async function listThreadNotifyTargets(

@@ -111,6 +111,14 @@ export async function getOverviewStats(): Promise<OverviewStats> {
   return readStats();
 }
 
+/** Active platform audience used for proportional Spotlight reach. */
+export function activeAudienceSize(stats: OverviewStats): number {
+  return Math.max(
+    0,
+    stats.totalUsers - stats.deactivated - stats.pendingDeletion,
+  );
+}
+
 export function parseStoredRole(value: unknown): UserRole {
   return parseRole(value);
 }

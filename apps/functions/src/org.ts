@@ -1,5 +1,4 @@
 import { FieldValue, type DocumentData } from "firebase-admin/firestore";
-import { getStorage } from "firebase-admin/storage";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { randomUUID } from "node:crypto";
 import {
@@ -15,7 +14,7 @@ import {
   validateNpn,
   validateOptionalEmail,
 } from "@pulse/shared";
-import { db, callableOpts } from "./init";
+import { db, callableOpts, storageBucket } from "./init";
 import { requireCaller } from "./auth";
 import { buildOrgNodePath, serializeOrgNode } from "./org-helpers";
 import { loadPermissionsForUid } from "./permissions";
@@ -277,10 +276,19 @@ export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
   const includeInactive = request.data?.includeInactive === true;
   const query = String(request.data?.query ?? "").trim().toLowerCase();
 
+  const ORG_PAGE_LIMIT = 400;
   const snaps = await Promise.all([
     db.collection("orgNodes").where("type", "==", "organization").limit(50).get(),
-    db.collection("orgNodes").where("type", "==", "agency").limit(3000).get(),
-    db.collection("orgNodes").where("type", "==", "sub_agency").limit(3000).get(),
+    db
+      .collection("orgNodes")
+      .where("type", "==", "agency")
+      .limit(ORG_PAGE_LIMIT)
+      .get(),
+    db
+      .collection("orgNodes")
+      .where("type", "==", "sub_agency")
+      .limit(ORG_PAGE_LIMIT)
+      .get(),
   ]);
 
   const seen = new Set<string>();
@@ -508,6 +516,11 @@ export const assignUserToOrgNode = onCall(callableOpts, async (request) => {
   };
   if (agencyName) updates.agency = agencyName;
   await userRef.update(updates);
+  const after = await userRef.get();
+  const { syncAgentParticipantSafe } = await import(
+    "./payments-participants-sync"
+  );
+  await syncAgentParticipantSafe(uid, after.data() ?? {});
   return { ok: true, uid, orgNodeId };
 });
 
@@ -546,8 +559,8 @@ export const listAgenciesForProfile = onCall(callableOpts, async (request) => {
 
   const snaps = await Promise.all([
     db.collection("orgNodes").where("type", "==", "organization").limit(50).get(),
-    db.collection("orgNodes").where("type", "==", "agency").limit(2000).get(),
-    db.collection("orgNodes").where("type", "==", "sub_agency").limit(2000).get(),
+    db.collection("orgNodes").where("type", "==", "agency").limit(400).get(),
+    db.collection("orgNodes").where("type", "==", "sub_agency").limit(400).get(),
   ]);
 
   const seen = new Set<string>();
@@ -669,7 +682,7 @@ export const uploadOrgLogo = onCall(
 
     const path = `org-logos/${orgNodeId}.jpg`;
     const token = randomUUID();
-    const file = getStorage().bucket().file(path);
+    const file = storageBucket().file(path);
     await file.save(buffer, {
       resumable: false,
       contentType,

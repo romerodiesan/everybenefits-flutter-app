@@ -14,6 +14,7 @@ import {
   hasPermission,
   loadPermissionsForUid,
 } from "./permissions";
+import { chunkArray } from "./batch-utils";
 
 export function parseVote(raw: unknown): VoteValue {
   const n = typeof raw === "number" ? raw : Number(raw);
@@ -93,6 +94,15 @@ export const castForumVote = onCall(callableOpts, async (request) => {
       updatedAt: FieldValue.serverTimestamp(),
     });
   });
+
+  // Votes count as thread interactions for Spotlight reach.
+  if (next !== 0) {
+    try {
+      await ensureThreadParticipant(threadId, uid);
+    } catch (error) {
+      console.error("castForumVote participant failed", error);
+    }
+  }
 
   // Notify content author on upvote (not clear / downvote). Never fail the
   // vote itself if the inbox/push side effect errors.
@@ -255,11 +265,16 @@ export const deleteForumThread = onCall(callableOpts, async (request) => {
     threadRef.collection("participants").get(),
   ]);
 
+  // Fetch reply votes in parallel (avoid N+1 sequential gets).
+  const replyVoteSnaps = await Promise.all(
+    repliesSnap.docs.map((reply) => reply.ref.collection("votes").get()),
+  );
+
   // Firestore batches cap at 500 ops; chunk if a thread is unusually large.
   const refsToDelete: DocumentReference[] = [];
-  for (const reply of repliesSnap.docs) {
-    const voteSnap = await reply.ref.collection("votes").get();
-    for (const vote of voteSnap.docs) refsToDelete.push(vote.ref);
+  for (let i = 0; i < repliesSnap.docs.length; i++) {
+    const reply = repliesSnap.docs[i]!;
+    for (const vote of replyVoteSnaps[i]!.docs) refsToDelete.push(vote.ref);
     refsToDelete.push(reply.ref);
   }
   for (const vote of threadVotesSnap.docs) refsToDelete.push(vote.ref);
@@ -268,9 +283,9 @@ export const deleteForumThread = onCall(callableOpts, async (request) => {
   }
   refsToDelete.push(threadRef);
 
-  for (let i = 0; i < refsToDelete.length; i += 450) {
+  for (const slice of chunkArray(refsToDelete)) {
     const batch = db.batch();
-    for (const ref of refsToDelete.slice(i, i + 450)) {
+    for (const ref of slice) {
       batch.delete(ref);
     }
     await batch.commit();

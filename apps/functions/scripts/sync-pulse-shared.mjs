@@ -25,4 +25,26 @@ delete pkg.devDependencies;
 fs.writeFileSync(path.join(dest, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
 
 fs.cpSync(path.join(src, "dist"), path.join(dest, "dist"), { recursive: true });
+
+// Refresh pnpm's materialized copy of file:./vendor/pulse-shared when present.
+const pnpmShared = path.join(
+  functionsDir,
+  "node_modules/@pulse/shared",
+);
+try {
+  const resolved = fs.realpathSync(pnpmShared);
+  if (resolved !== dest) {
+    fs.rmSync(path.join(resolved, "dist"), { recursive: true, force: true });
+    fs.cpSync(path.join(dest, "dist"), path.join(resolved, "dist"), {
+      recursive: true,
+    });
+    fs.copyFileSync(
+      path.join(dest, "package.json"),
+      path.join(resolved, "package.json"),
+    );
+  }
+} catch {
+  // node_modules may be absent during Cloud Build before install.
+}
+
 console.log(`Synced @pulse/shared → ${dest}`);

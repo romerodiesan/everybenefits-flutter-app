@@ -40,8 +40,13 @@ export declare function canConfigureGroupAutoJoin(roleOrPermissions: RoleOrPermi
 export declare function canParticipateInForums(roleOrPermissions: RoleOrPermissions, isAnonymous: boolean): boolean;
 export declare function canParticipateInChats(roleOrPermissions: RoleOrPermissions, isAnonymous: boolean): boolean;
 export declare function canAccessAdmin(roleOrPermissions: RoleOrPermissions): boolean;
-/** Override Management portal — platform admins only (not managers by default). */
+/** Override / Commission Management portal — platform admins only (not managers by default). */
 export declare function canAccessPayments(roleOrPermissions: RoleOrPermissions): boolean;
+/**
+ * Granular commission ops. `apps.payments.access` / `platform.manage` imply
+ * `commission.view`. Mutating ops require the explicit key (or platform.manage).
+ */
+export declare function hasCommissionPermission(roleOrPermissions: RoleOrPermissions, key: "commission.view" | "commission.upload" | "commission.resolve" | "commission.calculate" | "commission.approve" | "commission.publish" | "commission.manageRules" | "commission.manageImportProfiles" | "commission.viewAudit" | "commission.statements.self"): boolean;
 export declare function canManagePlatform(roleOrPermissions: RoleOrPermissions): boolean;
 export declare function canModerateForums(roleOrPermissions: RoleOrPermissions): boolean;
 export declare function canAccessStudio(roleOrPermissions: RoleOrPermissions): boolean;

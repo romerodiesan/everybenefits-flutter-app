@@ -1,7 +1,7 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { admin, db, rtdb, callableOpts } from "./init";
+import { admin, db, rtdb, callableOpts, storageBucket } from "./init";
 import { ACCOUNT_DELETION_GRACE_DAYS } from "./constants";
 import { requireCaller } from "./auth";
 
@@ -189,9 +189,7 @@ export const purgeDeletedAccounts = onSchedule("every 24 hours", async () => {
     const uid = doc.id;
     await db.recursiveDelete(doc.ref);
     await rtdb.ref(`userChats/${uid}`).remove().catch(() => undefined);
-    await admin
-      .storage()
-      .bucket()
+    await storageBucket()
       .file(`avatars/${uid}.jpg`)
       .delete()
       .catch(() => undefined);
