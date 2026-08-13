@@ -16,7 +16,7 @@
     "@pulse/shared": "workspace:*",
     "@pulse/sso": "workspace:*",
     "@tanstack/react-query": "^5.101.4",
-    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-table": "^9.1.2",
     "firebase": "~12.17.0",
     "firebase-admin": "~14.2.0",
     "motion": "~12.43.0",
