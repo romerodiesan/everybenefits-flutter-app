@@ -24,11 +24,48 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm exec turbo run build --filter=./apps/* --filter=./packages/*
+      - name: Check Functions @pulse/shared vendor
+        run: pnpm --filter @pulse/functions run check:shared
       - run: pnpm exec turbo run test --filter=./apps/* --filter=./packages/* --continue
       - name: Firestore rules tests
-        working-directory: test/rules
-        run: pnpm test
-        continue-on-error: true
+        run: |
+          npx -y firebase-tools@latest emulators:exec \
+            --only firestore \
+            --project every-benefits-us \
+            "pnpm --dir test/rules test"
+
+  audit:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.15.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: pnpm audit (prod)
+        run: pnpm audit --prod --audit-level=high
+
+  codeql:
+    name: CodeQL
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          queries: security-extended
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
 
   flutter:
     name: Flutter

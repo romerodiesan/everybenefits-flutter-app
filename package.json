@@ -24,6 +24,7 @@
     "seed:mega": "node ./tooling/scripts/seed-mega.mjs",
     "purge:ai-support": "node ./tooling/scripts/purge-ai-and-support.mjs",
     "sync:functions-shared": "pnpm --filter @pulse/functions run sync:shared",
+    "check:functions-shared": "pnpm --filter @pulse/functions run check:shared",
     "deploy:rules": "firebase deploy --only firestore:rules,firestore:indexes,database,storage",
     "deploy:functions": "pnpm sync:functions-shared && firebase deploy --only functions",
     "deploy:web": "firebase deploy --only apphosting:pulse-web-app",
@@ -32,7 +33,9 @@
     "deploy:legal": "pnpm build:legal && firebase deploy --only hosting:legal",
     "build:payments": "turbo run build --filter=@pulse/payments",
     "dev:payments": "pnpm --filter @pulse/payments dev",
-    "deploy:payments": "firebase deploy --only apphosting:payments-web-app"
+    "deploy:payments": "firebase deploy --only apphosting:payments-web-app",
+    "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore --project every-benefits-us \"pnpm --dir test/rules test\"",
+    "test:integration": "pnpm test:rules"
   },
   "devDependencies": {
     "turbo": "^2.10.8",

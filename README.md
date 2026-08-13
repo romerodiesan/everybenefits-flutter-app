@@ -86,7 +86,33 @@ pnpm seed
 
 ## Deploy
 
-Firebase App Hosting backends (Turborepo monorepo):
+### Continuous delivery (GitHub)
+
+| Surface | How it deploys |
+|---------|----------------|
+| `pulse-web-app` / `studio-web-app` / `admin-web-app` / `payments-web-app` | **Firebase App Hosting** native GitHub connection — push to `main` triggers a rollout. Console **Root directory** must match `firebase.json` → `apphosting[].rootDir` (`apps/web`, `apps/studio`, `apps/admin`, `apps/payments`). Live branch: `main`. |
+| Cloud Functions | GitHub Actions [`.github/workflows/cd.yml`](.github/workflows/cd.yml) after CI succeeds (path-filtered). |
+| Firestore / Storage / RTDB rules | Same CD workflow (path-filtered). |
+| `legal.everybenefits.us` | Same CD workflow → Classic Firebase Hosting (`pnpm deploy:legal`). |
+
+**One-time App Hosting ↔ GitHub setup** (requires `firebase login --reauth`):
+
+```bash
+firebase apphosting:backends:list --project every-benefits-us
+firebase apphosting:backends:get pulse-web-app --project every-benefits-us
+# If a backend is not linked to GitHub, create/connect it in Firebase Console
+# (App Hosting → backend → Connect repository) or via:
+#   firebase apphosting:backends:create --project every-benefits-us ...
+```
+
+**CD auth secrets** (repo Settings → Secrets):
+
+- Preferred: `GCP_WORKLOAD_IDENTITY_PROVIDER` + `GCP_SERVICE_ACCOUNT` (WIF)
+- Fallback: `FIREBASE_TOKEN` from `firebase login:ci`
+
+**Rollback:** App Hosting → previous rollout in Console; Functions/rules → redeploy prior commit or disable the CD workflow; legal → redeploy previous `apps/legal/build`.
+
+### Manual CLI
 
 | Backend | Console root directory | CLI |
 |---------|------------------------|-----|
@@ -109,6 +135,9 @@ pnpm deploy:web
 # pnpm deploy:studio
 # pnpm deploy:admin
 # pnpm deploy:payments
+
+# Legal Classic Hosting
+pnpm deploy:legal
 ```
 
 ## Naming

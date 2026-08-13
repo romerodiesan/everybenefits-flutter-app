@@ -1,0 +1,195 @@
+name: CD
+
+# Deploys Functions, Firebase rules, and legal Hosting after CI succeeds on main.
+# Next.js App Hosting backends (web/studio/admin/payments) deploy via the native
+# GitHub ↔ Firebase App Hosting connection — do not redeploy them here.
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      deploy_functions:
+        description: Deploy Cloud Functions
+        type: boolean
+        default: true
+      deploy_rules:
+        description: Deploy Firestore/Storage/RTDB rules
+        type: boolean
+        default: true
+      deploy_legal:
+        description: Deploy legal Hosting
+        type: boolean
+        default: true
+
+concurrency:
+  group: cd-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  gate:
+    name: CI gate
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.event == 'push')
+    outputs:
+      sha: ${{ steps.sha.outputs.sha }}
+      deploy_functions: ${{ steps.paths.outputs.deploy_functions }}
+      deploy_rules: ${{ steps.paths.outputs.deploy_rules }}
+      deploy_legal: ${{ steps.paths.outputs.deploy_legal }}
+    steps:
+      - id: sha
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "sha=${{ github.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${{ github.event.workflow_run.head_sha }}" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.sha.outputs.sha }}
+          fetch-depth: 2
+      - id: paths
+        name: Detect changed paths
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "deploy_functions=${{ inputs.deploy_functions }}" >> "$GITHUB_OUTPUT"
+            echo "deploy_rules=${{ inputs.deploy_rules }}" >> "$GITHUB_OUTPUT"
+            echo "deploy_legal=${{ inputs.deploy_legal }}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          BEFORE="${{ github.event.workflow_run.before_sha }}"
+          if [ -n "$BEFORE" ] && git rev-parse --verify "$BEFORE" >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only "$BEFORE" HEAD)
+          elif git rev-parse HEAD^ >/dev/null 2>&1; then
+            CHANGED=$(git diff --name-only HEAD^ HEAD)
+          else
+            CHANGED=$(git ls-files)
+          fi
+          echo "Changed files:"
+          echo "$CHANGED"
+          deploy_functions=false
+          deploy_rules=false
+          deploy_legal=false
+          echo "$CHANGED" | grep -E '^(apps/functions/|packages/shared/)' >/dev/null && deploy_functions=true || true
+          echo "$CHANGED" | grep -E '^(firestore\.rules|storage\.rules|database\.rules\.json|firestore\.indexes\.json)$' >/dev/null && deploy_rules=true || true
+          echo "$CHANGED" | grep -E '^apps/legal/' >/dev/null && deploy_legal=true || true
+          echo "deploy_functions=$deploy_functions" >> "$GITHUB_OUTPUT"
+          echo "deploy_rules=$deploy_rules" >> "$GITHUB_OUTPUT"
+          echo "deploy_legal=$deploy_legal" >> "$GITHUB_OUTPUT"
+
+  deploy-functions:
+    name: Deploy Functions
+    needs: gate
+    if: needs.gate.outputs.deploy_functions == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.15.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        continue-on-error: true
+        id: gcp_auth
+      - name: Deploy Functions
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -n "$FIREBASE_TOKEN" ]; then
+            pnpm deploy:functions
+          elif [ "${{ steps.gcp_auth.outcome }}" = "success" ]; then
+            pnpm deploy:functions
+          else
+            echo "Missing FIREBASE_TOKEN or GCP WIF secrets — skip deploy."
+            exit 1
+          fi
+
+  deploy-rules:
+    name: Deploy rules
+    needs: gate
+    if: needs.gate.outputs.deploy_rules == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.15.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        continue-on-error: true
+        id: gcp_auth
+      - name: Deploy rules
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -n "$FIREBASE_TOKEN" ] || [ "${{ steps.gcp_auth.outcome }}" = "success" ]; then
+            pnpm deploy:rules
+          else
+            echo "Missing FIREBASE_TOKEN or GCP WIF secrets — skip deploy."
+            exit 1
+          fi
+
+  deploy-legal:
+    name: Deploy legal Hosting
+    needs: gate
+    if: needs.gate.outputs.deploy_legal == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.gate.outputs.sha }}
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.15.1
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+        continue-on-error: true
+        id: gcp_auth
+      - name: Deploy legal
+        env:
+          FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
+        run: |
+          if [ -n "$FIREBASE_TOKEN" ] || [ "${{ steps.gcp_auth.outcome }}" = "success" ]; then
+            pnpm deploy:legal
+          else
+            echo "Missing FIREBASE_TOKEN or GCP WIF secrets — skip deploy."
+            exit 1
+          fi
