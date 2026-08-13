@@ -142,6 +142,30 @@ function IconRoles({ filled, ...props }: IconProps) {
   );
 }
 
+function IconBanners({ filled, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      <rect
+        x="3.5"
+        y="5.5"
+        width="17"
+        height="13"
+        rx="2.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        fill={filled ? "currentColor" : "none"}
+        fillOpacity={filled ? 0.12 : 0}
+      />
+      <path
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        d="M7 10h6M7 13.5h10"
+      />
+    </svg>
+  );
+}
+
 function IconSettings({ filled, ...props }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
@@ -286,6 +310,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
         match: (p: string) => p.startsWith("/roles"),
         adminOnly: true,
         Icon: IconRoles,
+      },
+      {
+        href: "/banners",
+        label: t("navBanners"),
+        match: (p: string) => p.startsWith("/banners"),
+        adminOnly: true,
+        Icon: IconBanners,
       },
       {
         href: "/settings",
