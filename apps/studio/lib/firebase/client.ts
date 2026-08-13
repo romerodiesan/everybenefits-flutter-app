@@ -1,3 +1,8 @@
+/**
+ * Shared Firebase web client bootstrap used by Pulse / Studio / Admin / Payments.
+ * App Check initializes only when NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY is set
+ * (ADR-005 — Enforce remains an ops step).
+ */
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getAuth, connectAuthEmulator, type Auth } from "firebase/auth";
 import {
@@ -30,6 +35,7 @@ const firebaseConfig = {
 };
 
 let emulatorsConnected = false;
+let appCheckInstance: AppCheck | null | undefined;
 
 export function getFirebaseApp(): FirebaseApp {
   if (getApps().length) return getApp();
@@ -66,17 +72,43 @@ export function getFirebaseFunctions(): Functions {
 }
 
 /**
- * App Check is currently disabled (opt-in later). Kept so SSO helpers can keep
- * calling this without special-casing.
+ * Returns an initialized App Check instance when
+ * `NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY` is set; otherwise null.
+ * Does not enforce tokens — Functions/SSO flags control enforcement (ADR-005).
  */
 export function getFirebaseAppCheck(): AppCheck | null {
-  return null;
+  if (typeof window === "undefined") return null;
+  if (appCheckInstance !== undefined) return appCheckInstance;
+
+  const siteKey = process.env.NEXT_PUBLIC_FIREBASE_APPCHECK_SITE_KEY?.trim();
+  if (!siteKey) {
+    appCheckInstance = null;
+    return null;
+  }
+
+  try {
+    // Dynamic import keeps the App Check chunk out of cold paths when unset.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const {
+      initializeAppCheck,
+      ReCaptchaEnterpriseProvider,
+    } = require("firebase/app-check") as typeof import("firebase/app-check");
+    appCheckInstance = initializeAppCheck(getFirebaseApp(), {
+      provider: new ReCaptchaEnterpriseProvider(siteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (error) {
+    console.warn("App Check init skipped:", error);
+    appCheckInstance = null;
+  }
+  return appCheckInstance;
 }
 
 export function initFirebaseClient() {
   if (typeof window === "undefined") return;
 
   getFirebaseApp();
+  getFirebaseAppCheck();
 
   const useEmulators =
     process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";
@@ -94,6 +126,8 @@ export function initFirebaseClient() {
     // onto production and ignore later connect*Emulator calls.
     try {
       const auth = getFirebaseAuth();
+      // Auth emulator cannot exercise production reCAPTCHA Enterprise keys;
+      // without this, SMS MFA / phone verify fails with "Invalid site key".
       auth.settings.appVerificationDisabledForTesting = true;
       connectAuthEmulator(auth, `http://${host}:9099`, {
         disableWarnings: true,

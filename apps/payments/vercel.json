@@ -1,4 +1,5 @@
 {
+  "_comment": "LEGACY — production deploys use Firebase App Hosting. Do not use for prod.",
   "framework": "nextjs",
   "installCommand": "pnpm install"
 }

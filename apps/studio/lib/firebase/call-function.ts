@@ -1,4 +1,7 @@
-import { httpsCallable } from "firebase/functions";
+import {
+  callCloudFunction as callShared,
+  FunctionsUnavailableError as SharedFunctionsUnavailableError,
+} from "@pulse/firebase-web";
 import { getFirebaseFunctions } from "./client";
 
 export class FunctionsUnavailableError extends Error {
@@ -11,37 +14,24 @@ export class FunctionsUnavailableError extends Error {
   }
 }
 
-function isUnavailable(error: unknown): boolean {
-  const code =
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    typeof (error as { code: unknown }).code === "string"
-      ? (error as { code: string }).code.replace(/^functions\//, "")
-      : "";
-  return (
-    code === "unavailable" ||
-    code === "not-found" ||
-    code === "unimplemented" ||
-    code === "internal" ||
-    code === "deadline-exceeded"
-  );
-}
-
 /**
- * Invokes a Firebase callable via the JS SDK.
+ * Thin app wrapper around shared `@pulse/firebase-web` callable helper.
  * With `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true` this hits `127.0.0.1:5001`.
  */
 export async function callCloudFunction<TResult = unknown>(
   name: string,
   data: unknown = {},
+  options?: { timeoutMs?: number },
 ): Promise<TResult> {
   try {
-    const callable = httpsCallable(getFirebaseFunctions(), name);
-    const result = await callable(data);
-    return result.data as TResult;
+    return await callShared<TResult>(
+      getFirebaseFunctions(),
+      name,
+      data,
+      options,
+    );
   } catch (error) {
-    if (isUnavailable(error)) {
+    if (error instanceof SharedFunctionsUnavailableError) {
       throw new FunctionsUnavailableError(name);
     }
     throw error;
