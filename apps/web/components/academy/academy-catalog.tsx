@@ -24,6 +24,7 @@ import {
   useLevelLabels,
 } from "./shared";
 import { CourseGridSkeleton } from "@/components/ui/skeleton";
+import { AcademyPromoBanner } from "@/components/promo/promo-banner";
 
 export function AcademyCatalog() {
   const t = useTranslations();
@@ -120,6 +121,8 @@ export function AcademyCatalog() {
           ) : undefined
         }
       />
+
+      <AcademyPromoBanner />
 
       {keepLearning.length > 0 && (
         <section className="mt-6">

@@ -3,6 +3,7 @@
 import type { SVGProps } from "react";
 import { useTranslations } from "next-intl";
 import { Avatar } from "@/components/ui/primitives";
+import { isForumHotThread } from "@/lib/forums-spotlight";
 import type { ForumThread } from "@/lib/types";
 
 function IconHeart({
@@ -87,7 +88,7 @@ export function FeedThreadCardPreview({
   compact?: boolean;
 }) {
   const t = useTranslations();
-  const isHot = thread.score >= 3 || thread.replyCount >= 3;
+  const isHot = isForumHotThread(thread, 0);
   const likeCount = Math.max(0, thread.score);
 
   return (

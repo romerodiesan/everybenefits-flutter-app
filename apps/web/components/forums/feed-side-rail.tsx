@@ -6,6 +6,7 @@ import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { canAccessTools } from "@/lib/roles";
 import type { ForumThread } from "@/lib/types";
 import { useSavedThreadIds } from "@/lib/saved-threads";
+import { RailPromoBanner } from "@/components/promo/promo-banner";
 
 type TopicStat = [string, number];
 
@@ -42,6 +43,8 @@ export function FeedSideRail({
   return (
     <aside className="hidden w-[280px] shrink-0 xl:block">
       <div className="sticky top-4 space-y-4">
+        <RailPromoBanner />
+
         {topicList.length > 0 && (
           <section className="feed-rail-card">
             <h2 className="feed-rail-title">{t("forumsRailTrending")}</h2>

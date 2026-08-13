@@ -125,6 +125,7 @@ export async function createThread(input: {
     authorRole: input.author.role,
     replyCount: 0,
     score: 0,
+    interactorCount: 0,
     acceptedReplyId: null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

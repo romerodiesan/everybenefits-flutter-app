@@ -704,5 +704,11 @@
   "privacyShowNpnHint": "When someone finds you, include your NPN in the result.",
   "privacyDmBlocked": "This member isn’t accepting new direct messages.",
   "appSwitchPayments": "Payments",
-  "appSwitchPaymentsBlurb": "Overrides, statements, and reconciliation"
+  "appSwitchPaymentsBlurb": "Overrides, statements, and reconciliation",
+  "promoBannerRegion": "Promotion",
+  "promoBannerDismiss": "Dismiss promotion",
+  "promoBannerCarousel": "Promotion slides",
+  "promoBannerPrev": "Previous promotion",
+  "promoBannerNext": "Next promotion",
+  "promoBannerSlide": "Promotion {current} of {total}"
 }

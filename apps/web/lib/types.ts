@@ -63,6 +63,8 @@ export type ForumThread = {
   authorRole: UserRole;
   replyCount: number;
   score: number;
+  /** Unique users who interacted (author + voters + repliers). */
+  interactorCount: number;
   acceptedReplyId: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;

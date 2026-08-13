@@ -41,6 +41,9 @@ import {
 import { ShareToChatDialog } from "@/components/forums/share-to-chat-dialog";
 import { TagEditor } from "@/components/forums/tag-controls";
 import { FeedSideRail } from "@/components/forums/feed-side-rail";
+import { HomePromoBanner } from "@/components/promo/promo-banner";
+import { fetchForumAudienceSize } from "@/lib/firebase/forum-audience";
+import { isForumHotThread, pickForumSpotlight } from "@/lib/forums-spotlight";
 import {
   ActionButton,
   FeedSkeleton,
@@ -80,6 +83,7 @@ export function ForumsHome() {
   const [burstId, setBurstId] = useState<string | null>(null);
   const [sharing, setSharing] = useState<ForumThread | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [audienceSize, setAudienceSize] = useState(0);
   const saved = useSavedThreadIds();
   const sentinelRef = useRef<HTMLDivElement>(null);
   const lastTapRef = useRef<{ id: string; at: number }>({ id: "", at: 0 });
@@ -291,19 +295,31 @@ export function ForumsHome() {
     return () => stop?.();
   }, []);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchForumAudienceSize()
+      .then((size) => {
+        if (!cancelled) setAudienceSize(size);
+      })
+      .catch(() => {
+        if (!cancelled) setAudienceSize(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const spotlight = useMemo(() => {
-    if (mode === "saved" || !threads.length) return null;
-    return [...threads].sort(
-      (a, b) =>
-        b.score + b.replyCount * 2 - (a.score + a.replyCount * 2),
-    )[0];
-  }, [threads, mode]);
+    if (mode === "saved") return null;
+    return pickForumSpotlight(threads, audienceSize);
+  }, [threads, mode, audienceSize]);
 
   const visibleThreads = useMemo(() => {
-    if (mode !== "saved") return threads;
-    // Saved loader already fetched by id — no recent-page filter needed.
-    return threads;
-  }, [mode, threads]);
+    if (mode === "saved") return threads;
+    // Don't duplicate the hero Spotlight in the list.
+    if (!spotlight) return threads;
+    return threads.filter((thread) => thread.id !== spotlight.id);
+  }, [mode, threads, spotlight]);
 
   const greetingName = profile ? headlineName(profile).split(" ")[0] : "";
   const dayPart = useSyncExternalStore(
@@ -546,6 +562,8 @@ export function ForumsHome() {
           </AnimatePresence>
         )}
 
+        <HomePromoBanner />
+
         {feedError && (
           <p
             role="alert"
@@ -612,16 +630,11 @@ export function ForumsHome() {
 
         <div className="space-y-3">
           {visibleThreads.map((thread, index) => {
-            const isHot = thread.score >= 3 || thread.replyCount >= 3;
+            const isHot = isForumHotThread(thread, audienceSize);
             const liked = likes[thread.id] === 1;
             const isOwn = profile?.uid === thread.authorId;
             const likeCount = Math.max(0, thread.score);
             const isSaved = saved.has(thread.id);
-            const isSpotlightCard = spotlight?.id === thread.id && index === 0;
-
-            if (isSpotlightCard && mode !== "saved") {
-              // Already featured above — keep in list but softer.
-            }
 
             return (
               <motion.article

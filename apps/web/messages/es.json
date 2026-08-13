@@ -704,5 +704,11 @@
   "privacyShowNpnHint": "Cuando te encuentren, incluir tu NPN en el resultado.",
   "privacyDmBlocked": "Este miembro no acepta mensajes directos nuevos.",
   "appSwitchPayments": "Payments",
-  "appSwitchPaymentsBlurb": "Overrides, statements y conciliación"
+  "appSwitchPaymentsBlurb": "Overrides, statements y conciliación",
+  "promoBannerRegion": "Promoción",
+  "promoBannerDismiss": "Cerrar promoción",
+  "promoBannerCarousel": "Promociones",
+  "promoBannerPrev": "Promoción anterior",
+  "promoBannerNext": "Promoción siguiente",
+  "promoBannerSlide": "Promoción {current} de {total}"
 }
