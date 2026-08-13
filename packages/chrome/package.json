@@ -29,7 +29,7 @@
     "@pulse/typescript-config": "workspace:*",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "next-intl": "~4.13.4",
+    "next-intl": "~4.13.5",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "typescript": "^5.9.3"
