@@ -1,37 +1,13 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.FunctionsUnavailableError = void 0;
-exports.callCloudFunction = callCloudFunction;
+exports.callCloudFunction = exports.FunctionsUnavailableError = void 0;
 exports.mapAdminUserRow = mapAdminUserRow;
 exports.mapOrgNode = mapOrgNode;
 exports.createAdminRepository = createAdminRepository;
-const functions_1 = require("firebase/functions");
 const shared_1 = require("@pulse/shared");
-class FunctionsUnavailableError extends Error {
-    constructor(message = "Cloud Functions unavailable") {
-        super(message);
-        this.name = "FunctionsUnavailableError";
-    }
-}
-exports.FunctionsUnavailableError = FunctionsUnavailableError;
-async function callCloudFunction(functions, name, data) {
-    try {
-        const callable = (0, functions_1.httpsCallable)(functions, name);
-        const result = await callable(data ?? {});
-        return result.data;
-    }
-    catch (error) {
-        const code = error && typeof error === "object" && "code" in error
-            ? String(error.code)
-            : "";
-        if (code.includes("unavailable") ||
-            code.includes("not-found") ||
-            code.includes("failed-precondition")) {
-            throw new FunctionsUnavailableError(error instanceof Error ? error.message : String(error));
-        }
-        throw error;
-    }
-}
+const callables_1 = require("./callables");
+Object.defineProperty(exports, "FunctionsUnavailableError", { enumerable: true, get: function () { return callables_1.FunctionsUnavailableError; } });
+Object.defineProperty(exports, "callCloudFunction", { enumerable: true, get: function () { return callables_1.callCloudFunction; } });
 function mapRoleDoc(entry) {
     const category = String(entry.category ?? "custom");
     return {
@@ -107,11 +83,48 @@ function mapOrgNode(entry) {
         active: entry.active !== false,
     };
 }
+function mapPromoBanner(entry) {
+    const localized = (value) => {
+        if (!value || typeof value !== "object")
+            return { en: "", es: "" };
+        const record = value;
+        return {
+            en: typeof record.en === "string" ? record.en : "",
+            es: typeof record.es === "string" ? record.es : "",
+        };
+    };
+    return (0, shared_1.withBannerCompatDefaults)({
+        id: String(entry.id ?? ""),
+        version: typeof entry.version === "number" ? entry.version : 1,
+        active: entry.active === true,
+        type: entry.type,
+        format: entry.format,
+        surface: entry.surface ?? "home",
+        audiences: Array.isArray(entry.audiences)
+            ? entry.audiences.map(String)
+            : ["all"],
+        dismissible: entry.dismissible !== false,
+        showCta: entry.showCta !== false,
+        showImage: typeof entry.showImage === "boolean" ? entry.showImage : undefined,
+        eyebrow: localized(entry.eyebrow),
+        title: localized(entry.title),
+        body: localized(entry.body),
+        ctaLabel: localized(entry.ctaLabel),
+        href: typeof entry.href === "string" ? entry.href : "",
+        imageUrl: typeof entry.imageUrl === "string" ? entry.imageUrl : null,
+        imagePath: typeof entry.imagePath === "string" ? entry.imagePath : null,
+        startsAt: typeof entry.startsAt === "number" ? entry.startsAt : null,
+        endsAt: typeof entry.endsAt === "number" ? entry.endsAt : null,
+        createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
+        updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : null,
+        updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
+    });
+}
 function createAdminRepository(functions) {
     return {
         async listUsers(filters) {
             try {
-                const data = await callCloudFunction(functions, "listUsersForAdmin", {
+                const data = await (0, callables_1.callCloudFunction)(functions, "listUsersForAdmin", {
                     ...filters,
                     pageSize: filters?.pageSize ?? filters?.limit ?? 25,
                     pageToken: filters?.pageToken ?? undefined,
@@ -124,54 +137,54 @@ function createAdminRepository(functions) {
                 };
             }
             catch (error) {
-                if (error instanceof FunctionsUnavailableError) {
+                if (error instanceof callables_1.FunctionsUnavailableError) {
                     return { users: [], nextPageToken: null };
                 }
                 throw error;
             }
         },
         async createUser(input) {
-            const data = await callCloudFunction(functions, "adminCreateUser", input);
+            const data = await (0, callables_1.callCloudFunction)(functions, "adminCreateUser", input);
             return data?.user ? mapAdminUserRow(data.user) : null;
         },
         async updateUser(input) {
-            const data = await callCloudFunction(functions, "adminUpdateUser", input);
+            const data = await (0, callables_1.callCloudFunction)(functions, "adminUpdateUser", input);
             return data?.user ? mapAdminUserRow(data.user) : null;
         },
         async deactivateUser(uid) {
-            await callCloudFunction(functions, "adminDeactivateUser", { uid });
+            await (0, callables_1.callCloudFunction)(functions, "adminDeactivateUser", { uid });
         },
         async reactivateUser(uid) {
-            await callCloudFunction(functions, "adminReactivateUser", { uid });
+            await (0, callables_1.callCloudFunction)(functions, "adminReactivateUser", { uid });
         },
         async bulkSetUserApproval(uids, status) {
-            return await callCloudFunction(functions, "bulkSetUserApproval", { uids, status });
+            return await (0, callables_1.callCloudFunction)(functions, "bulkSetUserApproval", { uids, status });
         },
         async bulkSetUserAccountStatus(uids, status) {
-            return await callCloudFunction(functions, "bulkSetUserAccountStatus", { uids, status });
+            return await (0, callables_1.callCloudFunction)(functions, "bulkSetUserAccountStatus", { uids, status });
         },
         async bulkSetUserRole(uids, role) {
-            return await callCloudFunction(functions, "bulkSetUserRole", { uids, role });
+            return await (0, callables_1.callCloudFunction)(functions, "bulkSetUserRole", { uids, role });
         },
         async bulkAssignUsersToOrgNode(uids, orgNodeId) {
-            return await callCloudFunction(functions, "bulkAssignUsersToOrgNode", { uids, orgNodeId });
+            return await (0, callables_1.callCloudFunction)(functions, "bulkAssignUsersToOrgNode", { uids, orgNodeId });
         },
         async bulkSetOrgNodesActive(ids, active) {
-            return await callCloudFunction(functions, "bulkSetOrgNodesActive", { ids, active });
+            return await (0, callables_1.callCloudFunction)(functions, "bulkSetOrgNodesActive", { ids, active });
         },
         async getInsights() {
             try {
-                return await callCloudFunction(functions, "getAdminInsights", {});
+                return await (0, callables_1.callCloudFunction)(functions, "getAdminInsights", {});
             }
             catch (error) {
-                if (error instanceof FunctionsUnavailableError)
+                if (error instanceof callables_1.FunctionsUnavailableError)
                     return null;
                 throw error;
             }
         },
         async listOrgSubtree(parentId, opts) {
             try {
-                const data = await callCloudFunction(functions, "listOrgSubtree", {
+                const data = await (0, callables_1.callCloudFunction)(functions, "listOrgSubtree", {
                     parentId: parentId ?? null,
                     full: opts?.full === true,
                     includeInactive: opts?.includeInactive === true,
@@ -179,49 +192,49 @@ function createAdminRepository(functions) {
                 return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
             }
             catch (error) {
-                if (error instanceof FunctionsUnavailableError)
+                if (error instanceof callables_1.FunctionsUnavailableError)
                     return [];
                 throw error;
             }
         },
         async listAgencies(opts) {
-            const data = await callCloudFunction(functions, "listAgenciesForAdmin", opts ?? {});
+            const data = await (0, callables_1.callCloudFunction)(functions, "listAgenciesForAdmin", opts ?? {});
             return {
                 agencies: (data?.agencies ?? []).map(mapOrgNode).filter((n) => n.id),
                 nextPageToken: data?.nextPageToken ?? null,
             };
         },
         async listOrgNodesByType(type, pageSize = 100) {
-            const data = await callCloudFunction(functions, "listOrgNodesByType", { type, pageSize });
+            const data = await (0, callables_1.callCloudFunction)(functions, "listOrgNodesByType", { type, pageSize });
             return (data?.nodes ?? []).map(mapOrgNode).filter((n) => n.id);
         },
         async ensureOrgRoot() {
             try {
-                const data = await callCloudFunction(functions, "ensureOrgRoot", {});
+                const data = await (0, callables_1.callCloudFunction)(functions, "ensureOrgRoot", {});
                 return data?.node ? mapOrgNode(data.node) : null;
             }
             catch (error) {
-                if (error instanceof FunctionsUnavailableError)
+                if (error instanceof callables_1.FunctionsUnavailableError)
                     return null;
                 throw error;
             }
         },
         async createOrgNode(input) {
-            const data = await callCloudFunction(functions, "createOrgNode", input);
+            const data = await (0, callables_1.callCloudFunction)(functions, "createOrgNode", input);
             return data?.node ? mapOrgNode(data.node) : null;
         },
         async updateOrgNode(input) {
-            const data = await callCloudFunction(functions, "updateOrgNode", input);
+            const data = await (0, callables_1.callCloudFunction)(functions, "updateOrgNode", input);
             return data?.node ? mapOrgNode(data.node) : null;
         },
         async assignUserToOrgNode(uid, orgNodeId) {
-            await callCloudFunction(functions, "assignUserToOrgNode", {
+            await (0, callables_1.callCloudFunction)(functions, "assignUserToOrgNode", {
                 uid,
                 orgNodeId,
             });
         },
         async migrateSubAgenciesToAgencies() {
-            const data = await callCloudFunction(functions, "migrateSubAgenciesToAgencies", {});
+            const data = await (0, callables_1.callCloudFunction)(functions, "migrateSubAgenciesToAgencies", {});
             return {
                 scanned: Number(data?.scanned ?? 0),
                 updated: Number(data?.updated ?? 0),
@@ -229,7 +242,7 @@ function createAdminRepository(functions) {
             };
         },
         async uploadOrgLogo(input) {
-            const data = await callCloudFunction(functions, "uploadOrgLogo", input);
+            const data = await (0, callables_1.callCloudFunction)(functions, "uploadOrgLogo", input);
             if (!data?.downloadUrl)
                 return null;
             return {
@@ -238,11 +251,11 @@ function createAdminRepository(functions) {
             };
         },
         async setUserRole(uid, role) {
-            await callCloudFunction(functions, "setUserRole", { uid, role });
+            await (0, callables_1.callCloudFunction)(functions, "setUserRole", { uid, role });
         },
         async listRoles(filters) {
             try {
-                const data = await callCloudFunction(functions, "listRoles", filters ?? {});
+                const data = await (0, callables_1.callCloudFunction)(functions, "listRoles", filters ?? {});
                 return {
                     roles: (data?.roles ?? [])
                         .map(mapRoleDoc)
@@ -250,31 +263,31 @@ function createAdminRepository(functions) {
                 };
             }
             catch (error) {
-                if (error instanceof FunctionsUnavailableError) {
+                if (error instanceof callables_1.FunctionsUnavailableError) {
                     return { roles: [] };
                 }
                 throw error;
             }
         },
         async createRole(input) {
-            const data = await callCloudFunction(functions, "createRole", input);
+            const data = await (0, callables_1.callCloudFunction)(functions, "createRole", input);
             return data?.role ? mapRoleDoc(data.role) : null;
         },
         async updateRole(input) {
-            const data = await callCloudFunction(functions, "updateRole", input);
+            const data = await (0, callables_1.callCloudFunction)(functions, "updateRole", input);
             return data?.role ? mapRoleDoc(data.role) : null;
         },
         async deleteRole(id, hard = false) {
-            await callCloudFunction(functions, "deleteRole", { id, hard });
+            await (0, callables_1.callCloudFunction)(functions, "deleteRole", { id, hard });
         },
         async seedSystemRoles() {
-            const data = await callCloudFunction(functions, "seedSystemRoles", {});
+            const data = await (0, callables_1.callCloudFunction)(functions, "seedSystemRoles", {});
             return {
                 roles: (data?.roles ?? []).map(mapRoleDoc).filter((r) => r.id),
             };
         },
         async backfillUserSearchFields(input) {
-            const data = await callCloudFunction(functions, "backfillUserSearchFields", {
+            const data = await (0, callables_1.callCloudFunction)(functions, "backfillUserSearchFields", {
                 pageSize: input?.pageSize,
                 pageToken: input?.pageToken ?? undefined,
             });
@@ -283,6 +296,38 @@ function createAdminRepository(functions) {
                 updated: Number(data?.updated ?? 0),
                 done: Boolean(data?.done),
                 nextPageToken: data?.nextPageToken ?? null,
+            };
+        },
+        async listPromoBanners() {
+            try {
+                const data = await (0, callables_1.callCloudFunction)(functions, "listPromoBanners", {});
+                return {
+                    banners: (data?.banners ?? [])
+                        .map(mapPromoBanner)
+                        .filter((b) => b.id),
+                };
+            }
+            catch (error) {
+                if (error instanceof callables_1.FunctionsUnavailableError) {
+                    return { banners: [] };
+                }
+                throw error;
+            }
+        },
+        async upsertPromoBanner(input) {
+            const data = await (0, callables_1.callCloudFunction)(functions, "upsertPromoBanner", input);
+            return data?.banner ? mapPromoBanner(data.banner) : null;
+        },
+        async deletePromoBanner(id, hard = false) {
+            await (0, callables_1.callCloudFunction)(functions, "deletePromoBanner", { id, hard });
+        },
+        async uploadPromoBannerImage(input) {
+            const data = await (0, callables_1.callCloudFunction)(functions, "uploadPromoBannerImage", input);
+            if (!data?.downloadUrl)
+                return null;
+            return {
+                downloadUrl: String(data.downloadUrl),
+                path: String(data.path ?? ""),
             };
         },
     };

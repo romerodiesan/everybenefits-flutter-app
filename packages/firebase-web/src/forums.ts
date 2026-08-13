@@ -12,6 +12,8 @@ export type MappedForumThread = {
   authorRole: UserRole;
   replyCount: number;
   score: number;
+  /** Unique users who interacted (author, voters, repliers). */
+  interactorCount: number;
   acceptedReplyId: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
@@ -50,6 +52,7 @@ export function mapForumThread(
     authorRole: parseRole(data.authorRole),
     replyCount: Number(data.replyCount ?? 0),
     score: Number(data.score ?? 0),
+    interactorCount: Number(data.interactorCount ?? 0),
     acceptedReplyId:
       typeof data.acceptedReplyId === "string" ? data.acceptedReplyId : null,
     createdAt: toDate(data.createdAt),

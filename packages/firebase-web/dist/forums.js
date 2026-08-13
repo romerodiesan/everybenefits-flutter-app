@@ -19,6 +19,7 @@ function mapForumThread(id, data) {
         authorRole: (0, shared_1.parseRole)(data.authorRole),
         replyCount: Number(data.replyCount ?? 0),
         score: Number(data.score ?? 0),
+        interactorCount: Number(data.interactorCount ?? 0),
         acceptedReplyId: typeof data.acceptedReplyId === "string" ? data.acceptedReplyId : null,
         createdAt: (0, dates_1.toDate)(data.createdAt),
         updatedAt: (0, dates_1.toDate)(data.updatedAt),

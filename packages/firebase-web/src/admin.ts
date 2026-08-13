@@ -1,49 +1,27 @@
-import { httpsCallable, type Functions } from "firebase/functions";
+import { type Functions } from "firebase/functions";
 import {
   parseOrgNodeType,
   parseRole,
+  withBannerCompatDefaults,
   type OrgDepth,
   type OrgNode,
   type OrgNodeType,
+  type PromoBanner,
+  type PromoBannerAudience,
+  type PromoBannerFormat,
+  type PromoBannerLocalizedString,
+  type PromoBannerSurface,
+  type PromoBannerType,
   type RoleCategory,
   type RoleDoc,
   type UserRole,
 } from "@pulse/shared";
+import {
+  FunctionsUnavailableError,
+  callCloudFunction,
+} from "./callables";
 
-export class FunctionsUnavailableError extends Error {
-  constructor(message = "Cloud Functions unavailable") {
-    super(message);
-    this.name = "FunctionsUnavailableError";
-  }
-}
-
-export async function callCloudFunction<T>(
-  functions: Functions,
-  name: string,
-  data?: unknown,
-): Promise<T> {
-  try {
-    const callable = httpsCallable(functions, name);
-    const result = await callable(data ?? {});
-    return result.data as T;
-  } catch (error) {
-    const code =
-      error && typeof error === "object" && "code" in error
-        ? String((error as { code: unknown }).code)
-        : "";
-    if (
-      code.includes("unavailable") ||
-      code.includes("not-found") ||
-      code.includes("failed-precondition")
-    ) {
-      throw new FunctionsUnavailableError(
-        error instanceof Error ? error.message : String(error),
-      );
-    }
-    throw error;
-  }
-}
-
+export { FunctionsUnavailableError, callCloudFunction };
 export type AdminUserRow = {
   uid: string;
   email: string | null;
@@ -319,7 +297,74 @@ export type AdminRepository = {
     done: boolean;
     nextPageToken: string | null;
   }>;
+  listPromoBanners: () => Promise<{ banners: PromoBanner[] }>;
+  upsertPromoBanner: (input: {
+    id?: string;
+    version?: number;
+    active?: boolean;
+    type?: PromoBannerType;
+    format?: PromoBannerFormat;
+    surface: PromoBannerSurface;
+    audiences: PromoBannerAudience[];
+    dismissible?: boolean;
+    showCta?: boolean;
+    showImage?: boolean;
+    eyebrow: PromoBannerLocalizedString;
+    title: PromoBannerLocalizedString;
+    body: PromoBannerLocalizedString;
+    ctaLabel?: PromoBannerLocalizedString;
+    href?: string;
+    imageUrl?: string | null;
+    imagePath?: string | null;
+    startsAt?: number | null;
+    endsAt?: number | null;
+    bumpVersion?: boolean;
+  }) => Promise<PromoBanner | null>;
+  deletePromoBanner: (id: string, hard?: boolean) => Promise<void>;
+  uploadPromoBannerImage: (input: {
+    bannerId: string;
+    contentType: string;
+    bytesBase64: string;
+  }) => Promise<{ downloadUrl: string; path: string } | null>;
 };
+
+function mapPromoBanner(entry: Record<string, unknown>): PromoBanner {
+  const localized = (value: unknown): PromoBannerLocalizedString => {
+    if (!value || typeof value !== "object") return { en: "", es: "" };
+    const record = value as Record<string, unknown>;
+    return {
+      en: typeof record.en === "string" ? record.en : "",
+      es: typeof record.es === "string" ? record.es : "",
+    };
+  };
+  return withBannerCompatDefaults({
+    id: String(entry.id ?? ""),
+    version: typeof entry.version === "number" ? entry.version : 1,
+    active: entry.active === true,
+    type: entry.type as PromoBannerType | undefined,
+    format: entry.format as PromoBannerFormat | undefined,
+    surface: (entry.surface as PromoBannerSurface) ?? "home",
+    audiences: Array.isArray(entry.audiences)
+      ? (entry.audiences.map(String) as PromoBannerAudience[])
+      : ["all"],
+    dismissible: entry.dismissible !== false,
+    showCta: entry.showCta !== false,
+    showImage:
+      typeof entry.showImage === "boolean" ? entry.showImage : undefined,
+    eyebrow: localized(entry.eyebrow),
+    title: localized(entry.title),
+    body: localized(entry.body),
+    ctaLabel: localized(entry.ctaLabel),
+    href: typeof entry.href === "string" ? entry.href : "",
+    imageUrl: typeof entry.imageUrl === "string" ? entry.imageUrl : null,
+    imagePath: typeof entry.imagePath === "string" ? entry.imagePath : null,
+    startsAt: typeof entry.startsAt === "number" ? entry.startsAt : null,
+    endsAt: typeof entry.endsAt === "number" ? entry.endsAt : null,
+    createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
+    updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : null,
+    updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
+  });
+}
 export function createAdminRepository(functions: Functions): AdminRepository {
   return {
     async listUsers(filters) {
@@ -551,6 +596,43 @@ export function createAdminRepository(functions: Functions): AdminRepository {
         updated: Number(data?.updated ?? 0),
         done: Boolean(data?.done),
         nextPageToken: data?.nextPageToken ?? null,
+      };
+    },
+    async listPromoBanners() {
+      try {
+        const data = await callCloudFunction<{
+          banners?: Array<Record<string, unknown>>;
+        }>(functions, "listPromoBanners", {});
+        return {
+          banners: (data?.banners ?? [])
+            .map(mapPromoBanner)
+            .filter((b) => b.id),
+        };
+      } catch (error) {
+        if (error instanceof FunctionsUnavailableError) {
+          return { banners: [] };
+        }
+        throw error;
+      }
+    },
+    async upsertPromoBanner(input) {
+      const data = await callCloudFunction<{
+        banner?: Record<string, unknown>;
+      }>(functions, "upsertPromoBanner", input);
+      return data?.banner ? mapPromoBanner(data.banner) : null;
+    },
+    async deletePromoBanner(id, hard = false) {
+      await callCloudFunction(functions, "deletePromoBanner", { id, hard });
+    },
+    async uploadPromoBannerImage(input) {
+      const data = await callCloudFunction<{
+        downloadUrl?: string;
+        path?: string;
+      }>(functions, "uploadPromoBannerImage", input);
+      if (!data?.downloadUrl) return null;
+      return {
+        downloadUrl: String(data.downloadUrl),
+        path: String(data.path ?? ""),
       };
     },
   };

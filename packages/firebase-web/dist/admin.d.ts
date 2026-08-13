@@ -1,9 +1,7 @@
 import { type Functions } from "firebase/functions";
-import { type OrgNode, type OrgNodeType, type RoleCategory, type RoleDoc, type UserRole } from "@pulse/shared";
-export declare class FunctionsUnavailableError extends Error {
-    constructor(message?: string);
-}
-export declare function callCloudFunction<T>(functions: Functions, name: string, data?: unknown): Promise<T>;
+import { type OrgNode, type OrgNodeType, type PromoBanner, type PromoBannerAudience, type PromoBannerFormat, type PromoBannerLocalizedString, type PromoBannerSurface, type PromoBannerType, type RoleCategory, type RoleDoc, type UserRole } from "@pulse/shared";
+import { FunctionsUnavailableError, callCloudFunction } from "./callables";
+export { FunctionsUnavailableError, callCloudFunction };
 export type AdminUserRow = {
     uid: string;
     email: string | null;
@@ -176,6 +174,40 @@ export type AdminRepository = {
         done: boolean;
         nextPageToken: string | null;
     }>;
+    listPromoBanners: () => Promise<{
+        banners: PromoBanner[];
+    }>;
+    upsertPromoBanner: (input: {
+        id?: string;
+        version?: number;
+        active?: boolean;
+        type?: PromoBannerType;
+        format?: PromoBannerFormat;
+        surface: PromoBannerSurface;
+        audiences: PromoBannerAudience[];
+        dismissible?: boolean;
+        showCta?: boolean;
+        showImage?: boolean;
+        eyebrow: PromoBannerLocalizedString;
+        title: PromoBannerLocalizedString;
+        body: PromoBannerLocalizedString;
+        ctaLabel?: PromoBannerLocalizedString;
+        href?: string;
+        imageUrl?: string | null;
+        imagePath?: string | null;
+        startsAt?: number | null;
+        endsAt?: number | null;
+        bumpVersion?: boolean;
+    }) => Promise<PromoBanner | null>;
+    deletePromoBanner: (id: string, hard?: boolean) => Promise<void>;
+    uploadPromoBannerImage: (input: {
+        bannerId: string;
+        contentType: string;
+        bytesBase64: string;
+    }) => Promise<{
+        downloadUrl: string;
+        path: string;
+    } | null>;
 };
 export declare function createAdminRepository(functions: Functions): AdminRepository;
 //# sourceMappingURL=admin.d.ts.map

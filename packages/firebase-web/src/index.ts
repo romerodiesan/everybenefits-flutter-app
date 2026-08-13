@@ -7,9 +7,15 @@ export {
   type MappedForumReply,
 } from "./forums";
 export {
-  createAdminRepository,
   FunctionsUnavailableError,
   callCloudFunction,
+} from "./callables";
+export {
+  createPulseQueryClientOptions,
+  pulseQueryDefaults,
+} from "./query";
+export {
+  createAdminRepository,
   mapAdminUserRow,
   mapOrgNode,
   type AdminRepository,
