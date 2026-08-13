@@ -268,7 +268,7 @@ service cloud.firestore {
             !isAnonymousAuth()
             && request.resource.data.role == 'student'
             && request.resource.data.isAnonymous == false
-            && request.resource.data.approvalStatus == 'pending'
+            && request.resource.data.get('approvalStatus', '') == 'pending'
             && !isProtectedRole(request.resource.data.role)
           )
         );
@@ -403,7 +403,9 @@ service cloud.firestore {
         && validTags(request.resource.data.tags)
         && request.resource.data.replyCount == 0
         && request.resource.data.score is int
-        && request.resource.data.score == 0;
+        && request.resource.data.score == 0
+        && request.resource.data.interactorCount is int
+        && request.resource.data.interactorCount == 0;
 
       allow update: if isForumParticipant()
         && threadAuthorUnchanged()
@@ -417,6 +419,7 @@ service cloud.firestore {
             && validTags(request.resource.data.tags)
             && request.resource.data.score == resource.data.score
             && request.resource.data.replyCount == resource.data.replyCount
+            && request.resource.data.interactorCount == resource.data.interactorCount
             && request.resource.data.acceptedReplyId == resource.data.acceptedReplyId
           )
           // Author/admin accept an answer.
@@ -658,9 +661,15 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Role permission documents — clients may read to hydrate Auth; writes via Functions.
+    // Role permission documents — registered members hydrate Auth; writes via Functions.
     match /roles/{roleId} {
-      allow read: if isSignedIn();
+      allow read: if isRegisteredMember();
+      allow write: if false;
+    }
+
+    // Promo banners — registered members hydrate active promos; writes via Functions.
+    match /promoBanners/{bannerId} {
+      allow read: if isRegisteredMember();
       allow write: if false;
     }
 
@@ -713,6 +722,96 @@ service cloud.firestore {
     }
     match /reconciliationItems/{id} {
       allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    // Compensation plans layer (override tiers / groups / plans / routing).
+    // Same policy as core payments: payments-admin read; writes via Functions only.
+    match /compensationTiers/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /agentRateGroups/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /compensationPlans/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /planAssignments/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /paymentRouting/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    // Commission Runs module (ADR-008) — payments-admin read; writes via Functions.
+    match /commissionRuns/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionSourceFiles/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionImportProfiles/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionTransactions/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionRules/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionRuleVersions/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionValidationIssues/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionCalculations/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionAllocations/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionStatements/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionStatementVersions/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionNotifications/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionAuditEvents/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /commissionSettings/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+    match /agencyPayModes/{id} {
+      allow read: if canAccessPaymentsData();
+      allow write: if false;
+    }
+
+    // Aggregate platform counts (Admin SDK writes). Registered-member read for
+    // proportional feed rules (e.g. Spotlight reach vs active audience).
+    match /platformStats/{docId} {
+      allow read: if isRegisteredMember();
       allow write: if false;
     }
 

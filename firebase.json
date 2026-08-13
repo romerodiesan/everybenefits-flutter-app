@@ -155,7 +155,7 @@
     {
       "source": "apps/functions",
       "codebase": "default",
-      "runtime": "nodejs22",
+      "runtime": "nodejs24",
       "ignore": [
         "node_modules",
         ".git",

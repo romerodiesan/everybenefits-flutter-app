@@ -93,10 +93,10 @@
     },
 
     "presence": {
-      // Non-anonymous Auth only. Use auth.provider (RTDB classic) — more
-      // reliable on the Auth emulator than token.firebase.sign_in_provider.
-      ".read": "auth != null && auth.provider != 'anonymous'",
+      // Per-uid only — no list/enumerate of other users' presence trees.
+      // Headcount uses the shallow online/ index instead.
       "$uid": {
+        ".read": "auth != null && auth.uid === $uid && auth.provider != 'anonymous'",
         "$clientId": {
           ".write": "auth != null && auth.uid === $uid",
           ".validate": "newData.hasChildren(['at']) && (newData.child('at').isNumber() || newData.child('at').val() === now)"
@@ -104,7 +104,7 @@
       }
     },
 
-    // Shallow online index for cheap headcount (one node per uid).
+    // Shallow online index for cheap headcount (one boolean per uid; no PII).
     "online": {
       ".read": "auth != null && auth.provider != 'anonymous'",
       "$uid": {

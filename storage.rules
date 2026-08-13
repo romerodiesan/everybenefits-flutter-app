@@ -94,12 +94,19 @@ service firebase.storage {
     // Prefer Admin uploadOrgLogo callable (avoids firestore.get fail-closed).
     // Direct client writes: platform roles only, single Firestore get.
     match /org-logos/{fileName} {
-      allow read: if isSignedIn();
+      allow read: if isRegisteredMember();
       allow write: if isSignedIn()
         && request.resource.size < 5 * 1024 * 1024
         && isAllowedImageType()
         && firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
           .data.role in ['admin', 'system', 'manager'];
+    }
+
+    // Promo banner covers: /banners/{bannerId}/...
+    // Writes go through uploadPromoBannerImage callable (Admin SDK).
+    match /banners/{bannerId}/{allPaths=**} {
+      allow read: if isRegisteredMember();
+      allow write: if false;
     }
 
     // Course covers and lesson videos: /courses/{courseId}/...
