@@ -35,6 +35,7 @@ exports.userProfileFixtureSchema = zod_1.z.object({
     addressState: zod_1.z.string().nullable(),
     addressZip: zod_1.z.string().nullable(),
     agency: zod_1.z.string().nullable(),
+    bio: zod_1.z.string().max(280).nullable().optional(),
     orgNodeId: zod_1.z.string().nullable().optional(),
     accountStatus: exports.accountStatusSchema.optional(),
     approvalStatus: exports.approvalStatusSchema.optional(),

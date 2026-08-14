@@ -38,6 +38,7 @@ export const userProfileFixtureSchema = z.object({
   addressState: z.string().nullable(),
   addressZip: z.string().nullable(),
   agency: z.string().nullable(),
+  bio: z.string().max(280).nullable().optional(),
   orgNodeId: z.string().nullable().optional(),
   accountStatus: accountStatusSchema.optional(),
   approvalStatus: approvalStatusSchema.optional(),

@@ -36,6 +36,14 @@ export type QuizQuestion = {
     selectionMode: QuizSelectionMode;
     options: string[];
 };
+/** Parses `m:ss` / `h:mm:ss` duration labels. */
+export declare function parseClockDuration(raw: string): number | null;
+/**
+ * Reads a lesson's duration in seconds.
+ * Some Studio docs stored minutes in `durationMinutes` (or duplicated that
+ * value into `durationSeconds`); prefer a real second count when present.
+ */
+export declare function resolveLessonDurationSeconds(data: Record<string, unknown>): number;
 export type Lesson = {
     id: string;
     moduleId: string;

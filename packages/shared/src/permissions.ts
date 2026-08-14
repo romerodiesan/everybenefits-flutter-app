@@ -551,6 +551,11 @@ export type RoleDoc = {
   locked: boolean;
   active: boolean;
   sortOrder: number;
+  /** Public badge label; falls back to [name]. */
+  badgeText?: string | null;
+  badgeIcon?: string | null;
+  /** Hex, accent seed, or `"accent"` to follow each user's appearance. */
+  badgeColor?: string | null;
   createdAt?: number | null;
   updatedAt?: number | null;
   updatedBy?: string | null;

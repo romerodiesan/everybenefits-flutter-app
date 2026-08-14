@@ -2,6 +2,31 @@
  * Shared profile field validation / normalization for Pulse clients.
  */
 
+/** Public bio on `users/{uid}` / `publicProfiles/{uid}`. */
+export const PUBLIC_BIO_MAX = 280;
+
+export {
+  APPEARANCE_ACCENTS,
+  APPEARANCE_ACCENT_HEX,
+  PROFILE_BADGE_ICONS,
+  PROFILE_BADGE_ICON_MAX,
+  PROFILE_BADGE_TEXT_MAX,
+  appearanceAccentFrom,
+  isAppearanceAccent,
+  isProfileBadgeIcon,
+  parseAppearanceAccent,
+  parseBadgeColorToken,
+  parseProfileBadgeConfig,
+  parsePublicProfileBadge,
+  resolveBadgeBackgroundColor,
+  sanitizeProfileBadgeInput,
+  toPublicProfileBadge,
+  type AppearanceAccent,
+  type ProfileBadgeConfig,
+  type ProfileBadgeIcon,
+  type PublicProfileBadge,
+} from "./profile-badge";
+
 import { hasPermission, resolvePermissionSet } from "./permissions";
 
 const EMAIL_LIKE =

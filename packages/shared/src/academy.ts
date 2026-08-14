@@ -49,6 +49,49 @@ export type QuizQuestion = {
   options: string[];
 };
 
+function toFiniteNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string" && value.trim()) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return n;
+  }
+  return null;
+}
+
+/** Parses `m:ss` / `h:mm:ss` duration labels. */
+export function parseClockDuration(raw: string): number | null {
+  const parts = raw.trim().split(":").map((part) => Number(part));
+  if (parts.length < 2 || parts.length > 3) return null;
+  if (parts.some((n) => !Number.isFinite(n) || n < 0)) return null;
+  if (parts.length === 2) {
+    return Math.round(parts[0]! * 60 + parts[1]!);
+  }
+  return Math.round(parts[0]! * 3600 + parts[1]! * 60 + parts[2]!);
+}
+
+/**
+ * Reads a lesson's duration in seconds.
+ * Some Studio docs stored minutes in `durationMinutes` (or duplicated that
+ * value into `durationSeconds`); prefer a real second count when present.
+ */
+export function resolveLessonDurationSeconds(
+  data: Record<string, unknown>,
+): number {
+  const minutes = toFiniteNumber(data.durationMinutes);
+  let seconds = toFiniteNumber(data.durationSeconds);
+  if (seconds == null && typeof data.durationSeconds === "string") {
+    seconds = parseClockDuration(data.durationSeconds);
+  }
+  if (
+    minutes != null &&
+    minutes > 0 &&
+    (seconds == null || seconds === 0 || seconds === minutes)
+  ) {
+    return Math.max(0, Math.round(minutes * 60));
+  }
+  return Math.max(0, Math.round(seconds ?? 0));
+}
+
 export type Lesson = {
   id: string;
   moduleId: string;

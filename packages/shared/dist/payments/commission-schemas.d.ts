@@ -137,9 +137,9 @@ export declare const getCommissionRunInputSchema: z.ZodObject<{
 }, z.core.$strip>;
 export declare const listCommissionPartiesInputSchema: z.ZodObject<{
     kind: z.ZodDefault<z.ZodOptional<z.ZodEnum<{
+        all: "all";
         agent: "agent";
         agency: "agency";
-        all: "all";
     }>>>;
     query: z.ZodDefault<z.ZodOptional<z.ZodString>>;
     limit: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;

@@ -3,6 +3,7 @@
  * Shared profile field validation / normalization for Pulse clients.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.toPublicProfileBadge = exports.sanitizeProfileBadgeInput = exports.resolveBadgeBackgroundColor = exports.parsePublicProfileBadge = exports.parseProfileBadgeConfig = exports.parseBadgeColorToken = exports.parseAppearanceAccent = exports.isProfileBadgeIcon = exports.isAppearanceAccent = exports.appearanceAccentFrom = exports.PROFILE_BADGE_TEXT_MAX = exports.PROFILE_BADGE_ICON_MAX = exports.PROFILE_BADGE_ICONS = exports.APPEARANCE_ACCENT_HEX = exports.APPEARANCE_ACCENTS = exports.PUBLIC_BIO_MAX = void 0;
 exports.requiresLicenseProfile = requiresLicenseProfile;
 exports.looksLikeEmailName = looksLikeEmailName;
 exports.normalizePersonName = normalizePersonName;
@@ -25,6 +26,24 @@ exports.isUserApproved = isUserApproved;
 exports.needsProfileCompletion = needsProfileCompletion;
 exports.headlineName = headlineName;
 exports.composeUsAddress = composeUsAddress;
+/** Public bio on `users/{uid}` / `publicProfiles/{uid}`. */
+exports.PUBLIC_BIO_MAX = 280;
+var profile_badge_1 = require("./profile-badge");
+Object.defineProperty(exports, "APPEARANCE_ACCENTS", { enumerable: true, get: function () { return profile_badge_1.APPEARANCE_ACCENTS; } });
+Object.defineProperty(exports, "APPEARANCE_ACCENT_HEX", { enumerable: true, get: function () { return profile_badge_1.APPEARANCE_ACCENT_HEX; } });
+Object.defineProperty(exports, "PROFILE_BADGE_ICONS", { enumerable: true, get: function () { return profile_badge_1.PROFILE_BADGE_ICONS; } });
+Object.defineProperty(exports, "PROFILE_BADGE_ICON_MAX", { enumerable: true, get: function () { return profile_badge_1.PROFILE_BADGE_ICON_MAX; } });
+Object.defineProperty(exports, "PROFILE_BADGE_TEXT_MAX", { enumerable: true, get: function () { return profile_badge_1.PROFILE_BADGE_TEXT_MAX; } });
+Object.defineProperty(exports, "appearanceAccentFrom", { enumerable: true, get: function () { return profile_badge_1.appearanceAccentFrom; } });
+Object.defineProperty(exports, "isAppearanceAccent", { enumerable: true, get: function () { return profile_badge_1.isAppearanceAccent; } });
+Object.defineProperty(exports, "isProfileBadgeIcon", { enumerable: true, get: function () { return profile_badge_1.isProfileBadgeIcon; } });
+Object.defineProperty(exports, "parseAppearanceAccent", { enumerable: true, get: function () { return profile_badge_1.parseAppearanceAccent; } });
+Object.defineProperty(exports, "parseBadgeColorToken", { enumerable: true, get: function () { return profile_badge_1.parseBadgeColorToken; } });
+Object.defineProperty(exports, "parseProfileBadgeConfig", { enumerable: true, get: function () { return profile_badge_1.parseProfileBadgeConfig; } });
+Object.defineProperty(exports, "parsePublicProfileBadge", { enumerable: true, get: function () { return profile_badge_1.parsePublicProfileBadge; } });
+Object.defineProperty(exports, "resolveBadgeBackgroundColor", { enumerable: true, get: function () { return profile_badge_1.resolveBadgeBackgroundColor; } });
+Object.defineProperty(exports, "sanitizeProfileBadgeInput", { enumerable: true, get: function () { return profile_badge_1.sanitizeProfileBadgeInput; } });
+Object.defineProperty(exports, "toPublicProfileBadge", { enumerable: true, get: function () { return profile_badge_1.toPublicProfileBadge; } });
 const permissions_1 = require("./permissions");
 const EMAIL_LIKE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/i;
 const NPN_DIGITS = /^\d{7,9}$/;
