@@ -53,6 +53,10 @@
           // Members may only post as themselves.
           ".write": "auth != null
             && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
+            && (
+              root.child('chats').child($chatId).child('isGroup').val() === true
+              || root.child('chats').child($chatId).child('dmMessagingEnabled').val() === true
+            )
             && !data.exists()
             && newData.child('senderId').val() === auth.uid
             && newData.child('body').isString()

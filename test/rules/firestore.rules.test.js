@@ -87,17 +87,21 @@ describe('users create', () => {
     );
   });
 
-  it('allows registered student create', async () => {
-    const db = authedDb('u1', { email: 'u1@example.com' });
+  it('allows registered student create with search index fields', async () => {
+    const db = authedDb('u1search', { email: 'search@example.com' });
     await assertSucceeds(
-      db.doc('users/u1').set({
-        uid: 'u1',
+      db.doc('users/u1search').set({
+        uid: 'u1search',
         role: 'student',
         isAnonymous: false,
         profileCompleted: false,
-        displayName: 'Ada',
-        email: 'u1@example.com',
+        displayName: 'Ada Lovelace',
+        displayNameLower: 'ada lovelace',
+        email: 'search@example.com',
+        emailLower: 'search@example.com',
+        nameTokens: ['ad', 'ada', 'lo', 'lov'],
         approvalStatus: 'pending',
+        accountStatus: 'active',
       }),
     );
   });
@@ -198,9 +202,33 @@ describe('users create', () => {
     await assertSucceeds(
       db.doc('users/u6').update({ displayName: 'New Name' }),
     );
+    await assertFails(
+      db.doc('users/u6').update({
+        profileBadge: { enabled: true, text: 'VIP', icon: 'star', color: 'accent' },
+      }),
+    );
   });
 
-  it('blocks deactivated users from clearing their own status', async () => {
+  it('allows protected-role owners to edit profile fields without changing role', async () => {
+    await seedUser('adminSelf', { role: 'admin', profileCompleted: true });
+    await seedUser('mgrSelf', { role: 'manager', profileCompleted: true });
+    await assertSucceeds(
+      authedDb('adminSelf').doc('users/adminSelf').update({
+        displayName: 'Admin Updated',
+        photoUrl: 'https://example.com/a.jpg',
+      }),
+    );
+    await assertSucceeds(
+      authedDb('mgrSelf').doc('users/mgrSelf').update({
+        displayName: 'Manager Updated',
+      }),
+    );
+    await assertFails(
+      authedDb('mgrSelf').doc('users/mgrSelf').update({ role: 'admin' }),
+    );
+  });
+
+  it('blocks owners from changing accountStatus', async () => {
     await seedUser('u7', {
       role: 'student',
       accountStatus: 'deactivated',
@@ -931,6 +959,77 @@ describe('course analytics rollups', () => {
     );
     await assertFails(
       authedDb('author1').doc('analyticsDedupe/x').get(),
+    );
+  });
+});
+
+describe('social graph', () => {
+  beforeEach(async () => {
+    await seedUser('a1', { role: 'agent', approvalStatus: 'approved' });
+    await seedUser('a2', { role: 'agent', approvalStatus: 'approved' });
+    await seedUser('a3', { role: 'agent', approvalStatus: 'approved' });
+  });
+
+  it('lets owners read and write their own blocks and mutes', async () => {
+    const db = authedDb('a1', { email: 'a1@example.com' });
+    await assertSucceeds(
+      db.doc('social/a1/blocks/a2').set({
+        uid: 'a2',
+        createdAt: new Date(),
+      }),
+    );
+    await assertSucceeds(
+      db.doc('social/a1/mutes/a2').set({
+        uid: 'a2',
+        createdAt: new Date(),
+      }),
+    );
+    await assertSucceeds(db.doc('social/a1/blocks/a2').get());
+    await assertSucceeds(db.doc('social/a1/mutes/a2').delete());
+  });
+
+  it('denies forging contacts or requests from the client', async () => {
+    const db = authedDb('a1', { email: 'a1@example.com' });
+    await assertFails(
+      db.doc('social/a1/contacts/a2').set({ uid: 'a2', since: new Date() }),
+    );
+    await assertFails(
+      db.doc('social/a1/outgoingRequests/a2').set({
+        fromUid: 'a1',
+        toUid: 'a2',
+        createdAt: new Date(),
+      }),
+    );
+    await assertFails(
+      db.doc('social/a2/incomingRequests/a1').set({
+        fromUid: 'a1',
+        toUid: 'a2',
+        createdAt: new Date(),
+      }),
+    );
+  });
+
+  it('denies reading another member social graph', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('social/a1/contacts/a2').set({ uid: 'a2' });
+    });
+    await assertFails(
+      authedDb('a2', { email: 'a2@example.com' }).doc('social/a1/contacts/a2').get(),
+    );
+  });
+
+  it('rejects blocking yourself or missing uid field', async () => {
+    const db = authedDb('a1', { email: 'a1@example.com' });
+    await assertFails(
+      db.doc('social/a1/blocks/a1').set({
+        uid: 'a1',
+        createdAt: new Date(),
+      }),
+    );
+    await assertFails(
+      db.doc('social/a1/blocks/a2').set({
+        createdAt: new Date(),
+      }),
     );
   });
 });

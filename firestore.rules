@@ -275,7 +275,9 @@ service cloud.firestore {
 
       // Owners may edit profile fields. Role is frozen except a one-time
       // student → student|agent transition when completing the profile.
-      // Later upgrades and privileged roles require Admin SDK / setUserRole.
+      // Protected roles (admin/manager/instructor) may still edit their own
+      // profile fields as long as role stays identical — no self-promotion.
+      // Later upgrades require Admin SDK / setUserRole.
       // Account lifecycle + approval fields are server-managed (callables),
       // so clients can never touch them.
       allow update: if isOwner(uid)
@@ -290,20 +292,32 @@ service cloud.firestore {
           'deletionSnapshot',
           'approvalStatus',
           'approvedBy',
-          'approvedAt'
+          'approvedAt',
+          'profileBadge',
+          'email'
         ])
-        && !isProtectedRole(request.resource.data.role)
-        && !isProtectedRole(resource.data.role)
+        && optionalBoundedString(request.resource.data.get('bio', null), 280)
         && (
-          request.resource.data.role == resource.data.role
+          (
+            !isProtectedRole(request.resource.data.role)
+            && !isProtectedRole(resource.data.role)
+            && (
+              request.resource.data.role == resource.data.role
+              || (
+                resource.data.profileCompleted == false
+                && resource.data.role == 'student'
+                && request.resource.data.role in ['student', 'agent']
+                && request.resource.data.profileCompleted == true
+              )
+            )
+          )
           || (
-            resource.data.profileCompleted == false
-            && resource.data.role == 'student'
-            && request.resource.data.role in ['student', 'agent']
-            && request.resource.data.profileCompleted == true
+            isProtectedRole(resource.data.role)
+            && request.resource.data.role == resource.data.role
           )
         );
 
+      // Admins may update/delete any user doc (promote, lifecycle, etc.).
       allow update, delete: if isAdmin();
 
       match /forumVotes/{voteId} {
@@ -376,6 +390,54 @@ service cloud.firestore {
     match /publicProfiles/{uid} {
       allow read: if isRegisteredMember();
       allow write: if false;
+    }
+
+    // Social graph: owner-only reads. Contacts and requests are Admin SDK only.
+    match /social/{uid} {
+      allow read, write: if false;
+
+      match /blocks/{otherUid} {
+        allow read: if isOwner(uid) && isRegisteredMember();
+        allow create: if isOwner(uid)
+          && isRegisteredMember()
+          && otherUid != uid
+          && otherUid.size() > 0
+          && otherUid.size() <= 128
+          && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+          && request.resource.data.uid == otherUid
+          && request.resource.data.createdAt is timestamp;
+        allow update: if false;
+        allow delete: if isOwner(uid);
+      }
+
+      match /mutes/{otherUid} {
+        allow read: if isOwner(uid) && isRegisteredMember();
+        allow create: if isOwner(uid)
+          && isRegisteredMember()
+          && otherUid != uid
+          && otherUid.size() > 0
+          && otherUid.size() <= 128
+          && request.resource.data.keys().hasOnly(['uid', 'createdAt'])
+          && request.resource.data.uid == otherUid
+          && request.resource.data.createdAt is timestamp;
+        allow update: if false;
+        allow delete: if isOwner(uid);
+      }
+
+      match /contacts/{otherUid} {
+        allow read: if isOwner(uid) && isRegisteredMember();
+        allow write: if false;
+      }
+
+      match /incomingRequests/{fromUid} {
+        allow read: if isOwner(uid) && isRegisteredMember();
+        allow write: if false;
+      }
+
+      match /outgoingRequests/{toUid} {
+        allow read: if isOwner(uid) && isRegisteredMember();
+        allow write: if false;
+      }
     }
 
     // Server-only outbound email queue (Resend).

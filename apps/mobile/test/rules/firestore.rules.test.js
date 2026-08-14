@@ -198,6 +198,14 @@ describe('users create', () => {
     await assertSucceeds(
       db.doc('users/u6').update({ displayName: 'New Name' }),
     );
+    await assertFails(
+      db.doc('users/u6').update({
+        profileBadge: { enabled: true, text: 'VIP', icon: 'star', color: 'accent' },
+      }),
+    );
+    await assertFails(
+      db.doc('users/u6').update({ email: 'new@example.com' }),
+    );
   });
 
   it('blocks deactivated users from clearing their own status', async () => {
@@ -931,6 +939,26 @@ describe('course analytics rollups', () => {
     );
     await assertFails(
       authedDb('author1').doc('analyticsDedupe/x').get(),
+    );
+  });
+});
+
+describe('social graph', () => {
+  beforeEach(async () => {
+    await seedUser('a1', { role: 'agent', approvalStatus: 'approved' });
+    await seedUser('a2', { role: 'agent', approvalStatus: 'approved' });
+  });
+
+  it('lets owners write blocks and mutes but not contacts', async () => {
+    const db = authedDb('a1', { email: 'a1@example.com' });
+    await assertSucceeds(
+      db.doc('social/a1/blocks/a2').set({
+        uid: 'a2',
+        createdAt: new Date(),
+      }),
+    );
+    await assertFails(
+      db.doc('social/a1/contacts/a2').set({ uid: 'a2', since: new Date() }),
     );
   });
 });
