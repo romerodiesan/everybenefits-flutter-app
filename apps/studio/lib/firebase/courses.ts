@@ -23,6 +23,7 @@ import {
   uploadBytesResumable,
 } from "firebase/storage";
 import { getFirebaseDb, getFirebaseStorage } from "./client";
+import { resolveLessonDurationSeconds } from "@pulse/shared";
 import type {
   Course,
   CourseContent,
@@ -126,7 +127,7 @@ function lessonFrom(id: string, data: Record<string, unknown>): Lesson {
     moduleId: String(data.moduleId ?? ""),
     title: String(data.title ?? ""),
     order: Number(data.order ?? 0),
-    durationSeconds: Number(data.durationSeconds ?? 0),
+    durationSeconds: resolveLessonDurationSeconds(data),
     type: parseLessonType(data.type),
     videoPath: (data.videoPath as string) ?? null,
     videoUrl: (data.videoUrl as string) ?? null,
@@ -532,13 +533,14 @@ export async function uploadLessonVideo(input: {
     );
   }
 
+  const seconds = Number(input.durationSeconds);
   await updateDoc(lessonRef, {
     videoPath: path,
     videoUrl: null,
     videoFileName: input.file.name,
     videoUploadGeneration: generation,
-    ...(input.durationSeconds
-      ? { durationSeconds: Math.round(input.durationSeconds) }
+    ...(Number.isFinite(seconds) && seconds > 0
+      ? { durationSeconds: Math.round(seconds) }
       : {}),
     updatedAt: serverTimestamp(),
   });
@@ -594,16 +596,27 @@ export function readVideoDuration(file: File) {
     const url = URL.createObjectURL(file);
     const video = document.createElement("video");
     video.preload = "metadata";
-    video.onloadedmetadata = () => {
-      const seconds = Number.isFinite(video.duration) ? video.duration : 0;
+    let settled = false;
+    const finish = (seconds: number) => {
+      if (settled) return;
+      settled = true;
       URL.revokeObjectURL(url);
-      resolve(Math.round(seconds));
+      video.removeAttribute("src");
+      video.load();
+      const value = Number.isFinite(seconds) && seconds > 0 ? Math.round(seconds) : 0;
+      resolve(value);
     };
-    video.onerror = () => {
-      URL.revokeObjectURL(url);
-      resolve(0);
+    const accept = () => {
+      const duration = video.duration;
+      if (Number.isFinite(duration) && duration > 0 && duration !== Infinity) {
+        finish(duration);
+      }
     };
+    video.onloadedmetadata = accept;
+    video.ondurationchange = accept;
+    video.onerror = () => finish(0);
     video.src = url;
+    window.setTimeout(() => finish(video.duration), 4000);
   });
 }
 
