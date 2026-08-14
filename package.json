@@ -38,7 +38,7 @@
     "test:integration": "pnpm test:rules"
   },
   "devDependencies": {
-    "turbo": "^2.10.8",
+    "turbo": "^2.10.9",
     "typescript": "~5.9.3"
   }
 }
