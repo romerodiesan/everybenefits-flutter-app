@@ -169,6 +169,7 @@ const EDITABLE_PROFILE_KEYS = [
   "addressState",
   "addressZip",
   "agency",
+  "bio",
   "privacy",
   "role",
 ] as const satisfies readonly (keyof UserProfile)[];

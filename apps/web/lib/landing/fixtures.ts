@@ -91,6 +91,7 @@ export const LANDING_CHATS: ChatConversation[] = [
     createdBy: LANDING_VIEWER_UID,
     isDefaultAgentGroup: false,
     autoJoinRoles: [],
+    dmMessagingEnabled: true,
   },
   {
     id: "c2",
@@ -112,6 +113,7 @@ export const LANDING_CHATS: ChatConversation[] = [
     createdBy: "u1",
     isDefaultAgentGroup: false,
     autoJoinRoles: [],
+    dmMessagingEnabled: true,
   },
 ];
 

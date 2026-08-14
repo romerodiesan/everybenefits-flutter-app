@@ -19,7 +19,7 @@ import {
 } from "@/lib/academy-progress";
 import { LESSON_COMPLETE_THRESHOLD } from "@/lib/types";
 import type { Course, CourseContent, Enrollment, Lesson } from "@/lib/types";
-import { EmptyState, LessonTypeIcon, ProgressBar } from "./shared";
+import { EmptyState, LessonTypeIcon, ProgressBar, formatLessonDurationSeconds } from "./shared";
 import { QuizStage, ReadingStage } from "./lesson-stages";
 import { PlayerSkeleton } from "@/components/ui/skeleton";
 import {
@@ -64,6 +64,7 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
   const [enrollment, setEnrollment] = useState<Enrollment | null>(null);
   const [activeId, setActiveId] = useState<string | null>(requestedLessonId);
   const [media, setMedia] = useState<MediaState | null>(null);
+  const [liveDurations, setLiveDurations] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [lockHint, setLockHint] = useState<string | null>(null);
 
@@ -262,6 +263,13 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
   const onLoadedMetadata = () => {
     const video = videoRef.current;
     if (!video || !active) return;
+    const duration = video.duration;
+    if (Number.isFinite(duration) && duration > 0) {
+      setLiveDurations((prev) => ({
+        ...prev,
+        [active.id]: Math.round(duration),
+      }));
+    }
     // Resume only once per lesson, and only where we actually left off.
     if (seekedFor.current === active.id) return;
     seekedFor.current = active.id;
@@ -274,6 +282,29 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
       lastHeartbeatPos.current = resumeAt;
     }
   };
+
+  async function enterFullscreen() {
+    const video = videoRef.current;
+    if (!video) return;
+    const webkit = video as HTMLVideoElement & {
+      webkitEnterFullscreen?: () => void;
+    };
+    if (video.requestFullscreen) {
+      await video.requestFullscreen();
+    } else if (webkit.webkitEnterFullscreen) {
+      webkit.webkitEnterFullscreen();
+    }
+  }
+
+  async function enterPictureInPicture() {
+    const video = videoRef.current;
+    if (!video || typeof video.requestPictureInPicture !== "function") return;
+    if (document.pictureInPictureElement === video) {
+      await document.exitPictureInPicture();
+      return;
+    }
+    await video.requestPictureInPicture();
+  }
 
   const onEnded = () => {
     const video = videoRef.current;
@@ -397,22 +428,42 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
           ) : (
             <div className="overflow-hidden rounded-2xl bg-black">
               {videoUrl ? (
-                <video
-                  key={videoUrl}
-                  ref={videoRef}
-                  src={videoUrl}
-                  controls
-                  playsInline
-                  className="aspect-video w-full"
-                  onTimeUpdate={onTimeUpdate}
-                  onLoadedMetadata={onLoadedMetadata}
-                  onEnded={onEnded}
-                  onError={() =>
-                    setMedia((prev) =>
-                      prev ? { ...prev, url: null, state: "error" } : prev,
-                    )
-                  }
-                />
+                <div className="relative">
+                  <video
+                    key={videoUrl}
+                    ref={videoRef}
+                    src={videoUrl}
+                    controls
+                    playsInline
+                    disablePictureInPicture={false}
+                    className="aspect-video w-full"
+                    onTimeUpdate={onTimeUpdate}
+                    onLoadedMetadata={onLoadedMetadata}
+                    onEnded={onEnded}
+                    onDoubleClick={() => void enterFullscreen()}
+                    onError={() =>
+                      setMedia((prev) =>
+                        prev ? { ...prev, url: null, state: "error" } : prev,
+                      )
+                    }
+                  />
+                  <div className="absolute right-2 top-2 flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => void enterPictureInPicture()}
+                      className="rounded-lg bg-black/55 px-2 py-1 text-[11px] font-semibold text-white"
+                    >
+                      {t("playerPip")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void enterFullscreen()}
+                      className="rounded-lg bg-black/55 px-2 py-1 text-[11px] font-semibold text-white"
+                    >
+                      {t("playerFullscreen")}
+                    </button>
+                  </div>
+                </div>
               ) : (
                 <div className="flex aspect-video w-full items-center justify-center px-6 text-center text-sm text-white/70">
                   {videoState === "error"
@@ -534,7 +585,12 @@ export function CoursePlayer({ courseId }: { courseId: string }) {
                         {t("moduleLockedShort")}
                       </span>
                     ) : (
-                      <LessonTypeIcon type={lesson.type} />
+                      <span className="shrink-0 text-[11px] font-medium text-muted">
+                        {formatLessonDurationSeconds(
+                          liveDurations[lesson.id] ?? lesson.durationSeconds,
+                          t,
+                        ) || <LessonTypeIcon type={lesson.type} />}
+                      </span>
                     )}
                   </button>
                 </li>

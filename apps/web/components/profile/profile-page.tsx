@@ -8,7 +8,9 @@ import { headlineName } from "@/lib/display-name";
 import { signOutAndRedirect } from "@/lib/firebase/auth";
 import { can } from "@/lib/roles";
 import type { UserProfile } from "@/lib/types";
-import { Avatar, Badge, Button } from "@/components/ui/primitives";
+import { Avatar, Button } from "@/components/ui/primitives";
+import { RoleBadgeView } from "@/components/profile/role-badge";
+import { Link } from "@/i18n/navigation";
 import {
   SettingsNav,
   type SettingsNavItem,
@@ -282,7 +284,13 @@ export function ProfilePage() {
                   {headlineName(profile)}
                 </p>
                 <div className="mt-1">
-                  <Badge>{roleLabel(profile.role, t)}</Badge>
+                  {profile.profileBadge ? (
+                    <RoleBadgeView badge={profile.profileBadge} compact />
+                  ) : (
+                    <p className="text-xs font-semibold text-muted">
+                      {roleLabel(profile.role, t)}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -292,6 +300,11 @@ export function ProfilePage() {
               </p>
             )}
             <div className="mt-3 space-y-1.5">
+              <Link href={`/members/${profile.uid}`}>
+                <Button variant="secondary" className="h-9 w-full text-xs">
+                  {t("profileViewPublic")}
+                </Button>
+              </Link>
               <Button
                 variant="secondary"
                 className="h-9 w-full text-xs lg:hidden"

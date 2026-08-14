@@ -21,6 +21,7 @@ import {
   fetchThreadVotes,
   getThreadsByIds,
   queryThreads,
+  watchThreads,
 } from "@/lib/firebase/forums";
 import { headlineName } from "@/lib/display-name";
 import { canParticipateInForums } from "@/lib/roles";
@@ -42,6 +43,7 @@ import { ShareToChatDialog } from "@/components/forums/share-to-chat-dialog";
 import { TagEditor } from "@/components/forums/tag-controls";
 import { FeedSideRail } from "@/components/forums/feed-side-rail";
 import { HomePromoBanner } from "@/components/promo/promo-banner";
+import { RoleBadgeView } from "@/components/profile/role-badge";
 import { fetchForumAudienceSize } from "@/lib/firebase/forum-audience";
 import { isForumHotThread, pickForumSpotlight } from "@/lib/forums-spotlight";
 import {
@@ -147,27 +149,32 @@ export function ForumsHome() {
     setLoading(true);
     setFeedError(null);
     setCursor(null);
-    queryThreads({ sort, tag: tag || undefined })
-      .then((page) => {
+    const unsub = watchThreads(
+      { sort, tag: tag || undefined },
+      (page) => {
         if (cancelled) return;
-        setThreads(page.threads);
+        setThreads((prev) => {
+          const liveIds = new Set(page.threads.map((thread) => thread.id));
+          const extras = prev.filter((thread) => !liveIds.has(thread.id));
+          return [...page.threads, ...extras];
+        });
         setCursor(page.nextCursor);
         setHasMore(Boolean(page.nextCursor));
         setFeedError(null);
+        setLoading(false);
         void loadVotes(page.threads.map((thread) => thread.id));
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setThreads([]);
-          setHasMore(false);
-          setFeedError(t("errorGeneric"));
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+      },
+      () => {
+        if (cancelled) return;
+        setThreads([]);
+        setHasMore(false);
+        setFeedError(t("errorGeneric"));
+        setLoading(false);
+      },
+    );
     return () => {
       cancelled = true;
+      unsub();
     };
   }, [sort, tag, mode, loadVotes, t]);
 
@@ -598,6 +605,7 @@ export function ForumsHome() {
                     size={22}
                   />
                   {spotlight.authorName}
+              <RoleBadgeView compact badge={spotlight.authorBadge} />
                 </span>
                 <span>
                   {t("forumsCommentsCount", { count: spotlight.replyCount })}
@@ -680,9 +688,14 @@ export function ForumsHome() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate text-sm font-bold">
+                        <Link
+                          href={`/members/${thread.authorId}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="truncate text-sm font-bold hover:underline"
+                        >
                           {thread.authorName}
-                        </span>
+                        </Link>
+                        <RoleBadgeView compact badge={thread.authorBadge} />
                         <span className="text-muted/50">·</span>
                         <span className="shrink-0 text-xs tabular-nums text-muted">
                           {formatRelative(thread.createdAt, t("forumsJustNow"))}

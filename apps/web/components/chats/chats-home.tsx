@@ -20,6 +20,7 @@ import {
   listDirectory,
   searchDirectoryContacts,
 } from "@/lib/firebase/users";
+import { listContacts } from "@/lib/firebase/social";
 import {
   canCreateChatGroups,
   canConfigureGroupAutoJoin,
@@ -89,7 +90,9 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
     setComposerError(null);
     setSearchQuery("");
     setSearchResults(null);
-    listDirectory(profile.uid)
+    const loader =
+      showNew === "dm" ? listContacts() : listDirectory(profile.uid);
+    loader
       .then((people) => {
         if (!cancelled) setDirectory(people);
       })
@@ -172,6 +175,7 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
       auth: t("errorAuth"),
       permissionDenied: t("chatsCreateGroupDenied"),
       dmBlocked: t("privacyDmBlocked"),
+      notContacts: t("chatsNeedContacts"),
     });
   }
 
@@ -368,6 +372,14 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
             onStartDm={(person) => {
               void startDm(person);
             }}
+            onOpenProfile={
+              showNew === "dm"
+                ? (person) => {
+                    closeComposer();
+                    router.push(`/members/${person.uid}`);
+                  }
+                : undefined
+            }
             onStartGroup={startGroup}
             onClose={closeComposer}
           />

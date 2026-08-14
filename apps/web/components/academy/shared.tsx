@@ -48,6 +48,21 @@ export function useLessonTypeLabels() {
   };
 }
 
+export function formatLessonDurationSeconds(
+  seconds: number,
+  t: ReturnType<typeof useTranslations>,
+) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "";
+  if (seconds < 60) {
+    return t("courseDurationSeconds", { seconds: Math.round(seconds) });
+  }
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return t("courseDurationMinutes", { minutes });
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return t("courseDurationHours", { hours, minutes: rest });
+}
+
 /** Compact glyph so playlists read at a glance: watch, read, or answer. */
 export function LessonTypeIcon({
   type,

@@ -28,6 +28,7 @@ import {
   LessonTypeIcon,
   ProgressBar,
   StatusChip,
+  formatLessonDurationSeconds,
   useDurationLabel,
   useLevelLabels,
 } from "./shared";
@@ -362,7 +363,8 @@ function LessonRow({
   disabled: boolean;
   onOpen: () => void;
 }) {
-  const minutes = Math.max(1, Math.round(lesson.durationSeconds / 60));
+  const t = useTranslations();
+  const label = formatLessonDurationSeconds(lesson.durationSeconds, t);
   return (
     <li className="border-b border-glass-border last:border-0">
       <button
@@ -383,9 +385,13 @@ function LessonRow({
           <LessonTypeIcon type={lesson.type} className="rounded-full" />
         )}
         <span className="min-w-0 flex-1 truncate text-sm">{lesson.title}</span>
-        <span className="shrink-0 text-[11px] font-medium text-muted">
-          {minutes} min
-        </span>
+        {label ? (
+          <span className="shrink-0 text-[11px] font-medium text-muted">
+            {label}
+          </span>
+        ) : (
+          <LessonTypeIcon type={lesson.type} className="rounded-full" />
+        )}
       </button>
     </li>
   );

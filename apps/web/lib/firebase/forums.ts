@@ -16,12 +16,65 @@ import {
   type QueryConstraint,
   type Unsubscribe,
 } from "firebase/firestore";
+import { parsePublicProfileBadge } from "@pulse/shared";
 import { mapForumReply, mapForumThread } from "@pulse/firebase-web";
 import { getFirebaseDb } from "./client";
 import { callCloudFunction } from "./call-function";
 import type { ForumReply, ForumThread, UserProfile } from "../types";
 import { headlineName } from "../display-name";
 import { normalizeForumTags } from "../forum-tags";
+
+const authorBadgeCache = new Map<
+  string,
+  NonNullable<ForumThread["authorBadge"]> | null
+>();
+
+async function fetchAuthorBadges(uids: string[]) {
+  const unique = [...new Set(uids.filter(Boolean))];
+  const missing = unique.filter((id) => !authorBadgeCache.has(id));
+  const db = getFirebaseDb();
+  for (let i = 0; i < missing.length; i += 30) {
+    const chunk = missing.slice(i, i + 30);
+    if (!chunk.length) continue;
+    const snap = await getDocs(
+      query(collection(db, "publicProfiles"), where("__name__", "in", chunk)),
+    );
+    const found = new Set<string>();
+    for (const d of snap.docs) {
+      found.add(d.id);
+      authorBadgeCache.set(
+        d.id,
+        parsePublicProfileBadge(
+          (d.data() as { profileBadge?: unknown }).profileBadge,
+        ),
+      );
+    }
+    for (const id of chunk) {
+      if (!found.has(id)) authorBadgeCache.set(id, null);
+    }
+  }
+  return authorBadgeCache;
+}
+
+async function hydrateThreads(threads: ForumThread[]): Promise<ForumThread[]> {
+  if (!threads.length) return threads;
+  await fetchAuthorBadges(threads.map((t) => t.authorId));
+  return threads.map((thread) => ({
+    ...thread,
+    authorBadge:
+      authorBadgeCache.get(thread.authorId) ?? thread.authorBadge ?? null,
+  }));
+}
+
+async function hydrateReplies(replies: ForumReply[]): Promise<ForumReply[]> {
+  if (!replies.length) return replies;
+  await fetchAuthorBadges(replies.map((r) => r.authorId));
+  return replies.map((reply) => ({
+    ...reply,
+    authorBadge:
+      authorBadgeCache.get(reply.authorId) ?? reply.authorBadge ?? null,
+  }));
+}
 
 function threadFrom(id: string, data: Record<string, unknown>): ForumThread {
   let tags: string[] = [];
@@ -44,12 +97,16 @@ function replyFrom(
 export async function queryThreads(options: {
   sort?: "recent" | "relevant";
   tag?: string;
+  authorId?: string;
   pageSize?: number;
   cursor?: DocumentSnapshot | null;
 }) {
   const pageSize = options.pageSize ?? 20;
   const orderField = options.sort === "relevant" ? "score" : "lastReplyAt";
   const constraints: QueryConstraint[] = [];
+  if (options.authorId) {
+    constraints.push(where("authorId", "==", options.authorId));
+  }
   if (options.tag) constraints.push(where("tags", "array-contains", options.tag));
   constraints.push(orderBy(orderField, "desc"), limit(pageSize + 1));
   if (options.cursor) constraints.push(startAfter(options.cursor));
@@ -59,11 +116,52 @@ export async function queryThreads(options: {
   const hasMore = docs.length > pageSize;
   const pageDocs = hasMore ? docs.slice(0, pageSize) : docs;
   return {
-    threads: pageDocs.map((d) =>
-      threadFrom(d.id, d.data() as Record<string, unknown>),
+    threads: await hydrateThreads(
+      pageDocs.map((d) => threadFrom(d.id, d.data() as Record<string, unknown>)),
     ),
     nextCursor: hasMore ? pageDocs[pageDocs.length - 1] : null,
   };
+}
+
+export function watchThreads(
+  options: {
+    sort?: "recent" | "relevant";
+    tag?: string;
+    pageSize?: number;
+  },
+  onChange: (page: {
+    threads: ForumThread[];
+    nextCursor: DocumentSnapshot | null;
+  }) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  const pageSize = options.pageSize ?? 20;
+  const orderField = options.sort === "relevant" ? "score" : "lastReplyAt";
+  const constraints: QueryConstraint[] = [];
+  if (options.tag) constraints.push(where("tags", "array-contains", options.tag));
+  constraints.push(orderBy(orderField, "desc"), limit(pageSize + 1));
+  let gen = 0;
+  return onSnapshot(
+    query(collection(getFirebaseDb(), "threads"), ...constraints),
+    (snap) => {
+      const docs = snap.docs;
+      const hasMore = docs.length > pageSize;
+      const pageDocs = hasMore ? docs.slice(0, pageSize) : docs;
+      const page = {
+        threads: pageDocs.map((d) =>
+          threadFrom(d.id, d.data() as Record<string, unknown>),
+        ),
+        nextCursor: hasMore ? pageDocs[pageDocs.length - 1] : null,
+      };
+      onChange(page);
+      const my = ++gen;
+      void hydrateThreads(page.threads).then((threads) => {
+        if (my !== gen) return;
+        onChange({ ...page, threads });
+      });
+    },
+    (error) => onError?.(error),
+  );
 }
 
 export function watchThread(
@@ -71,6 +169,7 @@ export function watchThread(
   onChange: (thread: ForumThread | null) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
+  let gen = 0;
   return onSnapshot(
     doc(getFirebaseDb(), "threads", threadId),
     (snap) => {
@@ -78,7 +177,13 @@ export function watchThread(
         onChange(null);
         return;
       }
-      onChange(threadFrom(snap.id, snap.data() as Record<string, unknown>));
+      const thread = threadFrom(snap.id, snap.data() as Record<string, unknown>);
+      onChange(thread);
+      const my = ++gen;
+      void hydrateThreads([thread]).then((threads) => {
+        if (my !== gen) return;
+        onChange(threads[0] ?? null);
+      });
     },
     (error) => onError?.(error),
   );
@@ -94,14 +199,19 @@ export function watchReplies(
     orderBy("createdAt", "desc"),
     limit(50),
   );
+  let gen = 0;
   return onSnapshot(
     q,
     (snap) => {
-      onChange(
-        snap.docs.map((d) =>
-          replyFrom(threadId, d.id, d.data() as Record<string, unknown>),
-        ),
+      const replies = snap.docs.map((d) =>
+        replyFrom(threadId, d.id, d.data() as Record<string, unknown>),
       );
+      onChange(replies);
+      const my = ++gen;
+      void hydrateReplies(replies).then((hydrated) => {
+        if (my !== gen) return;
+        onChange(hydrated);
+      });
     },
     (error) => onError?.(error),
   );
@@ -211,7 +321,8 @@ export async function setAcceptedReply(
 export async function getThread(threadId: string) {
   const snap = await getDoc(doc(getFirebaseDb(), "threads", threadId));
   if (!snap.exists()) return null;
-  return threadFrom(snap.id, snap.data() as Record<string, unknown>);
+  const thread = threadFrom(snap.id, snap.data() as Record<string, unknown>);
+  return (await hydrateThreads([thread]))[0] ?? thread;
 }
 
 export function watchThreadVote(
@@ -303,5 +414,7 @@ export async function getThreadsByIds(ids: string[]): Promise<ForumThread[]> {
   }
   // Preserve caller order when possible.
   const byId = new Map(threads.map((t) => [t.id, t]));
-  return unique.map((id) => byId.get(id)).filter(Boolean) as ForumThread[];
+  return hydrateThreads(
+    unique.map((id) => byId.get(id)).filter(Boolean) as ForumThread[],
+  );
 }

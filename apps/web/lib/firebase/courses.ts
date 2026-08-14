@@ -12,6 +12,7 @@ import {
 import { getDownloadURL, ref } from "firebase/storage";
 import { getFirebaseDb, getFirebaseStorage } from "./client";
 import { callCloudFunction } from "./call-function";
+import { resolveLessonDurationSeconds } from "@pulse/shared";
 import type {
   Course,
   CourseContent,
@@ -130,7 +131,7 @@ function lessonFrom(id: string, data: Record<string, unknown>): Lesson {
     moduleId: String(data.moduleId ?? ""),
     title: String(data.title ?? ""),
     order: Number(data.order ?? 0),
-    durationSeconds: Number(data.durationSeconds ?? 0),
+    durationSeconds: resolveLessonDurationSeconds(data),
     type: parseLessonType(data.type),
     videoPath: (data.videoPath as string) ?? null,
     videoUrl: (data.videoUrl as string) ?? null,

@@ -41,6 +41,7 @@ import {
   Label,
   TextArea,
 } from "@/components/ui/primitives";
+import { RoleBadgeView } from "@/components/profile/role-badge";
 import { ShareToChatDialog } from "@/components/forums/share-to-chat-dialog";
 import { TagEditor } from "@/components/forums/tag-controls";
 import { FeedSideRail } from "@/components/forums/feed-side-rail";
@@ -345,7 +346,15 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                 />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-bold">{thread.authorName}</p>
+                <p className="flex flex-wrap items-center gap-2 text-sm font-bold">
+                  <Link
+                    href={`/members/${thread.authorId}`}
+                    className="hover:underline"
+                  >
+                    {thread.authorName}
+                  </Link>
+                  <RoleBadgeView compact badge={thread.authorBadge} />
+                </p>
                 <p className="text-xs text-muted">
                   {formatRelative(thread.createdAt, t("forumsJustNow"))}
                 </p>
@@ -535,8 +544,14 @@ export function ThreadDetail({ threadId }: { threadId: string }) {
                     >
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-sm font-bold">
-                          {reply.authorName}
+                          <Link
+                            href={`/members/${reply.authorId}`}
+                            className="hover:underline"
+                          >
+                            {reply.authorName}
+                          </Link>
                         </span>
+                        <RoleBadgeView compact badge={reply.authorBadge} />
                         <span className="text-[11px] text-muted">
                           {formatRelative(reply.createdAt, t("forumsJustNow"))}
                         </span>

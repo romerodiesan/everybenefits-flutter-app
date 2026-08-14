@@ -5,6 +5,7 @@ export type CallableErrorLabels = {
   auth: string;
   permissionDenied: string;
   dmBlocked: string;
+  notContacts?: string;
   unavailable?: string;
 };
 
@@ -36,6 +37,11 @@ function errorMessage(error: unknown): string {
   return "";
 }
 
+function isNotContacts(error: unknown): boolean {
+  const message = errorMessage(error);
+  return message === "not-contacts" || message.includes("not-contacts");
+}
+
 function isDirectMessagesDisabled(error: unknown): boolean {
   const message = errorMessage(error);
   return message === "direct-messages-disabled" || message.includes("direct-messages-disabled");
@@ -52,6 +58,7 @@ export function mapCallableError(
   labels: CallableErrorLabels,
 ): string {
   if (isDirectMessagesDisabled(error)) return labels.dmBlocked;
+  if (isNotContacts(error)) return labels.notContacts ?? labels.dmBlocked;
   if (error instanceof FunctionsUnavailableError) {
     return labels.unavailable ?? labels.generic;
   }

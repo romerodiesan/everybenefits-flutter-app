@@ -17,13 +17,14 @@ import {
   updateUserProfile,
   uploadAvatar,
 } from "@/lib/firebase/users";
+import { updateAccountEmail } from "@/lib/firebase/functions";
 import {
   clearProfilePhoneRecaptcha,
   confirmProfilePhone,
   startProfilePhoneVerification,
   toE164,
 } from "@/lib/firebase/profile-phone";
-import { Avatar, Button, Input, Label } from "@/components/ui/primitives";
+import { Avatar, Button, Input, Label, TextArea } from "@/components/ui/primitives";
 import { CountryCodeSelect } from "@/components/ui/country-code-select";
 import {
   SettingsPanelShell,
@@ -36,6 +37,8 @@ export function AccountPanel() {
   const initialParts = splitDisplayName(profile?.displayName ?? "");
   const [givenName, setGivenName] = useState(initialParts.givenName);
   const [familyName, setFamilyName] = useState(initialParts.familyName);
+  const [email, setEmail] = useState(profile?.email ?? "");
+  const [bio, setBio] = useState(profile?.bio ?? "");
   const [phoneCountryCode, setPhoneCountryCode] = useState(
     profile?.phoneCountryCode ?? "+1",
   );
@@ -60,6 +63,14 @@ export function AccountPanel() {
     setGivenName(parts.givenName);
     setFamilyName(parts.familyName);
   }, [profile?.displayName]);
+
+  useEffect(() => {
+    setBio(profile?.bio ?? "");
+  }, [profile?.bio]);
+
+  useEffect(() => {
+    setEmail(profile?.email ?? "");
+  }, [profile?.email]);
 
   if (!profile) return null;
 
@@ -99,12 +110,24 @@ export function AccountPanel() {
         return;
       }
       const nextDisplayName = composeDisplayName(given.value, family.value);
+      const nextEmail = email.trim().toLowerCase();
+      if (!nextEmail.includes("@") || !nextEmail.includes(".")) {
+        setError(t("validationEmail"));
+        setBusy(false);
+        return;
+      }
+      if (nextEmail !== (profile.email ?? "").trim().toLowerCase()) {
+        await updateAccountEmail(nextEmail);
+      }
+
+      const nextBio = bio.trim().slice(0, 280) || null;
 
       if (phoneChanged) {
         const digits = phoneNumber.trim();
         if (!digits) {
           await updateUserProfile(profile, {
             displayName: nextDisplayName,
+            bio: nextBio,
             phoneCountryCode: phoneCountryCode.trim() || null,
             phoneNumber: null,
             phoneVerified: false,
@@ -120,6 +143,7 @@ export function AccountPanel() {
           await confirmProfilePhone(verificationId, smsCode);
           await updateUserProfile(profile, {
             displayName: nextDisplayName,
+            bio: nextBio,
             phoneCountryCode: phoneCountryCode.trim() || null,
             phoneNumber: phoneNumber.trim() || null,
             phoneVerified: true,
@@ -130,6 +154,7 @@ export function AccountPanel() {
       } else {
         await updateUserProfile(profile, {
           displayName: nextDisplayName,
+          bio: nextBio,
         });
       }
 
@@ -141,7 +166,11 @@ export function AccountPanel() {
         err && typeof err === "object" && "code" in err
           ? String((err as { code: string }).code)
           : "";
-      if (code.includes("invalid-phone-number")) {
+      if (code.includes("already-exists")) {
+        setError(t("errEmailInUse"));
+      } else if (code.includes("invalid-argument")) {
+        setError(t("validationEmail"));
+      } else if (code.includes("invalid-phone-number")) {
         setError(t("phoneVerifyInvalid"));
       } else if (code.includes("too-many-requests")) {
         setError(t("phoneVerifyTooMany"));
@@ -239,6 +268,27 @@ export function AccountPanel() {
               required
             />
           </div>
+        </div>
+        <div className="max-w-md">
+          <Label>{t("email")}</Label>
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
+          <p className="mt-1 text-xs text-muted">{t("profileEmailHint")}</p>
+        </div>
+        <div className="max-w-md">
+          <Label>{t("fieldBio")}</Label>
+          <TextArea
+            value={bio}
+            maxLength={280}
+            onChange={(e) => setBio(e.target.value)}
+            placeholder={t("fieldBioHint")}
+          />
+          <p className="mt-1 text-xs text-muted">{bio.trim().length}/280</p>
         </div>
         <div className="grid max-w-md grid-cols-1 gap-3 sm:grid-cols-[9.5rem_1fr]">
           <div>

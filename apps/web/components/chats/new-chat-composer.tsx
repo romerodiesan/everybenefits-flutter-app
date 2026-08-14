@@ -55,6 +55,7 @@ export type NewChatComposerProps = {
   visibleDirectory: UserProfile[];
   onToggleMember: (person: UserProfile) => void;
   onStartDm: (person: UserProfile) => void;
+  onOpenProfile?: (person: UserProfile) => void;
   onStartGroup: (e: FormEvent) => void;
   onClose: () => void;
 };
@@ -80,6 +81,7 @@ export function NewChatComposer({
   visibleDirectory,
   onToggleMember,
   onStartDm,
+  onOpenProfile,
   onStartGroup,
   onClose,
 }: NewChatComposerProps) {
@@ -257,6 +259,10 @@ export function NewChatComposer({
                   className="flex w-full cursor-pointer items-center gap-3 rounded-xl px-2 py-2 text-left hover:bg-white/[0.04] disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => {
                     if (mode === "dm") {
+                      if (onOpenProfile && searchQuery.trim().length >= 2) {
+                        onOpenProfile(person);
+                        return;
+                      }
                       onStartDm(person);
                       return;
                     }

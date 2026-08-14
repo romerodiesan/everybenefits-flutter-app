@@ -124,6 +124,8 @@ export function chatFrom(id: string, data: Record<string, unknown>): ChatConvers
     createdBy: String(data.createdBy ?? ""),
     isDefaultAgentGroup,
     autoJoinRoles,
+    dmMessagingEnabled:
+      Boolean(data.isGroup) || data.dmMessagingEnabled === true,
   };
 }
 
@@ -322,6 +324,7 @@ export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
     createdBy: me.uid,
     isDefaultAgentGroup: false,
     autoJoinRoles: [],
+    dmMessagingEnabled: true,
   } satisfies ChatConversation;
 }
 
@@ -392,6 +395,7 @@ export async function createGroupChat(input: {
     createdBy: input.creator.uid,
     isDefaultAgentGroup: false,
     autoJoinRoles,
+    dmMessagingEnabled: true,
   };
   if (result?.truncated === true) chat.truncated = true;
   return chat;

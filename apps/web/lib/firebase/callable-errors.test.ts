@@ -11,6 +11,15 @@ const labels = {
 };
 
 describe("mapCallableError", () => {
+  it("maps not-contacts to the dedicated label", () => {
+    expect(
+      mapCallableError(new Error("not-contacts"), {
+        ...labels,
+        notContacts: "add-contacts",
+      }),
+    ).toBe("add-contacts");
+  });
+
   it("maps direct-messages-disabled from Error.message", () => {
     expect(
       mapCallableError(new Error("direct-messages-disabled"), labels),

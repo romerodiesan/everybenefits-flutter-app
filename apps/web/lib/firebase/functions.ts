@@ -2,6 +2,7 @@ import {
   callCloudFunction,
   FunctionsUnavailableError,
 } from "./call-function";
+import { getFirebaseAuth } from "./client";
 import type { UserProfile, UserRole } from "../types";
 import { parseRole } from "../roles";
 
@@ -73,6 +74,14 @@ export async function cancelAccountDeletion(): Promise<void> {
   await callCloudFunction("cancelAccountDeletion", {});
 }
 
+export async function updateAccountEmail(email: string): Promise<{ email: string }> {
+  const result = await callCloudFunction<{ email: string }>("updateAccountEmail", {
+    email,
+  });
+  await getFirebaseAuth().currentUser?.reload();
+  return result;
+}
+
 export async function listPublicProfiles(max = 80): Promise<UserProfile[]> {
   const data = await callCloudFunction<{
     profiles?: Array<Record<string, unknown>>;
@@ -95,6 +104,7 @@ export async function listPublicProfiles(max = 80): Promise<UserProfile[]> {
     addressState: null,
     addressZip: null,
     agency: (entry.agency as string) ?? null,
+    bio: (entry.bio as string) ?? null,
     createdAt: null,
     updatedAt: null,
   }));
@@ -125,6 +135,7 @@ export async function searchDirectory(
     addressState: null,
     addressZip: null,
     agency: (entry.agency as string) ?? null,
+    bio: (entry.bio as string) ?? null,
     createdAt: null,
     updatedAt: null,
   }));
@@ -152,6 +163,7 @@ export async function listPendingApprovals(): Promise<UserProfile[]> {
     addressState: null,
     addressZip: null,
     agency: (entry.agency as string) ?? null,
+    bio: (entry.bio as string) ?? null,
     createdAt: null,
     updatedAt: null,
     approvalStatus: "pending",

@@ -192,7 +192,18 @@ export function ConversationPane({
           <Link href="/chats" className="text-xs text-muted lg:hidden">
             ← {t("navChats")}
           </Link>
-          <h2 className="font-display text-lg font-bold">{title}</h2>
+          <h2 className="font-display text-lg font-bold">
+            {!chat.isGroup && profile
+              ? (
+                  <Link
+                    href={`/members/${chat.memberIds.find((id) => id !== profile.uid) ?? ""}`}
+                    className="hover:underline"
+                  >
+                    {title}
+                  </Link>
+                )
+              : title}
+          </h2>
         </div>
         <div className="flex gap-2">
           {canPin && (
@@ -305,6 +316,9 @@ export function ConversationPane({
         {sendError && (
           <p className="text-xs text-red-400">{sendError}</p>
         )}
+        {!chat.isGroup && !chat.dmMessagingEnabled ? (
+          <p className="text-sm text-muted">{t("chatsDmDisabled")}</p>
+        ) : (
         <div className="flex gap-2">
           <Input
             value={body}
@@ -315,6 +329,7 @@ export function ConversationPane({
             {t("chatsSend")}
           </Button>
         </div>
+        )}
       </form>
     </div>
   );

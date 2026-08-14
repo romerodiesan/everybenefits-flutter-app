@@ -34,6 +34,7 @@ function destinationFor(item: AppNotification): string {
   if (href) return href;
   const ref = item.ref ?? {};
   if (ref.chatId) return `/chats/${ref.chatId}`;
+  if (ref.uid) return `/members/${ref.uid}`;
   if (ref.threadId) return `/home/${ref.threadId}`;
   if (ref.courseId) return `/academy/${ref.courseId}`;
   return "/notifications";

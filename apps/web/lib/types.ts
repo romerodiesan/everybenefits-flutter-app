@@ -26,6 +26,8 @@ export type UserProfile = {
   addressState: string | null;
   addressZip: string | null;
   agency: string | null;
+  /** Short public bio; omitted on older docs. */
+  bio?: string | null;
   /** Org hierarchy node; managed by Admin / Functions. */
   orgNodeId?: string | null;
   createdAt: Date | null;
@@ -50,6 +52,11 @@ export type UserProfile = {
     showNpnInSearch: boolean;
     allowDirectMessages: boolean;
   } | null;
+  profileBadge?: {
+    text: string;
+    icon: string;
+    backgroundColor: string;
+  } | null;
 };
 
 export type ForumThread = {
@@ -61,6 +68,11 @@ export type ForumThread = {
   authorName: string;
   authorPhotoUrl: string | null;
   authorRole: UserRole;
+  authorBadge?: {
+    text: string;
+    icon: string;
+    backgroundColor: string;
+  } | null;
   replyCount: number;
   score: number;
   /** Unique users who interacted (author + voters + repliers). */
@@ -79,6 +91,11 @@ export type ForumReply = {
   authorName: string;
   authorPhotoUrl: string | null;
   authorRole: UserRole;
+  authorBadge?: {
+    text: string;
+    icon: string;
+    backgroundColor: string;
+  } | null;
   score: number;
   createdAt: Date | null;
   updatedAt: Date | null;
@@ -229,6 +246,8 @@ export type ChatConversation = {
   isDefaultAgentGroup: boolean;
   /** Roles that auto-join when a user is approved. Empty = none. */
   autoJoinRoles: UserRole[];
+  /** 1:1 DMs require mutual contacts; groups are always true. */
+  dmMessagingEnabled: boolean;
 };
 
 export type ChatMessage = {

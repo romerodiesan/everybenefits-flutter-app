@@ -501,4 +501,175 @@ h3,
   .pulse-scroll-dot {
     animation: none;
   }
+  .role-sigil::after {
+    animation: none;
+    opacity: 0.18;
+    transform: none;
+  }
+}
+
+/* Faceted glass sigil — role / profile mark */
+.role-sigil {
+  --sigil: var(--brand);
+  --sigil-ink: #ffffff;
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 0.45rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--sigil) 48%, var(--glass-border));
+  border-radius: 3px 13px 3px 13px;
+  background:
+    linear-gradient(
+      135deg,
+      color-mix(in srgb, var(--sigil) 22%, transparent) 0%,
+      color-mix(in srgb, var(--sigil) 4%, transparent) 58%,
+      color-mix(in srgb, var(--mesh-deep) 40%, transparent) 100%
+    );
+  padding: 0.34rem 0.95rem 0.34rem 0.44rem;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 18%, transparent),
+    0 0 14px color-mix(in srgb, var(--sigil) 18%, transparent);
+  vertical-align: middle;
+}
+
+.role-sigil::after {
+  content: "";
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 28%,
+    color-mix(in srgb, white 38%, transparent) 46%,
+    transparent 64%
+  );
+  transform: translateX(-130%);
+  animation: role-sigil-sheen 5.4s ease-in-out 0.6s infinite;
+}
+
+.role-sigil-compact {
+  gap: 0.32rem;
+  padding: 0.2rem 0.68rem 0.2rem 0.34rem;
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, white 14%, transparent),
+    0 0 8px color-mix(in srgb, var(--sigil) 14%, transparent);
+}
+
+.role-sigil-facet {
+  display: grid;
+  width: 15px;
+  height: 15px;
+  flex-shrink: 0;
+  place-items: center;
+  transform: rotate(45deg);
+  border: 0.6px solid color-mix(in srgb, white 42%, var(--sigil));
+  border-radius: 2.4px;
+  background: linear-gradient(
+    145deg,
+    color-mix(in srgb, white 42%, var(--sigil)) 0%,
+    var(--sigil) 48%,
+    color-mix(in srgb, #0c0d10 28%, var(--sigil)) 100%
+  );
+  box-shadow: 0 0 8px color-mix(in srgb, var(--sigil) 55%, transparent);
+}
+
+.role-sigil-compact .role-sigil-facet {
+  width: 11px;
+  height: 11px;
+  border-radius: 1.6px;
+}
+
+.role-sigil-glyph {
+  transform: rotate(-45deg);
+  color: var(--sigil-ink);
+  font-size: 8px;
+  line-height: 1;
+}
+
+.role-sigil-compact .role-sigil-glyph {
+  font-size: 6.5px;
+}
+
+.role-sigil-text {
+  overflow: hidden;
+  max-width: 11rem;
+  background: linear-gradient(
+    90deg,
+    var(--sigil),
+    color-mix(in srgb, var(--sigil) 55%, var(--ink))
+  );
+  background-clip: text;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  line-height: 1.1;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: transparent;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.role-sigil-compact .role-sigil-text {
+  max-width: 8.5rem;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+}
+
+@keyframes role-sigil-sheen {
+  0%,
+  58% {
+    transform: translateX(-130%);
+  }
+  78%,
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+/* Social member profile */
+.profile-cover {
+  position: relative;
+  height: 148px;
+  overflow: hidden;
+  border-radius: 22px 22px 0 0;
+  background:
+    radial-gradient(ellipse 80% 90% at 12% 20%, color-mix(in srgb, var(--brand) 45%, transparent), transparent 58%),
+    radial-gradient(ellipse 70% 80% at 92% 10%, color-mix(in srgb, #b8e06a 28%, transparent), transparent 52%),
+    linear-gradient(135deg, color-mix(in srgb, var(--brand) 38%, var(--mesh-deep)), var(--mesh-deep));
+}
+
+.profile-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(color-mix(in srgb, white 14%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.profile-stat {
+  display: flex;
+  min-width: 4.5rem;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.profile-post {
+  display: block;
+  border: 1px solid var(--glass-border);
+  border-radius: 18px;
+  background: var(--mesh-deep);
+  padding: 1rem 1.1rem 0.9rem;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.profile-post:hover {
+  border-color: color-mix(in srgb, var(--brand) 40%, var(--glass-border));
+  transform: translateY(-1px);
 }
