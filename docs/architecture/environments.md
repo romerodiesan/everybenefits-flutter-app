@@ -9,6 +9,8 @@
 
 Treat **`.firebaserc` → `every-benefits-us`** as the active CLI default unless you `firebase use` another project. Align client `.env` `NEXT_PUBLIC_FIREBASE_PROJECT_ID` / Flutter Firebase options with the project you actually deploy.
 
+**Flutter mobile** (`apps/mobile`): `lib/firebase_options.dart` and native plists must use **every-benefits-us** (not legacy `every-insurance`). See [`apps/mobile/README.md`](../../apps/mobile/README.md).
+
 **Local emulators:** `NEXT_PUBLIC_FIREBASE_PROJECT_ID` (and `FIREBASE_PROJECT_ID`) **must** be `every-benefits-us` — the same ID passed to `firebase emulators:start --project every-benefits-us`. A mismatch stores Auth and Firestore data under different project keys, so registrations can create an Auth user with no `users/{uid}` document. Keep `NEXT_PUBLIC_USE_FIREBASE_EMULATORS=true` on web, studio, admin, and payments while testing locally.
 
 ## Domains (production)

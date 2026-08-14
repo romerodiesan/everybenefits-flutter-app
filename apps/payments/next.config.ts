@@ -56,7 +56,9 @@ const nextConfig: NextConfig = {
   ],
   transpilePackages: ["@pulse/shared", "@pulse/firebase-web", "@pulse/chrome", "@pulse/sso"],
   experimental: {
-    optimizePackageImports: ["motion", "firebase", "@tanstack/react-query"],
+    // Do not list "firebase" here — optimizePackageImports auto-adds to
+    // transpilePackages, which conflicts with serverExternalPackages above.
+    optimizePackageImports: ["motion", "@tanstack/react-query"],
     // Turbopack scope-hoisting TDZ with Zod 4 (z.string().datetime() →
     // "Cannot access 'h' before initialization"). Keep off until fixed upstream.
     // https://github.com/vercel/next.js/issues/82723
