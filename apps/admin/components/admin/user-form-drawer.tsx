@@ -3,6 +3,10 @@
 import { useEffect, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { OrgNode, RoleDoc, UserRole } from "@pulse/shared";
+import {
+  APPEARANCE_ACCENTS,
+  PROFILE_BADGE_ICONS,
+} from "@pulse/shared";
 import type { AdminUserRow } from "@pulse/firebase-web";
 import { Button, Input, Label } from "@/components/ui/primitives";
 import { Drawer } from "@/components/ui/drawer";
@@ -27,6 +31,10 @@ export type UserFormValues = {
   orgNodeId: string;
   npn: string;
   approvalStatus: "pending" | "approved" | "rejected";
+  badgeEnabled: boolean;
+  badgeText: string;
+  badgeIcon: string;
+  badgeColor: string;
 };
 
 const emptyCreate: UserFormValues = {
@@ -37,6 +45,10 @@ const emptyCreate: UserFormValues = {
   orgNodeId: "",
   npn: "",
   approvalStatus: "approved",
+  badgeEnabled: false,
+  badgeText: "",
+  badgeIcon: "badge",
+  badgeColor: "accent",
 };
 
 function roleLabel(t: (key: string) => string, role: RoleDoc): string {
@@ -89,6 +101,10 @@ export function UserFormDrawer({
         orgNodeId: user.orgNodeId ?? "",
         npn: user.npn ?? "",
         approvalStatus: user.approvalStatus ?? "approved",
+        badgeEnabled: user.profileBadge?.enabled === true,
+        badgeText: user.profileBadge?.text ?? "",
+        badgeIcon: user.profileBadge?.icon ?? "badge",
+        badgeColor: user.profileBadge?.color ?? "accent",
       });
     } else {
       setValues(emptyCreate);
@@ -136,6 +152,7 @@ export function UserFormDrawer({
             required
             autoComplete="off"
           />
+          <p className="mt-1 text-[11px] text-muted">{t("usersEmailHint")}</p>
         </div>
         <div>
           <Label>{t("colName")}</Label>
@@ -231,6 +248,69 @@ export function UserFormDrawer({
             onChange={(e) => setValues((v) => ({ ...v, npn: e.target.value }))}
           />
         </div>
+        {mode === "edit" ? (
+          <div className="space-y-2 rounded-xl border border-glass-border p-3">
+            <label className="flex items-center gap-2 text-xs font-medium">
+              <input
+                type="checkbox"
+                checked={values.badgeEnabled}
+                onChange={(e) =>
+                  setValues((v) => ({ ...v, badgeEnabled: e.target.checked }))
+                }
+              />
+              {t("usersBadgeEnable")}
+            </label>
+            <p className="text-[11px] text-muted">{t("usersBadgeHint")}</p>
+            {values.badgeEnabled ? (
+              <>
+                <div>
+                  <Label>{t("usersBadgeText")}</Label>
+                  <Input
+                    size="sm"
+                    value={values.badgeText}
+                    maxLength={40}
+                    onChange={(e) =>
+                      setValues((v) => ({ ...v, badgeText: e.target.value }))
+                    }
+                  />
+                </div>
+                <div>
+                  <Label>{t("usersBadgeIcon")}</Label>
+                  <select
+                    className="h-8 w-full rounded-lg border border-glass-border bg-transparent px-2.5 text-xs"
+                    value={values.badgeIcon}
+                    onChange={(e) =>
+                      setValues((v) => ({ ...v, badgeIcon: e.target.value }))
+                    }
+                  >
+                    {PROFILE_BADGE_ICONS.map((icon) => (
+                      <option key={icon} value={icon}>
+                        {icon}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <Label>{t("usersBadgeColor")}</Label>
+                  <select
+                    className="h-8 w-full rounded-lg border border-glass-border bg-transparent px-2.5 text-xs"
+                    value={values.badgeColor}
+                    onChange={(e) =>
+                      setValues((v) => ({ ...v, badgeColor: e.target.value }))
+                    }
+                  >
+                    <option value="accent">{t("usersBadgeColorAccent")}</option>
+                    {APPEARANCE_ACCENTS.map((accent) => (
+                      <option key={accent} value={accent}>
+                        {accent}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
     </Drawer>
   );

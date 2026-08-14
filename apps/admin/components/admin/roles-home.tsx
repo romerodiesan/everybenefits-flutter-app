@@ -123,6 +123,9 @@ export function RolesHome() {
           description: values.description || undefined,
           category: values.category,
           permissions: values.permissions,
+          badgeText: values.badgeText || undefined,
+          badgeIcon: values.badgeIcon,
+          badgeColor: values.badgeColor,
         });
       } else {
         await repo.updateRole({
@@ -132,6 +135,9 @@ export function RolesHome() {
           category: values.category,
           permissions: values.permissions,
           active: values.active,
+          badgeText: values.badgeText || null,
+          badgeIcon: values.badgeIcon,
+          badgeColor: values.badgeColor,
         });
       }
       await invalidate.invalidateRoles();

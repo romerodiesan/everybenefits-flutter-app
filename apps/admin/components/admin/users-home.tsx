@@ -202,6 +202,14 @@ export function UsersHome() {
           orgNodeId: values.orgNodeId || null,
           npn: values.npn.trim() || null,
           approvalStatus: values.approvalStatus,
+          profileBadge: values.badgeEnabled
+            ? {
+                enabled: true,
+                text: values.badgeText.trim(),
+                icon: values.badgeIcon,
+                color: values.badgeColor,
+              }
+            : null,
         });
       }
       setDrawerOpen(false);

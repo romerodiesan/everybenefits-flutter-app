@@ -3,8 +3,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import {
+  APPEARANCE_ACCENTS,
   PERMISSION_CATALOG,
   PERMISSION_CATEGORIES,
+  PROFILE_BADGE_ICONS,
   ROLE_CATEGORIES,
   permissionNameMessageKey,
   type PermissionCategory,
@@ -21,6 +23,9 @@ export type RoleFormValues = {
   category: RoleCategory;
   permissions: string[];
   active: boolean;
+  badgeText: string;
+  badgeIcon: string;
+  badgeColor: string;
 };
 
 const emptyCreate: RoleFormValues = {
@@ -30,6 +35,9 @@ const emptyCreate: RoleFormValues = {
   category: "custom",
   permissions: [],
   active: true,
+  badgeText: "",
+  badgeIcon: "badge",
+  badgeColor: "accent",
 };
 
 function PermissionMatrix({
@@ -214,6 +222,9 @@ export function RoleFormDrawer({
         category: role.category,
         permissions: [...role.permissions],
         active: role.active,
+        badgeText: role.badgeText ?? "",
+        badgeIcon: role.badgeIcon ?? "badge",
+        badgeColor: role.badgeColor ?? "accent",
       });
     } else {
       setValues(emptyCreate);
@@ -304,6 +315,53 @@ export function RoleFormDrawer({
               setValues((v) => ({ ...v, description: e.target.value }))
             }
           />
+        </div>
+        <div>
+          <Label>{t("rolesBadgeText")}</Label>
+          <Input
+            size="sm"
+            value={values.badgeText}
+            disabled={readOnly}
+            maxLength={40}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, badgeText: e.target.value }))
+            }
+          />
+        </div>
+        <div>
+          <Label>{t("rolesBadgeIcon")}</Label>
+          <select
+            className="h-8 w-full rounded-lg border border-glass-border bg-transparent px-2.5 text-xs"
+            value={values.badgeIcon}
+            disabled={readOnly}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, badgeIcon: e.target.value }))
+            }
+          >
+            {PROFILE_BADGE_ICONS.map((icon) => (
+              <option key={icon} value={icon}>
+                {icon}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <Label>{t("rolesBadgeColor")}</Label>
+          <select
+            className="h-8 w-full rounded-lg border border-glass-border bg-transparent px-2.5 text-xs"
+            value={values.badgeColor}
+            disabled={readOnly}
+            onChange={(e) =>
+              setValues((v) => ({ ...v, badgeColor: e.target.value }))
+            }
+          >
+            <option value="accent">{t("usersBadgeColorAccent")}</option>
+            {APPEARANCE_ACCENTS.map((accent) => (
+              <option key={accent} value={accent}>
+                {accent}
+              </option>
+            ))}
+          </select>
         </div>
         <div>
           <Label>{t("rolesCategory")}</Label>
