@@ -12,6 +12,7 @@ const ROLE_LABEL_KEYS: Record<
   Exclude<UserRole, "guest">,
   | "chatsRoleStudent"
   | "chatsRoleAgent"
+  | "roleAgencyOwner"
   | "chatsRoleInstructor"
   | "chatsRoleManager"
   | "chatsRoleAdmin"
@@ -19,6 +20,7 @@ const ROLE_LABEL_KEYS: Record<
 > = {
   student: "chatsRoleStudent",
   agent: "chatsRoleAgent",
+  agency_owner: "roleAgencyOwner",
   instructor: "chatsRoleInstructor",
   manager: "chatsRoleManager",
   admin: "chatsRoleAdmin",
