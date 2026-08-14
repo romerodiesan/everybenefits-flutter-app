@@ -1,6 +1,14 @@
 import { parsePublicProfileBadge } from "@pulse/shared";
 import { callCloudFunction } from "./call-function";
-import { doc, getDoc } from "firebase/firestore";
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  limit,
+  query,
+  where,
+} from "firebase/firestore";
 import { getFirebaseDb } from "./client";
 import { parseRole } from "../roles";
 import type { UserProfile } from "../types";
@@ -23,6 +31,7 @@ function mapCard(entry: Record<string, unknown>): UserProfile {
     uid: String(entry.uid ?? ""),
     email: (entry.email as string) ?? null,
     displayName: (entry.displayName as string) ?? null,
+    username: (entry.username as string) ?? null,
     photoUrl: (entry.photoUrl as string) ?? null,
     role: parseRole(entry.role),
     isAnonymous: false,
@@ -44,12 +53,48 @@ function mapCard(entry: Record<string, unknown>): UserProfile {
   };
 }
 
+const CLAIMED_HANDLE = /^[a-z0-9_]{3,20}$/;
+
+function claimedHandle(raw: string): string | null {
+  const value = raw.trim().toLowerCase();
+  return CLAIMED_HANDLE.test(value) ? value : null;
+}
+
+async function resolveProfileUid(
+  handleOrUid: string,
+): Promise<string | null> {
+  const db = getFirebaseDb();
+  const raw = handleOrUid.trim();
+  if (!raw) return null;
+  const handle = claimedHandle(raw);
+  if (handle) {
+    try {
+      const reserved = await getDoc(doc(db, "usernames", handle));
+      const reservedUid = String(reserved.data()?.uid ?? "").trim();
+      if (reserved.exists() && reservedUid) return reservedUid;
+    } catch {
+      // Reservation read can fail if rules lag; try the public card next.
+    }
+    const hits = await getDocs(
+      query(
+        collection(db, "publicProfiles"),
+        where("username", "==", handle),
+        limit(1),
+      ),
+    );
+    if (!hits.empty) return hits.docs[0].id;
+  }
+  return raw;
+}
+
 export async function fetchPublicProfile(
-  uid: string,
+  handleOrUid: string,
 ): Promise<UserProfile | null> {
+  const uid = await resolveProfileUid(handleOrUid);
+  if (!uid) return null;
   const snap = await getDoc(doc(getFirebaseDb(), "publicProfiles", uid));
   if (!snap.exists()) return null;
-  return mapCard({ uid: snap.id, ...snap.data() });
+  return mapCard({ ...snap.data(), uid: snap.id });
 }
 
 export async function getSocialRelationship(

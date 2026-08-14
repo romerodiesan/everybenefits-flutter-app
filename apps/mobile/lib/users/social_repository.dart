@@ -38,6 +38,7 @@ UserProfile publicCardFromMap(Map<dynamic, dynamic> data) {
     return UserProfile.fromMap({
       'uid': '${data['uid'] ?? ''}',
     'displayName': data['displayName'],
+    'username': data['username'],
     'photoUrl': data['photoUrl'],
     'role': data['role'] ?? 'student',
     'agency': data['agency'],
@@ -50,6 +51,8 @@ UserProfile publicCardFromMap(Map<dynamic, dynamic> data) {
   });
 }
 
+final _claimedHandle = RegExp(r'^[a-z0-9_]{3,20}$');
+
 class SocialRepository {
   SocialRepository({
     FirebaseFunctions? functions,
@@ -61,10 +64,34 @@ class SocialRepository {
   final FirebaseFunctions _functions;
   final FirebaseFirestore _firestore;
 
-  Future<UserProfile?> fetchPublicProfile(String uid) async {
+  Future<String?> _resolveProfileUid(String handleOrUid) async {
+    final raw = handleOrUid.trim();
+    if (raw.isEmpty) return null;
+    final handle = raw.toLowerCase();
+    if (_claimedHandle.hasMatch(handle)) {
+      try {
+        final reserved = await _firestore.doc('usernames/$handle').get();
+        final reservedUid = '${reserved.data()?['uid'] ?? ''}'.trim();
+        if (reserved.exists && reservedUid.isNotEmpty) return reservedUid;
+      } catch (_) {
+        // Reservation read can fail if rules lag; try the public card next.
+      }
+      final hits = await _firestore
+          .collection('publicProfiles')
+          .where('username', isEqualTo: handle)
+          .limit(1)
+          .get();
+      if (hits.docs.isNotEmpty) return hits.docs.first.id;
+    }
+    return raw;
+  }
+
+  Future<UserProfile?> fetchPublicProfile(String handleOrUid) async {
+    final uid = await _resolveProfileUid(handleOrUid);
+    if (uid == null || uid.isEmpty) return null;
     final snap = await _firestore.doc('publicProfiles/$uid').get();
     if (!snap.exists || snap.data() == null) return null;
-    return publicCardFromMap({'uid': snap.id, ...snap.data()!});
+    return publicCardFromMap({...snap.data()!, 'uid': snap.id});
   }
 
   Future<SocialRelationship> getRelationship(String otherUid) async {

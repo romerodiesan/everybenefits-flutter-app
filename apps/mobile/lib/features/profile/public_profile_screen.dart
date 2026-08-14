@@ -65,10 +65,14 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   }
 
   void _listenPosts() {
+    _listenPostsFor(widget.uid);
+  }
+
+  void _listenPostsFor(String authorId) {
     _postsSub?.cancel();
     _postsSub = _forums
         .watchThreads(
-          authorId: widget.uid,
+          authorId: authorId,
           sort: ForumSort.recent,
           limit: 24,
         )
@@ -90,13 +94,29 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   Future<void> _reload() async {
     try {
       final person = await _social.fetchPublicProfile(widget.uid);
-      final rel = await _social.getRelationship(widget.uid);
+      if (!mounted) return;
+      SocialRelationship? rel;
+      if (person != null) {
+        try {
+          rel = await _social.getRelationship(person.uid);
+        } catch (_) {
+          rel = SocialRelationship(
+            status: SocialStatus.none,
+            muted: false,
+            blockedByMe: false,
+            isSelf: person.uid == widget.viewer.uid,
+          );
+        }
+      }
       if (!mounted) return;
       setState(() {
         _person = person;
         _rel = rel;
         _loading = false;
       });
+      if (person != null && person.uid != widget.uid) {
+        _listenPostsFor(person.uid);
+      }
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -167,7 +187,9 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     final l10n = context.l10n;
     final person = _person;
     final rel = _rel;
-    final isSelf = rel?.isSelf == true || widget.viewer.uid == widget.uid;
+    final isSelf =
+        rel?.isSelf == true ||
+        (person != null && widget.viewer.uid == person.uid);
     final posts = _threads.length;
     final replies = _threads.fold<int>(0, (sum, item) => sum + item.replyCount);
     final likes = _threads.fold<int>(
