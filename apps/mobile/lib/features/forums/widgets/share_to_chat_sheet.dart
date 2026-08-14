@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
+import '../../../app/layout/pulse_adaptive_sheet.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/pulse_skeleton.dart';
 import '../../../l10n/l10n.dart';
@@ -41,7 +42,7 @@ Future<void> showShareToChatSheet({
   final forumRepo = forumRepository ?? ForumRepository();
   final chatRepo = chatRepository ?? ChatRepository();
 
-  return showModalBottomSheet<void>(
+  return showPulseSheet<void>(
     context: context,
     backgroundColor: colors.sheet,
     isScrollControlled: true,

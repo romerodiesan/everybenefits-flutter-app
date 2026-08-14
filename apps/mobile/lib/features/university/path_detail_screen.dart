@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'course_detail_screen.dart';
@@ -111,7 +112,7 @@ class _PathDetailScreenState extends State<PathDetailScreen> {
     return PulseScaffold(
       appBar: AppBar(title: Text(l10n.pathDetailTitle)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PulseCatalogSkeleton()
           : ListView(
               padding: const EdgeInsets.all(AppSpacing.lg),
               children: [

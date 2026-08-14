@@ -218,6 +218,12 @@ abstract class AppLocalizations {
   /// **'Agent'**
   String get roleAgent;
 
+  /// No description provided for @roleAgencyOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Agency owner'**
+  String get roleAgencyOwner;
+
   /// No description provided for @roleInstructor.
   ///
   /// In en, this message translates to:
@@ -457,6 +463,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Already have an account? Sign in'**
   String get registerHaveAccount;
+
+  /// No description provided for @accountGateDeactivatedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account deactivated'**
+  String get accountGateDeactivatedTitle;
+
+  /// No description provided for @accountGateDeactivatedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This account has been deactivated. Contact your administrator or sign out.'**
+  String get accountGateDeactivatedBody;
+
+  /// No description provided for @accountGateDeletionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Account scheduled for deletion'**
+  String get accountGateDeletionTitle;
+
+  /// No description provided for @accountGateDeletionBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This account is pending deletion. Sign out, or contact support if this was a mistake.'**
+  String get accountGateDeletionBody;
 
   /// No description provided for @forgotTitle.
   ///
@@ -806,6 +836,12 @@ abstract class AppLocalizations {
   /// **'Add SMS or an authenticator app as a second factor.'**
   String get securityMfaHint;
 
+  /// No description provided for @securityMfaEmulatorSkip.
+  ///
+  /// In en, this message translates to:
+  /// **'MFA enrollment is skipped on the Auth emulator. Use production Auth to enroll.'**
+  String get securityMfaEmulatorSkip;
+
   /// No description provided for @securityEnrollTotp.
   ///
   /// In en, this message translates to:
@@ -1087,6 +1123,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save changes'**
   String get editProfileSave;
+
+  /// No description provided for @profileEmailHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This is the email you use to sign in.'**
+  String get profileEmailHint;
+
+  /// No description provided for @errEmailInUse.
+  ///
+  /// In en, this message translates to:
+  /// **'That email is already registered.'**
+  String get errEmailInUse;
 
   /// No description provided for @editProfileUpdateFailed.
   ///
@@ -1397,8 +1445,20 @@ abstract class AppLocalizations {
   /// No description provided for @promoBannerDismiss.
   ///
   /// In en, this message translates to:
-  /// **'Dismiss promotion'**
+  /// **'Hide'**
   String get promoBannerDismiss;
+
+  /// No description provided for @promoBannerHide.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide'**
+  String get promoBannerHide;
+
+  /// No description provided for @promoBannerFromPulse.
+  ///
+  /// In en, this message translates to:
+  /// **'Pulse'**
+  String get promoBannerFromPulse;
 
   /// No description provided for @forumsClearFilters.
   ///
@@ -2036,6 +2096,30 @@ abstract class AppLocalizations {
   /// **'Tap + to message a teammate.'**
   String get chatsEmptySubtitle;
 
+  /// No description provided for @chatsSelectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a conversation'**
+  String get chatsSelectTitle;
+
+  /// No description provided for @chatsSelectSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a chat from the list to read and reply.'**
+  String get chatsSelectSubtitle;
+
+  /// No description provided for @forumsSelectTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a question'**
+  String get forumsSelectTitle;
+
+  /// No description provided for @forumsSelectSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a thread from the feed to read answers.'**
+  String get forumsSelectSubtitle;
+
   /// No description provided for @chatsSectionPinned.
   ///
   /// In en, this message translates to:
@@ -2432,6 +2516,12 @@ abstract class AppLocalizations {
   /// **'{minutes} min'**
   String courseDurationMinutes(int minutes);
 
+  /// No description provided for @courseDurationSeconds.
+  ///
+  /// In en, this message translates to:
+  /// **'{seconds}s'**
+  String courseDurationSeconds(int seconds);
+
   /// No description provided for @courseDurationHoursMinutes.
   ///
   /// In en, this message translates to:
@@ -2635,6 +2725,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The video couldn\'t be played.'**
   String get playerError;
+
+  /// No description provided for @playerFullscreen.
+  ///
+  /// In en, this message translates to:
+  /// **'Full screen'**
+  String get playerFullscreen;
+
+  /// No description provided for @playerPip.
+  ///
+  /// In en, this message translates to:
+  /// **'Picture in picture'**
+  String get playerPip;
 
   /// No description provided for @playerNextLesson.
   ///
@@ -3421,6 +3523,162 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Profile holds your details, notification preferences, and security. Agents can jump to Studio from the app switcher to author courses.'**
   String get tourYouBodyAgent;
+
+  /// No description provided for @fieldBio.
+  ///
+  /// In en, this message translates to:
+  /// **'Bio'**
+  String get fieldBio;
+
+  /// No description provided for @fieldBioHint.
+  ///
+  /// In en, this message translates to:
+  /// **'A short intro on your public profile (280 characters).'**
+  String get fieldBioHint;
+
+  /// No description provided for @profilePosts.
+  ///
+  /// In en, this message translates to:
+  /// **'Posts'**
+  String get profilePosts;
+
+  /// No description provided for @profilePostsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No posts yet.'**
+  String get profilePostsEmpty;
+
+  /// No description provided for @profileStatPosts.
+  ///
+  /// In en, this message translates to:
+  /// **'Posts'**
+  String get profileStatPosts;
+
+  /// No description provided for @profileStatReplies.
+  ///
+  /// In en, this message translates to:
+  /// **'Replies'**
+  String get profileStatReplies;
+
+  /// No description provided for @profileStatLikes.
+  ///
+  /// In en, this message translates to:
+  /// **'Likes'**
+  String get profileStatLikes;
+
+  /// No description provided for @profileViewPublic.
+  ///
+  /// In en, this message translates to:
+  /// **'View public profile'**
+  String get profileViewPublic;
+
+  /// No description provided for @memberProfileTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get memberProfileTitle;
+
+  /// No description provided for @memberNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'This member could not be found.'**
+  String get memberNotFound;
+
+  /// No description provided for @memberAddContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Add contact'**
+  String get memberAddContact;
+
+  /// No description provided for @memberCancelRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel request'**
+  String get memberCancelRequest;
+
+  /// No description provided for @memberAcceptRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Accept'**
+  String get memberAcceptRequest;
+
+  /// No description provided for @memberDeclineRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Decline'**
+  String get memberDeclineRequest;
+
+  /// No description provided for @memberMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get memberMessage;
+
+  /// No description provided for @memberRemoveContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove contact'**
+  String get memberRemoveContact;
+
+  /// No description provided for @memberMute.
+  ///
+  /// In en, this message translates to:
+  /// **'Mute chat notifications'**
+  String get memberMute;
+
+  /// No description provided for @memberUnmute.
+  ///
+  /// In en, this message translates to:
+  /// **'Unmute notifications'**
+  String get memberUnmute;
+
+  /// No description provided for @memberBlock.
+  ///
+  /// In en, this message translates to:
+  /// **'Block'**
+  String get memberBlock;
+
+  /// No description provided for @memberUnblock.
+  ///
+  /// In en, this message translates to:
+  /// **'Unblock'**
+  String get memberUnblock;
+
+  /// No description provided for @memberRequestsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact requests'**
+  String get memberRequestsTitle;
+
+  /// No description provided for @memberRequestsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No pending requests.'**
+  String get memberRequestsEmpty;
+
+  /// No description provided for @memberViewProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'View profile'**
+  String get memberViewProfile;
+
+  /// No description provided for @chatsNeedContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'Add each other as contacts to start a private chat.'**
+  String get chatsNeedContacts;
+
+  /// No description provided for @chatsDmDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Add each other as contacts to keep messaging.'**
+  String get chatsDmDisabled;
+
+  /// No description provided for @chatsFindMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Find members'**
+  String get chatsFindMembers;
 }
 
 class _AppLocalizationsDelegate

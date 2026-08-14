@@ -36,13 +36,19 @@ class AuthService {
   Future<UserCredential> signUpWithEmail({
     required String email,
     required String password,
+    String? displayName,
   }) {
-    return _guard(
-      () => _auth.createUserWithEmailAndPassword(
+    return _guard(() async {
+      final cred = await _auth.createUserWithEmailAndPassword(
         email: email.trim(),
         password: password,
-      ),
-    );
+      );
+      final name = displayName?.trim();
+      if (name != null && name.isNotEmpty) {
+        await cred.user?.updateDisplayName(name);
+      }
+      return cred;
+    });
   }
 
   Future<UserCredential> signInWithEmail({
@@ -105,8 +111,12 @@ class AuthService {
     MultiFactorSession? multiFactorSession,
     PhoneMultiFactorInfo? multiFactorInfo,
   }) {
-    return _guard(
-      () => _auth.verifyPhoneNumber(
+    return _guard(() async {
+      // Must be set before any SMS / MFA phone challenge (Auth emulator).
+      if (useFirebaseEmulators) {
+        await _auth.setSettings(appVerificationDisabledForTesting: true);
+      }
+      await _auth.verifyPhoneNumber(
         phoneNumber: phoneNumber?.trim(),
         timeout: timeout,
         forceResendingToken: forceResendingToken,
@@ -116,8 +126,8 @@ class AuthService {
         codeAutoRetrievalTimeout: onCodeAutoRetrievalTimeout,
         multiFactorSession: multiFactorSession,
         multiFactorInfo: multiFactorInfo,
-      ),
-    );
+      );
+    });
   }
 
   Future<UserCredential> signInWithSmsCode({

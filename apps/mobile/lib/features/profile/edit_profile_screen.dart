@@ -1,9 +1,10 @@
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_constrained.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
-import '../../app/widgets/role_badge.dart';
 import '../../auth/auth.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
@@ -32,9 +33,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Future<void> _save(ProfileFormData data) async {
     setState(() => _busy = true);
     try {
-      final isAgentFields = widget.profile.role == UserRole.agent ||
-          widget.profile.role == UserRole.instructor ||
-          widget.profile.role == UserRole.admin;
+      final isAgentFields = requiresLicenseProfile(widget.profile.roleId);
 
       final changed = phoneChangedFromProfile(
         previousCode: widget.profile.phoneCountryCode,
@@ -62,13 +61,25 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
 
+      final nextEmail = data.email?.trim().toLowerCase();
+      final currentEmail = widget.profile.email?.trim().toLowerCase() ?? '';
+      if (nextEmail != null &&
+          nextEmail.isNotEmpty &&
+          nextEmail != currentEmail) {
+        await widget.userRepository.updateAccountEmail(nextEmail);
+      }
+
       final next = widget.profile.copyWith(
         displayName: data.displayName,
+        email: nextEmail ?? widget.profile.email,
+        bio: data.bio,
+        clearBio: data.bio == null || data.bio!.isEmpty,
         phoneCountryCode: data.phoneCountryCode,
         phoneNumber: data.phoneNumber,
         phoneVerified: phoneVerified,
         // Role is frozen after completion — never written from edit.
         role: widget.profile.role,
+        roleId: widget.profile.roleId,
         profileCompleted: true,
         npn: widget.profile.npn,
         addressStreet: data.addressStreet,
@@ -86,8 +97,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       Navigator.of(context).pop();
     } catch (error) {
       if (!mounted) return;
+      final message = error is FirebaseFunctionsException
+          ? (error.code.contains('already-exists')
+              ? context.l10n.errEmailInUse
+              : error.code.contains('invalid-argument')
+                  ? context.l10n.validationEmail
+                  : context.l10n.editProfileUpdateFailed(
+                      error.message ?? error.code,
+                    ))
+          : context.l10n.editProfileUpdateFailed('$error');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(context.l10n.editProfileUpdateFailed('$error'))),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -110,7 +130,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ),
       ),
       body: SafeArea(
-        child: ListView(
+        child: PulseConstrained(
+          maxWidth: PulseContentWidth.form,
+          padding: EdgeInsets.zero,
+          child: ListView(
           padding: const EdgeInsets.fromLTRB(
             AppSpacing.lg,
             AppSpacing.sm,
@@ -145,7 +168,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 padding: const EdgeInsets.all(16),
                 child: Row(
                   children: [
-                    RoleBadge(role: profile.role),
+                    Text(
+                      roleLabelForId(profile.roleId, l10n),
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.4,
+                      ),
+                    ),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
@@ -173,8 +202,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               busy: _busy,
               lockName: false,
               lockNpn: true,
+              showEmail: true,
               submitLabel: l10n.editProfileSave,
               initialName: profile.displayName,
+              initialEmail: profile.email,
+              initialBio: profile.bio,
               initialCountryCode: profile.phoneCountryCode,
               initialPhoneNumber: profile.phoneNumber,
               initialNpn: profile.npn,
@@ -187,6 +219,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               onSubmit: _save,
             ),
           ],
+        ),
         ),
       ),
     );

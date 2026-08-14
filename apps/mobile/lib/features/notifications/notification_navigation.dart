@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../app/home_shell.dart';
+import '../../app/layout/pulse_breakpoints.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../chats/chat_models.dart';
@@ -7,6 +9,7 @@ import '../chats/chat_repository.dart';
 import '../chats/chats_screen.dart';
 import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
+import '../profile/public_profile_screen.dart';
 import '../university/course_detail_screen.dart';
 import '../university/course_repository.dart';
 import 'notification_models.dart';
@@ -25,8 +28,18 @@ Future<void> openNotificationTarget(
   if (!target.canNavigate) return;
 
   final id = target.id!;
+  final shell = PulseShellState.maybeActive;
+  final split = pulseUseMasterDetail(context);
+
   switch (target.kind) {
     case NotificationTargetKind.forum:
+      if (split && shell != null) {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        shell.openForumThread(id);
+        return;
+      }
       await Navigator.of(context).push(
         MaterialPageRoute<void>(
           builder: (_) => ThreadDetailScreen(
@@ -52,6 +65,13 @@ Future<void> openNotificationTarget(
         );
         return;
       }
+      if (split && shell != null) {
+        if (Navigator.of(context).canPop()) {
+          Navigator.of(context).pop();
+        }
+        shell.openChatConversation(chat);
+        return;
+      }
       openChat(
         context,
         chat: chat,
@@ -65,6 +85,16 @@ Future<void> openNotificationTarget(
             courseId: id,
             profile: profile,
             courseRepository: courseRepository ?? CourseRepository(),
+          ),
+        ),
+      );
+    case NotificationTargetKind.member:
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => PublicProfileScreen(
+            uid: id,
+            viewer: profile,
+            chatRepository: chatRepository,
           ),
         ),
       );

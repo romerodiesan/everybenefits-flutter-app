@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_spacing.dart';
 import '../../../auth/auth.dart';
 import '../../../l10n/l10n.dart';
+import '../../../users/profile_validation.dart';
 import 'login_screen.dart';
 import 'mfa_challenge_screen.dart';
 import 'phone_auth_screen.dart';
@@ -19,6 +20,8 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
+  final _givenName = TextEditingController();
+  final _familyName = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
   final _confirm = TextEditingController();
@@ -26,6 +29,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   @override
   void dispose() {
+    _givenName.dispose();
+    _familyName.dispose();
     _email.dispose();
     _password.dispose();
     _confirm.dispose();
@@ -54,10 +59,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _register() async {
     if (!_formKey.currentState!.validate()) return;
+    final displayName = composeDisplayName(_givenName.text, _familyName.text);
     await _run(() async {
       await widget.authService.signUpWithEmail(
         email: _email.text,
         password: _password.text,
+        displayName: displayName,
       );
     });
   }
@@ -74,6 +81,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              TextFormField(
+                controller: _givenName,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.givenName],
+                decoration: InputDecoration(labelText: l10n.fieldGivenName),
+                validator: (value) {
+                  final result = validateGivenName(value ?? '');
+                  if (result.ok) return null;
+                  if (result.issue == DisplayNameIssue.emailAsName) {
+                    return l10n.validationNameEmail;
+                  }
+                  if (result.issue == DisplayNameIssue.tooShort) {
+                    return l10n.validationNameShort;
+                  }
+                  return l10n.validationName;
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
+              TextFormField(
+                controller: _familyName,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.next,
+                autofillHints: const [AutofillHints.familyName],
+                decoration: InputDecoration(labelText: l10n.fieldFamilyName),
+                validator: (value) {
+                  final result = validateFamilyName(value ?? '');
+                  if (result.ok) return null;
+                  if (result.issue == DisplayNameIssue.tooShort) {
+                    return l10n.validationNameShort;
+                  }
+                  return l10n.validationNameLast;
+                },
+              ),
+              const SizedBox(height: AppSpacing.md),
               TextFormField(
                 controller: _email,
                 keyboardType: TextInputType.emailAddress,

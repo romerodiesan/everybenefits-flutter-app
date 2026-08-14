@@ -1,52 +1,27 @@
 {
   "project_info": {
-    "project_number": "978334689853",
-    "project_id": "every-insurance",
-    "storage_bucket": "every-insurance.firebasestorage.app",
-    "firebase_url": "https://every-insurance-default-rtdb.firebaseio.com"
+    "project_number": "1001601265155",
+    "project_id": "every-benefits-us",
+    "storage_bucket": "every-benefits-us.appspot.com",
+    "firebase_url": "https://every-benefits-us-default-rtdb.firebaseio.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:978334689853:android:da04393db288567a7d1854",
+        "mobilesdk_app_id": "1:1001601265155:android:0261ba55ef35c1a0",
         "android_client_info": {
           "package_name": "com.everybenefits.everyinsurance"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "978334689853-gtsd6137qfiun197dvd5fno8agc5f3mv.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.everybenefits.everyinsurance",
-            "certificate_hash": "cbedb57bec48d18d7a994620c474f7ebce97c67d"
-          }
-        },
-        {
-          "client_id": "978334689853-kfpmt1vo60khftpg1mieu5hggk4o506c.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDxEn-G4MK7g2kl8joAiztg3M-WqUVXH8g"
+          "current_key": "AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "978334689853-kfpmt1vo60khftpg1mieu5hggk4o506c.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "978334689853-tkm6t93ck27fnq16prpg4pshst6a1q1g.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.everybenefits.everyinsurance"
-              }
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }

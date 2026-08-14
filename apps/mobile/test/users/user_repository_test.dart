@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mocktail/mocktail.dart';
 
 import 'package:every_benefits/users/avatar_storage.dart';
+import 'package:every_benefits/users/profile_validation.dart';
 import 'package:every_benefits/users/user_profile.dart';
 import 'package:every_benefits/users/user_repository.dart';
 import 'package:every_benefits/users/user_role.dart';
@@ -45,6 +46,17 @@ class FakeUserStore implements UserProfileStore {
   }
 
   @override
+  Future<void> updateSearchIndex({
+    required String uid,
+    required String? displayName,
+    required String? email,
+  }) async {
+    searchBackfills.add(uid);
+  }
+
+  final List<String> searchBackfills = [];
+
+  @override
   Stream<UserProfile?> watch(String uid) async* {
     yield profiles[uid];
     yield* _controllerFor(uid).stream;
@@ -64,6 +76,11 @@ class FakeUserStore implements UserProfileStore {
         )
         .take(limit)
         .toList();
+  }
+
+  @override
+  Future<String> updateAccountEmail(String email) async {
+    throw UnimplementedError();
   }
 }
 
@@ -151,6 +168,51 @@ void main() {
 
       expect(profile.role, UserRole.admin);
       expect(profile.email, 'old@b.com');
+      expect(store.searchBackfills, contains('user-1'));
+    });
+
+    test('backfills search index when tokens are missing', () async {
+      store.profiles['user-2'] = UserProfile(
+        uid: 'user-2',
+        email: 'ada@example.com',
+        displayName: 'Ada Lovelace',
+        role: UserRole.student,
+        isAnonymous: false,
+        profileCompleted: true,
+        createdAt: DateTime.utc(2024, 1, 1),
+        updatedAt: DateTime.utc(2024, 1, 1),
+      );
+      when(() => user.uid).thenReturn('user-2');
+      when(() => user.isAnonymous).thenReturn(false);
+      when(() => user.email).thenReturn('ada@example.com');
+      when(() => user.displayName).thenReturn('Ada Lovelace');
+
+      await repository.ensureProfile(user);
+      expect(store.searchBackfills, ['user-2']);
+    });
+
+    test('skips search backfill when index already matches', () async {
+      final search = userSearchIndexFields('Ada Lovelace', 'ada@example.com');
+      store.profiles['user-3'] = UserProfile(
+        uid: 'user-3',
+        email: 'ada@example.com',
+        displayName: 'Ada Lovelace',
+        displayNameLower: search['displayNameLower'] as String?,
+        emailLower: search['emailLower'] as String?,
+        nameTokens: (search['nameTokens'] as List).cast<String>(),
+        role: UserRole.student,
+        isAnonymous: false,
+        profileCompleted: true,
+        createdAt: DateTime.utc(2024, 1, 1),
+        updatedAt: DateTime.utc(2024, 1, 1),
+      );
+      when(() => user.uid).thenReturn('user-3');
+      when(() => user.isAnonymous).thenReturn(false);
+      when(() => user.email).thenReturn('ada@example.com');
+      when(() => user.displayName).thenReturn('Ada Lovelace');
+
+      await repository.ensureProfile(user);
+      expect(store.searchBackfills, isEmpty);
     });
   });
 

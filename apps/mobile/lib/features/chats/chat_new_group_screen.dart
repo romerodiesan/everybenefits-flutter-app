@@ -7,7 +7,7 @@ import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_repository.dart';
-import '../../users/user_role.dart';
+import '../../users/users.dart';
 import 'chat_conversation_screen.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
@@ -106,7 +106,7 @@ class _ChatNewGroupScreenState extends State<ChatNewGroupScreen> {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final l10n = context.l10n;
-    final canCreate = canCreateChatGroups(widget.profile.role);
+    final canCreate = canCreateChatGroups(AccessScope.accessOf(context, fallbackRoleId: widget.profile.roleId));
 
     return PulseScaffold(
       appBar: AppBar(

@@ -16,6 +16,7 @@ import 'features/chats/chat_repository.dart';
 import 'features/forums/forum_repository.dart';
 import 'features/university/course_repository.dart';
 import 'features/onboarding/pending_approval_screen.dart';
+import 'features/onboarding/account_status_gate_screen.dart';
 import 'features/onboarding/set_password_screen.dart';
 import 'features/onboarding/welcome_screen.dart';
 import 'features/profile/profile_completion_flow.dart';
@@ -361,9 +362,18 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
             final profile = watchSnapshot.data ?? initial;
 
             if (!profile.isAnonymous &&
+                (profile.accountStatus == 'deactivated' ||
+                    profile.accountStatus == 'pendingDeletion')) {
+              return AccountStatusGateScreen(
+                profile: profile,
+                authService: widget.authService,
+              );
+            }
+
+            if (!profile.isAnonymous &&
                 needsProfileCompletion(
                   isAnonymous: profile.isAnonymous,
-                  roleName: profile.role.wireValue,
+                  roleName: profile.roleId,
                   displayName: profile.displayName,
                   profileCompleted: profile.profileCompleted,
                   npn: profile.npn,
@@ -372,10 +382,13 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
                   addressState: profile.addressState,
                   addressZip: profile.addressZip,
                 )) {
-              return ProfileCompletionFlow(
-                profile: profile,
-                userRepository: widget.userRepository,
-                authService: widget.authService,
+              return _AccessHost(
+                roleId: profile.roleId,
+                child: ProfileCompletionFlow(
+                  profile: profile,
+                  userRepository: widget.userRepository,
+                  authService: widget.authService,
+                ),
               );
             }
 
@@ -386,15 +399,44 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
               );
             }
 
-            return PulseShell(
-              authService: widget.authService,
-              userRepository: widget.userRepository,
-              profile: profile,
-              forumRepository: widget.forumRepository,
-              chatRepository: widget.chatRepository,
-              courseRepository: widget.courseRepository,
+            return _AccessHost(
+              roleId: profile.roleId,
+              child: PulseShell(
+                authService: widget.authService,
+                userRepository: widget.userRepository,
+                profile: profile,
+                forumRepository: widget.forumRepository,
+                chatRepository: widget.chatRepository,
+                courseRepository: widget.courseRepository,
+              ),
             );
           },
+        );
+      },
+    );
+  }
+}
+
+/// Hydrates `roles/{roleId}` permissions and exposes [AccessScope].
+class _AccessHost extends StatelessWidget {
+  const _AccessHost({required this.roleId, required this.child});
+
+  final String roleId;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = normalizeRoleId(roleId);
+    return StreamBuilder<List<String>>(
+      stream: RolePermissionsRepository().watch(normalized),
+      initialData: getDefaultPermissionsForRole(normalized),
+      builder: (context, snapshot) {
+        final permissions =
+            snapshot.data ?? getDefaultPermissionsForRole(normalized);
+        return AccessScope(
+          roleId: normalized,
+          permissions: permissions,
+          child: child,
         );
       },
     );

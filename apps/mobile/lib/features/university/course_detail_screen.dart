@@ -3,8 +3,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_breakpoints.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'course_models.dart';
@@ -196,7 +198,7 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                 icon: Icons.cloud_off_rounded,
                 message: friendlyCourseError(_error!, l10n),
               )
-            : const Center(child: CircularProgressIndicator()),
+            : const PulseCatalogSkeleton(),
       );
     }
 
@@ -215,9 +217,11 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final split = PulseWindowClass.of(context) == PulseWindowClass.expanded &&
+              constraints.maxWidth >= 840;
+          final hero = <Widget>[
           CourseCover(
             course: course,
             repository: _repository,
@@ -291,14 +295,13 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
               style: theme.textTheme.bodyLarge?.copyWith(color: colors.muted),
             ),
           ],
+          ];
+          final syllabus = <Widget>[
           const SizedBox(height: AppSpacing.xl),
           Text(l10n.playerClasses, style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpacing.sm),
           if (_loadingContent)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: AppSpacing.lg),
-              child: Center(child: CircularProgressIndicator()),
-            )
+            const PulseCatalogSkeleton(itemCount: 3)
           else if (_content.lessons.isEmpty)
             AcademyMessage(
               icon: Icons.playlist_add_rounded,
@@ -326,7 +329,31 @@ class _CourseDetailScreenState extends State<CourseDetailScreen> {
                   onTap: () => _startOrContinue(lesson: lesson),
                 ),
           ],
-        ],
+          ];
+          if (!split) {
+            return ListView(
+              padding: const EdgeInsets.all(AppSpacing.lg),
+              children: [...hero, ...syllabus],
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 5,
+                  child: ListView(children: hero),
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                Expanded(
+                  flex: 4,
+                  child: ListView(children: syllabus),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -457,7 +484,10 @@ class _LessonTile extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    final minutes = (lesson.durationSeconds / 60).ceil();
+    final durationLabel = lessonDurationLabel(
+      context.l10n,
+      lesson.durationSeconds,
+    );
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -480,9 +510,9 @@ class _LessonTile extends StatelessWidget {
           color: locked ? colors.muted : null,
         ),
       ),
-      trailing: minutes > 0
+      trailing: durationLabel.isNotEmpty
           ? Text(
-              context.l10n.courseDurationMinutes(minutes),
+              durationLabel,
               style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
             )
           : null,

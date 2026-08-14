@@ -7,7 +7,9 @@ import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../auth/auth.dart';
+import '../../firebase/firebase_emulators.dart';
 import '../../l10n/l10n.dart';
 
 /// Password + MFA enrollment for signed-in members.
@@ -139,6 +141,14 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
   }
 
   Future<void> _startTotp() async {
+    if (useFirebaseEmulators) {
+      showAppError(
+        context,
+        'mfa-emulator-skip',
+        fallbackMessage: context.l10n.securityMfaEmulatorSkip,
+      );
+      return;
+    }
     if (!await _ensureRecentLogin()) return;
     setState(() => _busy = true);
     try {
@@ -187,6 +197,14 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
   }
 
   Future<void> _sendPhoneSms() async {
+    if (useFirebaseEmulators) {
+      showAppError(
+        context,
+        'mfa-emulator-skip',
+        fallbackMessage: context.l10n.securityMfaEmulatorSkip,
+      );
+      return;
+    }
     final phone = _phone.text.trim();
     if (phone.isEmpty) return;
     if (!await _ensureRecentLogin()) return;
@@ -365,7 +383,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
           ],
           const SizedBox(height: AppSpacing.md),
           if (_loading)
-            const Center(child: CircularProgressIndicator())
+            const PulseListSkeleton(itemCount: 3)
           else if (_factors.isEmpty)
             Text(
               l10n.securityNoFactors,

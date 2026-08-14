@@ -1,17 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_constrained.dart';
 import '../../app/locale_controller.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/theme_controller.dart';
 import '../../app/widgets/pulse_chrome.dart';
-import '../../app/widgets/role_badge.dart';
 import '../../auth/auth.dart';
 import '../../l10n/l10n.dart';
 import '../../privacy/telemetry.dart';
 import '../../users/users.dart';
 import 'admin_promote_screen.dart';
+import 'contact_requests_screen.dart';
 import 'danger_zone_screen.dart';
 import 'notification_prefs_screen.dart';
 import 'security_settings_screen.dart';
@@ -48,7 +49,10 @@ class SettingsScreen extends StatelessWidget {
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 22),
         ),
       ),
-      body: ListView(
+      body: PulseConstrained(
+        maxWidth: PulseContentWidth.form,
+        padding: EdgeInsets.zero,
+        child: ListView(
         padding: const EdgeInsets.fromLTRB(
           AppSpacing.lg,
           AppSpacing.sm,
@@ -59,6 +63,24 @@ class SettingsScreen extends StatelessWidget {
           _AccountStrip(
             profile: profile,
             onEdit: onEditProfile,
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          PulseSheet(
+            onTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => ContactRequestsScreen(profile: profile),
+                ),
+              );
+            },
+            child: Row(
+              children: [
+                const Icon(Icons.person_add_alt_1_rounded),
+                const SizedBox(width: 12),
+                Expanded(child: Text(l10n.memberRequestsTitle)),
+                Icon(Icons.chevron_right_rounded, color: colors.muted),
+              ],
+            ),
           ),
           const SizedBox(height: AppSpacing.xl),
           _SectionLabel(label: l10n.settingsAppearance),
@@ -177,7 +199,7 @@ class SettingsScreen extends StatelessWidget {
               );
             },
           ),
-          if (profile.role == UserRole.admin) ...[
+          if (canAccessAdmin(AccessScope.accessOf(context, fallbackRoleId: profile.roleId))) ...[
             const SizedBox(height: AppSpacing.xl),
             _SectionLabel(label: l10n.settingsAdmin),
             const SizedBox(height: 6),
@@ -239,6 +261,7 @@ class SettingsScreen extends StatelessWidget {
             ),
           ),
         ],
+        ),
       ),
     );
   }
@@ -467,7 +490,13 @@ class _AccountStrip extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      RoleBadge(role: profile.role),
+                      Text(
+                        roleLabelForId(profile.roleId, l10n),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
                       const SizedBox(height: 6),
                       Text(
                         profile.headlineName,

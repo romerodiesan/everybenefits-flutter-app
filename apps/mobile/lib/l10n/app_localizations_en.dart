@@ -71,6 +71,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get roleAgent => 'Agent';
 
   @override
+  String get roleAgencyOwner => 'Agency owner';
+
+  @override
   String get roleInstructor => 'Instructor';
 
   @override
@@ -195,6 +198,20 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get registerHaveAccount => 'Already have an account? Sign in';
+
+  @override
+  String get accountGateDeactivatedTitle => 'Account deactivated';
+
+  @override
+  String get accountGateDeactivatedBody =>
+      'This account has been deactivated. Contact your administrator or sign out.';
+
+  @override
+  String get accountGateDeletionTitle => 'Account scheduled for deletion';
+
+  @override
+  String get accountGateDeletionBody =>
+      'This account is pending deletion. Sign out, or contact support if this was a mistake.';
 
   @override
   String get forgotTitle => 'Recover access';
@@ -388,6 +405,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Add SMS or an authenticator app as a second factor.';
 
   @override
+  String get securityMfaEmulatorSkip =>
+      'MFA enrollment is skipped on the Auth emulator. Use production Auth to enroll.';
+
+  @override
   String get securityEnrollTotp => 'Add authenticator';
 
   @override
@@ -532,6 +553,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get editProfileSave => 'Save changes';
+
+  @override
+  String get profileEmailHint => 'This is the email you use to sign in.';
+
+  @override
+  String get errEmailInUse => 'That email is already registered.';
 
   @override
   String editProfileUpdateFailed(String error) {
@@ -695,7 +722,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get forumsUnsaveThread => 'Remove bookmark';
 
   @override
-  String get promoBannerDismiss => 'Dismiss promotion';
+  String get promoBannerDismiss => 'Hide';
+
+  @override
+  String get promoBannerHide => 'Hide';
+
+  @override
+  String get promoBannerFromPulse => 'Pulse';
 
   @override
   String get forumsClearFilters => 'Clear';
@@ -1044,6 +1077,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsEmptySubtitle => 'Tap + to message a teammate.';
 
   @override
+  String get chatsSelectTitle => 'Pick a conversation';
+
+  @override
+  String get chatsSelectSubtitle =>
+      'Choose a chat from the list to read and reply.';
+
+  @override
+  String get forumsSelectTitle => 'Pick a question';
+
+  @override
+  String get forumsSelectSubtitle =>
+      'Open a thread from the feed to read answers.';
+
+  @override
   String get chatsSectionPinned => 'Pinned';
 
   @override
@@ -1268,6 +1315,11 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String courseDurationSeconds(int seconds) {
+    return '${seconds}s';
+  }
+
+  @override
   String courseDurationHoursMinutes(int hours, int minutes) {
     return '$hours h $minutes min';
   }
@@ -1378,6 +1430,12 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get playerError => 'The video couldn\'t be played.';
+
+  @override
+  String get playerFullscreen => 'Full screen';
+
+  @override
+  String get playerPip => 'Picture in picture';
 
   @override
   String get playerNextLesson => 'Next lesson';
@@ -1812,4 +1870,84 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get tourYouBodyAgent =>
       'Profile holds your details, notification preferences, and security. Agents can jump to Studio from the app switcher to author courses.';
+
+  @override
+  String get fieldBio => 'Bio';
+
+  @override
+  String get fieldBioHint =>
+      'A short intro on your public profile (280 characters).';
+
+  @override
+  String get profilePosts => 'Posts';
+
+  @override
+  String get profilePostsEmpty => 'No posts yet.';
+
+  @override
+  String get profileStatPosts => 'Posts';
+
+  @override
+  String get profileStatReplies => 'Replies';
+
+  @override
+  String get profileStatLikes => 'Likes';
+
+  @override
+  String get profileViewPublic => 'View public profile';
+
+  @override
+  String get memberProfileTitle => 'Profile';
+
+  @override
+  String get memberNotFound => 'This member could not be found.';
+
+  @override
+  String get memberAddContact => 'Add contact';
+
+  @override
+  String get memberCancelRequest => 'Cancel request';
+
+  @override
+  String get memberAcceptRequest => 'Accept';
+
+  @override
+  String get memberDeclineRequest => 'Decline';
+
+  @override
+  String get memberMessage => 'Message';
+
+  @override
+  String get memberRemoveContact => 'Remove contact';
+
+  @override
+  String get memberMute => 'Mute chat notifications';
+
+  @override
+  String get memberUnmute => 'Unmute notifications';
+
+  @override
+  String get memberBlock => 'Block';
+
+  @override
+  String get memberUnblock => 'Unblock';
+
+  @override
+  String get memberRequestsTitle => 'Contact requests';
+
+  @override
+  String get memberRequestsEmpty => 'No pending requests.';
+
+  @override
+  String get memberViewProfile => 'View profile';
+
+  @override
+  String get chatsNeedContacts =>
+      'Add each other as contacts to start a private chat.';
+
+  @override
+  String get chatsDmDisabled => 'Add each other as contacts to keep messaging.';
+
+  @override
+  String get chatsFindMembers => 'Find members';
 }

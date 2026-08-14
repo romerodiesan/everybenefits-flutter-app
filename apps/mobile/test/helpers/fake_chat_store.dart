@@ -155,8 +155,28 @@ class FakeChatStore implements ChatStore {
   }
 
   @override
-  Future<void> updateChat(ChatConversation chat) async {
-    chats[chat.id] = chat;
+  Future<void> patchOwnUnread({
+    required String chatId,
+    required String uid,
+    required int count,
+  }) async {
+    final chat = chats[chatId];
+    if (chat == null) return;
+    final next = Map<String, int>.from(chat.unreadCounts)..[uid] = count;
+    chats[chatId] = chat.copyWith(unreadCounts: next);
+    _bumpChats();
+  }
+
+  @override
+  Future<void> patchOwnPinned({
+    required String chatId,
+    required String uid,
+    required bool pinned,
+  }) async {
+    final chat = chats[chatId];
+    if (chat == null) return;
+    final next = Map<String, bool>.from(chat.pinnedBy)..[uid] = pinned;
+    chats[chatId] = chat.copyWith(pinnedBy: next);
     _bumpChats();
   }
 
@@ -178,6 +198,27 @@ class FakeChatStore implements ChatStore {
     final list = messages.putIfAbsent(message.chatId, () => []);
     list.add(saved);
     _messagesBump(message.chatId).add(null);
+
+    // Mirror syncChatMetadataOnMessage (Admin SDK in production).
+    final chat = chats[message.chatId];
+    if (chat != null) {
+      final preview = message.sharedPost != null
+          ? 'Pregunta: ${message.sharedPost!.title}'
+          : message.body;
+      final nextUnread = Map<String, int>.from(chat.unreadCounts);
+      for (final memberId in chat.memberIds) {
+        nextUnread[memberId] =
+            memberId == message.senderId ? 0 : (nextUnread[memberId] ?? 0) + 1;
+      }
+      chats[message.chatId] = chat.copyWith(
+        lastMessage: preview,
+        lastMessageAt: message.createdAt,
+        lastMessageSenderId: message.senderId,
+        unreadCounts: nextUnread,
+      );
+      _bumpChats();
+    }
+
     return saved;
   }
 

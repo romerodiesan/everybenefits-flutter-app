@@ -1,20 +1,18 @@
 /// Shared profile validation helpers (mirrors @pulse/shared profile.ts).
 library;
 
+import 'permissions.dart';
+import 'user_role.dart';
+
 final _emailLike = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
 final _npnDigits = RegExp(r'^\d{7,9}$');
 final _usState = RegExp(r'^[A-Za-z]{2}$');
 final _usZip = RegExp(r'^\d{5}(-\d{4})?$');
 final _nameLetters = RegExp(r'[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]');
 
-const licenseProfileRoles = {
-  'agent',
-  'instructor',
-  'manager',
-  'admin',
-};
-
-bool requiresLicenseProfile(String role) => licenseProfileRoles.contains(role);
+/// True when license fields are required for this role (permission-aware).
+bool requiresLicenseProfile(String role) =>
+    requiresLicenseProfileAccess(role);
 
 bool looksLikeEmailName(String value) => _emailLike.hasMatch(value.trim());
 
@@ -112,6 +110,29 @@ List<String> nameSearchTokens(String? displayName, [String? email]) {
   }
 
   return tokens.toList();
+}
+
+/// Same shape as web `userSearchIndexFields` (@pulse/shared).
+Map<String, Object?> userSearchIndexFields(String? displayName, String? email) {
+  final normalized = displayName?.trim();
+  final name =
+      normalized == null || normalized.isEmpty ? null : normalized;
+  final emailTrim = email?.trim();
+  final foldedName = name
+      ?.toLowerCase()
+      .replaceAll('á', 'a')
+      .replaceAll('é', 'e')
+      .replaceAll('í', 'i')
+      .replaceAll('ó', 'o')
+      .replaceAll('ú', 'u')
+      .replaceAll('ü', 'u')
+      .replaceAll('ñ', 'n');
+  return {
+    'displayName': name,
+    'displayNameLower': foldedName,
+    'emailLower': emailTrim?.toLowerCase(),
+    'nameTokens': nameSearchTokens(name, emailTrim),
+  };
 }
 
 enum DisplayNameIssue { empty, tooShort, needLastName, emailAsName }

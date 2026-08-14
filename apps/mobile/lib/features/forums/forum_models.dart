@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../users/avatar_storage.dart';
+import '../../users/profile_badge.dart';
 import '../../users/user_role.dart';
 import 'forum_tags.dart';
 
@@ -67,6 +68,7 @@ class ForumThread {
     required this.updatedAt,
     required this.lastReplyAt,
     this.authorPhotoUrl,
+    this.authorBadge,
     this.acceptedReplyId,
     this.interactorCount = 0,
   });
@@ -79,6 +81,7 @@ class ForumThread {
   final String authorName;
   final String? authorPhotoUrl;
   final UserRole authorRole;
+  final ProfileBadge? authorBadge;
   final int replyCount;
   /// Net relevance (upvotes − downvotes), Stack Overflow–style.
   final int score;
@@ -98,6 +101,7 @@ class ForumThread {
     DateTime? updatedAt,
     DateTime? lastReplyAt,
     String? authorPhotoUrl,
+    ProfileBadge? authorBadge,
     String? acceptedReplyId,
     int? interactorCount,
     bool clearAcceptedReplyId = false,
@@ -111,6 +115,7 @@ class ForumThread {
       authorName: authorName,
       authorPhotoUrl: authorPhotoUrl ?? this.authorPhotoUrl,
       authorRole: authorRole,
+      authorBadge: authorBadge ?? this.authorBadge,
       replyCount: replyCount ?? this.replyCount,
       score: score ?? this.score,
       createdAt: createdAt,
@@ -120,6 +125,27 @@ class ForumThread {
           ? null
           : (acceptedReplyId ?? this.acceptedReplyId),
       interactorCount: interactorCount ?? this.interactorCount,
+    );
+  }
+
+  ForumThread withAuthorBadge(ProfileBadge? badge) {
+    return ForumThread(
+      id: id,
+      tags: tags,
+      title: title,
+      body: body,
+      authorId: authorId,
+      authorName: authorName,
+      authorPhotoUrl: authorPhotoUrl,
+      authorRole: authorRole,
+      authorBadge: badge,
+      replyCount: replyCount,
+      score: score,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      lastReplyAt: lastReplyAt,
+      acceptedReplyId: acceptedReplyId,
+      interactorCount: interactorCount,
     );
   }
 
@@ -153,6 +179,7 @@ class ForumThread {
       authorPhotoUrl:
           sanitizeOptionalAvatarDownloadUrl(data['authorPhotoUrl'] as String?),
       authorRole: UserRole.parse(data['authorRole'] as String?),
+      authorBadge: ProfileBadge.fromMap(data['authorBadge']),
       replyCount: (data['replyCount'] as num?)?.toInt() ?? 0,
       score: (data['score'] as num?)?.toInt() ?? 0,
       interactorCount: (data['interactorCount'] as num?)?.toInt() ?? 0,
@@ -186,6 +213,7 @@ class ForumReply {
     required this.createdAt,
     required this.updatedAt,
     this.authorPhotoUrl,
+    this.authorBadge,
   });
 
   final String id;
@@ -195,6 +223,7 @@ class ForumReply {
   final String authorName;
   final String? authorPhotoUrl;
   final UserRole authorRole;
+  final ProfileBadge? authorBadge;
   final int score;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -206,6 +235,7 @@ class ForumReply {
     int? score,
     DateTime? updatedAt,
     String? authorPhotoUrl,
+    ProfileBadge? authorBadge,
   }) {
     return ForumReply(
       id: id,
@@ -215,9 +245,26 @@ class ForumReply {
       authorName: authorName,
       authorPhotoUrl: authorPhotoUrl ?? this.authorPhotoUrl,
       authorRole: authorRole,
+      authorBadge: authorBadge ?? this.authorBadge,
       score: score ?? this.score,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
+
+  ForumReply withAuthorBadge(ProfileBadge? badge) {
+    return ForumReply(
+      id: id,
+      threadId: threadId,
+      body: body,
+      authorId: authorId,
+      authorName: authorName,
+      authorPhotoUrl: authorPhotoUrl,
+      authorRole: authorRole,
+      authorBadge: badge,
+      score: score,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 
@@ -248,6 +295,7 @@ class ForumReply {
       authorPhotoUrl:
           sanitizeOptionalAvatarDownloadUrl(data['authorPhotoUrl'] as String?),
       authorRole: UserRole.parse(data['authorRole'] as String?),
+      authorBadge: ProfileBadge.fromMap(data['authorBadge']),
       score: (data['score'] as num?)?.toInt() ?? 0,
       createdAt: _readForumDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readForumDate(data['updatedAt']) ?? DateTime.now().toUtc(),

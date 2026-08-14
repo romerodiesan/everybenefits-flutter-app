@@ -1,28 +1,35 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_adaptive_sheet.dart';
+import '../../app/layout/pulse_constrained.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
-import '../../app/widgets/role_badge.dart';
 import '../../auth/auth.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
+import '../forums/forum_models.dart';
+import '../forums/forum_repository.dart';
+import '../forums/thread_detail_screen.dart';
 import '../notifications/notification_bell_button.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
-import 'widgets/profile_avatar.dart';
+import 'widgets/profile_social_header.dart';
 
-/// Identity tab — editorial Pulse portrait + dossier of contact details.
+/// Identity tab — social cover, stats, and the member's posts.
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({
     super.key,
     required this.authService,
     required this.userRepository,
     required this.profile,
+    this.forumRepository,
     this.notificationUnread = 0,
     this.onOpenNotifications,
   });
@@ -30,6 +37,7 @@ class ProfileScreen extends StatefulWidget {
   final AuthService authService;
   final UserRepository userRepository;
   final UserProfile profile;
+  final ForumRepository? forumRepository;
   final int notificationUnread;
   final VoidCallback? onOpenNotifications;
 
@@ -39,11 +47,59 @@ class ProfileScreen extends StatefulWidget {
 
 class ProfileScreenState extends State<ProfileScreen> {
   bool _uploading = false;
+  late final ForumRepository _forums =
+      widget.forumRepository ?? ForumRepository();
+  StreamSubscription<ForumThreadPage>? _postsSub;
+  List<ForumThread> _threads = const [];
+  var _postsLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenPosts();
+  }
+
+  @override
+  void didUpdateWidget(covariant ProfileScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profile.uid != widget.profile.uid) {
+      _listenPosts();
+    }
+  }
+
+  @override
+  void dispose() {
+    _postsSub?.cancel();
+    super.dispose();
+  }
+
+  void _listenPosts() {
+    _postsSub?.cancel();
+    _postsSub = _forums
+        .watchThreads(
+          authorId: widget.profile.uid,
+          sort: ForumSort.recent,
+          limit: 24,
+        )
+        .listen(
+          (page) {
+            if (!mounted) return;
+            setState(() {
+              _threads = page.threads;
+              _postsLoading = false;
+            });
+          },
+          onError: (_) {
+            if (!mounted) return;
+            setState(() => _postsLoading = false);
+          },
+        );
+  }
 
   Future<void> _pickAvatar() async {
     final l10n = context.l10n;
     final colors = AppColors.of(context);
-    final source = await showModalBottomSheet<ImageSource>(
+    final source = await showPulseSheet<ImageSource>(
       context: context,
       backgroundColor: colors.sheet,
       shape: const RoundedRectangleBorder(
@@ -178,7 +234,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     final l10n = context.l10n;
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    showModalBottomSheet<void>(
+    showPulseSheet<void>(
       context: context,
       backgroundColor: colors.sheet,
       shape: const RoundedRectangleBorder(
@@ -277,408 +333,91 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final l10n = context.l10n;
-    final profile = widget.profile;
-    final handle = profile.email?.split('@').first ??
-        (profile.uid.length <= 6 ? profile.uid : profile.uid.substring(0, 6));
-    final bottomPad = pulseShellListBottomPad(context, hasFab: true);
-
-    return PulseScaffold(
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: _PulseIdentityHero(
-              profile: profile,
-              handle: handle,
-              uploading: _uploading,
-              onAvatarTap: _pickAvatar,
-              onEdit: openEdit,
-              onSettings: _openSettings,
-              notificationUnread: widget.notificationUnread,
-              onOpenNotifications: widget.onOpenNotifications,
-            ),
-          ),
-          SliverPadding(
-            padding: EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.lg,
-              bottomPad,
-            ),
-            sliver: SliverList(
-              delegate: SliverChildListDelegate([
-                if (profile.isAnonymous) ...[
-                  Text(
-                    l10n.profileBioGuest,
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      height: 1.45,
-                      color: colors.ink.withValues(alpha: 0.85),
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                ],
-                if (profile.photoUrl == null) ...[
-                  TextButton.icon(
-                    onPressed: _uploading ? null : _pickAvatar,
-                    icon: const Icon(Icons.add_a_photo_outlined, size: 18),
-                    label: Text(l10n.profileTapToAddPhoto),
-                  ),
-                ],
-                if (_hasDossier(profile)) ...[
-                  if (profile.photoUrl == null || profile.isAnonymous)
-                    const SizedBox(height: AppSpacing.xl)
-                  else
-                    const SizedBox(height: AppSpacing.sm),
-                  _IdentityDossier(profile: profile),
-                ],
-                if (profile.role == UserRole.student &&
-                    profile.profileCompleted) ...[
-                  const SizedBox(height: AppSpacing.lg),
-                  Text(
-                    l10n.profileRoleLockedHint,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.muted,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ]),
-            ),
-          ),
-        ],
+  void _openThread(ForumThread thread) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => ThreadDetailScreen(
+          threadId: thread.id,
+          profile: widget.profile,
+          forumRepository: _forums,
+        ),
       ),
     );
   }
 
-  bool _hasDossier(UserProfile profile) {
-    return profile.fullPhone != null ||
-        profile.email != null ||
-        profile.agency?.trim().isNotEmpty == true ||
-        profile.npn?.trim().isNotEmpty == true ||
-        profile.hasAddressDetails;
-  }
-}
-
-class _PulseIdentityHero extends StatelessWidget {
-  const _PulseIdentityHero({
-    required this.profile,
-    required this.handle,
-    required this.uploading,
-    required this.onAvatarTap,
-    required this.onEdit,
-    required this.onSettings,
-    this.notificationUnread = 0,
-    this.onOpenNotifications,
-  });
-
-  final UserProfile profile;
-  final String handle;
-  final bool uploading;
-  final VoidCallback onAvatarTap;
-  final VoidCallback onEdit;
-  final VoidCallback onSettings;
-  final int notificationUnread;
-  final VoidCallback? onOpenNotifications;
-
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final colors = AppColors.of(context);
-    final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
-    final top = MediaQuery.paddingOf(context).top;
+    final profile = widget.profile;
+    final bottomPad = pulseShellListBottomPad(context, hasFab: true);
+    final posts = _threads.length;
+    final replies = _threads.fold<int>(0, (sum, item) => sum + item.replyCount);
+    final likes = _threads.fold<int>(
+      0,
+      (sum, item) => sum + (item.score < 0 ? 0 : item.score),
+    );
 
-    return SizedBox(
-      height: 320 + top * 0.35,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Positioned.fill(
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    brand.withValues(alpha: 0.22),
-                    colors.meshBase,
-                    colors.meshDeep.withValues(alpha: 0.9),
-                  ],
-                  stops: const [0.0, 0.55, 1.0],
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            right: -40,
-            top: top + 20,
-            child: IgnorePointer(
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: brand.withValues(alpha: 0.18),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            left: -60,
-            bottom: 40,
-            child: IgnorePointer(
-              child: Container(
-                width: 140,
-                height: 140,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: brand.withValues(alpha: 0.10),
-                ),
-              ),
-            ),
-          ),
-          Positioned(
-            top: top + 8,
-            left: AppSpacing.md,
-            right: AppSpacing.md,
-            child: Row(
-              children: [
-                Text(
-                  l10n.profilePulseEyebrow.toUpperCase(),
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    letterSpacing: 2.2,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                    color: colors.ink.withValues(alpha: 0.7),
-                  ),
-                ),
-                const Spacer(),
-                if (onOpenNotifications != null)
-                  NotificationBellButton(
-                    unreadCount: notificationUnread,
-                    onPressed: onOpenNotifications!,
+    return PulseScaffold(
+      body: PulseConstrained(
+        maxWidth: PulseContentWidth.feed,
+        padding: EdgeInsets.zero,
+        child: ListView(
+          physics: const BouncingScrollPhysics(),
+          padding: EdgeInsets.zero,
+          children: [
+            ProfileSocialHeader(
+              person: profile,
+              posts: posts,
+              replies: replies,
+              likes: likes,
+              avatarBusy: _uploading,
+              showEditBadge: true,
+              onAvatarTap: _uploading ? null : _pickAvatar,
+              topBar: Row(
+                children: [
+                  const Spacer(),
+                  if (widget.onOpenNotifications != null)
+                    NotificationBellButton(
+                      unreadCount: widget.notificationUnread,
+                      onPressed: widget.onOpenNotifications!,
+                      style: IconButton.styleFrom(
+                        backgroundColor:
+                            colors.glassFill.withValues(alpha: 0.7),
+                        foregroundColor: colors.ink,
+                      ),
+                    ),
+                  IconButton(
+                    tooltip: l10n.profileSettingsTooltip,
+                    onPressed: _openSettings,
                     style: IconButton.styleFrom(
                       backgroundColor:
                           colors.glassFill.withValues(alpha: 0.7),
                       foregroundColor: colors.ink,
                     ),
+                    icon: const Icon(Icons.settings_outlined),
                   ),
-                IconButton(
-                  tooltip: l10n.profileSettingsTooltip,
-                  onPressed: onSettings,
-                  style: IconButton.styleFrom(
-                    backgroundColor: colors.glassFill.withValues(alpha: 0.7),
-                    foregroundColor: colors.ink,
-                  ),
-                  icon: const Icon(Icons.settings_outlined),
+                ],
+              ),
+              actions: OutlinedButton(
+                onPressed: openEdit,
+                style: OutlinedButton.styleFrom(
+                  visualDensity: VisualDensity.compact,
+                  minimumSize: const Size(0, 36),
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-              ],
-            ),
-          ),
-          Positioned(
-            left: AppSpacing.lg,
-            right: AppSpacing.lg,
-            bottom: 28,
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                ProfileAvatar(
-                  profile: profile,
-                  size: 108,
-                  busy: uploading,
-                  showEditBadge: true,
-                  onTap: onAvatarTap,
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      RoleBadge(role: profile.role),
-                      const SizedBox(height: 8),
-                      Text(
-                        profile.headlineName,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.headlineMedium?.copyWith(
-                          fontSize: 28,
-                          height: 1.05,
-                          letterSpacing: -0.8,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '@$handle',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: colors.muted,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextButton(
-                        onPressed: onEdit,
-                        style: TextButton.styleFrom(
-                          foregroundColor: brand,
-                          padding: EdgeInsets.zero,
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                        child: Text(l10n.fabEditProfile),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Vertical identity file — labeled rows with a brand spine, not chip soup.
-class _IdentityDossier extends StatelessWidget {
-  const _IdentityDossier({required this.profile});
-
-  final UserProfile profile;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final brand = AppColors.brandOf(context);
-    final l10n = context.l10n;
-
-    final rows = <({String label, String value})>[
-      if (profile.email != null)
-        (label: l10n.profileDetailEmail, value: profile.email!),
-      if (profile.fullPhone != null)
-        (label: l10n.profileDetailPhone, value: profile.fullPhone!),
-      if (profile.agency?.trim().isNotEmpty == true)
-        (label: l10n.profileDetailAgency, value: profile.agency!.trim()),
-      if (profile.npn?.trim().isNotEmpty == true)
-        (label: l10n.profileDetailNpn, value: profile.npn!.trim()),
-      if (profile.formattedAddress != null)
-        (
-          label: l10n.profileDetailAddress,
-          value: profile.formattedAddress!,
-        ),
-    ];
-
-    if (rows.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          l10n.profileDossierEyebrow.toUpperCase(),
-          style: theme.textTheme.labelLarge?.copyWith(
-            color: colors.muted,
-            letterSpacing: 1.6,
-            fontSize: 11,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: colors.border),
-            color: colors.meshDeep.withValues(alpha: 0.55),
-          ),
-          child: IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Container(
-                  width: 4,
-                  decoration: BoxDecoration(
-                    color: brand,
-                    borderRadius: const BorderRadius.horizontal(
-                      left: Radius.circular(22),
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                    child: Column(
-                      children: [
-                        for (var i = 0; i < rows.length; i++) ...[
-                          if (i > 0)
-                            Divider(
-                              height: 1,
-                              color: colors.border.withValues(alpha: 0.7),
-                            ),
-                          _DossierRow(
-                            label: rows[i].label,
-                            value: rows[i].value,
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _DossierRow extends StatelessWidget {
-  const _DossierRow({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final brand = AppColors.brandOf(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 88,
-            child: Text(
-              label.toUpperCase(),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: brand,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 0.7,
-                fontSize: 10,
+                child: Text(l10n.fabEditProfile),
               ),
             ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                height: 1.3,
-                color: colors.ink,
-              ),
+            ProfilePostsSection(
+              threads: _threads,
+              loading: _postsLoading,
+              onOpenThread: _openThread,
+              bottomPad: bottomPad,
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

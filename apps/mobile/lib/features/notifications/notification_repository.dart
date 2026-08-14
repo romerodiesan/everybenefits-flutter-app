@@ -142,17 +142,30 @@ class NotificationRepository {
     if (settings.authorizationStatus == AuthorizationStatus.denied) {
       return null;
     }
-    final token = await _messaging.getToken();
-    if (token == null || token.isEmpty) return null;
-    final platform = defaultTargetPlatform == TargetPlatform.iOS
-        ? 'ios'
-        : 'android';
-    await _db.doc('users/$uid/fcmTokens/${tokenDocId(token)}').set({
-      'token': token,
-      'platform': platform,
-      'updatedAt': FieldValue.serverTimestamp(),
-    }, SetOptions(merge: true));
-    return token;
+    try {
+      // Physical device / emulator: APNS may not be ready yet — don't crash logs.
+      if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final apns = await _messaging.getAPNSToken();
+        if (apns == null) {
+          debugPrint('FCM skipped: APNS token not ready yet');
+          return null;
+        }
+      }
+      final token = await _messaging.getToken();
+      if (token == null || token.isEmpty) return null;
+      final platform = defaultTargetPlatform == TargetPlatform.iOS
+          ? 'ios'
+          : 'android';
+      await _db.doc('users/$uid/fcmTokens/${tokenDocId(token)}').set({
+        'token': token,
+        'platform': platform,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+      return token;
+    } catch (error) {
+      debugPrint('FCM registerPushToken skipped: $error');
+      return null;
+    }
   }
 
   Future<void> clearPushToken(String uid, String? token) async {

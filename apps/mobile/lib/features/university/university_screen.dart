@@ -3,10 +3,13 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_breakpoints.dart';
+import '../../app/layout/pulse_constrained.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
-import '../../users/user_profile.dart';
+import '../../users/users.dart';
 import 'course_detail_screen.dart';
 import 'course_models.dart';
 import 'course_repository.dart';
@@ -60,8 +63,12 @@ class _UniversityScreenState extends State<UniversityScreen> {
   Object? _error;
   CourseLevel? _levelFilter;
 
-  bool get _canAuthor => canAuthorCourses(widget.profile.role);
-  bool get _isAdmin => canManageCourses(widget.profile.role);
+  Object get _access => AccessScope.accessOf(
+        context,
+        fallbackRoleId: widget.profile.roleId,
+      );
+  bool get _canAuthor => canAuthorCourses(_access);
+  bool get _isAdmin => canManageCourses(_access);
 
   @override
   void didChangeDependencies() {
@@ -270,7 +277,10 @@ class _UniversityScreenState extends State<UniversityScreen> {
           // Streams are live; the pull gesture is a reassurance affordance.
           await Future<void>.delayed(const Duration(milliseconds: 350));
         },
-        child: ListView(
+        child: PulseConstrained(
+          maxWidth: PulseContentWidth.shell,
+          padding: EdgeInsets.zero,
+          child: ListView(
           padding: EdgeInsets.fromLTRB(
             AppSpacing.lg,
             AppSpacing.sm,
@@ -342,8 +352,9 @@ class _UniversityScreenState extends State<UniversityScreen> {
               const SizedBox(height: AppSpacing.xl),
               _SectionTitle(l10n.academyPendingReview),
               const SizedBox(height: AppSpacing.sm),
-              for (final course in _pending) ...[
-                CourseCard(
+              _CourseGrid(
+                courses: _pending,
+                itemBuilder: (course) => CourseCard(
                   course: course,
                   repository: _repository,
                   showStatus: true,
@@ -354,15 +365,15 @@ class _UniversityScreenState extends State<UniversityScreen> {
                     repository: _repository,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
+              ),
             ],
             if (myUnpublished.isNotEmpty) ...[
               const SizedBox(height: AppSpacing.xl),
               _SectionTitle(l10n.academyMyCourses),
               const SizedBox(height: AppSpacing.sm),
-              for (final course in myUnpublished) ...[
-                CourseCard(
+              _CourseGrid(
+                courses: myUnpublished,
+                itemBuilder: (course) => CourseCard(
                   course: course,
                   repository: _repository,
                   showStatus: true,
@@ -373,8 +384,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                     repository: _repository,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
+              ),
             ],
             const SizedBox(height: AppSpacing.xl),
             Row(
@@ -457,10 +467,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
             ),
             const SizedBox(height: AppSpacing.md),
             if (_loading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpacing.xl),
-                child: Center(child: CircularProgressIndicator()),
-              )
+              const PulseCatalogSkeleton()
             else if (_error != null)
               _AcademyMessage(
                 icon: Icons.cloud_off_rounded,
@@ -472,8 +479,9 @@ class _UniversityScreenState extends State<UniversityScreen> {
                 message: l10n.academyCatalogEmpty,
               )
             else
-              for (final course in filtered) ...[
-                CourseCard(
+              _CourseGrid(
+                courses: filtered,
+                itemBuilder: (course) => CourseCard(
                   course: course,
                   repository: _repository,
                   progress: _enrollments[course.id]
@@ -482,7 +490,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
                   trailing: canEditCourse(
                     course: course,
                     uid: widget.profile.uid,
-                    role: widget.profile.role,
+                    roleOrPermissions: _access,
                   )
                       ? CourseManageMenu(
                           course: course,
@@ -491,11 +499,48 @@ class _UniversityScreenState extends State<UniversityScreen> {
                         )
                       : null,
                 ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
+              ),
           ],
         ),
+        ),
       ),
+    );
+  }
+}
+
+class _CourseGrid extends StatelessWidget {
+  const _CourseGrid({
+    required this.courses,
+    required this.itemBuilder,
+  });
+
+  final List<Course> courses;
+  final Widget Function(Course course) itemBuilder;
+
+  @override
+  Widget build(BuildContext context) {
+    final cols = PulseWindowClass.of(context).catalogColumns;
+    if (cols <= 1) {
+      return Column(
+        children: [
+          for (final course in courses) ...[
+            itemBuilder(course),
+            const SizedBox(height: AppSpacing.sm),
+          ],
+        ],
+      );
+    }
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: courses.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: cols,
+        mainAxisSpacing: AppSpacing.sm,
+        crossAxisSpacing: AppSpacing.sm,
+        childAspectRatio: 0.78,
+      ),
+      itemBuilder: (context, index) => itemBuilder(courses[index]),
     );
   }
 }

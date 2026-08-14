@@ -4,7 +4,7 @@ import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
-import '../../app/widgets/role_badge.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import 'widgets/profile_avatar.dart';
@@ -102,7 +102,7 @@ class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
               future: _future,
               builder: (context, snapshot) {
                 if (snapshot.connectionState != ConnectionState.done) {
-                  return const Center(child: CircularProgressIndicator());
+                  return const PulseContactListSkeleton();
                 }
                 if (snapshot.hasError) {
                   return Center(
@@ -168,7 +168,13 @@ class _AdminPromoteScreenState extends State<AdminPromoteScreen> {
                                     ),
                                   ),
                                   const SizedBox(height: 4),
-                                  RoleBadge(role: profile.role),
+                                  Text(
+                                    roleLabelForId(profile.roleId, l10n),
+                                    style: theme.textTheme.labelLarge?.copyWith(
+                                      color: colors.muted,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
                                 ],
                               ),
                             ),

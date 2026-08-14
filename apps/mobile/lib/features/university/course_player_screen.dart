@@ -1,9 +1,11 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_breakpoints.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
@@ -13,6 +15,7 @@ import '../../users/user_profile.dart';
 import 'course_models.dart';
 import 'course_repository.dart';
 import 'widgets/lesson_stages.dart';
+import 'widgets/pulse_pip.dart';
 
 /// Persist cadence while playing, so a crash loses at most a few seconds.
 const _saveInterval = Duration(seconds: 5);
@@ -61,6 +64,7 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
   bool _advancing = false;
   final Set<String> _startedLessons = <String>{};
   final Set<String> _completedTracked = <String>{};
+  final Map<String, int> _liveDurations = <String, int>{};
 
   @override
   void initState() {
@@ -156,7 +160,13 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
         return;
       }
 
-      final controller = VideoPlayerController.networkUrl(Uri.parse(url));
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(url),
+        videoPlayerOptions: VideoPlayerOptions(
+          mixWithOthers: true,
+          allowBackgroundPlayback: true,
+        ),
+      );
       await controller.initialize();
       if (!mounted) {
         await controller.dispose();
@@ -174,9 +184,11 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
       }
 
       controller.addListener(_onTick);
+      final actual = controller.value.duration.inSeconds;
       setState(() {
         _controller = controller;
         _initializing = false;
+        if (actual > 0) _liveDurations[lesson.id] = actual;
       });
       await controller.play();
     } catch (error) {
@@ -366,6 +378,26 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
     setState(() => _controlsVisible = true);
   }
 
+  Future<void> _enterFullscreen() async {
+    final controller = _controller;
+    if (controller == null || !controller.value.isInitialized) return;
+    PulseHaptics.light();
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        fullscreenDialog: true,
+        builder: (_) => _FullscreenPlayer(controller: controller),
+      ),
+    );
+  }
+
+  Future<void> _enterPictureInPicture() async {
+    PulseHaptics.light();
+    final entered = await PulsePip.enter();
+    if (!entered && mounted) {
+      await _enterFullscreen();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -382,14 +414,11 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
           overflow: TextOverflow.ellipsis,
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(
-          AppSpacing.lg,
-          AppSpacing.sm,
-          AppSpacing.lg,
-          AppSpacing.xl,
-        ),
-        children: [
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final split = pulseUseLandscapeSplit(context) &&
+              constraints.maxWidth >= 720;
+          final stage = <Widget>[
           switch (_lesson.type) {
             LessonType.reading => ReadingStage(
                 key: ValueKey('reading-${_lesson.id}'),
@@ -423,6 +452,8 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
                 onToggleControls: () =>
                     setState(() => _controlsVisible = !_controlsVisible),
                 onTogglePlay: _togglePlay,
+                onFullscreen: _enterFullscreen,
+                onPictureInPicture: _enterPictureInPicture,
               ),
           },
           const SizedBox(height: AppSpacing.md),
@@ -460,7 +491,8 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
                 style: theme.textTheme.bodySmall?.copyWith(color: colors.muted),
               ),
             ),
-          const SizedBox(height: AppSpacing.lg),
+          ];
+          final playlist = <Widget>[
           Text(l10n.playerClasses, style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpacing.xs),
           for (final lesson in lessons)
@@ -469,11 +501,50 @@ class _CoursePlayerScreenState extends State<CoursePlayerScreen> {
               current: lesson.id == _lesson.id,
               completed: _enrollment.hasCompleted(lesson.id),
               locked: !widget.content.isLessonUnlocked(lesson, _enrollment),
+              durationSeconds: _liveDurations[lesson.id],
               onTap: lesson.id == _lesson.id
                   ? null
                   : () => _open(lesson),
             ),
-        ],
+          ];
+          if (!split) {
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.lg,
+                AppSpacing.sm,
+                AppSpacing.lg,
+                AppSpacing.xl,
+              ),
+              children: [
+                ...stage,
+                const SizedBox(height: AppSpacing.lg),
+                ...playlist,
+              ],
+            );
+          }
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.md,
+              AppSpacing.md,
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: ListView(children: stage),
+                ),
+                const SizedBox(width: AppSpacing.lg),
+                SizedBox(
+                  width: 320,
+                  child: ListView(children: playlist),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     );
   }
@@ -487,6 +558,9 @@ class _Stage extends StatelessWidget {
     required this.controlsVisible,
     required this.onToggleControls,
     required this.onTogglePlay,
+    this.onFullscreen,
+    this.onPictureInPicture,
+    this.compact = false,
   });
 
   final VideoPlayerController? controller;
@@ -495,6 +569,9 @@ class _Stage extends StatelessWidget {
   final bool controlsVisible;
   final VoidCallback onToggleControls;
   final VoidCallback onTogglePlay;
+  final VoidCallback? onFullscreen;
+  final VoidCallback? onPictureInPicture;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -552,6 +629,8 @@ class _Stage extends StatelessWidget {
                   builder: (context, _, child) => _Controls(
                     controller: controller!,
                     onTogglePlay: onTogglePlay,
+                    onFullscreen: onFullscreen,
+                    onPictureInPicture: onPictureInPicture,
                   ),
                 ),
               ),
@@ -564,7 +643,9 @@ class _Stage extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(18),
       child: AspectRatio(
-        aspectRatio: 16 / 9,
+        aspectRatio: compact
+            ? (controller?.value.aspectRatio ?? (16 / 9))
+            : 16 / 9,
         child: ColoredBox(
           color: Colors.black,
           child: DefaultTextStyle(
@@ -578,10 +659,17 @@ class _Stage extends StatelessWidget {
 }
 
 class _Controls extends StatelessWidget {
-  const _Controls({required this.controller, required this.onTogglePlay});
+  const _Controls({
+    required this.controller,
+    required this.onTogglePlay,
+    this.onFullscreen,
+    this.onPictureInPicture,
+  });
 
   final VideoPlayerController controller;
   final VoidCallback onTogglePlay;
+  final VoidCallback? onFullscreen;
+  final VoidCallback? onPictureInPicture;
 
   String _clock(Duration duration) {
     final minutes = duration.inMinutes.remainder(60).toString();
@@ -614,6 +702,28 @@ class _Controls extends StatelessWidget {
       ),
       child: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+            child: Row(
+              children: [
+                const Spacer(),
+                if (onPictureInPicture != null)
+                  IconButton(
+                    tooltip: context.l10n.playerPip,
+                    onPressed: onPictureInPicture,
+                    icon: const Icon(Icons.picture_in_picture_alt_rounded),
+                    color: Colors.white,
+                  ),
+                if (onFullscreen != null)
+                  IconButton(
+                    tooltip: context.l10n.playerFullscreen,
+                    onPressed: onFullscreen,
+                    icon: const Icon(Icons.fullscreen_rounded),
+                    color: Colors.white,
+                  ),
+              ],
+            ),
+          ),
           const Spacer(),
           IconButton.filled(
             onPressed: onTogglePlay,
@@ -711,6 +821,7 @@ class _PlaylistTile extends StatelessWidget {
     required this.completed,
     required this.locked,
     required this.onTap,
+    this.durationSeconds,
   });
 
   final Lesson lesson;
@@ -718,14 +829,18 @@ class _PlaylistTile extends StatelessWidget {
   final bool completed;
   final bool locked;
   final VoidCallback? onTap;
+  final int? durationSeconds;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    final minutes = (lesson.durationSeconds / 60).ceil();
     final l10n = context.l10n;
+    final durationLabel = lessonDurationLabel(
+      l10n,
+      durationSeconds ?? lesson.durationSeconds,
+    );
 
     return ListTile(
       contentPadding: EdgeInsets.zero,
@@ -752,13 +867,72 @@ class _PlaylistTile extends StatelessWidget {
               l10n.moduleLockedShort,
               style: theme.textTheme.labelSmall?.copyWith(color: colors.muted),
             )
-          : minutes > 0
+          : durationLabel.isNotEmpty
               ? Text(
-                  l10n.courseDurationMinutes(minutes),
+                  durationLabel,
                   style:
                       theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
                 )
               : null,
+    );
+  }
+}
+
+class _FullscreenPlayer extends StatefulWidget {
+  const _FullscreenPlayer({required this.controller});
+
+  final VideoPlayerController controller;
+
+  @override
+  State<_FullscreenPlayer> createState() => _FullscreenPlayerState();
+}
+
+class _FullscreenPlayerState extends State<_FullscreenPlayer> {
+  var _controlsVisible = true;
+
+  @override
+  void initState() {
+    super.initState();
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    SystemChrome.setPreferredOrientations(const [
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+      DeviceOrientation.portraitUp,
+    ]);
+  }
+
+  @override
+  void dispose() {
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: _Stage(
+          controller: widget.controller,
+          initializing: false,
+          error: null,
+          controlsVisible: _controlsVisible,
+          compact: true,
+          onToggleControls: () =>
+              setState(() => _controlsVisible = !_controlsVisible),
+          onTogglePlay: () {
+            final controller = widget.controller;
+            if (controller.value.isPlaying) {
+              controller.pause();
+            } else {
+              controller.play();
+            }
+            setState(() => _controlsVisible = true);
+          },
+          onFullscreen: () => Navigator.of(context).pop(),
+        ),
+      ),
     );
   }
 }

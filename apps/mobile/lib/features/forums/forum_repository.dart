@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
 import '../../users/avatar_storage.dart';
+import '../../users/profile_badge.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_role.dart';
 import 'forum_models.dart';
@@ -19,6 +20,13 @@ abstract class ForumStore {
     ForumSort sort = ForumSort.recent,
     int limit = kForumPageSize,
     Object? cursor,
+  });
+
+  Stream<ForumThreadPage> watchThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
   });
 
   Stream<ForumThread?> watchThread(String threadId);
@@ -145,14 +153,77 @@ class FirestoreForumStore implements ForumStore {
   ) =>
       _replies(threadId).doc(replyId).collection('votes').doc(uid);
 
-  @override
-  Future<ForumThreadPage> queryThreads({
+  final Map<String, ProfileBadge?> _authorBadgeCache = {};
+
+  Future<Map<String, ProfileBadge?>> _fetchAuthorBadges(
+    Iterable<String> uids,
+  ) async {
+    final unique = uids.where((id) => id.isNotEmpty).toSet().toList();
+    final missing = unique.where((id) => !_authorBadgeCache.containsKey(id));
+    const chunkSize = 30;
+    final missingList = missing.toList();
+    for (var i = 0; i < missingList.length; i += chunkSize) {
+      final chunk = missingList.sublist(
+        i,
+        i + chunkSize > missingList.length
+            ? missingList.length
+            : i + chunkSize,
+      );
+      final snap = await _firestore
+          .collection('publicProfiles')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snap.docs) {
+        _authorBadgeCache[doc.id] =
+            ProfileBadge.fromMap(doc.data()['profileBadge']);
+      }
+      for (final id in chunk) {
+        _authorBadgeCache.putIfAbsent(id, () => null);
+      }
+    }
+    return {
+      for (final id in unique) id: _authorBadgeCache[id],
+    };
+  }
+
+  Future<List<ForumThread>> _hydrateThreadBadges(
+    List<ForumThread> threads,
+  ) async {
+    if (threads.isEmpty) return threads;
+    final badges = await _fetchAuthorBadges(threads.map((t) => t.authorId));
+    return [
+      for (final thread in threads)
+        thread.withAuthorBadge(
+          badges[thread.authorId] ?? thread.authorBadge,
+        ),
+    ];
+  }
+
+  Future<ForumThreadPage> _hydratePage(ForumThreadPage page) async {
+    return ForumThreadPage(
+      threads: await _hydrateThreadBadges(page.threads),
+      nextCursor: page.nextCursor,
+    );
+  }
+
+  Future<List<ForumReply>> _hydrateReplyBadges(List<ForumReply> replies) async {
+    if (replies.isEmpty) return replies;
+    final badges = await _fetchAuthorBadges(replies.map((r) => r.authorId));
+    return [
+      for (final reply in replies)
+        reply.withAuthorBadge(
+          badges[reply.authorId] ?? reply.authorBadge,
+        ),
+    ];
+  }
+
+  Query<Map<String, dynamic>> _threadListQuery({
     String? tag,
     String? authorId,
     ForumSort sort = ForumSort.recent,
     int limit = kForumPageSize,
     Object? cursor,
-  }) async {
+  }) {
     final orderField =
         sort == ForumSort.relevant ? 'score' : 'lastReplyAt';
     Query<Map<String, dynamic>> query = _threads;
@@ -168,8 +239,13 @@ class FirestoreForumStore implements ForumStore {
     if (cursor is DocumentSnapshot<Map<String, dynamic>>) {
       query = query.startAfterDocument(cursor);
     }
+    return query;
+  }
 
-    final snapshot = await query.get();
+  ForumThreadPage _pageFromSnapshot(
+    QuerySnapshot<Map<String, dynamic>> snapshot,
+    int limit,
+  ) {
     final docs = snapshot.docs;
     final hasMore = docs.length > limit;
     final pageDocs = hasMore ? docs.sublist(0, limit) : docs;
@@ -182,10 +258,53 @@ class FirestoreForumStore implements ForumStore {
   }
 
   @override
+  Future<ForumThreadPage> queryThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+    Object? cursor,
+  }) async {
+    final snapshot = await _threadListQuery(
+      tag: tag,
+      authorId: authorId,
+      sort: sort,
+      limit: limit,
+      cursor: cursor,
+    ).get();
+    return _hydratePage(_pageFromSnapshot(snapshot, limit));
+  }
+
+  @override
+  Stream<ForumThreadPage> watchThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+  }) {
+    return _threadListQuery(
+      tag: tag,
+      authorId: authorId,
+      sort: sort,
+      limit: limit,
+    ).snapshots().asyncExpand((snapshot) async* {
+      final page = _pageFromSnapshot(snapshot, limit);
+      yield page;
+      yield await _hydratePage(page);
+    });
+  }
+
+  @override
   Stream<ForumThread?> watchThread(String threadId) {
-    return _threads.doc(threadId).snapshots().map((snapshot) {
-      if (!snapshot.exists || snapshot.data() == null) return null;
-      return ForumThread.fromMap(snapshot.id, snapshot.data()!);
+    return _threads.doc(threadId).snapshots().asyncExpand((snapshot) async* {
+      if (!snapshot.exists || snapshot.data() == null) {
+        yield null;
+        return;
+      }
+      final thread = ForumThread.fromMap(snapshot.id, snapshot.data()!);
+      yield thread;
+      final hydrated = await _hydrateThreadBadges([thread]);
+      yield hydrated.first;
     });
   }
 
@@ -198,11 +317,13 @@ class FirestoreForumStore implements ForumStore {
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots()
-        .map(
-          (snap) => snap.docs
+        .asyncExpand((snap) async* {
+          final replies = snap.docs
               .map((doc) => ForumReply.fromMap(threadId, doc.id, doc.data()))
-              .toList(),
-        );
+              .toList();
+          yield replies;
+          yield await _hydrateReplyBadges(replies);
+        });
   }
 
   @override
@@ -273,10 +394,10 @@ class FirestoreForumStore implements ForumStore {
     }
     // Preserve saved-list order.
     final byId = {for (final t in out) t.id: t};
-    return [
+    return _hydrateThreadBadges([
       for (final id in ids)
         if (byId.containsKey(id)) byId[id]!,
-    ];
+    ]);
   }
 
   @override
@@ -321,6 +442,7 @@ class FirestoreForumStore implements ForumStore {
       authorName: author.headlineName,
       authorPhotoUrl: author.photoUrl,
       authorRole: author.role,
+      authorBadge: author.profileBadge,
       replyCount: 0,
       score: 0,
       interactorCount: 0,
@@ -382,6 +504,7 @@ class FirestoreForumStore implements ForumStore {
       authorName: author.headlineName,
       authorPhotoUrl: author.photoUrl,
       authorRole: author.role,
+      authorBadge: author.profileBadge,
       score: 0,
       createdAt: now,
       updatedAt: now,
@@ -561,6 +684,19 @@ class ForumRepository {
         cursor: cursor,
       );
 
+  Stream<ForumThreadPage> watchThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+  }) =>
+      _store.watchThreads(
+        tag: tag,
+        authorId: authorId,
+        sort: sort,
+        limit: limit,
+      );
+
   Stream<ForumThread?> watchThread(String threadId) =>
       _store.watchThread(threadId);
 
@@ -614,7 +750,7 @@ class ForumRepository {
     required UserProfile author,
   }) {
     if (!canParticipateInForums(
-      role: author.role,
+      roleOrPermissions: author.roleId,
       isAnonymous: author.isAnonymous,
     )) {
       throw StateError('No tienes permiso para publicar en la comunidad.');
@@ -644,7 +780,7 @@ class ForumRepository {
     required List<String> tags,
   }) {
     final allowed =
-        actor.role == UserRole.admin || thread.authorId == actor.uid;
+        canModerateForums(actor.roleId) || thread.authorId == actor.uid;
     if (!allowed) {
       throw StateError('No puedes editar esta pregunta.');
     }
@@ -671,7 +807,7 @@ class ForumRepository {
     required UserProfile author,
   }) {
     if (!canParticipateInForums(
-      role: author.role,
+      roleOrPermissions: author.roleId,
       isAnonymous: author.isAnonymous,
     )) {
       throw StateError('No tienes permiso para responder.');
@@ -693,7 +829,7 @@ class ForumRepository {
     required String body,
   }) {
     final allowed =
-        actor.role == UserRole.admin || reply.authorId == actor.uid;
+        canModerateForums(actor.roleId) || reply.authorId == actor.uid;
     if (!allowed) {
       throw StateError('No puedes editar esta respuesta.');
     }
@@ -713,7 +849,7 @@ class ForumRepository {
     required UserProfile actor,
   }) {
     final allowed =
-        actor.role == UserRole.admin || thread.authorId == actor.uid;
+        canModerateForums(actor.roleId) || thread.authorId == actor.uid;
     if (!allowed) {
       throw StateError('No puedes eliminar esta pregunta.');
     }
@@ -724,7 +860,7 @@ class ForumRepository {
     required ForumReply reply,
     required UserProfile actor,
   }) {
-    final allowed = actor.role == UserRole.admin || reply.authorId == actor.uid;
+    final allowed = canModerateForums(actor.roleId) || reply.authorId == actor.uid;
     if (!allowed) {
       throw StateError('No puedes eliminar esta respuesta.');
     }
@@ -737,7 +873,7 @@ class ForumRepository {
     required UserProfile actor,
   }) {
     final allowed =
-        actor.role == UserRole.admin || thread.authorId == actor.uid;
+        canModerateForums(actor.roleId) || thread.authorId == actor.uid;
     if (!allowed) {
       throw StateError('Solo el autor de la pregunta puede aceptar respuestas.');
     }
@@ -755,7 +891,7 @@ class ForumRepository {
     required RelevanceVote vote,
   }) async {
     if (!canParticipateInForums(
-      role: actor.role,
+      roleOrPermissions: actor.roleId,
       isAnonymous: actor.isAnonymous,
     )) {
       throw StateError('Regístrate para marcar relevancia.');
@@ -793,7 +929,7 @@ class ForumRepository {
     required RelevanceVote vote,
   }) async {
     if (!canParticipateInForums(
-      role: actor.role,
+      roleOrPermissions: actor.roleId,
       isAnonymous: actor.isAnonymous,
     )) {
       throw StateError('Regístrate para marcar relevancia.');

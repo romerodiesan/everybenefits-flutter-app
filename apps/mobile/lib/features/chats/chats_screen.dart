@@ -4,14 +4,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_breakpoints.dart';
+import '../../app/layout/pulse_constrained.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
+import '../../app/widgets/empty_state.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
-import '../../users/user_profile.dart';
-import '../../users/user_repository.dart';
-import '../../users/user_role.dart';
+import '../../users/users.dart';
 import 'chat_conversation_screen.dart';
 import 'chat_default_group_callable.dart';
 import 'chat_models.dart';
@@ -43,10 +44,10 @@ class ChatsScreen extends StatefulWidget {
   final VoidCallback? onOpenNotifications;
 
   @override
-  State<ChatsScreen> createState() => _ChatsScreenState();
+  State<ChatsScreen> createState() => ChatsScreenState();
 }
 
-class _ChatsScreenState extends State<ChatsScreen> {
+class ChatsScreenState extends State<ChatsScreen> {
   late final ChatRepository _repo =
       widget.chatRepository ?? ChatRepository();
   final _gate = StreamController<List<ChatConversation>>.broadcast();
@@ -54,16 +55,39 @@ class _ChatsScreenState extends State<ChatsScreen> {
   List<ChatConversation>? _latest;
   bool? _listening;
   bool _defaultJoinAttempted = false;
+  ChatConversation? _selectedChat;
+
+  void selectConversation(ChatConversation chat) {
+    if (!pulseUseMasterDetail(context)) {
+      openChat(
+        context,
+        chat: chat,
+        profile: widget.profile,
+        chatRepository: _repo,
+      );
+      return;
+    }
+    setState(() => _selectedChat = chat);
+  }
 
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _maybeJoinDefaultAgentGroup();
   }
 
   Future<void> _maybeJoinDefaultAgentGroup() async {
     if (_defaultJoinAttempted) return;
-    if (!belongsInDefaultAgentGroup(widget.profile.role)) return;
+    if (!belongsInDefaultAgentGroup(
+          AccessScope.accessOf(context, fallbackRoleId: widget.profile.roleId),
+        )) {
+      return;
+    }
     _defaultJoinAttempted = true;
     try {
       await DefaultAgentGroupCallable().ensureMembership();
@@ -172,9 +196,14 @@ class _ChatsScreenState extends State<ChatsScreen> {
     final l10n = context.l10n;
     final profile = widget.profile;
     final canChat = canParticipateInChats(
-      role: profile.role,
+      roleOrPermissions: AccessScope.accessOf(
+        context,
+        fallbackRoleId: profile.roleId,
+      ),
       isAnonymous: profile.isAnonymous,
     );
+    final split = pulseUseMasterDetail(context);
+    final dense = PulseWindowClass.of(context).useRail;
 
     return PulseScaffold(
       appBar: AppBar(
@@ -206,7 +235,11 @@ class _ChatsScreenState extends State<ChatsScreen> {
               child: const Icon(Icons.chat_rounded),
             )
           : null,
-      body: !canChat
+      body: _wrapInbox(
+        context,
+        split: split,
+        profile: profile,
+        inbox: !canChat
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xl),
@@ -275,9 +308,9 @@ class _ChatsScreenState extends State<ChatsScreen> {
                     child = ListView.builder(
                       key: const ValueKey('list'),
                       padding: EdgeInsets.fromLTRB(
-                        AppSpacing.md,
+                        dense ? AppSpacing.sm : AppSpacing.md,
                         AppSpacing.sm,
-                        AppSpacing.md,
+                        dense ? AppSpacing.sm : AppSpacing.md,
                         pulseShellListBottomPad(context, hasFab: true),
                       ),
                       itemCount: _inboxItemCount(sections),
@@ -288,6 +321,7 @@ class _ChatsScreenState extends State<ChatsScreen> {
                           index: index,
                           sections: sections,
                           profile: profile,
+                          dense: dense,
                         );
                       },
                     );
@@ -299,6 +333,34 @@ class _ChatsScreenState extends State<ChatsScreen> {
                   child: child,
                 );
               },
+            ),
+      ),
+    );
+  }
+
+  Widget _wrapInbox(
+    BuildContext context, {
+    required bool split,
+    required UserProfile profile,
+    required Widget inbox,
+  }) {
+    if (!split) return inbox;
+    final l10n = context.l10n;
+    return PulseSplitView(
+      masterWidth: PulseContentWidth.inbox,
+      master: inbox,
+      detail: _selectedChat == null
+          ? EmptyState(
+              mark: 'C',
+              title: l10n.chatsSelectTitle,
+              subtitle: l10n.chatsSelectSubtitle,
+            )
+          : ChatConversationScreen(
+              key: ValueKey(_selectedChat!.id),
+              chat: _selectedChat!,
+              profile: profile,
+              chatRepository: _repo,
+              embedded: true,
             ),
     );
   }
@@ -326,21 +388,19 @@ class _ChatsScreenState extends State<ChatsScreen> {
     required int index,
     required ChatInboxSections sections,
     required UserProfile profile,
+    required bool dense,
   }) {
     Widget row(ChatConversation chat, {String? keyPrefix}) {
       return Padding(
         key: ValueKey('${keyPrefix ?? ''}${chat.id}'),
-        padding: const EdgeInsets.only(bottom: 8),
+        padding: EdgeInsets.only(bottom: dense ? 4 : 8),
         child: _ChatRow(
           chat: chat,
           viewerUid: profile.uid,
+          selected: _selectedChat?.id == chat.id,
+          dense: dense,
           swipeEnabled: _canSwipe(chat),
-          onTap: () => openChat(
-            context,
-            chat: chat,
-            profile: profile,
-            chatRepository: _repo,
-          ),
+          onTap: () => selectConversation(chat),
           onPin: () => _togglePin(chat),
           onDelete: () => _confirmDelete(chat),
         ),
@@ -488,6 +548,8 @@ class _ChatRow extends StatelessWidget {
     required this.swipeEnabled,
     required this.onPin,
     required this.onDelete,
+    this.selected = false,
+    this.dense = false,
   });
 
   final ChatConversation chat;
@@ -496,6 +558,8 @@ class _ChatRow extends StatelessWidget {
   final bool swipeEnabled;
   final VoidCallback onPin;
   final VoidCallback onDelete;
+  final bool selected;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -514,22 +578,26 @@ class _ChatRow extends StatelessWidget {
             : chat.lastMessage);
 
     final tile = Material(
-      color: colors.sheet,
+      color: selected
+          ? brand.withValues(alpha: 0.10)
+          : colors.sheet,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(18),
-        side: BorderSide(color: colors.border),
+        side: BorderSide(
+          color: selected ? brand.withValues(alpha: 0.35) : colors.border,
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+          padding: EdgeInsets.fromLTRB(12, dense ? 8 : 12, 14, dense ? 8 : 12),
           child: Row(
             children: [
               ChatAvatar(
                 initials: chat.initialsFor(viewerUid, l10n: l10n),
                 isGroup: chat.isGroup,
-                size: 50,
+                size: dense ? 44 : 50,
               ),
               const SizedBox(width: 12),
               Expanded(

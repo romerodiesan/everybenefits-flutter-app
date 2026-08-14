@@ -474,7 +474,7 @@ class CourseRepository {
     required UserProfile profile,
     required Course course,
   }) {
-    if (profile.isAnonymous || profile.role == UserRole.guest) {
+    if (profile.isAnonymous || profile.roleId == 'guest' || profile.role == UserRole.guest) {
       throw StateError(kCourseErrSignInRequired);
     }
     if (!course.isPublished) {
@@ -543,7 +543,7 @@ class CourseRepository {
     required String teacherName,
     required CourseLevel level,
   }) {
-    if (!canAuthorCourses(actor.role)) {
+    if (!canAuthorCourses(actor.roleId)) {
       throw StateError(kCourseErrNoPermission);
     }
     final trimmed = title.trim();
@@ -569,10 +569,10 @@ class CourseRepository {
     required String teacherName,
     required CourseLevel level,
   }) {
-    if (!canAuthorCourses(actor.role)) {
+    if (!canAuthorCourses(actor.roleId)) {
       throw StateError(kCourseErrNoPermission);
     }
-    if (!canEditCourse(course: course, uid: actor.uid, role: actor.role)) {
+    if (!canEditCourse(course: course, uid: actor.uid, roleOrPermissions: actor.roleId)) {
       throw StateError(
         course.isPublished
             ? kCourseErrAlreadyPublished
@@ -596,7 +596,7 @@ class CourseRepository {
     required UserProfile actor,
     required Course course,
   }) {
-    if (!canEditCourse(course: course, uid: actor.uid, role: actor.role)) {
+    if (!canEditCourse(course: course, uid: actor.uid, roleOrPermissions: actor.roleId)) {
       throw StateError(kCourseErrNoPermission);
     }
     return _store.setCourseStatus(
@@ -614,7 +614,7 @@ class CourseRepository {
     if (status == CourseStatus.pending) {
       return submitForReview(actor: actor, course: course);
     }
-    if (!canManageCourses(actor.role)) {
+    if (!canManageCourses(actor.roleId)) {
       throw StateError(kCourseErrOnlyAdminPublishes);
     }
     return _store.setCourseStatus(courseId: course.id, status: status);
@@ -624,8 +624,8 @@ class CourseRepository {
     required UserProfile actor,
     required Course course,
   }) {
-    final allowed = canManageCourses(actor.role) ||
-        canEditCourse(course: course, uid: actor.uid, role: actor.role);
+    final allowed = canManageCourses(actor.roleId) ||
+        canEditCourse(course: course, uid: actor.uid, roleOrPermissions: actor.roleId);
     if (!allowed) {
       throw StateError(kCourseErrNoPermission);
     }

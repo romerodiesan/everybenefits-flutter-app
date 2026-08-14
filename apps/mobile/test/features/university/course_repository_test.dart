@@ -460,7 +460,7 @@ void main() {
         canEditCourse(
           course: draft,
           uid: 'manager-1',
-          role: UserRole.manager,
+          roleOrPermissions: UserRole.manager,
         ),
         isTrue,
       );
@@ -468,16 +468,24 @@ void main() {
         canEditCourse(
           course: published,
           uid: 'manager-1',
-          role: UserRole.manager,
+          roleOrPermissions: UserRole.manager,
         ),
         isFalse,
       );
       expect(
-        canEditCourse(course: published, uid: 'admin', role: UserRole.admin),
+        canEditCourse(
+          course: published,
+          uid: 'admin',
+          roleOrPermissions: UserRole.admin,
+        ),
         isTrue,
       );
       expect(
-        canEditCourse(course: draft, uid: 'agent', role: UserRole.agent),
+        canEditCourse(
+          course: draft,
+          uid: 'agent',
+          roleOrPermissions: UserRole.agent,
+        ),
         isFalse,
       );
     });
@@ -506,19 +514,35 @@ void main() {
 
       expect(canAuthorPaths(UserRole.manager), isTrue);
       expect(
-        canEditPath(path: draft, uid: 'manager-1', role: UserRole.manager),
+        canEditPath(
+          path: draft,
+          uid: 'manager-1',
+          roleOrPermissions: UserRole.manager,
+        ),
         isTrue,
       );
       expect(
-        canEditPath(path: draft, uid: 'manager-2', role: UserRole.manager),
+        canEditPath(
+          path: draft,
+          uid: 'manager-2',
+          roleOrPermissions: UserRole.manager,
+        ),
         isFalse,
       );
       expect(
-        canEditPath(path: published, uid: 'manager-1', role: UserRole.manager),
+        canEditPath(
+          path: published,
+          uid: 'manager-1',
+          roleOrPermissions: UserRole.manager,
+        ),
         isFalse,
       );
       expect(
-        canEditPath(path: published, uid: 'admin', role: UserRole.admin),
+        canEditPath(
+          path: published,
+          uid: 'admin',
+          roleOrPermissions: UserRole.admin,
+        ),
         isTrue,
       );
     });

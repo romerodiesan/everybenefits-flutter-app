@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/pulse_chrome.dart';
+import '../../../app/widgets/role_badge.dart';
 import '../../../l10n/l10n.dart';
 import '../forum_models.dart';
 import 'forum_avatar.dart';
@@ -100,6 +101,11 @@ class ForumSpotlightCard extends StatelessWidget {
                       color: colors.muted,
                     ),
                   ),
+                ),
+                const SizedBox(width: 6),
+                RoleBadge(
+                  badge: thread.authorBadge,
+                  dense: true,
                 ),
                 const SizedBox(width: 10),
                 Text(

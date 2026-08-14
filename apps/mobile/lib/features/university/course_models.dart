@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../l10n/app_localizations.dart';
+import '../../users/permissions.dart';
 import '../../users/user_role.dart';
 
 DateTime? readCourseDate(Object? value) {
@@ -388,7 +389,7 @@ class Lesson {
       moduleId: data['moduleId'] as String? ?? '',
       title: data['title'] as String? ?? '',
       order: (data['order'] as num?)?.toInt() ?? 0,
-      durationSeconds: (data['durationSeconds'] as num?)?.toInt() ?? 0,
+      durationSeconds: resolveLessonDurationSeconds(data),
       type: LessonType.parse(data['type'] as String?),
       videoPath: data['videoPath'] as String?,
       videoUrl: data['videoUrl'] as String?,
@@ -685,22 +686,25 @@ class EnrolledCourse {
 }
 
 /// Managers and admins can author courses.
-bool canAuthorCourses(UserRole role) {
-  return role == UserRole.instructor ||
-      role == UserRole.manager ||
-      role == UserRole.admin;
-}
+bool canAuthorCoursesForRole(UserRole role) => canAuthorCourses(role.wireValue);
 
 /// Same authors who write courses can draft learning paths.
-bool canAuthorPaths(UserRole role) => canAuthorCourses(role);
+bool canAuthorPathsForRole(UserRole role) => canAuthorPaths(role.wireValue);
 
 /// Only admins publish and approve courses and paths.
-bool canManageCourses(UserRole role) => role == UserRole.admin;
+bool canManageCoursesForRole(UserRole role) => canManageCourses(role.wireValue);
 
 /// Authors keep editing until an admin publishes; admins always may.
-bool canEditCourse({required Course course, required String uid, required UserRole role}) {
-  if (role == UserRole.admin) return true;
-  if (!canAuthorCourses(role)) return false;
+bool canEditCourse({
+  required Course course,
+  required String uid,
+  required Object? roleOrPermissions,
+}) {
+  if (can(roleOrPermissions, Perm.coursesEditAny) ||
+      canManageCourses(roleOrPermissions)) {
+    return true;
+  }
+  if (!canAuthorCourses(roleOrPermissions)) return false;
   return course.createdBy == uid && !course.isPublished;
 }
 
@@ -708,13 +712,15 @@ bool canEditCourse({required Course course, required String uid, required UserRo
 bool canEditPath({
   required LearningPath path,
   required String uid,
-  required UserRole role,
+  required Object? roleOrPermissions,
 }) {
-  if (role == UserRole.admin) return true;
-  if (!canAuthorPaths(role)) return false;
+  if (can(roleOrPermissions, Perm.pathsEditAny) ||
+      canManageCourses(roleOrPermissions)) {
+    return true;
+  }
+  if (!canAuthorPaths(roleOrPermissions)) return false;
   return path.createdBy == uid && !path.isPublished;
 }
-
 /// Formats a course duration using localized units.
 String courseDurationLabel(AppLocalizations l10n, int minutes) {
   if (minutes < 60) return l10n.courseDurationMinutes(minutes);
@@ -722,6 +728,44 @@ String courseDurationLabel(AppLocalizations l10n, int minutes) {
   final rest = minutes % 60;
   if (rest == 0) return l10n.courseDurationHoursMinutes(hours, 0);
   return l10n.courseDurationHoursMinutes(hours, rest);
+}
+
+int resolveLessonDurationSeconds(Map<String, dynamic> data) {
+  final minutes = _asPositiveInt(data['durationMinutes']);
+  var seconds = _asPositiveInt(data['durationSeconds']);
+  if (seconds == null && data['durationSeconds'] is String) {
+    seconds = parseClockDuration(data['durationSeconds'] as String);
+  }
+  if (minutes != null &&
+      minutes > 0 &&
+      (seconds == null || seconds == 0 || seconds == minutes)) {
+    return minutes * 60;
+  }
+  return seconds ?? 0;
+}
+
+int? parseClockDuration(String raw) {
+  final parts = raw.trim().split(':');
+  if (parts.length < 2 || parts.length > 3) return null;
+  final nums = parts.map(int.tryParse).toList();
+  if (nums.any((n) => n == null || n < 0)) return null;
+  if (parts.length == 2) return nums[0]! * 60 + nums[1]!;
+  return nums[0]! * 3600 + nums[1]! * 60 + nums[2]!;
+}
+
+int? _asPositiveInt(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  if (value is String) return int.tryParse(value);
+  return null;
+}
+
+String lessonDurationLabel(AppLocalizations l10n, int seconds) {
+  if (seconds <= 0) return '';
+  if (seconds < 60) return l10n.courseDurationSeconds(seconds);
+  final minutes = (seconds / 60).round();
+  if (minutes < 60) return l10n.courseDurationMinutes(minutes);
+  return courseDurationLabel(l10n, minutes);
 }
 
 /// Video lesson completes once the learner reaches this share of the video.

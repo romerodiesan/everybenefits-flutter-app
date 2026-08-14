@@ -19,6 +19,7 @@ import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/onboarding_prefs.dart';
 import 'package:every_benefits/features/onboarding/register_screen.dart';
 import 'package:every_benefits/features/onboarding/welcome_screen.dart';
+import 'package:every_benefits/features/product_tour/product_tour_prefs.dart';
 import 'package:every_benefits/features/profile/profile_completion_flow.dart';
 import 'package:every_benefits/features/profile/settings_screen.dart';
 import 'package:every_benefits/l10n/app_localizations.dart';
@@ -53,10 +54,13 @@ void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues({
       OnboardingPrefs.prefsKey: true,
+      ProductTourPrefs.prefsKey: kProductTourVersion,
     });
     WelcomeScreen.debugAmbientMotion = false;
     auth = MockAuthService();
     users = MockUserRepository();
+    when(() => auth.hasPasswordProvider(any())).thenReturn(true);
+    when(() => auth.hasPasswordProvider()).thenReturn(true);
     emptyForums = ForumRepository(store: _EmptyForumStore());
     chatStore = FakeChatStore();
     emptyChats = ChatRepository(store: chatStore);
@@ -94,6 +98,7 @@ void main() {
       role: role,
       isAnonymous: anonymous,
       profileCompleted: true,
+      productTourVersion: kProductTourVersion,
       phoneCountryCode: anonymous ? null : '+506',
       phoneNumber: anonymous ? null : '88887777',
       npn: role == UserRole.agent ? '1234567' : null,
@@ -400,6 +405,15 @@ class _EmptyForumStore implements ForumStore {
     Object? cursor,
   }) async =>
       const ForumThreadPage(threads: []);
+
+  @override
+  Stream<ForumThreadPage> watchThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+  }) =>
+      Stream.value(const ForumThreadPage(threads: []));
 
   @override
   Stream<ForumThread?> watchThread(String threadId) => Stream.value(null);

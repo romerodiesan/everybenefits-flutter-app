@@ -65,6 +65,23 @@ void main() {
       expect(lesson.passPercent, kQuizDefaultPassPercent);
     });
 
+    test('uses durationMinutes when durationSeconds is missing or copied', () {
+      final fromMinutes = Lesson.fromMap('l-min', {
+        'moduleId': 'm1',
+        'title': 'Clase',
+        'durationMinutes': 7,
+      });
+      expect(fromMinutes.durationSeconds, 420);
+
+      final copied = Lesson.fromMap('l-copy', {
+        'moduleId': 'm1',
+        'title': 'Clase',
+        'durationMinutes': 10,
+        'durationSeconds': 10,
+      });
+      expect(copied.durationSeconds, 600);
+    });
+
     test('reads a reading lesson and its body', () {
       final lesson = Lesson.fromMap('l2', {
         'moduleId': 'm1',

@@ -5,9 +5,7 @@ import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
-import '../../users/user_profile.dart';
-import '../../users/user_repository.dart';
-import '../../users/user_role.dart';
+import '../../users/users.dart';
 import 'chat_conversation_screen.dart';
 import 'chat_models.dart';
 import 'chat_new_group_screen.dart';
@@ -41,7 +39,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
   @override
   void initState() {
     super.initState();
-    _contactsFuture = _users.listDirectory(excludeUid: widget.profile.uid);
+    _contactsFuture = SocialRepository().listContacts();
   }
 
   Future<void> _openDm(UserProfile other) async {
@@ -113,7 +111,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.xl),
                 child: Text(
-                  l10n.newChatEmpty,
+                  l10n.chatsNeedContacts,
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyLarge?.copyWith(
                     color: colors.muted,
@@ -132,7 +130,7 @@ class _ChatNewChatScreenState extends State<ChatNewChatScreen> {
               AppSpacing.xl,
             ),
             children: [
-              if (canCreateChatGroups(widget.profile.role)) ...[
+              if (canCreateChatGroups(AccessScope.accessOf(context, fallbackRoleId: widget.profile.roleId))) ...[
                 Material(
                   color: colors.sheet,
                   shape: RoundedRectangleBorder(

@@ -66,6 +66,7 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
 
       final completed = widget.profile.copyWith(
         displayName: data.displayName,
+        bio: data.bio,
         phoneCountryCode: data.phoneCountryCode,
         phoneNumber: data.phoneNumber,
         phoneVerified: phoneVerified,

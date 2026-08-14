@@ -1,9 +1,21 @@
-// File generated manually for FlutterFire (flutterfire configure blocked by xcodeproj).
+// Firebase client options for every-benefits-us (canonical; matches Pulse web).
 // ignore_for_file: lines_longer_than_80_chars
 //
-// Security: restrict these browser/Android/iOS API keys in Google Cloud Console
+// Security: restrict these API keys in Google Cloud Console
 // (APIs & Services → Credentials) to the app package / bundle ID and enabled
 // APIs only. Keys in client apps are public; App Check + rules are the real gate.
+//
+// Native GOOGLE_APP_ID / appId MUST use platform segments `:ios:` / `:android:`.
+// A `:web:` id crashes FIRApp on device ("invalid GOOGLE_APP_ID").
+//
+// Current mobile appIds are format-valid placeholders for local/emulator runs.
+// Register real apps and replace plists + this file:
+//   firebase login --reauth
+//   firebase apps:create IOS --bundle-id com.everybenefits.everyinsurance \
+//     --project every-benefits-us
+//   firebase apps:sdkconfig IOS <appId> --project every-benefits-us -o \
+//     apps/mobile/ios/Runner/GoogleService-Info.plist
+//   (same for ANDROID / google-services.json)
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
@@ -28,33 +40,36 @@ class DefaultFirebaseOptions {
     }
   }
 
+  /// Same public web app as Pulse / Studio / Admin (every-benefits-us).
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDroJ-XW_BHCRvq9TWEKOInUkEt0jYasXk',
-    appId: '1:978334689853:web:bf2108057fa442617d1854',
-    messagingSenderId: '978334689853',
-    projectId: 'every-insurance',
-    authDomain: 'every-insurance.firebaseapp.com',
-    storageBucket: 'every-insurance.firebasestorage.app',
-    databaseURL: 'https://every-insurance-default-rtdb.firebaseio.com',
-    measurementId: 'G-N4LWJZR3TW',
+    apiKey: 'AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk',
+    appId: '1:1001601265155:web:f03d9d5d1f14602dd8e836',
+    messagingSenderId: '1001601265155',
+    projectId: 'every-benefits-us',
+    authDomain: 'every-benefits-us.firebaseapp.com',
+    storageBucket: 'every-benefits-us.appspot.com',
+    databaseURL: 'https://every-benefits-us-default-rtdb.firebaseio.com',
+    measurementId: 'G-BM8TQCEQQN',
   );
 
+  /// Placeholder `:android:` appId — replace after firebase apps:create ANDROID.
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDxEn-G4MK7g2kl8joAiztg3M-WqUVXH8g',
-    appId: '1:978334689853:android:da04393db288567a7d1854',
-    messagingSenderId: '978334689853',
-    projectId: 'every-insurance',
-    storageBucket: 'every-insurance.firebasestorage.app',
-    databaseURL: 'https://every-insurance-default-rtdb.firebaseio.com',
+    apiKey: 'AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk',
+    appId: '1:1001601265155:android:0261ba55ef35c1a0',
+    messagingSenderId: '1001601265155',
+    projectId: 'every-benefits-us',
+    storageBucket: 'every-benefits-us.appspot.com',
+    databaseURL: 'https://every-benefits-us-default-rtdb.firebaseio.com',
   );
 
+  /// Placeholder `:ios:` appId — replace after firebase apps:create IOS.
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyCqRJ1zBd7kKsv_EYZHIdepmqlPVTFwbpM',
-    appId: '1:978334689853:ios:ed3ada3846885b5e7d1854',
-    messagingSenderId: '978334689853',
-    projectId: 'every-insurance',
-    storageBucket: 'every-insurance.firebasestorage.app',
-    databaseURL: 'https://every-insurance-default-rtdb.firebaseio.com',
+    apiKey: 'AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk',
+    appId: '1:1001601265155:ios:cb529635090fda32',
+    messagingSenderId: '1001601265155',
+    projectId: 'every-benefits-us',
+    storageBucket: 'every-benefits-us.appspot.com',
+    databaseURL: 'https://every-benefits-us-default-rtdb.firebaseio.com',
     iosBundleId: 'com.everybenefits.everyinsurance',
   );
 }

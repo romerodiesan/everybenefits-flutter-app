@@ -6,6 +6,7 @@ import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
+import '../profile/public_profile_screen.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
 import 'widgets/chat_avatar.dart';
@@ -108,6 +109,30 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
                 PulseSheet(
                   child: Column(
                     children: [
+                      if (!chat.isGroup)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          Icons.person_outline_rounded,
+                          color: colors.muted,
+                        ),
+                        title: Text(l10n.memberViewProfile),
+                        onTap: () {
+                          final other = chat.memberIds
+                              .where((id) => id != uid)
+                              .toList();
+                          if (other.isEmpty) return;
+                          Navigator.of(context).push(
+                            MaterialPageRoute<void>(
+                              builder: (_) => PublicProfileScreen(
+                                uid: other.first,
+                                viewer: widget.profile,
+                                chatRepository: _repo,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(

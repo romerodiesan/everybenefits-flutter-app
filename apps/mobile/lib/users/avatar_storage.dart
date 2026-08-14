@@ -2,25 +2,13 @@ import 'dart:typed_data';
 
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../firebase/firebase_emulators.dart';
+
 /// Strips a legacy cache-bust query (`v=`) that made the Storage emulator
-/// return an empty body to [NetworkImage].
+/// return an empty body to [NetworkImage], and rewrites loopback emulator
+/// hosts so a physical device can load the avatar.
 String sanitizeAvatarDownloadUrl(String url) {
-  final trimmed = url.trim();
-  if (trimmed.isEmpty) return trimmed;
-
-  // Prefer Uri parsing; fall back to regex if the URL is oddly encoded.
-  final uri = Uri.tryParse(trimmed);
-  if (uri != null && uri.hasQuery && uri.queryParameters.containsKey('v')) {
-    final params = Map<String, String>.from(uri.queryParameters)..remove('v');
-    return uri
-        .replace(queryParameters: params.isEmpty ? null : params)
-        .toString();
-  }
-
-  return trimmed
-      .replaceAll(RegExp(r'([?&])v=\d+&'), r'$1')
-      .replaceAll(RegExp(r'[?&]v=\d+$'), '')
-      .replaceAll(RegExp(r'\?&'), '?');
+  return rewriteEmulatorStorageUrl(url);
 }
 
 String? sanitizeOptionalAvatarDownloadUrl(String? url) {

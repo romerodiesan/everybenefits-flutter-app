@@ -1,21 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../app_spacing.dart';
+import '../layout/pulse_breakpoints.dart';
 import '../pulse_haptics.dart';
 import '../theme.dart';
 
-/// Visual height of the floating tab pill (excluding safe-area inset).
-const double kPulseTabBarPillHeight = 54;
+/// Visual width of [PulseNavRail] including the trailing border.
+const double kPulseNavRailWidth = 88;
 
-/// Extra gap between FAB / list content and the floating tab pill.
-const double kPulseTabBarFabGap = 20;
+/// Visual height of the bottom tab bar content (excluding safe-area inset).
+const double kPulseTabBarPillHeight = 56;
 
-/// Matches Material [kFloatingActionButtonMargin].
-const double _kFabMargin = 16;
+/// Extra gap between FAB / list content and the bottom tab bar.
+const double kPulseTabBarFabGap = 8;
 
 /// Raw home-indicator / system bottom inset in logical pixels.
-///
-/// Uses the window view when available so nested scaffolds under
-/// [Scaffold.extendBody] cannot zero out the value via MediaQuery.
 double systemBottomInset(BuildContext context) {
   final view = View.maybeOf(context);
   final fromView = view == null
@@ -28,31 +27,26 @@ double systemBottomInset(BuildContext context) {
     fromMedia,
     fromPad,
   ].fold<double>(0, (a, b) => a > b ? a : b);
-  return safe > 0 ? safe : 8.0;
+  return safe > 0 ? safe : 0.0;
 }
 
 /// Distance from the physical bottom to the top of [PulseTabBar].
 double pulseTabBarTopInset(BuildContext context) {
-  // Tab bar outer bottom pad is `(safe) + 6`, then the pill itself.
-  return systemBottomInset(context) + 6 + kPulseTabBarPillHeight;
+  return systemBottomInset(context) + kPulseTabBarPillHeight;
 }
 
-/// Extra bottom inset so nested FABs clear [PulseTabBar] under [extendBody].
-///
-/// Scaffold already lifts the FAB by [MediaQuery.padding] + [_kFabMargin];
-/// this only adds what's still needed above the floating pill.
+/// Extra bottom inset so nested FABs clear [PulseTabBar].
 double pulseFabClearance(BuildContext context) {
-  final padBottom = MediaQuery.paddingOf(context).bottom;
-  final alreadyCleared = padBottom + _kFabMargin;
-  final needed =
-      pulseTabBarTopInset(context) + kPulseTabBarFabGap - alreadyCleared;
-  return needed < kPulseTabBarFabGap ? kPulseTabBarFabGap : needed;
+  if (pulseUseRail(context)) return AppSpacing.md;
+  return kPulseTabBarFabGap;
 }
 
-/// List / scroll bottom padding that clears the floating tab bar.
+/// List / scroll bottom padding. Body sits above the nav bar already.
 double pulseShellListBottomPad(BuildContext context, {bool hasFab = false}) {
-  final clearance = pulseTabBarTopInset(context) + kPulseTabBarFabGap;
-  return hasFab ? clearance + 56 : clearance;
+  if (pulseUseRail(context)) {
+    return hasFab ? AppSpacing.xl : AppSpacing.md;
+  }
+  return hasFab ? 72 : AppSpacing.md;
 }
 
 EdgeInsets pulseFabPadding(BuildContext context) {
@@ -194,7 +188,7 @@ class PulseScaffold extends StatelessWidget {
   final bool extendBody;
   final bool? resizeToAvoidBottomInset;
 
-  /// Lift [floatingActionButton] above the shell's floating [PulseTabBar].
+  /// Lift [floatingActionButton] above the shell tab bar when needed.
   final bool clearFabForTabBar;
 
   @override
@@ -289,6 +283,171 @@ class PulseTabItem {
   final GlobalKey? tourKey;
 }
 
+class PulseNavRail extends StatelessWidget {
+  const PulseNavRail({
+    super.key,
+    required this.items,
+    required this.selectedIndex,
+    required this.onSelect,
+    this.barTourKey,
+    this.fab,
+  });
+
+  final List<PulseTabItem> items;
+  final int selectedIndex;
+  final ValueChanged<int> onSelect;
+  final GlobalKey? barTourKey;
+  final Widget? fab;
+
+  void _selectIndex(int index) {
+    final next = index.clamp(0, items.length - 1);
+    if (next == selectedIndex) return;
+    PulseHaptics.selection();
+    onSelect(next);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final brand = AppColors.brandOf(context);
+    final top = MediaQuery.paddingOf(context).top;
+    final bottom = MediaQuery.paddingOf(context).bottom;
+
+    return Material(
+      color: colors.sheet,
+      child: KeyedSubtree(
+        key: barTourKey,
+        child: SizedBox(
+          width: kPulseNavRailWidth,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              border: Border(right: BorderSide(color: colors.border)),
+            ),
+            child: Padding(
+              padding: EdgeInsets.only(top: top + 8, bottom: bottom + 8),
+              child: Column(
+                children: [
+                  Expanded(
+                    child: ListView(
+                      padding: const EdgeInsets.symmetric(horizontal: 6),
+                      children: [
+                        for (var i = 0; i < items.length; i++)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: KeyedSubtree(
+                              key: items[i].tourKey,
+                              child: _PulseRailDestination(
+                                item: items[i],
+                                selected: i == selectedIndex,
+                                brand: brand,
+                                onTap: () => _selectIndex(i),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (fab != null) ...[
+                    const SizedBox(height: 8),
+                    fab!,
+                    const SizedBox(height: 4),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PulseRailDestination extends StatelessWidget {
+  const _PulseRailDestination({
+    required this.item,
+    required this.selected,
+    required this.brand,
+    required this.onTap,
+  });
+
+  final PulseTabItem item;
+  final bool selected;
+  final Color brand;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final theme = Theme.of(context);
+
+    return Tooltip(
+      message: item.label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: item.label,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 240),
+            curve: Curves.easeOutCubic,
+            constraints: const BoxConstraints(minHeight: 48, minWidth: 48),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: selected
+                  ? brand.withValues(alpha: 0.12)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      selected ? item.selectedIcon : item.icon,
+                      size: 24,
+                      color: selected ? brand : colors.muted,
+                    ),
+                    if (item.badgeCount > 0)
+                      Positioned(
+                        right: -4,
+                        top: -2,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: brand,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: colors.sheet, width: 1.5),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontSize: 10.5,
+                    fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
+                    letterSpacing: -0.1,
+                    color: selected ? brand : colors.muted,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class PulseTabBar extends StatelessWidget {
   const PulseTabBar({
     super.key,
@@ -320,31 +479,20 @@ class PulseTabBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    final bottom = systemBottomInset(context);
 
     return Material(
-      type: MaterialType.transparency,
-      child: AnimatedPadding(
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOutCubic,
-        padding: EdgeInsets.fromLTRB(16, 0, 16, bottom + 6),
-        child: KeyedSubtree(
-          key: barTourKey,
+      color: colors.sheet,
+      elevation: 0,
+      child: KeyedSubtree(
+        key: barTourKey,
+        child: SafeArea(
+          top: false,
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: colors.sheet.withValues(alpha: 0.94),
-              borderRadius: BorderRadius.circular(26),
-              border: Border.all(color: colors.border),
-              boxShadow: [
-                BoxShadow(
-                  color: colors.ink.withValues(alpha: 0.07),
-                  blurRadius: 28,
-                  offset: const Offset(0, 10),
-                ),
-              ],
+              border: Border(top: BorderSide(color: colors.border)),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 5),
+            child: SizedBox(
+              height: kPulseTabBarPillHeight,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return GestureDetector(
@@ -372,7 +520,7 @@ class PulseTabBar extends StatelessWidget {
                               child: _PulseTab(
                                 item: items[i],
                                 selected: i == selectedIndex,
-                                showLabel: false,
+                                showLabel: true,
                                 brand: brand,
                                 onTap: () => _selectIndex(i),
                               ),
@@ -419,59 +567,60 @@ class _PulseTab extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 240),
           curve: Curves.easeOutCubic,
-          height: 44,
-          margin: const EdgeInsets.symmetric(horizontal: 2),
-          padding: EdgeInsets.symmetric(horizontal: showLabel ? 10 : 0),
+          margin: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
           decoration: BoxDecoration(
             color: selected
-                ? brand.withValues(alpha: 0.14)
+                ? brand.withValues(alpha: 0.12)
                 : Colors.transparent,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Stack(
-                clipBehavior: Clip.none,
-                children: [
-                  Icon(
-                    selected ? item.selectedIcon : item.icon,
-                    size: 22,
-                    color: selected ? brand : colors.muted,
-                  ),
-                  if (item.badgeCount > 0)
-                    Positioned(
-                      right: -4,
-                      top: -2,
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          color: brand,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: colors.sheet, width: 1.5),
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(
+                      selected ? item.selectedIcon : item.icon,
+                      size: 22,
+                      color: selected ? brand : colors.muted,
+                    ),
+                    if (item.badgeCount > 0)
+                      Positioned(
+                        right: -4,
+                        top: -2,
+                        child: Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: brand,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: colors.sheet, width: 1.5),
+                          ),
                         ),
                       ),
-                    ),
-                ],
-              ),
-              if (showLabel) ...[
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
+                  ],
+                ),
+                if (showLabel) ...[
+                  const SizedBox(height: 2),
+                  Text(
                     item.label,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      fontSize: 10.5,
+                      fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
                       letterSpacing: -0.1,
-                      color: colors.ink,
+                      color: selected ? brand : colors.muted,
                     ),
                   ),
-                ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       ),

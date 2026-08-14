@@ -1,7 +1,9 @@
+import '../../../users/users.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../app/app_spacing.dart';
+import '../../../app/layout/pulse_adaptive_sheet.dart';
 import '../../../app/pulse_haptics.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/pulse_chrome.dart';
@@ -60,27 +62,35 @@ class CourseManageMenu extends StatelessWidget {
   /// Called after a successful mutation (screens on live streams can skip it).
   final VoidCallback? onChanged;
 
-  bool get _isAdmin => canManageCourses(profile.role);
+  bool _isAdmin(BuildContext context) => canManageCourses(
+        AccessScope.accessOf(context, fallbackRoleId: profile.roleId),
+      );
 
-  bool get _canEdit =>
-      canEditCourse(course: course, uid: profile.uid, role: profile.role);
+  bool _canEdit(BuildContext context) => canEditCourse(
+        course: course,
+        uid: profile.uid,
+        roleOrPermissions:
+            AccessScope.accessOf(context, fallbackRoleId: profile.roleId),
+      );
 
-  List<_ManageAction> get _actions {
+  List<_ManageAction> _actions(BuildContext context) {
     final actions = <_ManageAction>[];
-    if (_canEdit) actions.add(_ManageAction.edit);
-    if (_canEdit && course.status == CourseStatus.draft && !_isAdmin) {
+    final canEdit = _canEdit(context);
+    final isAdmin = _isAdmin(context);
+    if (canEdit) actions.add(_ManageAction.edit);
+    if (canEdit && course.status == CourseStatus.draft && !isAdmin) {
       actions.add(_ManageAction.submitReview);
     }
-    if (_isAdmin && course.status != CourseStatus.published) {
+    if (isAdmin && course.status != CourseStatus.published) {
       actions.add(_ManageAction.publish);
     }
-    if (_isAdmin && course.status == CourseStatus.published) {
+    if (isAdmin && course.status == CourseStatus.published) {
       actions.add(_ManageAction.unpublish);
     }
-    if (_isAdmin && course.status == CourseStatus.pending) {
+    if (isAdmin && course.status == CourseStatus.pending) {
       actions.add(_ManageAction.rejectToDraft);
     }
-    if (_isAdmin || _canEdit) actions.add(_ManageAction.delete);
+    if (isAdmin || canEdit) actions.add(_ManageAction.delete);
     return actions;
   }
 
@@ -88,7 +98,7 @@ class CourseManageMenu extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     final colors = AppColors.of(context);
-    final actions = _actions;
+    final actions = _actions(context);
     if (actions.isEmpty) return const SizedBox.shrink();
 
     return PopupMenuButton<_ManageAction>(
@@ -226,7 +236,7 @@ Future<bool?> showCourseEditSheet(
   required UserProfile profile,
   required CourseRepository repository,
 }) {
-  return showModalBottomSheet<bool>(
+  return showPulseSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,

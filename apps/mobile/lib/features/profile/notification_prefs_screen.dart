@@ -7,6 +7,7 @@ import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../notifications/notification_models.dart';
 import '../notifications/notification_repository.dart';
@@ -136,7 +137,7 @@ class _NotificationPrefsScreenState extends State<NotificationPrefsScreen> {
             ),
           const SizedBox(height: AppSpacing.lg),
           if (!_loaded)
-            const Center(child: CircularProgressIndicator())
+            const PulseListSkeleton(itemCount: 4)
           else ...[
             _PrefTile(
               label: l10n.notificationsPrefChats,

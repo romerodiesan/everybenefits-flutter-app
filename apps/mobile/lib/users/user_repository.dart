@@ -17,6 +17,13 @@ abstract class UserProfileStore {
 
   Future<void> update(UserProfile profile);
 
+  /// Patch search index fields only (displayNameLower / emailLower / nameTokens).
+  Future<void> updateSearchIndex({
+    required String uid,
+    required String? displayName,
+    required String? email,
+  });
+
   Stream<UserProfile?> watch(String uid);
 
   /// Directory of peers for starting chats (excludes anonymous guests).
@@ -24,6 +31,9 @@ abstract class UserProfileStore {
     String? excludeUid,
     int limit = 80,
   });
+
+  /// Updates Firebase Auth + `users/{uid}.email` via Cloud Functions.
+  Future<String> updateAccountEmail(String email);
 }
 
 class FirestoreUserProfileStore implements UserProfileStore {
@@ -41,28 +51,13 @@ class FirestoreUserProfileStore implements UserProfileStore {
       _firestore.collection('users');
 
   Map<String, Object?> _payload(UserProfile profile) {
-    final displayName = profile.displayName?.trim();
-    final normalized =
-        displayName == null || displayName.isEmpty ? null : displayName;
-    final email = profile.email?.trim();
-    final foldedName = normalized
-        ?.toLowerCase()
-        .replaceAll('á', 'a')
-        .replaceAll('é', 'e')
-        .replaceAll('í', 'i')
-        .replaceAll('ó', 'o')
-        .replaceAll('ú', 'u')
-        .replaceAll('ü', 'u')
-        .replaceAll('ñ', 'n');
+    final search = _searchFields(profile.displayName, profile.email);
     return {
       'uid': profile.uid,
       'email': profile.email,
-      'emailLower': email?.toLowerCase(),
-      'displayName': normalized,
-      'displayNameLower': foldedName,
-      'nameTokens': nameSearchTokens(normalized, email),
+      ...search,
       'photoUrl': profile.photoUrl,
-      'role': profile.role.wireValue,
+      'role': profile.roleId,
       'isAnonymous': profile.isAnonymous,
       'profileCompleted': profile.profileCompleted,
       'productTourVersion': profile.productTourVersion,
@@ -77,9 +72,14 @@ class FirestoreUserProfileStore implements UserProfileStore {
       'addressState': profile.addressState,
       'addressZip': profile.addressZip,
       'agency': profile.agency,
+      'bio': profile.bio,
       'orgNodeId': profile.orgNodeId,
       'updatedAt': FieldValue.serverTimestamp(),
     };
+  }
+
+  Map<String, Object?> _searchFields(String? displayName, String? email) {
+    return userSearchIndexFields(displayName, email);
   }
 
   @override
@@ -117,7 +117,21 @@ class FirestoreUserProfileStore implements UserProfileStore {
 
   @override
   Future<void> update(UserProfile profile) async {
-    await _users.doc(profile.uid).update(_payload(profile));
+    final payload = Map<String, Object?>.from(_payload(profile))
+      ..remove('email');
+    await _users.doc(profile.uid).update(payload);
+  }
+
+  @override
+  Future<void> updateSearchIndex({
+    required String uid,
+    required String? displayName,
+    required String? email,
+  }) async {
+    await _users.doc(uid).update({
+      ..._searchFields(displayName, email),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 
   @override
@@ -151,6 +165,17 @@ class FirestoreUserProfileStore implements UserProfileStore {
       );
     return list;
   }
+
+  @override
+  Future<String> updateAccountEmail(String email) async {
+    final result = await _functions.httpsCallable('updateAccountEmail').call(
+      <String, dynamic>{'email': email.trim().toLowerCase()},
+    );
+    final data = result.data is Map ? result.data as Map : const {};
+    final next = '${data['email'] ?? email}'.trim().toLowerCase();
+    await FirebaseAuth.instance.currentUser?.reload();
+    return next;
+  }
 }
 
 typedef AuthorPhotoChanged = Future<void> Function({
@@ -176,10 +201,18 @@ Future<void> syncFirebaseAuthProfile({
     throw StateError('Signed-in user required to update Auth profile fields.');
   }
   final name = displayName?.trim();
-  await Future.wait([
-    user.updateDisplayName(name == null || name.isEmpty ? null : name),
-    user.updatePhotoURL(photoUrl),
-  ]);
+  // Soft-fail Auth mirror — emulator / invalid photo URLs must not roll back
+  // a successful Firestore profile write.
+  try {
+    await user.updateDisplayName(name == null || name.isEmpty ? null : name);
+  } catch (error) {
+    debugPrint('Auth displayName sync skipped: $error');
+  }
+  try {
+    await user.updatePhotoURL(photoUrl);
+  } catch (error) {
+    debugPrint('Auth photoURL sync skipped: $error');
+  }
 }
 
 class UserRepository {
@@ -217,7 +250,10 @@ class UserRepository {
 
     try {
       final existing = await _store.get(user.uid);
-      if (existing != null) return existing;
+      if (existing != null) {
+        await _maybeBackfillSearchIndex(existing);
+        return existing;
+      }
 
       final now = DateTime.now().toUtc();
       final isAnonymous = user.isAnonymous;
@@ -249,15 +285,58 @@ class UserRepository {
     }
   }
 
+  /// Mirrors web ensureProfile search self-heal when tokens/lower fields drift.
+  Future<void> _maybeBackfillSearchIndex(UserProfile profile) async {
+    final expected = userSearchIndexFields(profile.displayName, profile.email);
+    final expectedTokens =
+        (expected['nameTokens'] as List?)?.cast<String>() ?? const <String>[];
+    final expectedDisplayLower = expected['displayNameLower'] as String?;
+    final expectedEmailLower = expected['emailLower'] as String?;
+    final existingTokens = profile.nameTokens ?? const <String>[];
+
+    final needsBackfill =
+        profile.displayNameLower != expectedDisplayLower ||
+            profile.emailLower != expectedEmailLower ||
+            !_sameTokenList(existingTokens, expectedTokens);
+
+    if (!needsBackfill) return;
+
+    try {
+      await _store.updateSearchIndex(
+        uid: profile.uid,
+        displayName: profile.displayName,
+        email: profile.email,
+      );
+    } catch (error) {
+      debugPrint('Search index backfill skipped: $error');
+    }
+  }
+
+  bool _sameTokenList(List<String> a, List<String> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
   Future<UserProfile> updateProfile(UserProfile profile) async {
     final next = profile.copyWith(updatedAt: DateTime.now().toUtc());
     await _store.update(next);
-    await _syncAuthProfile(
-      uid: next.uid,
-      displayName: next.displayName,
-      photoUrl: next.photoUrl,
-    );
+    try {
+      await _syncAuthProfile(
+        uid: next.uid,
+        displayName: next.displayName,
+        photoUrl: next.photoUrl,
+      );
+    } catch (error) {
+      debugPrint('Auth profile sync skipped: $error');
+    }
     return next;
+  }
+
+  Future<String> updateAccountEmail(String email) {
+    return _store.updateAccountEmail(email);
   }
 
   Future<UserProfile> updateAvatar({

@@ -20,6 +20,7 @@
   "roleGuest": "Invitado",
   "roleStudent": "Estudiante",
   "roleAgent": "Agente",
+  "roleAgencyOwner": "Dueño de agencia",
   "roleInstructor": "Instructor",
   "roleManager": "Gerente",
   "roleAdmin": "Admin",
@@ -67,6 +68,10 @@
   "validationPasswordMin": "Mínimo 6 caracteres.",
   "registerSubmit": "Crear cuenta",
   "registerHaveAccount": "¿Ya tienes cuenta? Iniciar sesión",
+  "accountGateDeactivatedTitle": "Cuenta desactivada",
+  "accountGateDeactivatedBody": "Esta cuenta está desactivada. Contacta a tu administrador o cierra sesión.",
+  "accountGateDeletionTitle": "Cuenta programada para eliminación",
+  "accountGateDeletionBody": "Esta cuenta está pendiente de eliminación. Cierra sesión o contacta soporte si fue un error.",
   "forgotTitle": "Recuperar acceso",
   "forgotSubtitle": "Te enviaremos un enlace para restablecer tu contraseña.",
   "forgotSubtitleSent": "Revisa tu correo y sigue el enlace para crear una nueva contraseña.",
@@ -146,6 +151,7 @@
   "securityPasswordSaved": "Contraseña actualizada.",
   "securityMfaTitle": "Verificación en dos pasos",
   "securityMfaHint": "Añade SMS o una app autenticadora como segundo factor.",
+  "securityMfaEmulatorSkip": "El alta de MFA se omite en el emulador de Auth. Usa Auth de producción para enrollar.",
   "securityEnrollTotp": "Añadir autenticador",
   "securityEnrollSms": "Añadir teléfono (SMS)",
   "securityTotpScan": "Escanea este código QR en tu app autenticadora y luego ingresa el código de 6 dígitos.",
@@ -193,6 +199,8 @@
   "editProfileAgentSubtitle": "NPN, dirección y agencia",
   "editProfileStudentSubtitle": "Nombre y teléfono",
   "editProfileSave": "Guardar cambios",
+  "profileEmailHint": "Este es el correo con el que inicias sesión.",
+  "errEmailInUse": "Ese correo ya está registrado.",
   "editProfileUpdateFailed": "No se pudo actualizar: {error}",
   "@editProfileUpdateFailed": {
     "placeholders": {
@@ -265,7 +273,9 @@
   "forumsSavedEmptySubtitle": "Guarda hilos para volver después — aparecerán aquí.",
   "forumsSaveThread": "Guardar hilo",
   "forumsUnsaveThread": "Quitar de guardados",
-  "promoBannerDismiss": "Cerrar promoción",
+  "promoBannerDismiss": "Ocultar",
+  "promoBannerHide": "Ocultar",
+  "promoBannerFromPulse": "Pulse",
   "forumsClearFilters": "Limpiar",
   "forumsReadOnlyBanner": "Modo lectura — regístrate para publicar.",
   "forumsFilterYourQuestions": "Tus preguntas",
@@ -421,6 +431,10 @@
   "chatsGuestPrompt": "Regístrate con una cuenta para enviar y recibir mensajes.",
   "chatsEmptyTitle": "Aún no tienes chats",
   "chatsEmptySubtitle": "Toca + para escribirle a un compañero.",
+  "chatsSelectTitle": "Elige una conversación",
+  "chatsSelectSubtitle": "Selecciona un chat de la lista para leer y responder.",
+  "forumsSelectTitle": "Elige una pregunta",
+  "forumsSelectSubtitle": "Abre un hilo del feed para leer las respuestas.",
   "chatsSectionPinned": "Fijados",
   "chatsSectionRecent": "Recientes",
   "chatsSectionCommunity": "Comunidad",
@@ -522,6 +536,14 @@
       }
     }
   },
+  "courseDurationSeconds": "{seconds}s",
+  "@courseDurationSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "courseDurationHoursMinutes": "{hours} h {minutes} min",
   "@courseDurationHoursMinutes": {
     "placeholders": {
@@ -587,6 +609,8 @@
   "playerLoading": "Cargando video…",
   "playerNoVideo": "Esta clase todavía no tiene video.",
   "playerError": "No se pudo reproducir el video.",
+  "playerFullscreen": "Pantalla grande",
+  "playerPip": "Picture in picture",
   "playerNextLesson": "Siguiente clase",
   "playerCourseCompleted": "¡Completaste el curso!",
   "playerLessonOf": "Clase {index} de {total}",
@@ -799,5 +823,31 @@
   "tourAcademyBody": "Explora cursos y rutas publicados, retoma donde lo dejaste y sigue tu progreso en Academia.",
   "tourYouTitle": "Tu espacio",
   "tourYouBody": "En Perfil están tus datos, preferencias de notificación y seguridad. Puedes volver a todo desde la navegación cuando quieras.",
-  "tourYouBodyAgent": "En Perfil están tus datos, notificaciones y seguridad. Los agentes pueden saltar a Studio desde el selector de apps para crear cursos."
+  "tourYouBodyAgent": "En Perfil están tus datos, notificaciones y seguridad. Los agentes pueden saltar a Studio desde el selector de apps para crear cursos.",
+  "profilePosts": "Publicaciones",
+  "profilePostsEmpty": "Aún no hay publicaciones.",
+  "profileStatPosts": "Posts",
+  "profileStatReplies": "Respuestas",
+  "profileStatLikes": "Me gusta",
+  "profileViewPublic": "Ver perfil público",
+  "fieldBio": "Bio",
+  "fieldBioHint": "Una presentación corta en tu perfil público (280 caracteres).",
+  "memberProfileTitle": "Perfil",
+  "memberNotFound": "No se encontró este miembro.",
+  "memberAddContact": "Agregar contacto",
+  "memberCancelRequest": "Cancelar solicitud",
+  "memberAcceptRequest": "Aceptar",
+  "memberDeclineRequest": "Rechazar",
+  "memberMessage": "Mensaje",
+  "memberRemoveContact": "Quitar contacto",
+  "memberMute": "Silenciar notificaciones de chat",
+  "memberUnmute": "Activar notificaciones",
+  "memberBlock": "Bloquear",
+  "memberUnblock": "Desbloquear",
+  "memberRequestsTitle": "Solicitudes de contacto",
+  "memberRequestsEmpty": "No hay solicitudes pendientes.",
+  "memberViewProfile": "Ver perfil",
+  "chatsNeedContacts": "Agréguese como contactos para iniciar un chat privado.",
+  "chatsDmDisabled": "Agréguese como contactos para seguir escribiendo.",
+  "chatsFindMembers": "Buscar miembros"
 }

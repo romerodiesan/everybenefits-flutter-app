@@ -342,3 +342,86 @@ class PulseContactListSkeleton extends StatelessWidget {
     );
   }
 }
+
+/// Course / learning catalog cards.
+class PulseCatalogSkeleton extends StatelessWidget {
+  const PulseCatalogSkeleton({super.key, this.itemCount = 4});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      itemCount: itemCount,
+      separatorBuilder: (_, _) => const SizedBox(height: 12),
+      itemBuilder: (_, _) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.of(context).sheet,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.of(context).border),
+        ),
+        child: const Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            PulseSkeleton(width: 72, height: 72, borderRadius: 14),
+            SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  PulseSkeleton(width: 160, height: 14),
+                  SizedBox(height: 8),
+                  PulseSkeleton(width: double.infinity, height: 11),
+                  SizedBox(height: 6),
+                  PulseSkeleton(width: 120, height: 11),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Generic settings / notification list rows.
+class PulseListSkeleton extends StatelessWidget {
+  const PulseListSkeleton({super.key, this.itemCount = 6});
+
+  final int itemCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.xl,
+      ),
+      itemCount: itemCount,
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
+      itemBuilder: (_, _) => Container(
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+        decoration: BoxDecoration(
+          color: AppColors.of(context).sheet,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.of(context).border),
+        ),
+        child: const Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            PulseSkeleton(width: 180, height: 13),
+            SizedBox(height: 8),
+            PulseSkeleton(width: double.infinity, height: 11),
+          ],
+        ),
+      ),
+    );
+  }
+}

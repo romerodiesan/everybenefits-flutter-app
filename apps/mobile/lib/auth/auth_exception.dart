@@ -56,6 +56,7 @@ class AuthException implements Exception {
         return l10n.authErrUserNotFound;
       case 'wrong-password':
       case 'invalid-credential':
+      case 'invalid-login-credentials':
         return l10n.authErrWrongPassword;
       case 'email-already-in-use':
         return l10n.authErrEmailInUse;
@@ -83,9 +84,11 @@ class AuthException implements Exception {
       case 'credential-already-in-use':
         return l10n.authErrCredentialInUse;
       case 'invalid-verification-code':
-        return l10n.authErrInvalidSms;
+      case 'code-expired':
       case 'session-expired':
-        return l10n.authErrSmsExpired;
+        return code == 'session-expired' || code == 'code-expired'
+            ? l10n.authErrSmsExpired
+            : l10n.authErrInvalidSms;
       case 'operation-not-allowed':
         return l10n.authErrOpNotAllowed;
       default:

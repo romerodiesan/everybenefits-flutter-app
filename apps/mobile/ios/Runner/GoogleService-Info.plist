@@ -3,25 +3,23 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>978334689853-tkm6t93ck27fnq16prpg4pshst6a1q1g.apps.googleusercontent.com</string>
+	<string>1001601265155-9g2khfbo51k1ccsj31ilc1ciarq7rl7e.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.978334689853-tkm6t93ck27fnq16prpg4pshst6a1q1g</string>
+	<string>com.googleusercontent.apps.1001601265155-9g2khfbo51k1ccsj31ilc1ciarq7rl7e</string>
 	<key>ANDROID_CLIENT_ID</key>
-	<string>978334689853-gtsd6137qfiun197dvd5fno8agc5f3mv.apps.googleusercontent.com</string>
+	<string>1001601265155-jiv5dtk9v55uoa3qpo6vm57s6lsg2t8q.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyCqRJ1zBd7kKsv_EYZHIdepmqlPVTFwbpM</string>
+	<string>AIzaSyD5m-1RB6HQuBXwUfSKFBCDkdzNjSCiPLo</string>
 	<key>GCM_SENDER_ID</key>
-	<string>978334689853</string>
+	<string>1001601265155</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.everybenefits.everyinsurance</string>
+	<string>us.everybenefits.Every-Insurance</string>
 	<key>PROJECT_ID</key>
-	<string>every-insurance</string>
+	<string>every-benefits-us</string>
 	<key>STORAGE_BUCKET</key>
-	<string>every-insurance.firebasestorage.app</string>
-	<key>DATABASE_URL</key>
-	<string>https://every-insurance-default-rtdb.firebaseio.com</string>
+	<string>every-benefits-us.appspot.com</string>
 	<key>IS_ADS_ENABLED</key>
 	<false></false>
 	<key>IS_ANALYTICS_ENABLED</key>
@@ -33,6 +31,8 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:978334689853:ios:ed3ada3846885b5e7d1854</string>
+	<string>1:1001601265155:ios:b198277d563832e2d8e836</string>
+	<key>DATABASE_URL</key>
+	<string>https://every-benefits-us-default-rtdb.firebaseio.com</string>
 </dict>
 </plist>

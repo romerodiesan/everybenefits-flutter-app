@@ -1,7 +1,7 @@
 import 'notification_models.dart';
 
 /// In-app destination resolved from a notification payload.
-enum NotificationTargetKind { forum, chat, academy, inbox }
+enum NotificationTargetKind { forum, chat, academy, member, inbox }
 
 class NotificationTarget {
   const NotificationTarget(this.kind, [this.id]);
@@ -33,6 +33,10 @@ NotificationTarget notificationTargetFor(AppNotification item) {
   final courseId = ref['courseId']?.trim();
   if (courseId != null && courseId.isNotEmpty) {
     return NotificationTarget(NotificationTargetKind.academy, courseId);
+  }
+  final memberId = ref['uid']?.trim();
+  if (memberId != null && memberId.isNotEmpty) {
+    return NotificationTarget(NotificationTargetKind.member, memberId);
   }
   return const NotificationTarget(NotificationTargetKind.inbox);
 }
@@ -73,6 +77,12 @@ NotificationTarget? _fromSegments(String? head, List<String> rest) {
     case 'courses':
       if (id.isEmpty) return const NotificationTarget(NotificationTargetKind.inbox);
       return NotificationTarget(NotificationTargetKind.academy, id);
+    case 'members':
+    case 'member':
+      if (id.isEmpty) {
+        return const NotificationTarget(NotificationTargetKind.inbox);
+      }
+      return NotificationTarget(NotificationTargetKind.member, id);
     case 'notifications':
     case 'notification':
       return const NotificationTarget(NotificationTargetKind.inbox);

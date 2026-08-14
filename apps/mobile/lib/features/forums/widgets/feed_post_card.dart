@@ -22,6 +22,8 @@ class FeedPostCard extends StatelessWidget {
     this.onTagTap,
     this.onShare,
     this.onToggleSave,
+    this.onAuthorTap,
+    this.selected = false,
   });
 
   final ForumThread thread;
@@ -33,6 +35,8 @@ class FeedPostCard extends StatelessWidget {
   final ValueChanged<String>? onTagTap;
   final VoidCallback? onShare;
   final VoidCallback? onToggleSave;
+  final VoidCallback? onAuthorTap;
+  final bool selected;
 
   @override
   Widget build(BuildContext context) {
@@ -50,7 +54,17 @@ class FeedPostCard extends StatelessWidget {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-      child: GestureDetector(
+      child: DecoratedBox(
+        decoration: selected
+            ? BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(
+                  color: AppColors.brandOf(context).withValues(alpha: 0.55),
+                  width: 1.5,
+                ),
+              )
+            : const BoxDecoration(),
+        child: GestureDetector(
         // Instagram-style double tap to like; single tap still opens.
         onDoubleTap: onLike,
         child: PulseSheet(
@@ -62,20 +76,27 @@ class FeedPostCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ForumAvatar(
-                  name: thread.authorName,
-                  photoUrl: thread.authorPhotoUrl,
-                  size: 44,
+                GestureDetector(
+                  onTap: onAuthorTap,
+                  child: ForumAvatar(
+                    name: thread.authorName,
+                    photoUrl: thread.authorPhotoUrl,
+                    size: 44,
+                  ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
-                  child: ForumMetaLine(
+                  child: GestureDetector(
+                    onTap: onAuthorTap,
+                    child: ForumMetaLine(
                     authorName: thread.authorName,
                     role: thread.authorRole,
+                    badge: thread.authorBadge,
                     at: thread.lastReplyAt,
                     social: true,
                     showRole: true,
                     dense: true,
+                  ),
                   ),
                 ),
                 if (onToggleSave != null)
@@ -171,6 +192,7 @@ class FeedPostCard extends StatelessWidget {
           ],
         ),
         ),
+      ),
       ),
     );
   }

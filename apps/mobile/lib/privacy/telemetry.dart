@@ -19,7 +19,9 @@ class TelemetryPrefs {
   static Future<void> setAnalyticsEnabled(bool enabled) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(analyticsKey, enabled);
-    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(enabled);
+    await FirebaseAnalytics.instance.setAnalyticsCollectionEnabled(
+      enabled && !useFirebaseEmulators,
+    );
   }
 }
 
@@ -29,7 +31,10 @@ class TelemetryPrefs {
 /// Analytics stays off until the user opts in from Settings.
 Future<void> initTelemetry() async {
   try {
-    final analyticsEnabled = await TelemetryPrefs.isAnalyticsEnabled();
+    // Native Analytics still pings google-analytics.com at Firebase.initializeApp.
+    // Keep collection off on emulators so debug TLS noise isn't mixed with local Auth.
+    final analyticsEnabled = !useFirebaseEmulators &&
+        await TelemetryPrefs.isAnalyticsEnabled();
 
     // Emulators / debug: never ship crash reports to production Crashlytics.
     final crashEnabled = !kIsWeb && !kDebugMode && !useFirebaseEmulators;

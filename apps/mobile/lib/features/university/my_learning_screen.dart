@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import 'course_detail_screen.dart';
@@ -112,7 +113,7 @@ class _MyLearningScreenState extends State<MyLearningScreen> {
     return PulseScaffold(
       appBar: AppBar(title: Text(l10n.academyMyLearning)),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const PulseCatalogSkeleton()
           : _error != null
               ? AcademyMessage(
                   icon: Icons.cloud_off_rounded,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../app/app_spacing.dart';
+import '../../../app/layout/pulse_adaptive_sheet.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/glass_card.dart';
 import '../../../l10n/l10n.dart';
@@ -9,6 +10,8 @@ import '../../../users/users.dart';
 
 typedef ProfileFormData = ({
   String displayName,
+  String? email,
+  String? bio,
   String phoneCountryCode,
   String phoneNumber,
   String? npn,
@@ -34,7 +37,7 @@ class PhoneCountryField extends StatelessWidget {
   final ValueChanged<PhoneCountry> onChanged;
 
   Future<void> _pick(BuildContext context) async {
-    final selected = await showModalBottomSheet<PhoneCountry>(
+    final selected = await showPulseSheet<PhoneCountry>(
       context: context,
       backgroundColor: AppColors.of(context).meshDeep,
       shape: const RoundedRectangleBorder(
@@ -96,6 +99,8 @@ class ProfileDetailsForm extends StatefulWidget {
     required this.accountType,
     required this.onSubmit,
     this.initialName,
+    this.initialEmail,
+    this.initialBio,
     this.initialCountryCode,
     this.initialPhoneNumber,
     this.initialNpn,
@@ -109,11 +114,14 @@ class ProfileDetailsForm extends StatefulWidget {
     this.busy = false,
     this.lockName = false,
     this.lockNpn = false,
+    this.showEmail = false,
   });
 
   final UserRole accountType;
   final Future<void> Function(ProfileFormData data) onSubmit;
   final String? initialName;
+  final String? initialEmail;
+  final String? initialBio;
   final String? initialCountryCode;
   final String? initialPhoneNumber;
   final String? initialNpn;
@@ -127,6 +135,7 @@ class ProfileDetailsForm extends StatefulWidget {
   final bool busy;
   final bool lockName;
   final bool lockNpn;
+  final bool showEmail;
 
   @override
   State<ProfileDetailsForm> createState() => _ProfileDetailsFormState();
@@ -136,6 +145,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _givenName;
   late final TextEditingController _familyName;
+  late final TextEditingController _email;
   late final TextEditingController _phone;
   late final TextEditingController _npn;
   late final TextEditingController _street;
@@ -144,12 +154,11 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   late final TextEditingController _state;
   late final TextEditingController _zip;
   late final TextEditingController _agency;
+  late final TextEditingController _bio;
   late PhoneCountry _country;
 
   bool get _isAgent =>
-      widget.accountType == UserRole.agent ||
-      widget.accountType == UserRole.instructor ||
-      widget.accountType == UserRole.admin;
+      requiresLicenseProfile(widget.accountType.wireValue);
 
   @override
   void initState() {
@@ -157,6 +166,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
     final parts = splitDisplayName(widget.initialName ?? '');
     _givenName = TextEditingController(text: parts.givenName);
     _familyName = TextEditingController(text: parts.familyName);
+    _email = TextEditingController(text: widget.initialEmail ?? '');
     _phone = TextEditingController(text: widget.initialPhoneNumber ?? '');
     _npn = TextEditingController(text: widget.initialNpn ?? '');
     _street = TextEditingController(text: widget.initialAddressStreet ?? '');
@@ -171,6 +181,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
           ? widget.initialAgency!
           : kDefaultAgency,
     );
+    _bio = TextEditingController(text: widget.initialBio ?? '');
     _country = phoneCountryByDialCode(widget.initialCountryCode);
   }
 
@@ -178,6 +189,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   void dispose() {
     _givenName.dispose();
     _familyName.dispose();
+    _email.dispose();
     _phone.dispose();
     _npn.dispose();
     _street.dispose();
@@ -186,6 +198,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
     _state.dispose();
     _zip.dispose();
     _agency.dispose();
+    _bio.dispose();
     super.dispose();
   }
 
@@ -196,6 +209,8 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
         : composeDisplayName(_givenName.text, _familyName.text);
     await widget.onSubmit((
       displayName: displayName,
+      email: widget.showEmail ? _email.text.trim().toLowerCase() : null,
+      bio: _bio.text.trim().isEmpty ? null : _bio.text.trim(),
       phoneCountryCode: _country.dialCode,
       phoneNumber: _phone.text.trim(),
       npn: _isAgent
@@ -280,6 +295,38 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
               },
             ),
           ],
+          if (widget.showEmail) ...[
+            const SizedBox(height: AppSpacing.sm),
+            TextFormField(
+              controller: _email,
+              keyboardType: TextInputType.emailAddress,
+              autocorrect: false,
+              textInputAction: TextInputAction.next,
+              decoration: InputDecoration(
+                labelText: l10n.fieldEmail,
+                helperText: l10n.profileEmailHint,
+              ),
+              validator: (value) {
+                final raw = (value ?? '').trim();
+                if (raw.isEmpty || !raw.contains('@') || !raw.contains('.')) {
+                  return l10n.validationEmail;
+                }
+                return null;
+              },
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          TextFormField(
+            controller: _bio,
+            maxLength: 280,
+            minLines: 2,
+            maxLines: 4,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: InputDecoration(
+              labelText: l10n.fieldBio,
+              helperText: l10n.fieldBioHint,
+            ),
+          ),
           const SizedBox(height: AppSpacing.md),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,

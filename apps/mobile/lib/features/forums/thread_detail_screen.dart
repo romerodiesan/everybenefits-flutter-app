@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_adaptive_sheet.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/empty_state.dart';
 import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
+import '../../app/widgets/role_badge.dart' show RoleBadge;
 import '../../l10n/l10n.dart';
 import '../../users/users.dart';
 import '../chats/chat_repository.dart';
@@ -26,12 +28,14 @@ class ThreadDetailScreen extends StatefulWidget {
     required this.profile,
     required this.forumRepository,
     this.chatRepository,
+    this.embedded = false,
   });
 
   final String threadId;
   final UserProfile profile;
   final ForumRepository forumRepository;
   final ChatRepository? chatRepository;
+  final bool embedded;
 
   @override
   State<ThreadDetailScreen> createState() => _ThreadDetailScreenState();
@@ -56,14 +60,23 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
   static const _composerRadius = BorderRadius.all(Radius.circular(20));
 
-  bool get _canPost => canParticipateInForums(
-        role: widget.profile.role,
-        isAnonymous: widget.profile.isAnonymous,
-      );
+  bool get _canPost {
+    final access = AccessScope.accessOf(
+      context,
+      fallbackRoleId: widget.profile.roleId,
+    );
+    return canParticipateInForums(
+      roleOrPermissions: access,
+      isAnonymous: widget.profile.isAnonymous,
+    );
+  }
 
   bool _isAuthorOrAdmin(String authorId) {
-    return widget.profile.role == UserRole.admin ||
-        authorId == widget.profile.uid;
+    final access = AccessScope.accessOf(
+      context,
+      fallbackRoleId: widget.profile.roleId,
+    );
+    return canModerateForums(access) || authorId == widget.profile.uid;
   }
 
   @override
@@ -161,7 +174,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _editThread(ForumThread thread) async {
-    final result = await showModalBottomSheet<_EditThreadResult>(
+    final result = await showPulseSheet<_EditThreadResult>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -182,7 +195,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
   }
 
   Future<void> _editReply(ForumReply reply) async {
-    final body = await showModalBottomSheet<String>(
+    final body = await showPulseSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -293,6 +306,7 @@ class _ThreadDetailScreenState extends State<ThreadDetailScreen> {
 
         return PulseScaffold(
           appBar: AppBar(
+            automaticallyImplyLeading: !widget.embedded,
             title: Text(
               thread?.title ?? l10n.threadFallbackTitle,
               maxLines: 1,
@@ -523,6 +537,7 @@ class _OriginalPost extends StatelessWidget {
                       child: ForumMetaLine(
                         authorName: thread.authorName,
                         role: thread.authorRole,
+                        badge: thread.authorBadge,
                         at: thread.createdAt,
                         social: true,
                         dense: true,
@@ -735,62 +750,68 @@ class _PulseAnswer extends StatelessWidget {
                     children: [
                       Row(
                         children: [
-                          Expanded(
+                          Flexible(
                             child: Text(
                               reply.authorName,
+                              overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.labelLarge?.copyWith(
                                     fontWeight: FontWeight.w800,
                                     fontSize: 13,
                                     letterSpacing: -0.1,
                                     color: colors.ink,
                                   ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          RoleBadge(
+                            badge: reply.authorBadge,
+                            dense: true,
+                          ),
+                          if (accepted)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.brandOf(context)
+                                    .withValues(alpha: 0.14),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: Text(
+                                l10n.acceptedBadge,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: AppColors.brandOf(context),
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 10,
                                 ),
                               ),
-                              if (accepted)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.brandOf(context)
-                                        .withValues(alpha: 0.14),
-                                    borderRadius: BorderRadius.circular(999),
-                                  ),
-                                  child: Text(
-                                    l10n.acceptedBadge,
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: AppColors.brandOf(context),
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 10,
-                                    ),
-                                  ),
+                            ),
+                          if (canManage)
+                            PopupMenuButton<_ThreadAction>(
+                              tooltip: l10n.actionOptions,
+                              padding: EdgeInsets.zero,
+                              onSelected: (action) {
+                                switch (action) {
+                                  case _ThreadAction.edit:
+                                    onEdit();
+                                  case _ThreadAction.delete:
+                                    onDelete();
+                                }
+                              },
+                              itemBuilder: (context) => [
+                                PopupMenuItem(
+                                  value: _ThreadAction.edit,
+                                  child: Text(l10n.actionEdit),
                                 ),
-                              if (canManage)
-                                PopupMenuButton<_ThreadAction>(
-                                  tooltip: l10n.actionOptions,
-                                  padding: EdgeInsets.zero,
-                                  onSelected: (action) {
-                                    switch (action) {
-                                      case _ThreadAction.edit:
-                                        onEdit();
-                                      case _ThreadAction.delete:
-                                        onDelete();
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    PopupMenuItem(
-                                      value: _ThreadAction.edit,
-                                      child: Text(l10n.actionEdit),
-                                    ),
-                                    PopupMenuItem(
-                                      value: _ThreadAction.delete,
-                                      child: Text(l10n.actionDelete),
-                                    ),
-                                  ],
+                                PopupMenuItem(
+                                  value: _ThreadAction.delete,
+                                  child: Text(l10n.actionDelete),
                                 ),
-                            ],
-                          ),
+                              ],
+                            ),
+                        ],
+                      ),
                           const SizedBox(height: 3),
                           Text(
                             reply.body,

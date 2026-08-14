@@ -151,3 +151,46 @@ bool isAuthEmulatorIdToken(String? idToken) {
     return false;
   }
 }
+
+/// Rewrites Storage download URLs that point at loopback so a physical device
+/// can reach the Storage emulator on [firebaseEmulatorHost].
+///
+/// Also strips legacy `v=` query params that make the emulator return an empty body.
+String rewriteEmulatorStorageUrl(String url, {String? host, int port = 9199}) {
+  final trimmed = url.trim();
+  if (trimmed.isEmpty) return trimmed;
+
+  var cleaned = trimmed;
+  final uri = Uri.tryParse(trimmed);
+  if (uri != null && uri.hasQuery && uri.queryParameters.containsKey('v')) {
+    final params = Map<String, String>.from(uri.queryParameters)..remove('v');
+    cleaned = uri
+        .replace(queryParameters: params.isEmpty ? null : params)
+        .toString();
+  } else {
+    cleaned = trimmed
+        .replaceAll(RegExp(r'([?&])v=\d+&'), r'$1')
+        .replaceAll(RegExp(r'[?&]v=\d+$'), '')
+        .replaceAll(RegExp(r'\?&'), '?');
+  }
+
+  if (!useFirebaseEmulators) return cleaned;
+
+  final parsed = Uri.tryParse(cleaned);
+  if (parsed == null || !parsed.hasScheme) return cleaned;
+
+  final loopback = parsed.host == '127.0.0.1' ||
+      parsed.host == 'localhost' ||
+      parsed.host == '0.0.0.0' ||
+      parsed.host == '10.0.2.2';
+  final storagePort = parsed.hasPort ? parsed.port == port : false;
+  if (!loopback && !storagePort) return cleaned;
+
+  final emulatorHost = host ?? firebaseEmulatorHost();
+  return parsed
+      .replace(
+        host: emulatorHost,
+        port: parsed.hasPort ? parsed.port : port,
+      )
+      .toString();
+}

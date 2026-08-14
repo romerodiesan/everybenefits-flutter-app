@@ -22,10 +22,32 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.978334689853-tkm6t93ck27fnq16prpg4pshst6a1q1g</string>
+			</array>
+		</dict>
+	</array>
 	<key>CFBundleVersion</key>
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSCameraUsageDescription</key>
+	<string>Every Insurance necesita la cámara para tomar tu foto de perfil.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Pulse Insurance usa la red local para transmitir cursos y videos en otros dispositivos a los que quieras acceder.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Every Insurance necesita acceso a tus fotos para actualizar tu avatar y subir photos en los posts.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
@@ -49,17 +71,6 @@
 	</dict>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>CFBundleURLTypes</key>
-	<array>
-		<dict>
-			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
-			<key>CFBundleURLSchemes</key>
-			<array>
-				<string>com.googleusercontent.apps.978334689853-tkm6t93ck27fnq16prpg4pshst6a1q1g</string>
-			</array>
-		</dict>
-	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -77,16 +88,5 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Every Insurance necesita acceso a tus fotos para actualizar tu avatar.</string>
-	<key>NSCameraUsageDescription</key>
-	<string>Every Insurance necesita la cámara para tomar tu foto de perfil.</string>
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Every Insurance usa la red local en desarrollo para hablar con los emuladores de Firebase en tu Mac.</string>
-	<key>NSAppTransportSecurity</key>
-	<dict>
-		<key>NSAllowsLocalNetworking</key>
-		<true/>
-	</dict>
 </dict>
 </plist>

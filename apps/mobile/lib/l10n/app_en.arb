@@ -20,6 +20,7 @@
   "roleGuest": "Guest",
   "roleStudent": "Student",
   "roleAgent": "Agent",
+  "roleAgencyOwner": "Agency owner",
   "roleInstructor": "Instructor",
   "roleManager": "Manager",
   "roleAdmin": "Admin",
@@ -67,6 +68,10 @@
   "validationPasswordMin": "At least 6 characters.",
   "registerSubmit": "Create account",
   "registerHaveAccount": "Already have an account? Sign in",
+  "accountGateDeactivatedTitle": "Account deactivated",
+  "accountGateDeactivatedBody": "This account has been deactivated. Contact your administrator or sign out.",
+  "accountGateDeletionTitle": "Account scheduled for deletion",
+  "accountGateDeletionBody": "This account is pending deletion. Sign out, or contact support if this was a mistake.",
   "forgotTitle": "Recover access",
   "forgotSubtitle": "We'll send a link to reset your password.",
   "forgotSubtitleSent": "Check your email and follow the link to create a new password.",
@@ -146,6 +151,7 @@
   "securityPasswordSaved": "Password updated.",
   "securityMfaTitle": "Two-step verification",
   "securityMfaHint": "Add SMS or an authenticator app as a second factor.",
+  "securityMfaEmulatorSkip": "MFA enrollment is skipped on the Auth emulator. Use production Auth to enroll.",
   "securityEnrollTotp": "Add authenticator",
   "securityEnrollSms": "Add phone (SMS)",
   "securityTotpScan": "Scan this QR code in your authenticator app, then enter the 6-digit code.",
@@ -193,6 +199,8 @@
   "editProfileAgentSubtitle": "NPN, address, and agency",
   "editProfileStudentSubtitle": "Name and phone",
   "editProfileSave": "Save changes",
+  "profileEmailHint": "This is the email you use to sign in.",
+  "errEmailInUse": "That email is already registered.",
   "editProfileUpdateFailed": "Couldn't update: {error}",
   "@editProfileUpdateFailed": {
     "placeholders": {
@@ -265,7 +273,9 @@
   "forumsSavedEmptySubtitle": "Bookmark threads you want to revisit — they'll show up here.",
   "forumsSaveThread": "Save thread",
   "forumsUnsaveThread": "Remove bookmark",
-  "promoBannerDismiss": "Dismiss promotion",
+  "promoBannerDismiss": "Hide",
+  "promoBannerHide": "Hide",
+  "promoBannerFromPulse": "Pulse",
   "forumsClearFilters": "Clear",
   "forumsReadOnlyBanner": "Read-only — sign up to post.",
   "forumsFilterYourQuestions": "Your questions",
@@ -421,6 +431,10 @@
   "chatsGuestPrompt": "Sign up with an account to send and receive messages.",
   "chatsEmptyTitle": "You don't have chats yet",
   "chatsEmptySubtitle": "Tap + to message a teammate.",
+  "chatsSelectTitle": "Pick a conversation",
+  "chatsSelectSubtitle": "Choose a chat from the list to read and reply.",
+  "forumsSelectTitle": "Pick a question",
+  "forumsSelectSubtitle": "Open a thread from the feed to read answers.",
   "chatsSectionPinned": "Pinned",
   "chatsSectionRecent": "Recent",
   "chatsSectionCommunity": "Community",
@@ -522,6 +536,14 @@
       }
     }
   },
+  "courseDurationSeconds": "{seconds}s",
+  "@courseDurationSeconds": {
+    "placeholders": {
+      "seconds": {
+        "type": "int"
+      }
+    }
+  },
   "courseDurationHoursMinutes": "{hours} h {minutes} min",
   "@courseDurationHoursMinutes": {
     "placeholders": {
@@ -587,6 +609,8 @@
   "playerLoading": "Loading video…",
   "playerNoVideo": "This lesson has no video yet.",
   "playerError": "The video couldn't be played.",
+  "playerFullscreen": "Full screen",
+  "playerPip": "Picture in picture",
   "playerNextLesson": "Next lesson",
   "playerCourseCompleted": "You finished the course!",
   "playerLessonOf": "Lesson {index} of {total}",
@@ -799,5 +823,31 @@
   "tourAcademyBody": "Browse published courses and paths, resume where you left off, and track progress from Academy.",
   "tourYouTitle": "Your space",
   "tourYouBody": "Profile holds your details, notification preferences, and security options. You can revisit anything from the nav anytime.",
-  "tourYouBodyAgent": "Profile holds your details, notification preferences, and security. Agents can jump to Studio from the app switcher to author courses."
+  "tourYouBodyAgent": "Profile holds your details, notification preferences, and security. Agents can jump to Studio from the app switcher to author courses.",
+  "fieldBio": "Bio",
+  "fieldBioHint": "A short intro on your public profile (280 characters).",
+  "profilePosts": "Posts",
+  "profilePostsEmpty": "No posts yet.",
+  "profileStatPosts": "Posts",
+  "profileStatReplies": "Replies",
+  "profileStatLikes": "Likes",
+  "profileViewPublic": "View public profile",
+  "memberProfileTitle": "Profile",
+  "memberNotFound": "This member could not be found.",
+  "memberAddContact": "Add contact",
+  "memberCancelRequest": "Cancel request",
+  "memberAcceptRequest": "Accept",
+  "memberDeclineRequest": "Decline",
+  "memberMessage": "Message",
+  "memberRemoveContact": "Remove contact",
+  "memberMute": "Mute chat notifications",
+  "memberUnmute": "Unmute notifications",
+  "memberBlock": "Block",
+  "memberUnblock": "Unblock",
+  "memberRequestsTitle": "Contact requests",
+  "memberRequestsEmpty": "No pending requests.",
+  "memberViewProfile": "View profile",
+  "chatsNeedContacts": "Add each other as contacts to start a private chat.",
+  "chatsDmDisabled": "Add each other as contacts to keep messaging.",
+  "chatsFindMembers": "Find members"
 }

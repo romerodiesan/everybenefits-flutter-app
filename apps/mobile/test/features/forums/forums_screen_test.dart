@@ -48,6 +48,21 @@ class _MemoryForumStore implements ForumStore {
   }
 
   @override
+  Stream<ForumThreadPage> watchThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+  }) async* {
+    yield await queryThreads(
+      tag: tag,
+      authorId: authorId,
+      sort: sort,
+      limit: limit,
+    );
+  }
+
+  @override
   Stream<ForumThread?> watchThread(String threadId) async* {
     yield seed.cast<ForumThread?>().firstWhere(
           (t) => t?.id == threadId,

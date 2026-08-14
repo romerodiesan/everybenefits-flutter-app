@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/layout/pulse_breakpoints.dart';
 import '../../app/theme.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
@@ -35,7 +36,7 @@ class ProductTourTargets {
   }
 }
 
-/// Coachmark tour that spotlights real shell chrome.
+/// Coachmark tour that spotlights shell chrome and pins a card away from it.
 class ProductTourOverlay extends StatefulWidget {
   const ProductTourOverlay({
     super.key,
@@ -59,6 +60,7 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
   bool _busy = false;
   bool? _show;
   Rect? _hole;
+  int _measureAttempts = 0;
 
   static const _steps = <ProductTourStepId>[
     ProductTourStepId.welcome,
@@ -69,11 +71,8 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
   ];
 
   bool get _isAgent {
-    final role = widget.profile.role;
-    return role == UserRole.agent ||
-        role == UserRole.admin ||
-        role == UserRole.instructor ||
-        role == UserRole.manager;
+    return belongsInDefaultAgentGroup(widget.profile.roleId) ||
+        canAccessTools(widget.profile.roleId);
   }
 
   @override
@@ -93,6 +92,7 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
     );
     setState(() => _show = show);
     if (show) {
+      _measureAttempts = 0;
       WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
     }
   }
@@ -113,21 +113,32 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
       setState(() => _page = _steps.isEmpty ? 0 : _steps.length - 1);
       return;
     }
+    final overlayBox = context.findRenderObject() as RenderBox?;
     final key = widget.targets.keyFor(_steps[_page]);
-    final ctx = key?.currentContext;
-    final box = ctx?.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) {
-      setState(() => _hole = null);
+    final targetBox = key?.currentContext?.findRenderObject() as RenderBox?;
+    if (overlayBox == null ||
+        !overlayBox.hasSize ||
+        targetBox == null ||
+        !targetBox.hasSize) {
+      if (_hole != null) setState(() => _hole = null);
+      if (_measureAttempts < 8) {
+        _measureAttempts++;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || _show != true) return;
+          _measure();
+        });
+      }
       return;
     }
-    final offset = box.localToGlobal(Offset.zero);
+    _measureAttempts = 0;
+    final offset = targetBox.localToGlobal(Offset.zero, ancestor: overlayBox);
     const pad = 8.0;
     setState(() {
       _hole = Rect.fromLTWH(
         offset.dx - pad,
         offset.dy - pad,
-        box.size.width + pad * 2,
-        box.size.height + pad * 2,
+        targetBox.size.width + pad * 2,
+        targetBox.size.height + pad * 2,
       );
     });
   }
@@ -154,6 +165,7 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
   }
 
   void _goTo(int page) {
+    _measureAttempts = 0;
     setState(() => _page = page.clamp(0, _steps.length - 1));
     WidgetsBinding.instance.addPostFrameCallback((_) => _measure());
   }
@@ -179,157 +191,229 @@ class _ProductTourOverlayState extends State<ProductTourOverlay> {
     };
   }
 
+  /// Pin the card to the larger gap so it never shares a tight strip with the
+  /// spotlight (that leftover ~250px slot is what broke layout before).
+  bool _pinCardToTop({
+    required Size size,
+    required EdgeInsets padding,
+    required bool rail,
+  }) {
+    final hole = _hole;
+    if (hole == null) return true;
+    if (rail && hole.left < 180) return true;
+    final topGap = hole.top - padding.top;
+    final bottomGap = size.height - padding.bottom - hole.bottom;
+    return topGap >= bottomGap;
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_show != true) return const SizedBox.shrink();
+    if (_show != true || _steps.isEmpty) {
+      return const IgnorePointer(ignoring: true, child: SizedBox.shrink());
+    }
 
     final l10n = context.l10n;
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    if (_steps.isEmpty) return const SizedBox.shrink();
+    final media = MediaQuery.of(context);
+    final rail = pulseUseRail(context);
     final step = _steps[_page.clamp(0, _steps.length - 1)];
-    final isLast = _page >= _steps.length - 1;
-    final size = MediaQuery.sizeOf(context);
+    final pinTop = _pinCardToTop(
+      size: media.size,
+      padding: media.padding,
+      rail: rail,
+    );
 
-    final tipTop = () {
-      final hole = _hole;
-      if (hole == null) return size.height * 0.35;
-      final spaceBelow = size.height - hole.bottom;
-      if (spaceBelow > 200) return hole.bottom + 14;
-      return (hole.top - 170).clamp(24.0, size.height - 200);
-    }();
+    final card = _TourCard(
+      key: ValueKey(step),
+      eyebrow: l10n.tourEyebrow.toUpperCase(),
+      stepLabel: l10n.tourStep(_page + 1, _steps.length),
+      title: _title(l10n, step),
+      body: _body(l10n, step),
+      skipLabel: l10n.tourSkip,
+      backLabel: l10n.tourBack,
+      nextLabel: _page >= _steps.length - 1 ? l10n.tourDone : l10n.tourNext,
+      page: _page,
+      pageCount: _steps.length,
+      busy: _busy,
+      brand: brand,
+      colors: colors,
+      showBack: _page > 0,
+      onSkip: _finish,
+      onBack: () => _goTo(_page - 1),
+      onNext: () {
+        if (_page >= _steps.length - 1) {
+          _finish();
+        } else {
+          _goTo(_page + 1);
+        }
+      },
+    );
 
     return Material(
       type: MaterialType.transparency,
       child: Stack(
+        fit: StackFit.expand,
         children: [
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _SpotlightPainter(
-                hole: _hole,
-                scrim: Colors.black.withValues(alpha: 0.72),
-                ring: brand,
-              ),
+          CustomPaint(
+            painter: _SpotlightPainter(
+              hole: _hole,
+              scrim: Colors.black.withValues(alpha: 0.72),
+              ring: brand,
             ),
+            child: const SizedBox.expand(),
           ),
           Positioned(
-            left: 16,
+            left: rail ? 88 : 16,
             right: 16,
-            top: tipTop,
-            child: IgnorePointer(
-              ignoring: false,
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 280),
-                child: DecoratedBox(
-                  key: ValueKey(step),
-                  decoration: BoxDecoration(
-                    color: colors.sheet,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: colors.border),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.28),
-                        blurRadius: 24,
-                        offset: const Offset(0, 12),
-                      ),
-                    ],
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Row(
-                          children: [
-                            Text(
-                              l10n.tourEyebrow.toUpperCase(),
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 1.1,
-                                color: brand,
-                              ),
-                            ),
-                            const Spacer(),
-                            TextButton(
-                              onPressed: _busy ? null : _finish,
-                              child: Text(l10n.tourSkip),
-                            ),
-                          ],
-                        ),
-                        Text(
-                          l10n.tourStep(_page + 1, _steps.length),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: colors.muted,
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          _title(l10n, step),
-                          style: Theme.of(context).textTheme.titleLarge
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          _body(l10n, step),
-                          style: Theme.of(context).textTheme.bodyMedium
-                              ?.copyWith(color: colors.muted, height: 1.4),
-                        ),
-                        const SizedBox(height: 14),
-                        Row(
-                          children: [
-                            for (var i = 0; i < _steps.length; i++) ...[
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: i == _page ? 18 : 7,
-                                height: 7,
-                                decoration: BoxDecoration(
-                                  color: i == _page
-                                      ? brand
-                                      : i < _page
-                                      ? brand.withValues(alpha: 0.45)
-                                      : colors.border,
-                                  borderRadius: BorderRadius.circular(99),
-                                ),
-                              ),
-                              if (i < _steps.length - 1)
-                                const SizedBox(width: 5),
-                            ],
-                            const Spacer(),
-                            if (_page > 0)
-                              TextButton(
-                                onPressed: _busy
-                                    ? null
-                                    : () => _goTo(_page - 1),
-                                child: Text(l10n.tourBack),
-                              ),
-                            FilledButton(
-                              onPressed: _busy
-                                  ? null
-                                  : () {
-                                      if (isLast) {
-                                        _finish();
-                                      } else {
-                                        _goTo(_page + 1);
-                                      }
-                                    },
-                              child: Text(
-                                isLast ? l10n.tourDone : l10n.tourNext,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
+            top: pinTop ? media.padding.top + 12 : null,
+            bottom: pinTop ? null : media.padding.bottom + 12,
+            child: card,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TourCard extends StatelessWidget {
+  const _TourCard({
+    super.key,
+    required this.eyebrow,
+    required this.stepLabel,
+    required this.title,
+    required this.body,
+    required this.skipLabel,
+    required this.backLabel,
+    required this.nextLabel,
+    required this.page,
+    required this.pageCount,
+    required this.busy,
+    required this.brand,
+    required this.colors,
+    required this.showBack,
+    required this.onSkip,
+    required this.onBack,
+    required this.onNext,
+  });
+
+  final String eyebrow;
+  final String stepLabel;
+  final String title;
+  final String body;
+  final String skipLabel;
+  final String backLabel;
+  final String nextLabel;
+  final int page;
+  final int pageCount;
+  final bool busy;
+  final Color brand;
+  final AppColors colors;
+  final bool showBack;
+  final VoidCallback onSkip;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    // Theme FilledButtons use min width infinity. Stretch them in a Column
+    // (bounded by Positioned left/right) instead of measuring inside a Row.
+    final fillStyle = FilledButton.styleFrom(
+      minimumSize: const Size.fromHeight(44),
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+
+    return Material(
+      color: colors.sheet,
+      elevation: 12,
+      shadowColor: Colors.black.withValues(alpha: 0.28),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: colors.border),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    eyebrow,
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.1,
+                      color: brand,
                     ),
                   ),
                 ),
+                TextButton(
+                  onPressed: busy ? null : onSkip,
+                  child: Text(skipLabel),
+                ),
+              ],
+            ),
+            Text(
+              stepLabel,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: colors.muted,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 6),
+            Text(
+              title,
+              style: textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              body,
+              style: textTheme.bodyMedium?.copyWith(
+                color: colors.muted,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                for (var i = 0; i < pageCount; i++) ...[
+                  Container(
+                    width: i == page ? 18 : 7,
+                    height: 7,
+                    decoration: BoxDecoration(
+                      color: i == page
+                          ? brand
+                          : i < page
+                          ? brand.withValues(alpha: 0.45)
+                          : colors.border,
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                  if (i < pageCount - 1) const SizedBox(width: 5),
+                ],
+              ],
+            ),
+            const SizedBox(height: 14),
+            if (showBack)
+              TextButton(
+                onPressed: busy ? null : onBack,
+                child: Text(backLabel),
+              ),
+            FilledButton(
+              style: fillStyle,
+              onPressed: busy ? null : onNext,
+              child: Text(nextLabel),
+            ),
+          ],
+        ),
       ),
     );
   }

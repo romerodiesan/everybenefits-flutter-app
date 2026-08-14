@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import 'avatar_storage.dart';
+import 'permissions.dart';
+import 'profile_badge.dart';
 import 'user_role.dart';
 
 /// Default agency assigned to new agents.
@@ -20,10 +22,7 @@ String? composeUsAddress({
   final st = (state?.trim() ?? '').toUpperCase();
   final z = zip?.trim() ?? '';
 
-  final line1 = [
-    if (s.isNotEmpty) s,
-    if (a.isNotEmpty) a,
-  ].join(', ');
+  final line1 = [if (s.isNotEmpty) s, if (a.isNotEmpty) a].join(', ');
   final stateZip = [if (st.isNotEmpty) st, if (z.isNotEmpty) z].join(' ');
   final line2 = [
     if (c.isNotEmpty) c,
@@ -37,7 +36,7 @@ String? composeUsAddress({
 }
 
 class UserProfile {
-  const UserProfile({
+  UserProfile({
     required this.uid,
     required this.role,
     required this.isAnonymous,
@@ -59,24 +58,43 @@ class UserProfile {
     this.addressState,
     this.addressZip,
     this.agency,
+    this.bio,
+    this.profileBadge,
     this.orgNodeId,
     this.accountStatus = 'active',
     this.approvalStatus,
-  });
+    this.displayNameLower,
+    this.emailLower,
+    this.nameTokens,
+    String? roleId,
+  }) : roleId = roleId ?? role.wireValue;
 
   final String uid;
   final String? email;
   final String? displayName;
+
+  /// Firestore search index (read for ensureProfile self-heal).
+  final String? displayNameLower;
+  final String? emailLower;
+  final List<String>? nameTokens;
   final String? photoUrl;
+
+  /// Canonical Firestore `users.role` wire value (may be a custom slug).
+  final String roleId;
+
+  /// Built-in enum for UI; custom [roleId] maps to [UserRole.guest] here —
+  /// use [roleId] + permissions for authorization.
   final UserRole role;
   final bool isAnonymous;
   final bool profileCompleted;
+
   /// Last product-tour version the user finished or skipped (0 = never).
   final int productTourVersion;
   final String? phoneCountryCode;
   final String? phoneNumber;
   final bool phoneVerified;
   final String? npn;
+
   /// Legacy / composed display address (kept for compatibility).
   final String? address;
   final String? addressStreet;
@@ -85,10 +103,15 @@ class UserProfile {
   final String? addressState;
   final String? addressZip;
   final String? agency;
+  final String? bio;
+  final ProfileBadge? profileBadge;
+
   /// Firestore `orgNodes/{id}` attachment for Admin hierarchy.
   final String? orgNodeId;
+
   /// `active` | `deactivated` | `pendingDeletion`.
   final String accountStatus;
+
   /// `pending` | `approved` | `rejected`. Null = legacy (treated as approved).
   final String? approvalStatus;
   final DateTime createdAt;
@@ -99,6 +122,13 @@ class UserProfile {
         ? displayName!
         : (email ?? 'U');
     return source.substring(0, 1).toUpperCase();
+  }
+
+  /// Client mirror of `isRegisteredMember()` in firestore.rules.
+  bool get isRegisteredMember {
+    if (isAnonymous) return false;
+    if (normalizeRoleId(roleId) == 'guest') return false;
+    return accountStatus != 'deactivated' && accountStatus != 'pendingDeletion';
   }
 
   String get headlineName {
@@ -150,6 +180,7 @@ class UserProfile {
     String? displayName,
     String? photoUrl,
     UserRole? role,
+    String? roleId,
     bool? isAnonymous,
     bool? profileCompleted,
     int? productTourVersion,
@@ -164,18 +195,25 @@ class UserProfile {
     String? addressState,
     String? addressZip,
     String? agency,
+    String? bio,
+    ProfileBadge? profileBadge,
     String? orgNodeId,
     String? accountStatus,
     String? approvalStatus,
+    String? displayNameLower,
+    String? emailLower,
+    List<String>? nameTokens,
     DateTime? updatedAt,
     bool clearPhotoUrl = false,
     bool clearNpn = false,
     bool clearAddress = false,
     bool clearAgency = false,
+    bool clearBio = false,
     bool clearOrgNodeId = false,
   }) {
-    final nextStreet =
-        clearAddress ? null : (addressStreet ?? this.addressStreet);
+    final nextStreet = clearAddress
+        ? null
+        : (addressStreet ?? this.addressStreet);
     final nextApt = clearAddress ? null : (addressApt ?? this.addressApt);
     final nextCity = clearAddress ? null : (addressCity ?? this.addressCity);
     final nextState = clearAddress ? null : (addressState ?? this.addressState);
@@ -183,21 +221,25 @@ class UserProfile {
     final composed = clearAddress
         ? null
         : (address ??
-            composeUsAddress(
-              street: nextStreet,
-              apt: nextApt,
-              city: nextCity,
-              state: nextState,
-              zip: nextZip,
-            ) ??
-            this.address);
+              composeUsAddress(
+                street: nextStreet,
+                apt: nextApt,
+                city: nextCity,
+                state: nextState,
+                zip: nextZip,
+              ) ??
+              this.address);
+
+    final nextRole = role ?? this.role;
+    final nextRoleId = roleId ?? (role != null ? role.wireValue : this.roleId);
 
     return UserProfile(
       uid: uid,
       email: email ?? this.email,
       displayName: displayName ?? this.displayName,
       photoUrl: clearPhotoUrl ? null : (photoUrl ?? this.photoUrl),
-      role: role ?? this.role,
+      role: nextRole,
+      roleId: nextRoleId,
       isAnonymous: isAnonymous ?? this.isAnonymous,
       profileCompleted: profileCompleted ?? this.profileCompleted,
       productTourVersion: productTourVersion ?? this.productTourVersion,
@@ -212,9 +254,14 @@ class UserProfile {
       addressState: nextState,
       addressZip: nextZip,
       agency: clearAgency ? null : (agency ?? this.agency),
+      bio: clearBio ? null : (bio ?? this.bio),
+      profileBadge: profileBadge ?? this.profileBadge,
       orgNodeId: clearOrgNodeId ? null : (orgNodeId ?? this.orgNodeId),
       accountStatus: accountStatus ?? this.accountStatus,
       approvalStatus: approvalStatus ?? this.approvalStatus,
+      displayNameLower: displayNameLower ?? this.displayNameLower,
+      emailLower: emailLower ?? this.emailLower,
+      nameTokens: nameTokens ?? this.nameTokens,
       createdAt: createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );
@@ -226,7 +273,7 @@ class UserProfile {
       'email': email,
       'displayName': displayName,
       'photoUrl': photoUrl,
-      'role': role.wireValue,
+      'role': roleId,
       'isAnonymous': isAnonymous,
       'profileCompleted': profileCompleted,
       'productTourVersion': productTourVersion,
@@ -241,6 +288,7 @@ class UserProfile {
       'addressState': addressState,
       'addressZip': addressZip,
       'agency': agency,
+      'bio': bio,
       'orgNodeId': orgNodeId,
       'accountStatus': accountStatus,
       if (approvalStatus != null) 'approvalStatus': approvalStatus,
@@ -256,7 +304,8 @@ class UserProfile {
     final state = data['addressState'] as String?;
     final zip = data['addressZip'] as String?;
     final legacy = data['address'] as String?;
-    final composed = composeUsAddress(
+    final composed =
+        composeUsAddress(
           street: street,
           apt: apt,
           city: city,
@@ -265,17 +314,20 @@ class UserProfile {
         ) ??
         legacy;
     final status = data['accountStatus'] as String?;
-    final accountStatus =
-        status == 'deactivated' || status == 'pendingDeletion'
-            ? status!
-            : 'active';
+    final accountStatus = status == 'deactivated' || status == 'pendingDeletion'
+        ? status!
+        : 'active';
+    final rawRole = data['role'] as String?;
+    final roleId = normalizeRoleId(rawRole);
+    final known = UserRole.tryParseBuiltin(roleId) ?? UserRole.guest;
 
     return UserProfile(
       uid: data['uid'] as String,
       email: data['email'] as String?,
       displayName: data['displayName'] as String?,
       photoUrl: sanitizeOptionalAvatarDownloadUrl(data['photoUrl'] as String?),
-      role: UserRole.parse(data['role'] as String?),
+      role: known,
+      roleId: roleId,
       isAnonymous: data['isAnonymous'] as bool? ?? false,
       profileCompleted: data['profileCompleted'] as bool? ?? true,
       productTourVersion: _readInt(data['productTourVersion']) ?? 0,
@@ -290,9 +342,14 @@ class UserProfile {
       addressState: state,
       addressZip: zip,
       agency: data['agency'] as String?,
+      bio: data['bio'] as String?,
+      profileBadge: ProfileBadge.fromMap(data['profileBadge']),
       orgNodeId: data['orgNodeId'] as String?,
       accountStatus: accountStatus,
       approvalStatus: data['approvalStatus'] as String?,
+      displayNameLower: data['displayNameLower'] as String?,
+      emailLower: data['emailLower'] as String?,
+      nameTokens: (data['nameTokens'] as List?)?.map((e) => '$e').toList(),
       createdAt: _readDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readDate(data['updatedAt']) ?? DateTime.now().toUtc(),
     );

@@ -91,6 +91,29 @@ class FakeForumStore implements ForumStore {
   }
 
   @override
+  Stream<ForumThreadPage> watchThreads({
+    String? tag,
+    String? authorId,
+    ForumSort sort = ForumSort.recent,
+    int limit = kForumPageSize,
+  }) async* {
+    yield await queryThreads(
+      tag: tag,
+      authorId: authorId,
+      sort: sort,
+      limit: limit,
+    );
+    yield* _threadsController.stream.asyncMap(
+      (_) => queryThreads(
+        tag: tag,
+        authorId: authorId,
+        sort: sort,
+        limit: limit,
+      ),
+    );
+  }
+
+  @override
   Stream<ForumThread?> watchThread(String threadId) async* {
     yield threads[threadId];
     yield* _threadsController.stream.map((_) => threads[threadId]);
@@ -641,19 +664,38 @@ void main() {
 
   test('canParticipateInForums matches roles', () {
     expect(
-      canParticipateInForums(role: UserRole.guest, isAnonymous: true),
+      canParticipateInForums(
+        roleOrPermissions: UserRole.guest,
+        isAnonymous: true,
+      ),
       isFalse,
     );
     expect(
-      canParticipateInForums(role: UserRole.student, isAnonymous: false),
+      canParticipateInForums(
+        roleOrPermissions: UserRole.student,
+        isAnonymous: false,
+      ),
       isTrue,
     );
     expect(
-      canParticipateInForums(role: UserRole.agent, isAnonymous: false),
+      canParticipateInForums(
+        roleOrPermissions: UserRole.agent,
+        isAnonymous: false,
+      ),
       isTrue,
     );
     expect(
-      canParticipateInForums(role: UserRole.manager, isAnonymous: false),
+      canParticipateInForums(
+        roleOrPermissions: 'agency_owner',
+        isAnonymous: false,
+      ),
+      isTrue,
+    );
+    expect(
+      canParticipateInForums(
+        roleOrPermissions: UserRole.manager,
+        isAnonymous: false,
+      ),
       isTrue,
     );
   });
@@ -820,6 +862,18 @@ void main() {
     );
     expect(next.threads, hasLength(1));
     expect(next.hasMore, isFalse);
+  });
+
+  test('watchThreads emits the first page', () async {
+    final author = _agent();
+    await repository.createThread(
+      tags: ['general'],
+      title: 'Live question title here',
+      body: 'Live question body here',
+      author: author,
+    );
+    final page = await repository.watchThreads(limit: 10).first;
+    expect(page.threads, isNotEmpty);
   });
 
   test('syncAuthorPhotoUrl updates threads and replies for that author only',

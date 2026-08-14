@@ -53,7 +53,19 @@ abstract class ChatStore {
   /// Ensures inbox rows exist for all indexable members (e.g. after a new message).
   Future<void> ensureUserChatIndexes(ChatConversation chat);
 
-  Future<void> updateChat(ChatConversation chat);
+  /// Own unread only — `chats/{id}/unreadCounts/{uid}` (rules allow self).
+  Future<void> patchOwnUnread({
+    required String chatId,
+    required String uid,
+    required int count,
+  });
+
+  /// Own pin only — `chats/{id}/pinnedBy/{uid}` (rules allow self).
+  Future<void> patchOwnPinned({
+    required String chatId,
+    required String uid,
+    required bool pinned,
+  });
 
   Future<ChatMessage> addMessage(ChatMessage message);
 
@@ -381,23 +393,26 @@ class RtdbChatStore implements ChatStore {
   }
 
   @override
-  Future<void> updateChat(ChatConversation chat) async {
-    final at = chat.lastMessageAt.toUtc().millisecondsSinceEpoch;
-    // Do not touch userChats here: reading other members' indexes is denied
-    // (owner-only), and writing them would recreate a chat someone hid.
-    // New messages call [ensureUserChatIndexes] to refresh every inbox row.
-    await _root.update({
-      'chats/${chat.id}/memberNames': chat.memberNames,
-      'chats/${chat.id}/title': chat.title,
-      'chats/${chat.id}/lastMessage': chat.lastMessage,
-      'chats/${chat.id}/lastMessageAt': at,
-      'chats/${chat.id}/lastMessageSenderId': chat.lastMessageSenderId,
-      'chats/${chat.id}/unreadCounts': chat.unreadCounts,
-      'chats/${chat.id}/pinnedBy': {
-        for (final e in chat.pinnedBy.entries)
-          if (e.value) e.key: true,
-      },
-    });
+  Future<void> patchOwnUnread({
+    required String chatId,
+    required String uid,
+    required int count,
+  }) async {
+    await _root.child('chats/$chatId/unreadCounts/$uid').set(count);
+  }
+
+  @override
+  Future<void> patchOwnPinned({
+    required String chatId,
+    required String uid,
+    required bool pinned,
+  }) async {
+    final ref = _root.child('chats/$chatId/pinnedBy/$uid');
+    if (pinned) {
+      await ref.set(true);
+    } else {
+      await ref.remove();
+    }
   }
 
   @override
@@ -533,7 +548,7 @@ class ChatRepository {
     required List<UserProfile> members,
   }) async {
     _ensureCanChat(creator);
-    if (!canCreateChatGroups(creator.role)) {
+    if (!canCreateChatGroups(creator.roleId)) {
       throw StateError(
         'Only admins, instructors, and managers can create groups.',
       );
@@ -625,8 +640,7 @@ class ChatRepository {
       throw StateError('No eres miembro de este chat.');
     }
     if (chat.unreadFor(uid) == 0) return;
-    final nextUnread = Map<String, int>.from(chat.unreadCounts)..[uid] = 0;
-    await _store.updateChat(chat.copyWith(unreadCounts: nextUnread));
+    await _store.patchOwnUnread(chatId: chatId, uid: uid, count: 0);
   }
 
   Future<void> setPinned({
@@ -641,14 +655,12 @@ class ChatRepository {
     if (!chat.memberIds.contains(uid)) {
       throw StateError('No eres miembro de este chat.');
     }
-    final nextPinned = Map<String, bool>.from(chat.pinnedBy)..[uid] = pinned;
-    final updated = chat.copyWith(pinnedBy: nextPinned);
-    await _store.updateChat(updated);
+    await _store.patchOwnPinned(chatId: chatId, uid: uid, pinned: pinned);
     // Touch own inbox row so watchChats (listens to userChats) refreshes.
     await _store.patchUserChatIndex(
       uid: uid,
       chatId: chatId,
-      lastMessageAt: updated.lastMessageAt.toUtc().millisecondsSinceEpoch,
+      lastMessageAt: chat.lastMessageAt.toUtc().millisecondsSinceEpoch,
       pinned: pinned,
     );
   }
@@ -666,8 +678,7 @@ class ChatRepository {
       throw StateError('No eres miembro de este chat.');
     }
     if (chat.isPinnedFor(uid)) {
-      final nextPinned = Map<String, bool>.from(chat.pinnedBy)..[uid] = false;
-      await _store.updateChat(chat.copyWith(pinnedBy: nextPinned));
+      await _store.patchOwnPinned(chatId: chatId, uid: uid, pinned: false);
     }
     // Only this user's index — never other members' userChats.
     await _store.removeUserChatIndex(uid: uid, chatId: chatId);
@@ -723,11 +734,13 @@ class ChatRepository {
     }
 
     final now = _clock();
+    // RTDB rules require a non-empty body; shared-post-only uses the preview.
+    final bodyForStore = body.trim().isEmpty ? preview : body;
     final message = await _store.addMessage(
       ChatMessage(
         id: '',
         chatId: chatId,
-        body: body,
+        body: bodyForStore,
         senderId: author.uid,
         senderName: author.headlineName,
         createdAt: now,
@@ -735,36 +748,9 @@ class ChatRepository {
       ),
     );
 
-    final nextUnread = Map<String, int>.from(chat.unreadCounts);
-    for (final memberId in chat.memberIds) {
-      if (memberId == author.uid) {
-        nextUnread[memberId] = 0;
-      } else {
-        nextUnread[memberId] = (nextUnread[memberId] ?? 0) + 1;
-      }
-    }
-
-    final names = Map<String, String>.from(chat.memberNames)
-      ..[author.uid] = author.headlineName;
-
-    await _store.updateChat(
-      chat.copyWith(
-        lastMessage: preview,
-        lastMessageAt: now,
-        lastMessageSenderId: author.uid,
-        unreadCounts: nextUnread,
-        memberNames: names,
-      ),
-    );
-    await _store.ensureUserChatIndexes(
-      chat.copyWith(
-        lastMessage: preview,
-        lastMessageAt: now,
-        lastMessageSenderId: author.uid,
-        unreadCounts: nextUnread,
-        memberNames: names,
-      ),
-    );
+    // lastMessage / unreadCounts are applied server-side by
+    // syncChatMetadataOnMessage (clients cannot forge chat summary fields).
+    await _store.ensureUserChatIndexes(chat);
 
     return message;
   }
@@ -779,7 +765,7 @@ class ChatRepository {
 
   void _ensureCanChat(UserProfile profile) {
     if (!canParticipateInChats(
-      role: profile.role,
+      roleOrPermissions: profile.roleId,
       isAnonymous: profile.isAnonymous,
     )) {
       throw StateError('Regístrate con una cuenta para usar los chats.');

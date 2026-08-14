@@ -4,32 +4,26 @@ import 'package:flutter/foundation.dart';
 
 import 'firebase_emulators.dart';
 
-/// App Check is currently disabled across Pulse (ADR-005).
+/// App Check policy for Pulse mobile (ADR-005: not enforced).
 ///
-/// Native iOS may still attempt DeviceCheck exchange if a prior session
-/// activated App Check — we force-disable refresh and, in debug/emulator,
-/// install a no-op debug provider so production App Check is not hit.
+/// Native iOS: [AppDelegate] replaces Flutter's default DeviceCheck factory with
+/// a no-op provider so `exchangeDeviceCheckToken` never hits production.
+/// Dart must not call [FirebaseAppCheck.activate] in non-production — activate
+/// would reconfigure DeviceCheck / debug exchange against unregistered app IDs.
 Future<void> activateFirebaseAppCheck() async {
   try {
     await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);
   } catch (_) {}
 
   if (useFirebaseEmulators || kDebugMode) {
-    try {
-      // Debug provider avoids DeviceCheck → production "App not registered".
-      await FirebaseAppCheck.instance.activate(
-        providerApple: const AppleDebugProvider(),
-        providerAndroid: const AndroidDebugProvider(),
-      );
-      await FirebaseAppCheck.instance.setTokenAutoRefreshEnabled(false);
-    } catch (error) {
-      debugPrint('App Check debug provider skipped: $error');
-    }
+    debugPrint(
+      'App Check skipped (non-production; native no-op provider + no activate)',
+    );
+    return;
   }
 
-  if (kDebugMode) {
-    debugPrint('App Check skipped (disabled)');
-  }
+  // Production still disabled until Console Monitor → Enforce + real app IDs.
+  debugPrint('App Check skipped (disabled — ADR-005)');
 }
 
 /// Points Cloud Functions at the local emulator when enabled.

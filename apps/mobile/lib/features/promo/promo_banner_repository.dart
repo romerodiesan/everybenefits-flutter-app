@@ -49,25 +49,50 @@ class FirestorePromoBannerStore implements PromoBannerStore {
     String? imagePath,
   }) async {
     final path = imagePath?.trim();
-    final url = imageUrl?.trim();
+    final rawUrl = imageUrl?.trim();
     final preferPath = path != null &&
         path.isNotEmpty &&
         (useFirebaseEmulators ||
-            url == null ||
-            url.isEmpty ||
-            url.contains('firebasestorage.googleapis.com'));
-    if (preferPath && path != null && path.isNotEmpty) {
+            rawUrl == null ||
+            rawUrl.isEmpty ||
+            rawUrl.contains('firebasestorage.googleapis.com') ||
+            rawUrl.startsWith('gs://'));
+
+    Future<String?> fromStoragePath(String storagePath) async {
       try {
         final storage = _storage ?? FirebaseStorage.instance;
-        return await storage.ref(path).getDownloadURL();
+        final url = await storage.ref(storagePath).getDownloadURL();
+        return rewriteEmulatorStorageUrl(url);
       } catch (_) {
-        return url;
+        return null;
       }
     }
-    return (url != null && url.isNotEmpty) ? url : null;
+
+    Future<String?> fromUrl(String candidate) async {
+      if (candidate.startsWith('gs://')) {
+        try {
+          final storage = _storage ?? FirebaseStorage.instance;
+          final url = await storage.refFromURL(candidate).getDownloadURL();
+          return rewriteEmulatorStorageUrl(url);
+        } catch (_) {
+          return null;
+        }
+      }
+      return rewriteEmulatorStorageUrl(candidate);
+    }
+
+    if (preferPath) {
+      final resolved = await fromStoragePath(path!);
+      if (resolved != null && resolved.isNotEmpty) return resolved;
+      if (rawUrl != null && rawUrl.isNotEmpty) return fromUrl(rawUrl);
+      return null;
+    }
+
+    if (rawUrl != null && rawUrl.isNotEmpty) return fromUrl(rawUrl);
+    if (path != null && path.isNotEmpty) return fromStoragePath(path);
+    return null;
   }
 }
-
 class PromoBannerRepository {
   PromoBannerRepository({PromoBannerStore? store})
       : _store = store ?? FirestorePromoBannerStore();

@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_constrained.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/empty_state.dart';
@@ -13,6 +16,7 @@ import '../notifications/notification_bell_button.dart';
 import '../promo/promo_banner_models.dart';
 import '../promo/promo_banner_repository.dart';
 import '../promo/widgets/promo_banner_slot.dart';
+import '../profile/public_profile_screen.dart';
 import 'create_thread_screen.dart';
 import 'forum_audience.dart';
 import 'forum_models.dart';
@@ -76,6 +80,7 @@ class ForumsScreenState extends State<ForumsScreen> {
   String _query = '';
   bool _searchOpen = false;
   int _audienceSize = 0;
+  String? _selectedThreadId;
 
   /// Threads used to rank discovery tags (kept when filtering by tag / mine).
   List<ForumThread> _tagCatalog = const [];
@@ -83,14 +88,21 @@ class ForumsScreenState extends State<ForumsScreen> {
   /// Viewer's like state per thread (thread vote up == like).
   Map<String, RelevanceVote> _threadVotes = {};
   String? _threadVoteKey;
+  StreamSubscription<ForumThreadPage>? _liveSub;
 
   ForumSort get _sort =>
       _mode == ForumFeedMode.pulse ? ForumSort.relevant : ForumSort.recent;
 
-  bool get _canPost => canParticipateInForums(
-        role: widget.profile.role,
-        isAnonymous: widget.profile.isAnonymous,
-      );
+  bool get _canPost {
+    final access = AccessScope.accessOf(
+      context,
+      fallbackRoleId: widget.profile.roleId,
+    );
+    return canParticipateInForums(
+      roleOrPermissions: access,
+      isAnonymous: widget.profile.isAnonymous,
+    );
+  }
 
   bool get _isSearching => _query.trim().isNotEmpty;
 
@@ -126,12 +138,15 @@ class ForumsScreenState extends State<ForumsScreen> {
 
   @override
   void dispose() {
+    _liveSub?.cancel();
     _saved.removeListener(_onSavedChanged);
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> _reload() async {
+    await _liveSub?.cancel();
+    _liveSub = null;
     setState(() {
       _loading = true;
       _loadingMore = false;
@@ -144,7 +159,6 @@ class ForumsScreenState extends State<ForumsScreen> {
       if (_isSavedMode) {
         final ids = (await _saved.readIds()).toList();
         final threads = await _repository.fetchThreadsByIds(ids);
-        // Drop bookmarks for deleted threads.
         final found = threads.map((t) => t.id).toSet();
         for (final id in ids) {
           if (!found.contains(id)) {
@@ -159,22 +173,41 @@ class ForumsScreenState extends State<ForumsScreen> {
           _loading = false;
           _refreshTagCatalog();
         });
-      } else {
-        final page = await _repository.queryThreads(
-          tag: _selectedTag,
-          authorId: _mineOnly ? widget.profile.uid : null,
-          sort: _sort,
-        );
-        if (!mounted) return;
-        setState(() {
-          _threads = page.threads;
-          _cursor = page.nextCursor;
-          _hasMore = page.hasMore;
-          _loading = false;
-          _refreshTagCatalog();
-        });
+        _ensureThreadVotes();
+        return;
       }
-      _ensureThreadVotes();
+
+      _liveSub = _repository
+          .watchThreads(
+            tag: _selectedTag,
+            authorId: _mineOnly ? widget.profile.uid : null,
+            sort: _sort,
+          )
+          .listen(
+            (page) {
+              if (!mounted) return;
+              final liveIds = page.threads.map((t) => t.id).toSet();
+              final extras = _threads
+                  .where((t) => !liveIds.contains(t.id))
+                  .toList();
+              setState(() {
+                _threads = [...page.threads, ...extras];
+                _cursor = page.nextCursor;
+                _hasMore = page.hasMore;
+                _loading = false;
+                _error = null;
+                _refreshTagCatalog();
+              });
+              _ensureThreadVotes();
+            },
+            onError: (Object error) {
+              if (!mounted) return;
+              setState(() {
+                _error = friendlyForumError(error, context.l10n);
+                _loading = false;
+              });
+            },
+          );
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -353,23 +386,59 @@ class ForumsScreenState extends State<ForumsScreen> {
   }
 
   Future<void> openCreate() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => CreateThreadScreen(
-          profile: widget.profile,
-          forumRepository: _repository,
-          initialTags: _selectedTag == null ? const [] : [_selectedTag!],
+    if (PulseWindowClass.of(context).useRail) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) {
+          return Dialog(
+            insetPadding: const EdgeInsets.all(24),
+            child: SizedBox(
+              width: PulseContentWidth.form,
+              height: 640,
+              child: CreateThreadScreen(
+                profile: widget.profile,
+                forumRepository: _repository,
+                initialTags: _selectedTag == null ? const [] : [_selectedTag!],
+              ),
+            ),
+          );
+        },
+      );
+    } else {
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => CreateThreadScreen(
+            profile: widget.profile,
+            forumRepository: _repository,
+            initialTags: _selectedTag == null ? const [] : [_selectedTag!],
+          ),
         ),
-      ),
-    );
+      );
+    }
     if (mounted) await _softRefresh();
   }
 
+  void openThreadById(String threadId) {
+    if (pulseUseMasterDetail(context)) {
+      setState(() => _selectedThreadId = threadId);
+      return;
+    }
+    _pushThread(threadId);
+  }
+
   Future<void> _openThread(ForumThread thread) async {
+    if (pulseUseMasterDetail(context)) {
+      setState(() => _selectedThreadId = thread.id);
+      return;
+    }
+    await _pushThread(thread.id);
+  }
+
+  Future<void> _pushThread(String threadId) async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => ThreadDetailScreen(
-          threadId: thread.id,
+          threadId: threadId,
           profile: widget.profile,
           forumRepository: _repository,
           chatRepository: widget.chatRepository,
@@ -464,7 +533,9 @@ class ForumsScreenState extends State<ForumsScreen> {
               child: const Icon(Icons.question_mark_rounded),
             )
           : null,
-      body: Column(
+      body: _wrapFeed(
+        context,
+        feed: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           ForumFeedModeBar(mode: _mode, onChanged: _setMode),
@@ -569,18 +640,6 @@ class ForumsScreenState extends State<ForumsScreen> {
                   ),
                 ),
               ),
-            PromoBannerSlot(
-              surface: PromoBannerSurface.home,
-              profile: widget.profile,
-              repository: widget.promoBannerRepository,
-              forumRepository: _repository,
-              chatRepository: widget.chatRepository,
-            ),
-            if (spotlight != null)
-              ForumSpotlightCard(
-                thread: spotlight,
-                onTap: () => _openThread(spotlight),
-              ),
           ],
           Expanded(
             child: AnimatedSwitcher(
@@ -593,12 +652,42 @@ class ForumsScreenState extends State<ForumsScreen> {
                           ? 'error'
                           : (_threads.isEmpty ? 'empty' : 'feed')),
                 ),
-                child: _buildFeed(context, l10n, feedThreads),
+                child: _buildFeed(
+                  context,
+                  l10n,
+                  feedThreads,
+                  spotlight: spotlight,
+                ),
               ),
             ),
           ),
         ],
       ),
+      ),
+    );
+  }
+
+  Widget _wrapFeed(BuildContext context, {required Widget feed}) {
+    if (!pulseUseMasterDetail(context)) return feed;
+    final l10n = context.l10n;
+    final id = _selectedThreadId;
+    return PulseSplitView(
+      masterWidth: 400,
+      master: feed,
+      detail: id == null
+          ? EmptyState(
+              mark: 'Q',
+              title: l10n.forumsSelectTitle,
+              subtitle: l10n.forumsSelectSubtitle,
+            )
+          : ThreadDetailScreen(
+              key: ValueKey(id),
+              threadId: id,
+              profile: widget.profile,
+              forumRepository: _repository,
+              chatRepository: widget.chatRepository,
+              embedded: true,
+            ),
     );
   }
 
@@ -614,8 +703,9 @@ class ForumsScreenState extends State<ForumsScreen> {
   Widget _buildFeed(
     BuildContext context,
     AppLocalizations l10n,
-    List<ForumThread> visible,
-  ) {
+    List<ForumThread> visible, {
+    ForumThread? spotlight,
+  }) {
     if (_loading) {
       return const PulseFeedSkeleton();
     }
@@ -628,30 +718,93 @@ class ForumsScreenState extends State<ForumsScreen> {
         onAction: _reload,
       );
     }
+
+    final headers = <Widget>[];
+    if (!_isSavedMode) {
+      headers.add(
+        PromoBannerSlot(
+          surface: PromoBannerSurface.home,
+          profile: widget.profile,
+          repository: widget.promoBannerRepository,
+          forumRepository: _repository,
+          chatRepository: widget.chatRepository,
+        ),
+      );
+      if (PulseWindowClass.of(context).useRail) {
+        headers.add(
+          PromoBannerSlot(
+            surface: PromoBannerSurface.rail,
+            profile: widget.profile,
+            repository: widget.promoBannerRepository,
+            forumRepository: _repository,
+            chatRepository: widget.chatRepository,
+          ),
+        );
+      }
+      if (spotlight != null) {
+        headers.add(
+          ForumSpotlightCard(
+            thread: spotlight,
+            onTap: () => _openThread(spotlight),
+          ),
+        );
+      }
+    }
+
     if (_threads.isEmpty) {
-      return EmptyState(
-        mark: 'P',
-        title: _isSavedMode
-            ? l10n.forumsSavedEmptyTitle
-            : (_mineOnly
-                ? l10n.forumsEmptyMineTitle
-                : l10n.forumsEmptyFeedTitle),
-        subtitle: _isSavedMode
-            ? l10n.forumsSavedEmptySubtitle
-            : (_mineOnly
-                ? l10n.forumsEmptyMineSubtitle
-                : l10n.forumsEmptyFeedSubtitle),
-        actionLabel: !_isSavedMode && _canPost ? l10n.fabNewQuestion : null,
-        onAction: !_isSavedMode && _canPost ? openCreate : null,
+      return RefreshIndicator(
+        onRefresh: _reload,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          top: AppSpacing.xs,
+          bottom: widget.embeddedInShell
+              ? pulseShellListBottomPad(context, hasFab: _canPost)
+              : (_canPost ? 88.0 : AppSpacing.xl),
+        ),
+        children: [
+          ...headers,
+          EmptyState(
+            mark: 'P',
+            title: _isSavedMode
+                ? l10n.forumsSavedEmptyTitle
+                : (_mineOnly
+                    ? l10n.forumsEmptyMineTitle
+                    : l10n.forumsEmptyFeedTitle),
+            subtitle: _isSavedMode
+                ? l10n.forumsSavedEmptySubtitle
+                : (_mineOnly
+                    ? l10n.forumsEmptyMineSubtitle
+                    : l10n.forumsEmptyFeedSubtitle),
+            actionLabel: !_isSavedMode && _canPost ? l10n.fabNewQuestion : null,
+            onAction: !_isSavedMode && _canPost ? openCreate : null,
+          ),
+        ],
+      ),
       );
     }
     if (visible.isEmpty) {
-      return EmptyState(
-        mark: '?',
-        title: l10n.forumsNoMatchesTitle,
-        subtitle: _isSearching
-            ? l10n.forumsNoMatchesQuery(_query.trim())
-            : l10n.forumsNoMatchesFilter,
+      return RefreshIndicator(
+        onRefresh: _reload,
+        child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: EdgeInsets.only(
+          top: AppSpacing.xs,
+          bottom: widget.embeddedInShell
+              ? pulseShellListBottomPad(context, hasFab: _canPost)
+              : (_canPost ? 88.0 : AppSpacing.xl),
+        ),
+        children: [
+          ...headers,
+          EmptyState(
+            mark: '?',
+            title: l10n.forumsNoMatchesTitle,
+            subtitle: _isSearching
+                ? l10n.forumsNoMatchesQuery(_query.trim())
+                : l10n.forumsNoMatchesFilter,
+          ),
+        ],
+      ),
       );
     }
 
@@ -659,14 +812,21 @@ class ForumsScreenState extends State<ForumsScreen> {
     final double bottomPad = widget.embeddedInShell
         ? pulseShellListBottomPad(context, hasFab: _canPost)
         : (_canPost ? 88.0 : AppSpacing.xl);
-    return ListView.builder(
+    return RefreshIndicator(
+      onRefresh: _reload,
+      child: ListView.builder(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.only(
         top: AppSpacing.xs,
         bottom: bottomPad,
       ),
-      itemCount: visible.length + (showLoadMore ? 1 : 0),
+      itemCount: headers.length + visible.length + (showLoadMore ? 1 : 0),
       itemBuilder: (context, index) {
-        if (index >= visible.length) {
+        if (index < headers.length) {
+          return headers[index];
+        }
+        final feedIndex = index - headers.length;
+        if (feedIndex >= visible.length) {
           return Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.md,
@@ -686,12 +846,13 @@ class ForumsScreenState extends State<ForumsScreen> {
             ),
           );
         }
-        final thread = visible[index];
+        final thread = visible[feedIndex];
         return Padding(
           key: ValueKey(thread.id),
           padding: const EdgeInsets.only(bottom: AppSpacing.sm),
           child: FeedPostCard(
             thread: thread,
+            selected: _selectedThreadId == thread.id,
             onTap: () => _openThread(thread),
             liked: (_threadVotes[thread.id] ?? RelevanceVote.none) ==
                 RelevanceVote.up,
@@ -710,9 +871,22 @@ class ForumsScreenState extends State<ForumsScreen> {
               );
             },
             onTagTap: _setSelectedTag,
+            onAuthorTap: () {
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => PublicProfileScreen(
+                    uid: thread.authorId,
+                    viewer: widget.profile,
+                    forumRepository: _repository,
+                    chatRepository: widget.chatRepository,
+                  ),
+                ),
+              );
+            },
           ),
         );
       },
+      ),
     );
   }
 }

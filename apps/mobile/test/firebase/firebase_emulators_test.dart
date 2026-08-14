@@ -32,4 +32,15 @@ void main() {
     expect(looksLikeEmulatorFirestoreHost('10.0.0.77:8080'), isTrue);
     expect(looksLikeEmulatorFirestoreHost('firestore.googleapis.com'), isFalse);
   });
+
+  test('rewriteEmulatorStorageUrl rewrites loopback and strips v=', () {
+    final rewritten = rewriteEmulatorStorageUrl(
+      'http://127.0.0.1:9199/v0/b/bucket/o/promo%2Fx.png?alt=media&token=abc&v=1',
+      host: '10.0.0.210',
+    );
+    expect(rewritten, contains('10.0.0.210'));
+    expect(rewritten, isNot(contains('127.0.0.1')));
+    expect(rewritten, isNot(contains('v=1')));
+    expect(rewritten, contains('token=abc'));
+  });
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../app/theme.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../chats/chat_repository.dart';
@@ -88,7 +89,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           final items = snap.data ?? const <AppNotification>[];
           if (snap.connectionState == ConnectionState.waiting &&
               items.isEmpty) {
-            return const Center(child: CircularProgressIndicator());
+            return const PulseListSkeleton();
           }
           if (items.isEmpty) {
             return Center(

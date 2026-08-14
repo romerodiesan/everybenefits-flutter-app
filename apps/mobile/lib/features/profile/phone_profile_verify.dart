@@ -4,8 +4,10 @@ import 'package:flutter/services.dart';
 
 import '../../app/app_feedback.dart';
 import '../../app/app_spacing.dart';
+import '../../app/layout/pulse_adaptive_sheet.dart';
 import '../../app/theme.dart';
 import '../../auth/auth.dart';
+import '../../firebase/firebase_emulators.dart';
 import '../../l10n/l10n.dart';
 
 /// Returns true if [code] + [number] differ from the stored profile phone.
@@ -36,7 +38,7 @@ Future<bool> verifyProfilePhone({
   required AuthService authService,
   required String e164,
 }) async {
-  final result = await showModalBottomSheet<bool>(
+  final result = await showPulseSheet<bool>(
     context: context,
     isScrollControlled: true,
     backgroundColor: AppColors.of(context).meshDeep,
@@ -85,6 +87,19 @@ class _PhoneVerifySheetState extends State<_PhoneVerifySheet> {
   Future<void> _sendCode() async {
     setState(() => _busy = true);
     try {
+      // Auth emulator: auto-complete with test code 123456 (no real SMS).
+      if (useFirebaseEmulators) {
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+        if (!mounted) return;
+        setState(() {
+          _verificationId = 'emulator-verification-id';
+          _sent = true;
+          _busy = false;
+          _code.text = '123456';
+        });
+        showAppSuccess(context, context.l10n.phoneSmsSent);
+        return;
+      }
       await widget.authService.verifyPhoneNumber(
         phoneNumber: widget.e164,
         onVerificationCompleted: (credential) async {
@@ -133,6 +148,12 @@ class _PhoneVerifySheetState extends State<_PhoneVerifySheet> {
     }
     setState(() => _busy = true);
     try {
+      if (useFirebaseEmulators) {
+        // Emulator: accept the debug code without Identity Toolkit SMS.
+        if (!mounted) return;
+        Navigator.of(context).pop(true);
+        return;
+      }
       final credential = PhoneAuthProvider.credential(
         verificationId: vid,
         smsCode: sms,

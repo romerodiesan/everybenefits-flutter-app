@@ -71,22 +71,25 @@ class _ReactionPopupLayer extends StatelessWidget {
     double left = mine ? anchor.right - barWidth : anchor.left;
     left = left.clamp(8.0, size.width - barWidth - 8);
 
-    return Stack(
-      children: [
-        Positioned(
-          left: left,
-          top: top,
-          width: barWidth,
-          height: barHeight,
-          child: _ReactionBar(
-            emojis: emojis,
-            selected: selected,
-            animation: animation,
-            alignRight: mine,
-            onPick: (emoji) => Navigator.of(context).pop(emoji),
+    return SizedBox.expand(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            left: left,
+            top: top,
+            width: barWidth,
+            height: barHeight,
+            child: _ReactionBar(
+              emojis: emojis,
+              selected: selected,
+              animation: animation,
+              alignRight: mine,
+              onPick: (emoji) => Navigator.of(context).pop(emoji),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

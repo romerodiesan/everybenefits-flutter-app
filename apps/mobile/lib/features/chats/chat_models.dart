@@ -1,5 +1,4 @@
 import '../../l10n/app_localizations.dart';
-import '../../users/user_role.dart';
 
 /// Compact post reference shared into a private chat.
 class SharedPostPreview {
@@ -58,6 +57,7 @@ class ChatConversation {
     this.unreadCounts = const {},
     this.pinnedBy = const {},
     this.isDefaultAgentGroup = false,
+    this.dmMessagingEnabled = false,
   });
 
   /// Fixed RTDB path id for the system agents community chat.
@@ -77,6 +77,9 @@ class ChatConversation {
   final DateTime createdAt;
   final String createdBy;
   final bool isDefaultAgentGroup;
+  final bool dmMessagingEnabled;
+
+  bool get canSendMessages => isGroup || dmMessagingEnabled;
 
   int unreadFor(String uid) => unreadCounts[uid] ?? 0;
 
@@ -109,6 +112,7 @@ class ChatConversation {
     Map<String, String>? memberNames,
     String? title,
     bool? isDefaultAgentGroup,
+    bool? dmMessagingEnabled,
   }) {
     return ChatConversation(
       id: id,
@@ -125,6 +129,7 @@ class ChatConversation {
       createdAt: createdAt,
       createdBy: createdBy,
       isDefaultAgentGroup: isDefaultAgentGroup ?? this.isDefaultAgentGroup,
+      dmMessagingEnabled: dmMessagingEnabled ?? this.dmMessagingEnabled,
     );
   }
 
@@ -148,6 +153,7 @@ class ChatConversation {
       'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
       'createdBy': createdBy,
       'isDefaultAgentGroup': isDefaultAgentGroup,
+      'dmMessagingEnabled': dmMessagingEnabled,
     };
   }
 
@@ -166,6 +172,7 @@ class ChatConversation {
       'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
       'createdBy': createdBy,
       'isDefaultAgentGroup': isDefaultAgentGroup,
+      'dmMessagingEnabled': dmMessagingEnabled,
     };
   }
 
@@ -224,6 +231,8 @@ class ChatConversation {
       createdBy: data['createdBy'] as String? ?? '',
       isDefaultAgentGroup: data['isDefaultAgentGroup'] as bool? ??
           id == ChatConversation.defaultAgentGroupId,
+      dmMessagingEnabled: data['isGroup'] == true ||
+          data['dmMessagingEnabled'] == true,
     );
   }
 }
@@ -419,18 +428,6 @@ DateTime? _readDate(Object? value) {
   return null;
 }
 
-bool canParticipateInChats({
-  required UserRole role,
-  required bool isAnonymous,
-}) {
-  if (isAnonymous || role == UserRole.guest) return false;
-  return role == UserRole.student ||
-      role == UserRole.agent ||
-      role == UserRole.instructor ||
-      role == UserRole.manager ||
-      role == UserRole.admin;
-}
-
 String friendlyChatError(Object error, AppLocalizations l10n) {
   final raw = '$error';
   if (raw.contains('permission') || raw.contains('PERMISSION')) {
@@ -465,6 +462,8 @@ String friendlyChatError(Object error, AppLocalizations l10n) {
     'Enter a group name.': (l) => l.newGroupNeedTitle,
     'Pick at least one other member.': (l) => l.newGroupNeedMembers,
     'Groups can have at most 20 members.': (l) => l.newGroupTooMany,
+    'not-contacts': (l) => l.chatsNeedContacts,
+    'direct-messages-disabled': (l) => l.chatsNeedContacts,
   };
 
   final mapped = known[cleaned];

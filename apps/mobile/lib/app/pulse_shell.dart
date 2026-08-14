@@ -6,7 +6,6 @@ import '../auth/auth.dart';
 import '../features/chats/chat_models.dart';
 import '../features/chats/chat_repository.dart';
 import '../features/chats/chats_screen.dart';
-import '../features/forums/forum_models.dart';
 import '../features/forums/forum_repository.dart';
 import '../features/forums/forums_screen.dart';
 import '../features/notifications/notification_repository.dart';
@@ -18,6 +17,7 @@ import '../features/university/university_screen.dart';
 import '../features/product_tour/product_tour_overlay.dart';
 import '../l10n/l10n.dart';
 import '../users/users.dart';
+import 'layout/pulse_breakpoints.dart';
 import 'pulse_haptics.dart';
 import 'widgets/lifebuoy_icon.dart';
 import 'widgets/pulse_chrome.dart';
@@ -52,6 +52,7 @@ class PulseShellState extends State<PulseShell> {
   int _index = 0;
 
   final _forumsKey = GlobalKey<ForumsScreenState>();
+  final _chatsKey = GlobalKey<ChatsScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
   final _notifications = NotificationRepository();
   final _chatRepoFallback = ChatRepository();
@@ -71,15 +72,20 @@ class PulseShellState extends State<PulseShell> {
 
   int get currentIndex => _index;
 
+  static PulseShellState? _active;
+
+  static PulseShellState? get maybeActive => _active;
+
   @override
   void initState() {
     super.initState();
+    _active = this;
     _bindBadgeStreams();
   }
 
   void _bindBadgeStreams() {
     final profile = widget.profile;
-    if (profile.isAnonymous) return;
+    if (!profile.isRegisteredMember) return;
     final chatRepo = widget.chatRepository ?? _chatRepoFallback;
     _subs.add(
       chatRepo.watchChats(profile.uid).listen((chats) {
@@ -89,7 +95,7 @@ class PulseShellState extends State<PulseShell> {
           (acc, chat) => acc + chat.unreadFor(profile.uid),
         );
         setState(() => _chatUnread = sum);
-      }),
+      }, onError: (_) {}),
     );
     _subs.add(
       _notifications.watchState(profile.uid).listen((state) async {
@@ -101,13 +107,14 @@ class PulseShellState extends State<PulseShell> {
           _notifUnread = state.unreadCount;
           _forumBadge = state.unreadForumCount + newThreads;
         });
-      }),
+      }, onError: (_) {}),
     );
     unawaited(_notifications.registerPushToken(profile.uid));
   }
 
   @override
   void dispose() {
+    if (_active == this) _active = null;
     for (final sub in _subs) {
       sub.cancel();
     }
@@ -121,6 +128,32 @@ class PulseShellState extends State<PulseShell> {
     if (next == 0 && !widget.profile.isAnonymous) {
       _notifications.markFeedSeen(widget.profile.uid);
     }
+  }
+
+  void openForumThread(String threadId) {
+    selectTab(0);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _forumsKey.currentState?.openThreadById(threadId);
+    });
+  }
+
+  void openChatConversation(ChatConversation chat) {
+    selectTab(1);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _chatsKey.currentState?.selectConversation(chat);
+    });
+  }
+
+  Future<void> openChatById(String chatId, ChatRepository chats) async {
+    selectTab(1);
+    ChatConversation? chat;
+    try {
+      chat = await chats.watchChat(chatId).first;
+    } catch (_) {
+      chat = null;
+    }
+    if (!mounted || chat == null) return;
+    _chatsKey.currentState?.selectConversation(chat);
   }
 
   void _openNotifications() {
@@ -183,10 +216,14 @@ class PulseShellState extends State<PulseShell> {
 
   _ShellFabConfig? _fabConfig(AppLocalizations l10n) {
     final profile = widget.profile;
+    final access = AccessScope.accessOf(
+      context,
+      fallbackRoleId: profile.roleId,
+    );
     switch (_index) {
       case 0:
         if (!canParticipateInForums(
-          role: profile.role,
+          roleOrPermissions: access,
           isAnonymous: profile.isAnonymous,
         )) {
           return null;
@@ -197,7 +234,7 @@ class PulseShellState extends State<PulseShell> {
         );
       case 1:
         if (!canParticipateInChats(
-          role: profile.role,
+          roleOrPermissions: access,
           isAnonymous: profile.isAnonymous,
         )) {
           return null;
@@ -265,6 +302,7 @@ class PulseShellState extends State<PulseShell> {
         onOpenNotifications: _openNotifications,
       ),
       ChatsScreen(
+        key: _chatsKey,
         profile: profile,
         chatRepository: widget.chatRepository,
         userRepository: widget.userRepository,
@@ -283,15 +321,18 @@ class PulseShellState extends State<PulseShell> {
         authService: widget.authService,
         userRepository: widget.userRepository,
         profile: profile,
+        forumRepository: widget.forumRepository,
         notificationUnread: _notifUnread,
         onOpenNotifications: _openNotifications,
       ),
     ];
 
+    final useRail = pulseUseRail(context);
+
     final Widget? fabButton;
     if (fab == null) {
       fabButton = null;
-    } else if (fab.extended) {
+    } else if (fab.extended && !useRail) {
       fabButton = FloatingActionButton.extended(
         heroTag: 'pulse-shell-fab',
         onPressed: _onFabPressed,
@@ -310,6 +351,7 @@ class PulseShellState extends State<PulseShell> {
     } else {
       fabButton = FloatingActionButton(
         heroTag: 'pulse-shell-fab',
+        mini: useRail,
         onPressed: _onFabPressed,
         tooltip: fab.tooltip,
         child: AnimatedSwitcher(
@@ -322,7 +364,9 @@ class PulseShellState extends State<PulseShell> {
               child: ScaleTransition(scale: animation, child: child),
             );
           },
-          child: Icon(fab.icon, key: ValueKey(fab.icon.codePoint)),
+          child: fab.extended
+              ? const LifebuoyIcon(size: 20, key: ValueKey('support'))
+              : Icon(fab.icon, key: ValueKey(fab.icon.codePoint)),
         ),
       );
     }
@@ -337,21 +381,42 @@ class PulseShellState extends State<PulseShell> {
       profileKey: _tourProfileKey,
     );
 
+    final body = PulseTabBody(index: _index, children: pages);
+    final scaffold = useRail
+        ? PulseScaffold(
+            extendBody: false,
+            resizeToAvoidBottomInset: false,
+            body: Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                PulseNavRail(
+                  barTourKey: _tourBarKey,
+                  items: navItems,
+                  selectedIndex: _index,
+                  onSelect: selectTab,
+                  fab: fabButton,
+                ),
+                Expanded(child: body),
+              ],
+            ),
+          )
+        : PulseScaffold(
+            extendBody: false,
+            resizeToAvoidBottomInset: false,
+            body: body,
+            floatingActionButton: fabButton,
+            bottomNavigationBar: PulseTabBar(
+              barTourKey: _tourBarKey,
+              items: navItems,
+              selectedIndex: _index,
+              onSelect: selectTab,
+            ),
+          );
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        PulseScaffold(
-          extendBody: true,
-          resizeToAvoidBottomInset: false,
-          body: PulseTabBody(index: _index, children: pages),
-          floatingActionButton: fabButton,
-          bottomNavigationBar: PulseTabBar(
-            barTourKey: _tourBarKey,
-            items: navItems,
-            selectedIndex: _index,
-            onSelect: selectTab,
-          ),
-        ),
+        scaffold,
         ProductTourOverlay(
           profile: profile,
           userRepository: widget.userRepository,

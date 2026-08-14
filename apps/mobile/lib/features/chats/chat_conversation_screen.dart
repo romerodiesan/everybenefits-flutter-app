@@ -12,6 +12,7 @@ import '../../users/user_profile.dart';
 import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
 import '../forums/widgets/share_to_chat_sheet.dart';
+import '../profile/public_profile_screen.dart';
 import 'chat_contact_info_screen.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
@@ -26,6 +27,7 @@ class ChatConversationScreen extends StatefulWidget {
     this.chatRepository,
     this.forumRepository,
     this.initialSharedPost,
+    this.embedded = false,
   });
 
   final ChatConversation chat;
@@ -33,6 +35,7 @@ class ChatConversationScreen extends StatefulWidget {
   final ChatRepository? chatRepository;
   final ForumRepository? forumRepository;
   final SharedPostPreview? initialSharedPost;
+  final bool embedded;
 
   @override
   State<ChatConversationScreen> createState() => _ChatConversationScreenState();
@@ -177,6 +180,19 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            size: Size(constraints.maxWidth, constraints.maxHeight),
+          ),
+          child: _conversationScaffold(context),
+        );
+      },
+    );
+  }
+
+  Widget _conversationScaffold(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
@@ -185,6 +201,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
     return PulseScaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: !widget.embedded,
         titleSpacing: 0,
         title: StreamBuilder<ChatConversation?>(
           stream: _chatStream,
@@ -196,11 +213,23 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               onTap: () {
                 Navigator.of(context).push(
                   MaterialPageRoute<void>(
-                    builder: (_) => ChatContactInfoScreen(
-                      chat: chat,
-                      profile: widget.profile,
-                      chatRepository: _repo,
-                    ),
+                    builder: (_) {
+                      final other = chat.memberIds
+                          .where((id) => id != uid)
+                          .toList();
+                      if (!chat.isGroup && other.isNotEmpty) {
+                        return PublicProfileScreen(
+                          uid: other.first,
+                          viewer: widget.profile,
+                          chatRepository: _repo,
+                        );
+                      }
+                      return ChatContactInfoScreen(
+                        chat: chat,
+                        profile: widget.profile,
+                        chatRepository: _repo,
+                      );
+                    },
                   ),
                 );
               },
@@ -321,12 +350,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           onOpenShared: shared == null
                               ? null
                               : () => _openSharedPost(shared),
-                          onLongPress: reactionsEnabled
-                              ? (anchor) => _showReactionPicker(msg, anchor)
-                              : null,
-                          onTapReaction: reactionsEnabled
-                              ? (emoji) => _react(msg, emoji)
-                              : null,
+                          onLongPress: (anchor) =>
+                              _showReactionPicker(msg, anchor),
+                          onTapReaction: (emoji) => _react(msg, emoji),
                         );
                       },
                     );
@@ -342,7 +368,46 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             ),
             child: SafeArea(
               top: false,
-              child: Column(
+              child: StreamBuilder<ChatConversation?>(
+                stream: _chatStream,
+                initialData: widget.chat,
+                builder: (context, snap) {
+                  final liveChat = snap.data ?? widget.chat;
+                  if (!liveChat.canSendMessages) {
+                    return Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                      child: Column(
+                        children: [
+                          Text(
+                            l10n.chatsDmDisabled,
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.muted,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              final other = liveChat.memberIds
+                                  .where((id) => id != uid)
+                                  .toList();
+                              if (other.isEmpty) return;
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => PublicProfileScreen(
+                                    uid: other.first,
+                                    viewer: widget.profile,
+                                    chatRepository: _repo,
+                                  ),
+                                ),
+                              );
+                            },
+                            child: Text(l10n.memberViewProfile),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+                  return Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Padding(
@@ -461,6 +526,8 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                       ),
                     ),
                 ],
+                  );
+                },
               ),
             ),
           ),
