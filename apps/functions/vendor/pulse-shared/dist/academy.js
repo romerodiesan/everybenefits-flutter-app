@@ -1,6 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.ACADEMY_ANALYTICS_PLATFORMS = exports.ACADEMY_ANALYTICS_SOURCES = exports.ACADEMY_ANALYTICS_EVENT_NAMES = exports.ANALYTICS_HEARTBEAT_SECONDS = exports.ANALYTICS_MIN_COHORT = exports.ACADEMY_ANALYTICS_SCHEMA_VERSION = exports.QUIZ_DEFAULT_PASS_PERCENT = exports.LESSON_COMPLETE_THRESHOLD = exports.LESSON_TYPES = exports.COURSE_LEVELS = void 0;
+exports.parseClockDuration = parseClockDuration;
+exports.resolveLessonDurationSeconds = resolveLessonDurationSeconds;
 exports.emptyRetentionBuckets = emptyRetentionBuckets;
 exports.emptyHourHistogram = emptyHourHistogram;
 exports.emptyAnalyticsWindow = emptyAnalyticsWindow;
@@ -10,6 +12,46 @@ exports.COURSE_LEVELS = [
     "advanced",
 ];
 exports.LESSON_TYPES = ["video", "reading", "quiz"];
+function toFiniteNumber(value) {
+    if (typeof value === "number" && Number.isFinite(value))
+        return value;
+    if (typeof value === "string" && value.trim()) {
+        const n = Number(value);
+        if (Number.isFinite(n))
+            return n;
+    }
+    return null;
+}
+/** Parses `m:ss` / `h:mm:ss` duration labels. */
+function parseClockDuration(raw) {
+    const parts = raw.trim().split(":").map((part) => Number(part));
+    if (parts.length < 2 || parts.length > 3)
+        return null;
+    if (parts.some((n) => !Number.isFinite(n) || n < 0))
+        return null;
+    if (parts.length === 2) {
+        return Math.round(parts[0] * 60 + parts[1]);
+    }
+    return Math.round(parts[0] * 3600 + parts[1] * 60 + parts[2]);
+}
+/**
+ * Reads a lesson's duration in seconds.
+ * Some Studio docs stored minutes in `durationMinutes` (or duplicated that
+ * value into `durationSeconds`); prefer a real second count when present.
+ */
+function resolveLessonDurationSeconds(data) {
+    const minutes = toFiniteNumber(data.durationMinutes);
+    let seconds = toFiniteNumber(data.durationSeconds);
+    if (seconds == null && typeof data.durationSeconds === "string") {
+        seconds = parseClockDuration(data.durationSeconds);
+    }
+    if (minutes != null &&
+        minutes > 0 &&
+        (seconds == null || seconds === 0 || seconds === minutes)) {
+        return Math.max(0, Math.round(minutes * 60));
+    }
+    return Math.max(0, Math.round(seconds ?? 0));
+}
 exports.LESSON_COMPLETE_THRESHOLD = 0.9;
 exports.QUIZ_DEFAULT_PASS_PERCENT = 70;
 // --- Creator analytics (aggregate-only in Studio) ---

@@ -4,6 +4,7 @@ import { admin, db } from "./init";
 
 export type NotificationType =
   | "chat_message"
+  | "contact_request"
   | "forum_reply"
   | "forum_vote"
   | "forum_new_thread"
@@ -27,6 +28,7 @@ export type NotifyPayload = {
 
 const TYPE_CHANNEL: Record<NotificationType, NotificationChannel> = {
   chat_message: "chats",
+  contact_request: "chats",
   forum_reply: "forums",
   forum_vote: "forums",
   forum_new_thread: "forums",

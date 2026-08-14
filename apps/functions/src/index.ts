@@ -10,6 +10,20 @@ export {
   searchDirectory,
 } from "./profiles";
 
+export {
+  sendContactRequest,
+  acceptContactRequest,
+  declineContactRequest,
+  cancelContactRequest,
+  removeContact,
+  setBlocked,
+  setMuted,
+  getSocialRelationship,
+  listContacts,
+  listIncomingContactRequests,
+  onSocialBlockWritten,
+} from "./social";
+
 export { bootstrapUserProfile } from "./bootstrap-user";
 
 export {
@@ -72,6 +86,7 @@ export {
   requestAccountDeletion,
   cancelAccountDeletion,
   purgeDeletedAccounts,
+  updateAccountEmail,
 } from "./account";
 
 export {

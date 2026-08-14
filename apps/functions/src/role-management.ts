@@ -11,9 +11,11 @@ import {
   filterValidPermissions,
   hasPermission,
   isBuiltinRoleId,
+  isProfileBadgeIcon,
   isRoleCategory,
   isSystemEditableRoleId,
   isSystemRole,
+  parseBadgeColorToken,
   type BuiltinRoleId,
   type RoleCategory,
   type RoleDoc,
@@ -48,6 +50,10 @@ export function mapRoleDoc(id: string, data: DocumentData): RoleDoc {
     locked: data.locked === true,
     active: data.active !== false,
     sortOrder: typeof data.sortOrder === "number" ? data.sortOrder : 100,
+    badgeText:
+      typeof data.badgeText === "string" ? data.badgeText.slice(0, 40) : null,
+    badgeIcon: isProfileBadgeIcon(data.badgeIcon) ? data.badgeIcon : null,
+    badgeColor: typeof data.badgeColor === "string" ? data.badgeColor : null,
     createdAt: millisOrNull(data.createdAt),
     updatedAt: millisOrNull(data.updatedAt),
     updatedBy:
@@ -269,6 +275,14 @@ export const createRole = onCall(callableOpts, async (request) => {
     locked: false,
     active: true,
     sortOrder,
+    badgeText:
+      typeof request.data?.badgeText === "string"
+        ? request.data.badgeText.trim().slice(0, 40) || null
+        : null,
+    badgeIcon: isProfileBadgeIcon(request.data?.badgeIcon)
+      ? request.data.badgeIcon
+      : "badge",
+    badgeColor: parseBadgeColorToken(request.data?.badgeColor),
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: uid,
@@ -348,6 +362,21 @@ export const updateRole = onCall(callableOpts, async (request) => {
   }
   if (typeof request.data?.sortOrder === "number") {
     updates.sortOrder = request.data.sortOrder;
+  }
+  if ("badgeText" in (request.data ?? {})) {
+    const text =
+      typeof request.data?.badgeText === "string"
+        ? request.data.badgeText.trim().slice(0, 40)
+        : "";
+    updates.badgeText = text || null;
+  }
+  if ("badgeIcon" in (request.data ?? {})) {
+    updates.badgeIcon = isProfileBadgeIcon(request.data?.badgeIcon)
+      ? request.data.badgeIcon
+      : null;
+  }
+  if ("badgeColor" in (request.data ?? {})) {
+    updates.badgeColor = parseBadgeColorToken(request.data?.badgeColor);
   }
 
   // Never allow flipping locked / builtIn / editableBySystemOnly via API

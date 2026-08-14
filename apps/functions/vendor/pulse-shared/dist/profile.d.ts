@@ -1,6 +1,9 @@
 /**
  * Shared profile field validation / normalization for Pulse clients.
  */
+/** Public bio on `users/{uid}` / `publicProfiles/{uid}`. */
+export declare const PUBLIC_BIO_MAX = 280;
+export { APPEARANCE_ACCENTS, APPEARANCE_ACCENT_HEX, PROFILE_BADGE_ICONS, PROFILE_BADGE_ICON_MAX, PROFILE_BADGE_TEXT_MAX, appearanceAccentFrom, isAppearanceAccent, isProfileBadgeIcon, parseAppearanceAccent, parseBadgeColorToken, parseProfileBadgeConfig, parsePublicProfileBadge, resolveBadgeBackgroundColor, sanitizeProfileBadgeInput, toPublicProfileBadge, type AppearanceAccent, type ProfileBadgeConfig, type ProfileBadgeIcon, type PublicProfileBadge, } from "./profile-badge";
 /** True when license profile fields are required for this role/permission set. */
 export declare function requiresLicenseProfile(roleOrPermissions: string | readonly string[] | null | undefined): boolean;
 /** True when the string looks like an email used as a display name. */

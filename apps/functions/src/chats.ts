@@ -24,6 +24,11 @@ import {
 } from "./auth";
 import { loadPermissionsForUid, callerHasPermission } from "./permissions";
 import { notifyUser } from "./notifications";
+import {
+  areMutualContacts,
+  isBlockedEitherWay,
+  isMutedBy,
+} from "./social";
 
 export function chatInboxRow(
   chatId: string,
@@ -52,6 +57,8 @@ export function chatInboxRow(
     createdBy: String(chat.createdBy ?? ""),
     isDefaultAgentGroup: chat.isDefaultAgentGroup === true,
     autoJoinRoles,
+    dmMessagingEnabled:
+      chat.isGroup === true || chat.dmMessagingEnabled === true,
   };
 }
 
@@ -285,6 +292,7 @@ export const syncChatInbox = onValueWritten(
         const prev = Number(beforeUnread[uid] ?? 0);
         const next = Number(afterUnread[uid] ?? 0);
         if (next <= prev) return;
+        if (await isMutedBy(uid, senderId)) return;
         await notifyUser(
           uid,
           {
@@ -386,6 +394,9 @@ export const createDm = onCall(callableOpts, async (request) => {
       "direct-messages-disabled",
     );
   }
+  if (await isBlockedEitherWay(uid, otherUid)) {
+    throw new HttpsError("permission-denied", "Cannot message this member.");
+  }
 
   const memberIds = [uid, otherUid].sort();
   const dmKey = memberIds.join("_");
@@ -399,6 +410,10 @@ export const createDm = onCall(callableOpts, async (request) => {
       memberIds,
       memberNames: (chat.memberNames ?? {}) as Record<string, string>,
     };
+  }
+
+  if (!(await areMutualContacts(uid, otherUid))) {
+    throw new HttpsError("failed-precondition", "not-contacts");
   }
 
   const memberNames = {
@@ -422,6 +437,7 @@ export const createDm = onCall(callableOpts, async (request) => {
     createdBy: uid,
     isDefaultAgentGroup: false,
     autoJoinRoles: {},
+    dmMessagingEnabled: true,
   };
 
   const updates: Record<string, unknown> = {

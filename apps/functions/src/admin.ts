@@ -10,6 +10,7 @@ import {
   foldSearchText,
   normalizeSearchQueryToken,
   parseRole,
+  sanitizeProfileBadgeInput,
   userSearchIndexFields,
   type UserRole,
 } from "@pulse/shared";
@@ -17,6 +18,7 @@ import { admin, db, callableOpts } from "./init";
 import { requireCaller } from "./auth";
 import { assertAssignableRoleId } from "./role-management";
 import { loadPermissionsForUid } from "./permissions";
+import { syncUserEmail } from "./account";
 
 const DEFAULT_AGENCY = "Every Benefits";
 
@@ -32,6 +34,7 @@ function mapAdminUserRow(id: string, data: DocumentData) {
     npn: typeof data.npn === "string" ? data.npn : null,
     agency: typeof data.agency === "string" ? data.agency : null,
     orgNodeId: typeof data.orgNodeId === "string" ? data.orgNodeId : null,
+    profileBadge: sanitizeProfileBadgeInput(data.profileBadge),
     accountStatus:
       data.accountStatus === "deactivated" ||
       data.accountStatus === "pendingDeletion"
@@ -460,7 +463,11 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
   const updates: Record<string, unknown> = {
     updatedAt: FieldValue.serverTimestamp(),
   };
-  const authUpdates: { email?: string; displayName?: string } = {};
+  const authUpdates: { displayName?: string } = {};
+
+  if (typeof request.data?.email === "string") {
+    await syncUserEmail(targetUid, request.data.email);
+  }
 
   if (typeof request.data?.displayName === "string") {
     const displayName = request.data.displayName.trim();
@@ -472,21 +479,6 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
           : null;
     Object.assign(updates, userSearchIndexFields(displayName, emailForTokens));
     authUpdates.displayName = displayName || undefined;
-  }
-  if (typeof request.data?.email === "string") {
-    const email = request.data.email.trim().toLowerCase();
-    if (!email.includes("@")) {
-      throw new HttpsError("invalid-argument", "Valid email required.");
-    }
-    updates.email = email;
-    const nameForTokens =
-      typeof updates.displayName === "string"
-        ? String(updates.displayName)
-        : typeof snap.data()?.displayName === "string"
-          ? String(snap.data()?.displayName)
-          : null;
-    Object.assign(updates, userSearchIndexFields(nameForTokens, email));
-    authUpdates.email = email;
   }
   if (typeof request.data?.role === "string") {
     const role = await assertAssignableRoleId(request.data.role);
@@ -520,6 +512,9 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
     } else {
       updates.orgNodeId = null;
     }
+  }
+  if ("profileBadge" in (request.data ?? {})) {
+    updates.profileBadge = sanitizeProfileBadgeInput(request.data?.profileBadge);
   }
 
   if (Object.keys(authUpdates).length > 0) {

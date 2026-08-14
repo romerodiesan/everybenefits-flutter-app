@@ -1,9 +1,93 @@
 import { FieldValue, Timestamp } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { userSearchIndexFields, validateOptionalEmail } from "@pulse/shared";
 import { admin, db, rtdb, callableOpts, storageBucket } from "./init";
 import { ACCOUNT_DELETION_GRACE_DAYS } from "./constants";
 import { requireCaller } from "./auth";
+
+function authErrorCode(error: unknown): string {
+  if (error && typeof error === "object" && "code" in error) {
+    return String((error as { code: unknown }).code);
+  }
+  return "";
+}
+
+/** Updates Firebase Auth + `users/{uid}.email` (and search index) together. */
+export async function syncUserEmail(uid: string, rawEmail: string): Promise<string> {
+  const parsed = validateOptionalEmail(rawEmail);
+  if (!parsed.ok || !parsed.value) {
+    throw new HttpsError("invalid-argument", "Valid email required.");
+  }
+  const email = parsed.value;
+
+  let authEmail = "";
+  try {
+    const record = await admin.auth().getUser(uid);
+    authEmail = (record.email ?? "").trim().toLowerCase();
+  } catch (error) {
+    if (authErrorCode(error).includes("user-not-found")) {
+      throw new HttpsError("not-found", "Auth user not found.");
+    }
+    throw new HttpsError(
+      "internal",
+      error instanceof Error ? error.message : "Failed to read auth user.",
+    );
+  }
+
+  const userRef = db.doc(`users/${uid}`);
+  const snap = await userRef.get();
+  if (!snap.exists) throw new HttpsError("not-found", "User not found.");
+  const profileEmail =
+    typeof snap.data()?.email === "string"
+      ? String(snap.data()?.email).trim().toLowerCase()
+      : "";
+
+  if (authEmail === email && profileEmail === email) return email;
+
+  if (authEmail !== email) {
+    try {
+      await admin.auth().updateUser(uid, {
+        email,
+        emailVerified: false,
+      });
+    } catch (error) {
+      const code = authErrorCode(error);
+      if (code.includes("email-already-exists")) {
+        throw new HttpsError("already-exists", "Email already registered.");
+      }
+      throw new HttpsError(
+        "internal",
+        error instanceof Error ? error.message : "Failed to update auth email.",
+      );
+    }
+  }
+
+  const displayName =
+    typeof snap.data()?.displayName === "string"
+      ? String(snap.data()?.displayName)
+      : null;
+  await userRef.update({
+    email,
+    ...userSearchIndexFields(displayName, email),
+    updatedAt: FieldValue.serverTimestamp(),
+  });
+  return email;
+}
+
+export const updateAccountEmail = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "updateAccountEmail");
+  const snap = await db.doc(`users/${uid}`).get();
+  if (!snap.exists) throw new HttpsError("not-found", "User not found.");
+  if (snap.data()?.isAnonymous === true) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Anonymous accounts cannot set an email.",
+    );
+  }
+  const email = await syncUserEmail(uid, String(request.data?.email ?? ""));
+  return { email };
+});
 
 async function clearFcmTokens(uid: string): Promise<void> {
   const tokens = await db.collection(`users/${uid}/fcmTokens`).limit(50).get();

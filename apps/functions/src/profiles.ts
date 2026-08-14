@@ -4,7 +4,17 @@ import {
 } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import { canParticipateInChats, normalizeSearchQueryToken, parseRole, userSearchIndexFields } from "@pulse/shared";
+import {
+  appearanceAccentFrom,
+  canParticipateInChats,
+  normalizeSearchQueryToken,
+  parseRole,
+  sanitizeProfileBadgeInput,
+  toPublicProfileBadge,
+  userSearchIndexFields,
+} from "@pulse/shared";
+import { blockedWithCaller } from "./social";
+import { sanitizeBio } from "./social-helpers";
 import { db, callableOpts } from "./init";
 import { isUserApprovedForJoin, requireCaller } from "./auth";
 
@@ -28,6 +38,42 @@ function readPrivacy(raw: unknown): PrivacyPrefs {
     showNpnInSearch: data.showNpnInSearch !== false,
     allowDirectMessages: data.allowDirectMessages !== false,
   };
+}
+
+function adminRoleBadge(
+  role: DocumentData | undefined,
+): { text: string; icon?: string; color?: string | null } | undefined {
+  const text =
+    typeof role?.badgeText === "string" ? role.badgeText.trim() : "";
+  if (!text || !role) return undefined;
+  return {
+    text,
+    icon: typeof role.badgeIcon === "string" ? role.badgeIcon : undefined,
+    color: typeof role.badgeColor === "string" ? role.badgeColor : null,
+  };
+}
+
+function publicBadgeFor(
+  data: DocumentData,
+  roleFallback?: { text: string; icon?: string; color?: string | null },
+) {
+  return toPublicProfileBadge(
+    sanitizeProfileBadgeInput(data.profileBadge),
+    appearanceAccentFrom(data.appearance),
+    roleFallback,
+  );
+}
+
+async function roleBadgeById(
+  roleIds: Iterable<string>,
+): Promise<Map<string, ReturnType<typeof adminRoleBadge>>> {
+  const unique = [...new Set(roleIds)];
+  const snaps = await Promise.all(
+    unique.map((id) => db.doc(`roles/${id}`).get()),
+  );
+  return new Map(
+    unique.map((id, index) => [id, adminRoleBadge(snaps[index].data())]),
+  );
 }
 
 export const syncPublicProfile = onDocumentWritten(
@@ -65,6 +111,10 @@ export const syncPublicProfile = onDocumentWritten(
       );
     }
 
+    const roleId = String(data.role ?? "student");
+    const roleSnap = await db.doc(`roles/${roleId}`).get();
+    const profileBadge = publicBadgeFor(data, adminRoleBadge(roleSnap.data()));
+
     await ref.set({
       uid,
       displayName:
@@ -72,6 +122,8 @@ export const syncPublicProfile = onDocumentWritten(
       photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
       role: String(data.role ?? "student"),
       agency: typeof data.agency === "string" ? data.agency.slice(0, 120) : null,
+      bio: sanitizeBio(data.bio),
+      profileBadge,
       isAnonymous: data.isAnonymous === true,
       discoverableInDirectory: privacy.discoverableInDirectory,
       allowDirectMessages: privacy.allowDirectMessages,
@@ -90,23 +142,34 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
     .where("isAnonymous", "==", false)
     .limit(Math.min(300, max * 3 + 10))
     .get();
-  const profiles = snap.docs
-    .filter((profile) => {
-      if (profile.id === uid) return false;
-      const privacy = readPrivacy(profile.data().privacy);
-      return privacy.discoverableInDirectory;
-    })
-    .slice(0, max)
-    .map((profile) => {
+  const visible = snap.docs.filter((profile) => {
+    if (profile.id === uid) return false;
+    const privacy = readPrivacy(profile.data().privacy);
+    return privacy.discoverableInDirectory;
+  });
+  const blocked = await blockedWithCaller(
+    uid,
+    visible.map((profile) => profile.id),
+  );
+  const page = visible
+    .filter((profile) => !blocked.has(profile.id))
+    .slice(0, max);
+  const roleBadges = await roleBadgeById(
+    page.map((profile) => String(profile.data().role ?? "student")),
+  );
+  const profiles = page.map((profile) => {
       const data = profile.data();
       const privacy = readPrivacy(data.privacy);
+      const roleId = String(data.role ?? "student");
       return {
         uid: profile.id,
         displayName:
           typeof data.displayName === "string" ? data.displayName : null,
         photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
-        role: String(data.role ?? "student"),
+        role: roleId,
         agency: typeof data.agency === "string" ? data.agency : null,
+        bio: sanitizeBio(data.bio),
+        profileBadge: publicBadgeFor(data, roleBadges.get(roleId)),
         isAnonymous: false,
         profileCompleted: data.profileCompleted !== false,
         allowDirectMessages: privacy.allowDirectMessages,
@@ -231,15 +294,23 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     }
   }
 
-  const profiles = [...matched.entries()].map(([id, data]) => {
+  const blocked = await blockedWithCaller(uid, [...matched.keys()]);
+  const visible = [...matched.entries()].filter(([id]) => !blocked.has(id));
+  const roleBadges = await roleBadgeById(
+    visible.map(([, data]) => String(data.role ?? "student")),
+  );
+  const profiles = visible.map(([id, data]) => {
     const privacy = readPrivacy(data.privacy);
+    const roleId = String(data.role ?? "student");
     return {
       uid: id,
       displayName:
         typeof data.displayName === "string" ? data.displayName : null,
       photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
-      role: String(data.role ?? "student"),
+      role: roleId,
       agency: typeof data.agency === "string" ? data.agency : null,
+      bio: sanitizeBio(data.bio),
+      profileBadge: publicBadgeFor(data, roleBadges.get(roleId)),
       email:
         privacy.showEmailInSearch && typeof data.email === "string"
           ? data.email

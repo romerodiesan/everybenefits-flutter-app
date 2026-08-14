@@ -49,6 +49,7 @@ export declare const userProfileFixtureSchema: z.ZodObject<{
     addressState: z.ZodNullable<z.ZodString>;
     addressZip: z.ZodNullable<z.ZodString>;
     agency: z.ZodNullable<z.ZodString>;
+    bio: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     orgNodeId: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     accountStatus: z.ZodOptional<z.ZodEnum<{
         active: "active";

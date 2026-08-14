@@ -12,10 +12,10 @@ export declare const promoBannerUpsertSchema: z.ZodObject<{
         education: "education";
     }>>;
     format: z.ZodOptional<z.ZodEnum<{
+        text: "text";
         card: "card";
         tile: "tile";
         strip: "strip";
-        text: "text";
     }>>;
     surface: z.ZodEnum<{
         home: "home";
@@ -23,6 +23,7 @@ export declare const promoBannerUpsertSchema: z.ZodObject<{
         academy: "academy";
     }>;
     audiences: z.ZodArray<z.ZodEnum<{
+        all: "all";
         admin: "admin";
         guest: "guest";
         manager: "manager";
@@ -30,7 +31,6 @@ export declare const promoBannerUpsertSchema: z.ZodObject<{
         agent: "agent";
         student: "student";
         instructor: "instructor";
-        all: "all";
     }>>;
     dismissible: z.ZodOptional<z.ZodBoolean>;
     showCta: z.ZodOptional<z.ZodBoolean>;
@@ -69,10 +69,10 @@ export declare const promoBannerDocSchema: z.ZodObject<{
         education: "education";
     }>;
     format: z.ZodEnum<{
+        text: "text";
         card: "card";
         tile: "tile";
         strip: "strip";
-        text: "text";
     }>;
     surface: z.ZodEnum<{
         home: "home";
@@ -80,6 +80,7 @@ export declare const promoBannerDocSchema: z.ZodObject<{
         academy: "academy";
     }>;
     audiences: z.ZodArray<z.ZodEnum<{
+        all: "all";
         admin: "admin";
         guest: "guest";
         manager: "manager";
@@ -87,7 +88,6 @@ export declare const promoBannerDocSchema: z.ZodObject<{
         agent: "agent";
         student: "student";
         instructor: "instructor";
-        all: "all";
     }>>;
     dismissible: z.ZodBoolean;
     showCta: z.ZodBoolean;
