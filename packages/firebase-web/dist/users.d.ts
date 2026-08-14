@@ -19,11 +19,17 @@ export type MappedUserProfile = {
     addressState: string | null;
     addressZip: string | null;
     agency: string | null;
+    bio?: string | null;
     orgNodeId?: string | null;
     createdAt: Date | null;
     updatedAt: Date | null;
     accountStatus?: "active" | "deactivated" | "pendingDeletion";
     approvalStatus?: "pending" | "approved" | "rejected";
+    profileBadge?: {
+        text: string;
+        icon: string;
+        backgroundColor: string;
+    } | null;
 };
 export declare function mapUserProfile(id: string, data: Record<string, unknown>): MappedUserProfile;
 //# sourceMappingURL=users.d.ts.map

@@ -33,6 +33,12 @@ export type AdminUserRow = {
   npn: string | null;
   agency: string | null;
   orgNodeId: string | null;
+  profileBadge?: {
+    enabled: boolean;
+    text: string;
+    icon: string;
+    color: string;
+  } | null;
   accountStatus: "active" | "deactivated" | "pendingDeletion";
   approvalStatus?: "pending" | "approved" | "rejected";
   createdAt?: number | null;
@@ -96,6 +102,9 @@ function mapRoleDoc(entry: Record<string, unknown>): RoleDoc {
     locked: entry.locked === true,
     active: entry.active !== false,
     sortOrder: typeof entry.sortOrder === "number" ? entry.sortOrder : 100,
+    badgeText: typeof entry.badgeText === "string" ? entry.badgeText : null,
+    badgeIcon: typeof entry.badgeIcon === "string" ? entry.badgeIcon : null,
+    badgeColor: typeof entry.badgeColor === "string" ? entry.badgeColor : null,
     createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
     updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : null,
     updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
@@ -114,6 +123,15 @@ export function mapAdminUserRow(entry: Record<string, unknown>): AdminUserRow {
     npn: (entry.npn as string) ?? null,
     agency: (entry.agency as string) ?? null,
     orgNodeId: (entry.orgNodeId as string) ?? null,
+    profileBadge:
+      entry.profileBadge && typeof entry.profileBadge === "object"
+        ? {
+            enabled: (entry.profileBadge as { enabled?: unknown }).enabled === true,
+            text: String((entry.profileBadge as { text?: unknown }).text ?? ""),
+            icon: String((entry.profileBadge as { icon?: unknown }).icon ?? "badge"),
+            color: String((entry.profileBadge as { color?: unknown }).color ?? "accent"),
+          }
+        : null,
     accountStatus:
       entry.accountStatus === "deactivated" ||
       entry.accountStatus === "pendingDeletion"
@@ -193,6 +211,12 @@ export type AdminRepository = {
     orgNodeId?: string | null;
     npn?: string | null;
     approvalStatus?: "pending" | "approved" | "rejected";
+    profileBadge?: {
+      enabled: boolean;
+      text: string;
+      icon: string;
+      color: string;
+    } | null;
   }) => Promise<AdminUserRow | null>;
   deactivateUser: (uid: string) => Promise<void>;
   reactivateUser: (uid: string) => Promise<void>;
@@ -277,14 +301,21 @@ export type AdminRepository = {
     category?: RoleCategory;
     permissions?: string[];
     sortOrder?: number;
+    badgeText?: string | null;
+    badgeIcon?: string | null;
+    badgeColor?: string | null;
   }) => Promise<RoleDoc | null>;
   updateRole: (input: {
     id: string;
     name?: string;
     description?: string;
     category?: RoleCategory;
-    permissions?: string[];    active?: boolean;
+    permissions?: string[];
+    active?: boolean;
     sortOrder?: number;
+    badgeText?: string | null;
+    badgeIcon?: string | null;
+    badgeColor?: string | null;
   }) => Promise<RoleDoc | null>;
   deleteRole: (id: string, hard?: boolean) => Promise<void>;
   seedSystemRoles: () => Promise<ListRolesResult>;

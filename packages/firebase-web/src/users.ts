@@ -1,4 +1,4 @@
-import { parseRole, type UserRole } from "@pulse/shared";
+import { appearanceAccentFrom, parseRole, resolveBadgeBackgroundColor, type UserRole } from "@pulse/shared";
 import { toDate } from "./dates";
 
 export type MappedUserProfile = {
@@ -21,11 +21,17 @@ export type MappedUserProfile = {
   addressState: string | null;
   addressZip: string | null;
   agency: string | null;
+  bio?: string | null;
   orgNodeId?: string | null;
   createdAt: Date | null;
   updatedAt: Date | null;
   accountStatus?: "active" | "deactivated" | "pendingDeletion";
   approvalStatus?: "pending" | "approved" | "rejected";
+  profileBadge?: {
+    text: string;
+    icon: string;
+    backgroundColor: string;
+  } | null;
 };
 
 function asString(value: unknown): string | null {
@@ -74,10 +80,36 @@ export function mapUserProfile(
     addressState: asString(data.addressState),
     addressZip: asString(data.addressZip),
     agency: asString(data.agency),
+    bio: asString(data.bio),
     orgNodeId: asString(data.orgNodeId),
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),
     accountStatus,
     approvalStatus,
+    profileBadge: parsePublicBadge(data.profileBadge, data.appearance),
+  };
+}
+
+function parsePublicBadge(
+  raw: unknown,
+  appearance?: unknown,
+): MappedUserProfile["profileBadge"] {
+  if (!raw || typeof raw !== "object") return null;
+  const data = raw as Record<string, unknown>;
+  if (data.enabled === false) return null;
+  const text = typeof data.text === "string" ? data.text.trim() : "";
+  if (!text) return null;
+  const accent = appearanceAccentFrom(appearance);
+  const backgroundColor =
+    typeof data.backgroundColor === "string" && data.backgroundColor.startsWith("#")
+      ? data.backgroundColor
+      : resolveBadgeBackgroundColor(
+          typeof data.color === "string" ? data.color : "accent",
+          accent,
+        );
+  return {
+    text: text.slice(0, 40),
+    icon: typeof data.icon === "string" ? data.icon : "badge",
+    backgroundColor,
   };
 }

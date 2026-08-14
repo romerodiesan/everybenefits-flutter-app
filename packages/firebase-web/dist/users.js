@@ -40,10 +40,31 @@ function mapUserProfile(id, data) {
         addressState: asString(data.addressState),
         addressZip: asString(data.addressZip),
         agency: asString(data.agency),
+        bio: asString(data.bio),
         orgNodeId: asString(data.orgNodeId),
         createdAt: (0, dates_1.toDate)(data.createdAt),
         updatedAt: (0, dates_1.toDate)(data.updatedAt),
         accountStatus,
         approvalStatus,
+        profileBadge: parsePublicBadge(data.profileBadge, data.appearance),
+    };
+}
+function parsePublicBadge(raw, appearance) {
+    if (!raw || typeof raw !== "object")
+        return null;
+    const data = raw;
+    if (data.enabled === false)
+        return null;
+    const text = typeof data.text === "string" ? data.text.trim() : "";
+    if (!text)
+        return null;
+    const accent = (0, shared_1.appearanceAccentFrom)(appearance);
+    const backgroundColor = typeof data.backgroundColor === "string" && data.backgroundColor.startsWith("#")
+        ? data.backgroundColor
+        : (0, shared_1.resolveBadgeBackgroundColor)(typeof data.color === "string" ? data.color : "accent", accent);
+    return {
+        text: text.slice(0, 40),
+        icon: typeof data.icon === "string" ? data.icon : "badge",
+        backgroundColor,
     };
 }

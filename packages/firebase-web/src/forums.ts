@@ -1,4 +1,4 @@
-import { parseRole, type UserRole } from "@pulse/shared";
+import { parsePublicProfileBadge, parseRole, type PublicProfileBadge, type UserRole } from "@pulse/shared";
 import { toDate } from "./dates";
 
 export type MappedForumThread = {
@@ -10,6 +10,7 @@ export type MappedForumThread = {
   authorName: string;
   authorPhotoUrl: string | null;
   authorRole: UserRole;
+  authorBadge: PublicProfileBadge | null;
   replyCount: number;
   score: number;
   /** Unique users who interacted (author, voters, repliers). */
@@ -28,6 +29,7 @@ export type MappedForumReply = {
   authorName: string;
   authorPhotoUrl: string | null;
   authorRole: UserRole;
+  authorBadge: PublicProfileBadge | null;
   score: number;
   createdAt: Date | null;
   updatedAt: Date | null;
@@ -50,6 +52,7 @@ export function mapForumThread(
     authorPhotoUrl:
       typeof data.authorPhotoUrl === "string" ? data.authorPhotoUrl : null,
     authorRole: parseRole(data.authorRole),
+    authorBadge: parsePublicProfileBadge(data.authorBadge),
     replyCount: Number(data.replyCount ?? 0),
     score: Number(data.score ?? 0),
     interactorCount: Number(data.interactorCount ?? 0),
@@ -75,6 +78,7 @@ export function mapForumReply(
     authorPhotoUrl:
       typeof data.authorPhotoUrl === "string" ? data.authorPhotoUrl : null,
     authorRole: parseRole(data.authorRole),
+    authorBadge: parsePublicProfileBadge(data.authorBadge),
     score: Number(data.score ?? 0),
     createdAt: toDate(data.createdAt),
     updatedAt: toDate(data.updatedAt),

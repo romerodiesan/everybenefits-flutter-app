@@ -23,6 +23,9 @@ function mapRoleDoc(entry) {
         locked: entry.locked === true,
         active: entry.active !== false,
         sortOrder: typeof entry.sortOrder === "number" ? entry.sortOrder : 100,
+        badgeText: typeof entry.badgeText === "string" ? entry.badgeText : null,
+        badgeIcon: typeof entry.badgeIcon === "string" ? entry.badgeIcon : null,
+        badgeColor: typeof entry.badgeColor === "string" ? entry.badgeColor : null,
         createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
         updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : null,
         updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
@@ -40,6 +43,14 @@ function mapAdminUserRow(entry) {
         npn: entry.npn ?? null,
         agency: entry.agency ?? null,
         orgNodeId: entry.orgNodeId ?? null,
+        profileBadge: entry.profileBadge && typeof entry.profileBadge === "object"
+            ? {
+                enabled: entry.profileBadge.enabled === true,
+                text: String(entry.profileBadge.text ?? ""),
+                icon: String(entry.profileBadge.icon ?? "badge"),
+                color: String(entry.profileBadge.color ?? "accent"),
+            }
+            : null,
         accountStatus: entry.accountStatus === "deactivated" ||
             entry.accountStatus === "pendingDeletion"
             ? entry.accountStatus

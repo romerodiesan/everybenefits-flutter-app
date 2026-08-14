@@ -13,6 +13,12 @@ export type AdminUserRow = {
     npn: string | null;
     agency: string | null;
     orgNodeId: string | null;
+    profileBadge?: {
+        enabled: boolean;
+        text: string;
+        icon: string;
+        color: string;
+    } | null;
     accountStatus: "active" | "deactivated" | "pendingDeletion";
     approvalStatus?: "pending" | "approved" | "rejected";
     createdAt?: number | null;
@@ -84,6 +90,12 @@ export type AdminRepository = {
         orgNodeId?: string | null;
         npn?: string | null;
         approvalStatus?: "pending" | "approved" | "rejected";
+        profileBadge?: {
+            enabled: boolean;
+            text: string;
+            icon: string;
+            color: string;
+        } | null;
     }) => Promise<AdminUserRow | null>;
     deactivateUser: (uid: string) => Promise<void>;
     reactivateUser: (uid: string) => Promise<void>;
@@ -153,6 +165,9 @@ export type AdminRepository = {
         category?: RoleCategory;
         permissions?: string[];
         sortOrder?: number;
+        badgeText?: string | null;
+        badgeIcon?: string | null;
+        badgeColor?: string | null;
     }) => Promise<RoleDoc | null>;
     updateRole: (input: {
         id: string;
@@ -162,6 +177,9 @@ export type AdminRepository = {
         permissions?: string[];
         active?: boolean;
         sortOrder?: number;
+        badgeText?: string | null;
+        badgeIcon?: string | null;
+        badgeColor?: string | null;
     }) => Promise<RoleDoc | null>;
     deleteRole: (id: string, hard?: boolean) => Promise<void>;
     seedSystemRoles: () => Promise<ListRolesResult>;
