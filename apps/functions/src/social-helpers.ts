@@ -10,6 +10,7 @@ export type SocialRelationship = {
   muted: boolean;
   blockedByMe: boolean;
   isSelf: boolean;
+  following: boolean;
 };
 
 export function dmKeyFor(a: string, b: string): string {
@@ -40,6 +41,7 @@ export function computeRelationship(options: {
   isContact: boolean;
   hasOutgoing: boolean;
   hasIncoming: boolean;
+  following?: boolean;
 }): SocialRelationship {
   if (options.viewerUid === options.otherUid) {
     return {
@@ -47,6 +49,7 @@ export function computeRelationship(options: {
       muted: false,
       blockedByMe: false,
       isSelf: true,
+      following: false,
     };
   }
   if (options.theyBlockedViewer) {
@@ -55,6 +58,7 @@ export function computeRelationship(options: {
       muted: false,
       blockedByMe: false,
       isSelf: false,
+      following: false,
     };
   }
   if (options.viewerBlockedOther) {
@@ -63,6 +67,7 @@ export function computeRelationship(options: {
       muted: options.muted,
       blockedByMe: true,
       isSelf: false,
+      following: false,
     };
   }
   let status: SocialRelationshipStatus = "none";
@@ -74,5 +79,6 @@ export function computeRelationship(options: {
     muted: options.muted,
     blockedByMe: false,
     isSelf: false,
+    following: options.following === true,
   };
 }

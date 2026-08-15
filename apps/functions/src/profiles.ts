@@ -12,6 +12,7 @@ import {
   sanitizeProfileBadgeInput,
   toPublicProfileBadge,
   userSearchIndexFields,
+  validateUsState,
 } from "@pulse/shared";
 import { blockedWithCaller } from "./social";
 import { sanitizeBio } from "./social-helpers";
@@ -25,6 +26,7 @@ type PrivacyPrefs = {
   showEmailInSearch: boolean;
   showNpnInSearch: boolean;
   allowDirectMessages: boolean;
+  showLocationOnProfile: boolean;
 };
 
 function readPrivacy(raw: unknown): PrivacyPrefs {
@@ -37,7 +39,27 @@ function readPrivacy(raw: unknown): PrivacyPrefs {
     showEmailInSearch: data.showEmailInSearch !== false,
     showNpnInSearch: data.showNpnInSearch !== false,
     allowDirectMessages: data.allowDirectMessages !== false,
+    showLocationOnProfile: data.showLocationOnProfile === true,
   };
+}
+
+function publicLocation(data: DocumentData, show: boolean) {
+  if (!show) return { addressCity: null as string | null, addressState: null as string | null };
+  const city =
+    typeof data.addressCity === "string" ? data.addressCity.trim().slice(0, 80) : "";
+  const state =
+    typeof data.addressState === "string"
+      ? validateUsState(data.addressState)
+      : null;
+  return {
+    addressCity: city || null,
+    addressState: state,
+  };
+}
+
+function countOrZero(value: unknown): number {
+  const n = Math.round(Number(value ?? 0));
+  return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
 function adminRoleBadge(
@@ -93,6 +115,7 @@ export const syncPublicProfile = onDocumentWritten(
     const search = userSearchIndexFields(
       typeof data.displayName === "string" ? data.displayName : null,
       typeof data.email === "string" ? data.email : null,
+      typeof data.username === "string" ? data.username : null,
     );
     const existingTokens = Array.isArray(data.nameTokens)
       ? data.nameTokens.map(String)
@@ -114,11 +137,14 @@ export const syncPublicProfile = onDocumentWritten(
     const roleId = String(data.role ?? "student");
     const roleSnap = await db.doc(`roles/${roleId}`).get();
     const profileBadge = publicBadgeFor(data, adminRoleBadge(roleSnap.data()));
+    const existing = (await ref.get()).data() ?? {};
+    const location = publicLocation(data, privacy.showLocationOnProfile);
 
     await ref.set({
       uid,
       displayName:
         typeof data.displayName === "string" ? data.displayName.slice(0, 120) : null,
+      username: typeof data.username === "string" ? data.username : null,
       photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
       role: String(data.role ?? "student"),
       agency: typeof data.agency === "string" ? data.agency.slice(0, 120) : null,
@@ -127,6 +153,11 @@ export const syncPublicProfile = onDocumentWritten(
       isAnonymous: data.isAnonymous === true,
       discoverableInDirectory: privacy.discoverableInDirectory,
       allowDirectMessages: privacy.allowDirectMessages,
+      addressCity: location.addressCity,
+      addressState: location.addressState,
+      createdAt: data.createdAt ?? existing.createdAt ?? FieldValue.serverTimestamp(),
+      followerCount: countOrZero(existing.followerCount),
+      followingCount: countOrZero(existing.followingCount),
       updatedAt: FieldValue.serverTimestamp(),
     });
   },
@@ -165,6 +196,7 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
         uid: profile.id,
         displayName:
           typeof data.displayName === "string" ? data.displayName : null,
+        username: typeof data.username === "string" ? data.username : null,
         photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
         role: roleId,
         agency: typeof data.agency === "string" ? data.agency : null,
@@ -276,6 +308,15 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
           .limit(limit)
           .get()
       : Promise.resolve(null),
+    rangeKey
+      ? db
+          .collection("users")
+          .where("username", ">=", rangeKey)
+          .where("username", "<=", end)
+          .orderBy("username", "asc")
+          .limit(limit)
+          .get()
+      : Promise.resolve(null),
     token.length >= 2
       ? db
           .collection("users")
@@ -306,6 +347,7 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
       uid: id,
       displayName:
         typeof data.displayName === "string" ? data.displayName : null,
+      username: typeof data.username === "string" ? data.username : null,
       photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
       role: roleId,
       agency: typeof data.agency === "string" ? data.agency : null,

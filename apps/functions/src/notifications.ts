@@ -4,7 +4,9 @@ import { admin, db } from "./init";
 
 export type NotificationType =
   | "chat_message"
+  | "chat_mention"
   | "contact_request"
+  | "new_follower"
   | "forum_reply"
   | "forum_vote"
   | "forum_new_thread"
@@ -28,7 +30,9 @@ export type NotifyPayload = {
 
 const TYPE_CHANNEL: Record<NotificationType, NotificationChannel> = {
   chat_message: "chats",
+  chat_mention: "chats",
   contact_request: "chats",
+  new_follower: "chats",
   forum_reply: "forums",
   forum_vote: "forums",
   forum_new_thread: "forums",
@@ -162,6 +166,11 @@ export function groupKeyFor(
   }
   if (type === "chat_message") {
     return ref.chatId ? `${type}:${ref.chatId}` : null;
+  }
+  if (type === "chat_mention") {
+    const chatId = ref.chatId ?? "";
+    const messageId = ref.messageId ?? "";
+    return chatId && messageId ? `${type}:${chatId}:${messageId}` : null;
   }
   return null;
 }

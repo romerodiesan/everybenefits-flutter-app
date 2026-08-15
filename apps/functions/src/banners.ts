@@ -145,7 +145,8 @@ export const upsertPromoBanner = onCall(callableOpts, async (request) => {
       ? input.version
       : prevVersion;
 
-  const active = input.active ?? existing.data()?.active === true;
+  const prevActive = existing.data()?.active === true;
+  const active = input.active ?? (existing.exists ? prevActive : true);
   const showCta = input.showCta !== false;
   const format =
     input.format ??

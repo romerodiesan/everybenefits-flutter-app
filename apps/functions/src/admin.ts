@@ -667,6 +667,7 @@ export const backfillUserSearchFields = onCall(
       const search = userSearchIndexFields(
         typeof data.displayName === "string" ? data.displayName : null,
         typeof data.email === "string" ? data.email : null,
+        typeof data.username === "string" ? data.username : null,
       );
       const existingTokens = Array.isArray(data.nameTokens)
         ? data.nameTokens.map(String)

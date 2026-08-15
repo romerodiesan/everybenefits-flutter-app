@@ -67,6 +67,7 @@ describe("social helpers", () => {
       muted: false,
       blockedByMe: false,
       isSelf: false,
+      following: false,
     });
   });
 
@@ -81,12 +82,36 @@ describe("social helpers", () => {
         isContact: false,
         hasOutgoing: false,
         hasIncoming: false,
+        following: true,
       }),
     ).toEqual({
       status: "none",
       muted: true,
       blockedByMe: true,
       isSelf: false,
+      following: false,
+    });
+  });
+
+  it("exposes following when the viewer follows", () => {
+    expect(
+      computeRelationship({
+        viewerUid: "a",
+        otherUid: "b",
+        theyBlockedViewer: false,
+        viewerBlockedOther: false,
+        muted: false,
+        isContact: false,
+        hasOutgoing: false,
+        hasIncoming: false,
+        following: true,
+      }),
+    ).toEqual({
+      status: "none",
+      muted: false,
+      blockedByMe: false,
+      isSelf: false,
+      following: true,
     });
   });
 });

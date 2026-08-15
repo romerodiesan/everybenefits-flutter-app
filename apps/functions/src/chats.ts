@@ -9,6 +9,8 @@ import {
   canConfigureGroupAutoJoin,
   canCreateChatGroups,
   parseRole,
+  parseUsername,
+  parseMentions,
   type UserRole,
 } from "@pulse/shared";
 import { db, rtdb, callableOpts } from "./init";
@@ -30,6 +32,69 @@ import {
   isMutedBy,
 } from "./social";
 
+function asObj(raw: unknown): Record<string, unknown> {
+  return raw && typeof raw === "object"
+    ? { ...(raw as Record<string, unknown>) }
+    : {};
+}
+
+function photoOf(data: DocumentData | undefined): string {
+  return typeof data?.photoUrl === "string" ? data.photoUrl.trim() : "";
+}
+
+function claimedUsernameOf(data: DocumentData | undefined): string {
+  const parsed = parseUsername(data?.username);
+  return parsed.ok ? parsed.value : "";
+}
+
+function compactStrings(
+  entries: Array<[string, string]>,
+): Record<string, string> {
+  return Object.fromEntries(entries.filter(([, value]) => value));
+}
+
+function applyMemberIdentity(
+  current: Record<string, unknown>,
+  uid: string,
+  displayName: string,
+  photoUrl: string,
+  username: string,
+) {
+  const memberNames = { ...asObj(current.memberNames), [uid]: displayName };
+  const memberPhotos = { ...asObj(current.memberPhotos) };
+  if (photoUrl) memberPhotos[uid] = photoUrl;
+  const memberUsernames = { ...asObj(current.memberUsernames) };
+  if (username) memberUsernames[uid] = username;
+  return { memberNames, memberPhotos, memberUsernames };
+}
+
+/** Rewrites this member's name / photo / username inside their RTDB chats. */
+export async function syncChatMemberIdentity(
+  uid: string,
+  fields: {
+    name?: string;
+    photoUrl?: string | null;
+    username?: string | null;
+  },
+): Promise<void> {
+  const index = await rtdb.ref(`userChats/${uid}`).get();
+  const chatIds = Object.keys((index.val() ?? {}) as Record<string, unknown>);
+  const updates: Record<string, unknown> = {};
+  for (const chatId of chatIds.slice(0, 200)) {
+    if (fields.name != null) {
+      updates[`chats/${chatId}/memberNames/${uid}`] = fields.name;
+    }
+    if ("photoUrl" in fields) {
+      updates[`chats/${chatId}/memberPhotos/${uid}`] = fields.photoUrl || null;
+    }
+    if ("username" in fields) {
+      updates[`chats/${chatId}/memberUsernames/${uid}`] =
+        fields.username || null;
+    }
+  }
+  if (Object.keys(updates).length) await rtdb.ref().update(updates);
+}
+
 export function chatInboxRow(
   chatId: string,
   chat: Record<string, unknown>,
@@ -45,6 +110,8 @@ export function chatInboxRow(
     chatId,
     memberIds: members,
     memberNames: (chat.memberNames ?? {}) as Record<string, unknown>,
+    memberPhotos: (chat.memberPhotos ?? {}) as Record<string, unknown>,
+    memberUsernames: (chat.memberUsernames ?? {}) as Record<string, unknown>,
     isGroup: chat.isGroup === true,
     title: chat.title ?? null,
     dmKey: chat.dmKey ?? null,
@@ -67,6 +134,9 @@ export async function addMemberToChat(
   uid: string,
   displayName: string,
 ) {
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const photoUrl = photoOf(userSnap.data());
+  const username = claimedUsernameOf(userSnap.data());
   const chatRef = rtdb.ref(`chats/${chatId}`);
   let joinedChat: Record<string, unknown> | null = null;
   await chatRef.transaction((current) => {
@@ -82,10 +152,13 @@ export async function addMemberToChat(
       return; // abort — already a member
     }
     members[uid] = true;
-    const memberNames =
-      current.memberNames && typeof current.memberNames === "object"
-        ? { ...current.memberNames, [uid]: displayName }
-        : { [uid]: displayName };
+    const identity = applyMemberIdentity(
+      current as Record<string, unknown>,
+      uid,
+      displayName,
+      photoUrl,
+      username,
+    );
     const unreadCounts =
       current.unreadCounts && typeof current.unreadCounts === "object"
         ? { ...current.unreadCounts, [uid]: 0 }
@@ -94,7 +167,7 @@ export async function addMemberToChat(
       ...current,
       members,
       memberCount: Object.keys(members).length,
-      memberNames,
+      ...identity,
       unreadCounts,
     };
     return joinedChat;
@@ -156,6 +229,9 @@ export async function collectUsersByRoles(
 }
 
 export async function addAgentToDefaultGroup(uid: string, displayName: string) {
+  const userSnap = await db.doc(`users/${uid}`).get();
+  const photoUrl = photoOf(userSnap.data());
+  const username = claimedUsernameOf(userSnap.data());
   const chatRef = rtdb.ref(`chats/${DEFAULT_AGENT_GROUP_ID}`);
   const now = Date.now();
 
@@ -165,6 +241,8 @@ export async function addAgentToDefaultGroup(uid: string, displayName: string) {
         members: { [uid]: true },
         memberCount: 1,
         memberNames: { [uid]: displayName },
+        memberPhotos: photoUrl ? { [uid]: photoUrl } : {},
+        memberUsernames: username ? { [uid]: username } : {},
         isGroup: true,
         isDefaultAgentGroup: true,
         title: "Team",
@@ -187,10 +265,13 @@ export async function addAgentToDefaultGroup(uid: string, displayName: string) {
       return; // abort — already a member
     }
     members[uid] = true;
-    const memberNames =
-      current.memberNames && typeof current.memberNames === "object"
-        ? { ...current.memberNames, [uid]: displayName }
-        : { [uid]: displayName };
+    const identity = applyMemberIdentity(
+      current as Record<string, unknown>,
+      uid,
+      displayName,
+      photoUrl,
+      username,
+    );
     const unreadCounts =
       current.unreadCounts && typeof current.unreadCounts === "object"
         ? { ...current.unreadCounts, [uid]: 0 }
@@ -200,7 +281,7 @@ export async function addAgentToDefaultGroup(uid: string, displayName: string) {
       ...current,
       members,
       memberCount: Object.keys(members).length,
-      memberNames,
+      ...identity,
       unreadCounts,
       isGroup: true,
       isDefaultAgentGroup: true,
@@ -232,6 +313,18 @@ export const syncUserAutoJoinGroups = onDocumentWritten(
     const afterRole = parseRole(afterData.role);
     const beforeApproval = String(beforeData?.approvalStatus ?? "approved");
     const afterApproval = String(afterData.approvalStatus ?? "approved");
+    const identityChanged =
+      !before?.exists ||
+      headlineName(beforeData) !== headlineName(afterData) ||
+      photoOf(beforeData) !== photoOf(afterData) ||
+      claimedUsernameOf(beforeData) !== claimedUsernameOf(afterData);
+    if (identityChanged) {
+      await syncChatMemberIdentity(uid, {
+        name: headlineName(afterData),
+        photoUrl: photoOf(afterData) || null,
+        username: claimedUsernameOf(afterData) || null,
+      });
+    }
     if (
       before?.exists &&
       beforeRole === afterRole &&
@@ -353,6 +446,39 @@ export const syncChatMetadataOnMessage = onValueCreated(
       [`chats/${chatId}/lastMessageSenderId`]: senderId,
       [`chats/${chatId}/unreadCounts`]: unreadCounts,
     });
+
+    const memberUsernames =
+      (chat.memberUsernames ?? {}) as Record<string, unknown>;
+    const byHandle = new Map<string, string>();
+    for (const [uid, raw] of Object.entries(memberUsernames)) {
+      const parsed = parseUsername(raw);
+      if (parsed.ok) byHandle.set(parsed.value, uid);
+    }
+    const memberNames =
+      (chat.memberNames ?? {}) as Record<string, unknown>;
+    const senderName = String(memberNames[senderId] ?? "").trim() || "Someone";
+    const handles = parseMentions(body);
+    const mentioned = new Set<string>();
+    for (const handle of handles) {
+      const uid = byHandle.get(handle);
+      if (!uid || uid === senderId || members[uid] !== true) continue;
+      mentioned.add(uid);
+    }
+    await Promise.all(
+      [...mentioned].map(async (uid) => {
+        if (await isMutedBy(uid, senderId)) return;
+        await notifyUser(uid, {
+          type: "chat_mention",
+          title: `${senderName} mentioned you`,
+          body: body.slice(0, 120) || `@${handles[0] ?? "you"}`,
+          href: `/chats/${chatId}`,
+          deepLink: `pulse://chats/${chatId}`,
+          ref: { chatId, messageId: event.params.messageId },
+          actorId: senderId,
+          actorName: senderName,
+        });
+      }),
+    );
   },
 );
 
@@ -420,11 +546,21 @@ export const createDm = onCall(callableOpts, async (request) => {
     [uid]: headlineName(meData),
     [otherUid]: headlineName(otherData),
   };
+  const memberPhotos = compactStrings([
+    [uid, photoOf(meData)],
+    [otherUid, photoOf(otherData)],
+  ]);
+  const memberUsernames = compactStrings([
+    [uid, claimedUsernameOf(meData)],
+    [otherUid, claimedUsernameOf(otherData)],
+  ]);
   const now = Date.now();
   const chat = {
     members: Object.fromEntries(memberIds.map((id) => [id, true])),
     memberCount: 2,
     memberNames,
+    memberPhotos,
+    memberUsernames,
     isGroup: false,
     title: null,
     dmKey,
@@ -567,6 +703,14 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
   const memberNames = Object.fromEntries(
     memberIds.map((id) => [id, headlineName(roleUsers.get(id))]),
   );
+  const memberPhotos = compactStrings(
+    memberIds.map((id) => [id, photoOf(roleUsers.get(id))] as [string, string]),
+  );
+  const memberUsernames = compactStrings(
+    memberIds.map(
+      (id) => [id, claimedUsernameOf(roleUsers.get(id))] as [string, string],
+    ),
+  );
   const autoJoinRolesMap = persistAutoJoin
     ? Object.fromEntries(seedRoles.map((role) => [role, true]))
     : {};
@@ -578,6 +722,8 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     members: Object.fromEntries(memberIds.map((id) => [id, true])),
     memberCount: memberIds.length,
     memberNames,
+    memberPhotos,
+    memberUsernames,
     isGroup: true,
     title,
     dmKey: null,

@@ -21,6 +21,11 @@ export {
   getSocialRelationship,
   listContacts,
   listIncomingContactRequests,
+  followUser,
+  unfollowUser,
+  listFollowers,
+  listFollowing,
+  reportMember,
   onSocialBlockWritten,
 } from "./social";
 
@@ -87,6 +92,7 @@ export {
   cancelAccountDeletion,
   purgeDeletedAccounts,
   updateAccountEmail,
+  updateUsername,
 } from "./account";
 
 export {
@@ -173,3 +179,5 @@ export {
   deletePromoBanner,
   uploadPromoBannerImage,
 } from "./banners";
+
+export { listPolls, upsertPoll, deletePoll, votePoll } from "./polls";

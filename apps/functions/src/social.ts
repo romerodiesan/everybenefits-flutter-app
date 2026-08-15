@@ -92,7 +92,76 @@ export async function applyBlockSideEffects(
   batch.delete(db.doc(`social/${uid}/contacts/${otherUid}`));
   batch.delete(db.doc(`social/${otherUid}/contacts/${uid}`));
   await batch.commit();
+  await Promise.all([
+    dropFollowEdge(uid, otherUid),
+    dropFollowEdge(otherUid, uid),
+  ]);
   await syncDmMessagingEnabled(uid, otherUid);
+}
+
+async function dropFollowEdge(follower: string, followed: string): Promise<void> {
+  await db.runTransaction(async (tx) => {
+    const followingRef = db.doc(`social/${follower}/following/${followed}`);
+    const snap = await tx.get(followingRef);
+    if (!snap.exists) return;
+    tx.delete(followingRef);
+    tx.delete(db.doc(`social/${followed}/followers/${follower}`));
+    tx.set(
+      db.doc(`publicProfiles/${followed}`),
+      { followerCount: FieldValue.increment(-1) },
+      { merge: true },
+    );
+    tx.set(
+      db.doc(`publicProfiles/${follower}`),
+      { followingCount: FieldValue.increment(-1) },
+      { merge: true },
+    );
+  });
+}
+
+async function setFollowEdge(
+  follower: string,
+  followed: string,
+  follow: boolean,
+): Promise<boolean> {
+  return db.runTransaction(async (tx) => {
+    const followingRef = db.doc(`social/${follower}/following/${followed}`);
+    const snap = await tx.get(followingRef);
+    if (follow) {
+      if (snap.exists) return false;
+      const now = FieldValue.serverTimestamp();
+      tx.set(followingRef, { uid: followed, createdAt: now });
+      tx.set(db.doc(`social/${followed}/followers/${follower}`), {
+        uid: follower,
+        createdAt: now,
+      });
+      tx.set(
+        db.doc(`publicProfiles/${followed}`),
+        { followerCount: FieldValue.increment(1) },
+        { merge: true },
+      );
+      tx.set(
+        db.doc(`publicProfiles/${follower}`),
+        { followingCount: FieldValue.increment(1) },
+        { merge: true },
+      );
+      return true;
+    }
+    if (!snap.exists) return false;
+    tx.delete(followingRef);
+    tx.delete(db.doc(`social/${followed}/followers/${follower}`));
+    tx.set(
+      db.doc(`publicProfiles/${followed}`),
+      { followerCount: FieldValue.increment(-1) },
+      { merge: true },
+    );
+    tx.set(
+      db.doc(`publicProfiles/${follower}`),
+      { followingCount: FieldValue.increment(-1) },
+      { merge: true },
+    );
+    return true;
+  });
 }
 
 async function acceptPair(uid: string, otherUid: string): Promise<void> {
@@ -131,6 +200,7 @@ async function assertApprovedMember(uid: string) {
 type PublicCard = {
   uid: string;
   displayName: string | null;
+  username: string | null;
   photoUrl: string | null;
   role: string;
   agency: string | null;
@@ -151,6 +221,7 @@ async function cardsForUids(uids: string[]): Promise<PublicCard[]> {
         uid: snap.id,
         displayName:
           typeof data.displayName === "string" ? data.displayName : null,
+        username: typeof data.username === "string" ? data.username : null,
         photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
         role: String(data.role ?? "student"),
         agency: typeof data.agency === "string" ? data.agency : null,
@@ -342,6 +413,7 @@ export const getSocialRelationship = onCall(callableOpts, async (request) => {
     blockedByMe,
     muted,
     theyBlocked,
+    following,
   ] = await db.getAll(
     db.doc(`social/${uid}/outgoingRequests/${otherUid}`),
     db.doc(`social/${uid}/incomingRequests/${otherUid}`),
@@ -349,6 +421,7 @@ export const getSocialRelationship = onCall(callableOpts, async (request) => {
     db.doc(`social/${uid}/blocks/${otherUid}`),
     db.doc(`social/${uid}/mutes/${otherUid}`),
     db.doc(`social/${otherUid}/blocks/${uid}`),
+    db.doc(`social/${uid}/following/${otherUid}`),
   );
   const relationship: SocialRelationship = computeRelationship({
     viewerUid: uid,
@@ -359,6 +432,7 @@ export const getSocialRelationship = onCall(callableOpts, async (request) => {
     isContact: contact.exists,
     hasOutgoing: outgoing.exists,
     hasIncoming: incoming.exists,
+    following: following.exists,
   });
   return relationship;
 });
@@ -385,6 +459,111 @@ export const listIncomingContactRequests = onCall(
     return { profiles };
   },
 );
+
+export const followUser = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "followUser");
+  const otherUid = otherUidFrom(request);
+  if (otherUid === uid) {
+    throw new HttpsError("invalid-argument", "Cannot follow yourself.");
+  }
+  await Promise.all([assertApprovedMember(uid), assertApprovedMember(otherUid)]);
+  if (await isBlockedEitherWay(uid, otherUid)) {
+    throw new HttpsError("permission-denied", "Cannot follow this member.");
+  }
+  const created = await setFollowEdge(uid, otherUid, true);
+  if (created) {
+    const me = await db.doc(`users/${uid}`).get();
+    const name = headlineName(me.data());
+    await notifyUser(otherUid, {
+      type: "new_follower",
+      title: "New follower",
+      body: `${name} started following you`,
+      href: `/members/${uid}`,
+      deepLink: `pulse://members/${uid}`,
+      ref: { uid },
+      actorId: uid,
+      actorName: name,
+    });
+  }
+  return { following: true };
+});
+
+export const unfollowUser = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "unfollowUser");
+  const otherUid = otherUidFrom(request);
+  if (otherUid === uid) {
+    throw new HttpsError("invalid-argument", "Cannot unfollow yourself.");
+  }
+  await setFollowEdge(uid, otherUid, false);
+  return { following: false };
+});
+
+async function listFollowGraph(
+  callerUid: string,
+  targetUid: string,
+  edge: "followers" | "following",
+): Promise<{ profiles: PublicCard[] }> {
+  if (await isBlockedEitherWay(callerUid, targetUid) && callerUid !== targetUid) {
+    return { profiles: [] };
+  }
+  const snap = await db.collection(`social/${targetUid}/${edge}`).limit(100).get();
+  const ids = snap.docs.map((doc) => doc.id);
+  const blocked = await blockedWithCaller(callerUid, ids);
+  const visible = ids.filter((id) => !blocked.has(id));
+  const profiles = await cardsForUids(visible);
+  profiles.sort((a, b) =>
+    (a.displayName ?? "").localeCompare(b.displayName ?? ""),
+  );
+  return { profiles };
+}
+
+export const listFollowers = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "listFollowers");
+  const otherUid = otherUidFrom(request);
+  return listFollowGraph(uid, otherUid, "followers");
+});
+
+export const listFollowing = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "listFollowing");
+  const otherUid = otherUidFrom(request);
+  return listFollowGraph(uid, otherUid, "following");
+});
+
+const REPORT_REASONS = new Set([
+  "spam",
+  "harassment",
+  "impersonation",
+  "other",
+]);
+
+export const reportMember = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "reportMember");
+  const otherUid = otherUidFrom(request);
+  if (otherUid === uid) {
+    throw new HttpsError("invalid-argument", "Cannot report yourself.");
+  }
+  const payload =
+    request.data && typeof request.data === "object"
+      ? (request.data as Record<string, unknown>)
+      : {};
+  const reason = String(payload.reason ?? "").trim();
+  if (!REPORT_REASONS.has(reason)) {
+    throw new HttpsError("invalid-argument", "Valid reason required.");
+  }
+  const details = String(payload.details ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .slice(0, 500);
+  await db.collection("moderationReports").add({
+    reporterUid: uid,
+    targetUid: otherUid,
+    reason,
+    details: details || null,
+    status: "open",
+    createdAt: FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
+});
 
 export const onSocialBlockWritten = onDocumentWritten(
   "social/{uid}/blocks/{otherUid}",

@@ -1,10 +1,11 @@
-import { FieldValue, Timestamp } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type DocumentSnapshot } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { userSearchIndexFields, validateOptionalEmail } from "@pulse/shared";
+import { userSearchIndexFields, validateOptionalEmail, parseUsername } from "@pulse/shared";
 import { admin, db, rtdb, callableOpts, storageBucket } from "./init";
 import { ACCOUNT_DELETION_GRACE_DAYS } from "./constants";
 import { requireCaller } from "./auth";
+import { syncChatMemberIdentity } from "./chats";
 
 function authErrorCode(error: unknown): string {
   if (error && typeof error === "object" && "code" in error) {
@@ -67,9 +68,11 @@ export async function syncUserEmail(uid: string, rawEmail: string): Promise<stri
     typeof snap.data()?.displayName === "string"
       ? String(snap.data()?.displayName)
       : null;
+  const username =
+    typeof snap.data()?.username === "string" ? String(snap.data()?.username) : null;
   await userRef.update({
     email,
-    ...userSearchIndexFields(displayName, email),
+    ...userSearchIndexFields(displayName, email, username),
     updatedAt: FieldValue.serverTimestamp(),
   });
   return email;
@@ -87,6 +90,57 @@ export const updateAccountEmail = onCall(callableOpts, async (request) => {
   }
   const email = await syncUserEmail(uid, String(request.data?.email ?? ""));
   return { email };
+});
+
+export const updateUsername = onCall(callableOpts, async (request) => {
+  const uid = await requireCaller(request, "updateUsername");
+  const parsed = parseUsername(request.data?.username);
+  if (!parsed.ok) {
+    throw new HttpsError("invalid-argument", "invalid");
+  }
+  const username = parsed.value;
+
+  await db.runTransaction(async (tx) => {
+    const userRef = db.doc(`users/${uid}`);
+    const userSnap = await tx.get(userRef);
+    if (!userSnap.exists) throw new HttpsError("not-found", "User not found.");
+    const data = userSnap.data() ?? {};
+    if (data.isAnonymous === true) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Anonymous accounts cannot set a username.",
+      );
+    }
+    const current =
+      typeof data.username === "string" ? data.username.trim().toLowerCase() : "";
+    const newRef = db.doc(`usernames/${username}`);
+    const newSnap = await tx.get(newRef);
+    let oldSnap: DocumentSnapshot | null = null;
+    if (current && current !== username) {
+      oldSnap = await tx.get(db.doc(`usernames/${current}`));
+    }
+    if (current === username) return;
+
+    if (newSnap.exists && String(newSnap.data()?.uid ?? "") !== uid) {
+      throw new HttpsError("already-exists", "taken");
+    }
+    if (oldSnap?.exists && String(oldSnap.data()?.uid ?? "") === uid) {
+      tx.delete(oldSnap.ref);
+    }
+    tx.set(newRef, { uid });
+    tx.update(userRef, {
+      username,
+      ...userSearchIndexFields(
+        typeof data.displayName === "string" ? data.displayName : null,
+        typeof data.email === "string" ? data.email : null,
+        username,
+      ),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+
+  await syncChatMemberIdentity(uid, { username });
+  return { username };
 });
 
 async function clearFcmTokens(uid: string): Promise<void> {
@@ -130,13 +184,7 @@ async function renameChatMemberships(
   uid: string,
   name: string,
 ): Promise<void> {
-  const index = await rtdb.ref(`userChats/${uid}`).get();
-  const chatIds = Object.keys((index.val() ?? {}) as Record<string, unknown>);
-  const updates: Record<string, unknown> = {};
-  for (const chatId of chatIds.slice(0, 200)) {
-    updates[`chats/${chatId}/memberNames/${uid}`] = name;
-  }
-  if (Object.keys(updates).length) await rtdb.ref().update(updates);
+  await syncChatMemberIdentity(uid, { name });
 }
 
 export const deactivateAccount = onCall(callableOpts, async (request) => {
