@@ -5,12 +5,14 @@ export type MappedUserProfile = {
   uid: string;
   email: string | null;
   displayName: string | null;
+  username?: string | null;
   photoUrl: string | null;
   role: UserRole;
   isAnonymous: boolean;
   profileCompleted: boolean;
   productTourVersion?: number;
   phoneCountryCode: string | null;
+  phoneCountryIso2?: string | null;
   phoneNumber: string | null;
   phoneVerified?: boolean;
   npn: string | null;
@@ -60,6 +62,7 @@ export function mapUserProfile(
     uid: id,
     email: asString(data.email),
     displayName: asString(data.displayName),
+    username: asString(data.username),
     photoUrl: asString(data.photoUrl),
     role: parseRole(data.role),
     isAnonymous: data.isAnonymous === true,
@@ -69,6 +72,7 @@ export function mapUserProfile(
         ? data.productTourVersion
         : undefined,
     phoneCountryCode: asString(data.phoneCountryCode),
+    phoneCountryIso2: asString(data.phoneCountryIso2),
     phoneNumber: asString(data.phoneNumber),
     phoneVerified:
       typeof data.phoneVerified === "boolean" ? data.phoneVerified : undefined,

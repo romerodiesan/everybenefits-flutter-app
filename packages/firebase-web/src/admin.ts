@@ -3,6 +3,7 @@ import {
   parseOrgNodeType,
   parseRole,
   withBannerCompatDefaults,
+  withPollCompatDefaults,
   type OrgDepth,
   type OrgNode,
   type OrgNodeType,
@@ -12,6 +13,11 @@ import {
   type PromoBannerLocalizedString,
   type PromoBannerSurface,
   type PromoBannerType,
+  type Poll,
+  type PollAudience,
+  type PollLocalizedString,
+  type PollOption,
+  type PollSurface,
   type RoleCategory,
   type RoleDoc,
   type UserRole,
@@ -357,6 +363,23 @@ export type AdminRepository = {
     contentType: string;
     bytesBase64: string;
   }) => Promise<{ downloadUrl: string; path: string } | null>;
+  listPolls: () => Promise<{ polls: Poll[] }>;
+  upsertPoll: (input: {
+    id?: string;
+    version?: number;
+    active?: boolean;
+    surface: PollSurface;
+    audiences: PollAudience[];
+    question: PollLocalizedString;
+    options: PollOption[];
+    allowChange?: boolean;
+    showResultsBeforeVote?: boolean;
+    dismissible?: boolean;
+    startsAt?: number | null;
+    endsAt?: number | null;
+    bumpVersion?: boolean;
+  }) => Promise<Poll | null>;
+  deletePoll: (id: string, hard?: boolean) => Promise<void>;
 };
 
 function mapPromoBanner(entry: Record<string, unknown>): PromoBanner {
@@ -396,6 +419,63 @@ function mapPromoBanner(entry: Record<string, unknown>): PromoBanner {
     updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
   });
 }
+
+function mapPoll(entry: Record<string, unknown>): Poll {
+  const localized = (value: unknown): PollLocalizedString => {
+    if (!value || typeof value !== "object") return { en: "", es: "" };
+    const record = value as Record<string, unknown>;
+    return {
+      en: typeof record.en === "string" ? record.en : "",
+      es: typeof record.es === "string" ? record.es : "",
+    };
+  };
+  const options: PollOption[] = Array.isArray(entry.options)
+    ? entry.options
+        .map((raw, index) => {
+          if (!raw || typeof raw !== "object") return null;
+          const record = raw as Record<string, unknown>;
+          return {
+            id:
+              typeof record.id === "string" && record.id.trim()
+                ? record.id.trim()
+                : `o${index + 1}`,
+            label: localized(record.label),
+          };
+        })
+        .filter((option): option is PollOption => Boolean(option))
+    : [];
+  const counts: Record<string, number> = {};
+  if (entry.counts && typeof entry.counts === "object") {
+    for (const [key, value] of Object.entries(
+      entry.counts as Record<string, unknown>,
+    )) {
+      const n = Number(value);
+      if (Number.isFinite(n)) counts[key] = n;
+    }
+  }
+  return withPollCompatDefaults({
+    id: String(entry.id ?? ""),
+    version: typeof entry.version === "number" ? entry.version : 1,
+    active: entry.active === true,
+    surface: (entry.surface as PollSurface) ?? "home",
+    audiences: Array.isArray(entry.audiences)
+      ? (entry.audiences.map(String) as PollAudience[])
+      : ["all"],
+    question: localized(entry.question),
+    options,
+    allowChange: entry.allowChange === true,
+    showResultsBeforeVote: entry.showResultsBeforeVote === true,
+    dismissible: entry.dismissible !== false,
+    counts,
+    voteCount: typeof entry.voteCount === "number" ? entry.voteCount : 0,
+    startsAt: typeof entry.startsAt === "number" ? entry.startsAt : null,
+    endsAt: typeof entry.endsAt === "number" ? entry.endsAt : null,
+    createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
+    updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : null,
+    updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
+  });
+}
+
 export function createAdminRepository(functions: Functions): AdminRepository {
   return {
     async listUsers(filters) {
@@ -665,6 +745,30 @@ export function createAdminRepository(functions: Functions): AdminRepository {
         downloadUrl: String(data.downloadUrl),
         path: String(data.path ?? ""),
       };
+    },
+    async listPolls() {
+      try {
+        const data = await callCloudFunction<{
+          polls?: Array<Record<string, unknown>>;
+        }>(functions, "listPolls", {});
+        return {
+          polls: (data?.polls ?? []).map(mapPoll).filter((poll) => poll.id),
+        };
+      } catch (error) {
+        if (error instanceof FunctionsUnavailableError) {
+          return { polls: [] };
+        }
+        throw error;
+      }
+    },
+    async upsertPoll(input) {
+      const data = await callCloudFunction<{
+        poll?: Record<string, unknown>;
+      }>(functions, "upsertPoll", input);
+      return data?.poll ? mapPoll(data.poll) : null;
+    },
+    async deletePoll(id, hard = false) {
+      await callCloudFunction(functions, "deletePoll", { id, hard });
     },
   };
 }

@@ -1,5 +1,5 @@
 import { type Functions } from "firebase/functions";
-import { type OrgNode, type OrgNodeType, type PromoBanner, type PromoBannerAudience, type PromoBannerFormat, type PromoBannerLocalizedString, type PromoBannerSurface, type PromoBannerType, type RoleCategory, type RoleDoc, type UserRole } from "@pulse/shared";
+import { type OrgNode, type OrgNodeType, type PromoBanner, type PromoBannerAudience, type PromoBannerFormat, type PromoBannerLocalizedString, type PromoBannerSurface, type PromoBannerType, type Poll, type PollAudience, type PollLocalizedString, type PollOption, type PollSurface, type RoleCategory, type RoleDoc, type UserRole } from "@pulse/shared";
 import { FunctionsUnavailableError, callCloudFunction } from "./callables";
 export { FunctionsUnavailableError, callCloudFunction };
 export type AdminUserRow = {
@@ -226,6 +226,25 @@ export type AdminRepository = {
         downloadUrl: string;
         path: string;
     } | null>;
+    listPolls: () => Promise<{
+        polls: Poll[];
+    }>;
+    upsertPoll: (input: {
+        id?: string;
+        version?: number;
+        active?: boolean;
+        surface: PollSurface;
+        audiences: PollAudience[];
+        question: PollLocalizedString;
+        options: PollOption[];
+        allowChange?: boolean;
+        showResultsBeforeVote?: boolean;
+        dismissible?: boolean;
+        startsAt?: number | null;
+        endsAt?: number | null;
+        bumpVersion?: boolean;
+    }) => Promise<Poll | null>;
+    deletePoll: (id: string, hard?: boolean) => Promise<void>;
 };
 export declare function createAdminRepository(functions: Functions): AdminRepository;
 //# sourceMappingURL=admin.d.ts.map

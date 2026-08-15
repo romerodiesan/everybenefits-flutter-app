@@ -22,6 +22,7 @@ function mapUserProfile(id, data) {
         uid: id,
         email: asString(data.email),
         displayName: asString(data.displayName),
+        username: asString(data.username),
         photoUrl: asString(data.photoUrl),
         role: (0, shared_1.parseRole)(data.role),
         isAnonymous: data.isAnonymous === true,
@@ -30,6 +31,7 @@ function mapUserProfile(id, data) {
             ? data.productTourVersion
             : undefined,
         phoneCountryCode: asString(data.phoneCountryCode),
+        phoneCountryIso2: asString(data.phoneCountryIso2),
         phoneNumber: asString(data.phoneNumber),
         phoneVerified: typeof data.phoneVerified === "boolean" ? data.phoneVerified : undefined,
         npn: asString(data.npn),

@@ -131,6 +131,61 @@ function mapPromoBanner(entry) {
         updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
     });
 }
+function mapPoll(entry) {
+    const localized = (value) => {
+        if (!value || typeof value !== "object")
+            return { en: "", es: "" };
+        const record = value;
+        return {
+            en: typeof record.en === "string" ? record.en : "",
+            es: typeof record.es === "string" ? record.es : "",
+        };
+    };
+    const options = Array.isArray(entry.options)
+        ? entry.options
+            .map((raw, index) => {
+            if (!raw || typeof raw !== "object")
+                return null;
+            const record = raw;
+            return {
+                id: typeof record.id === "string" && record.id.trim()
+                    ? record.id.trim()
+                    : `o${index + 1}`,
+                label: localized(record.label),
+            };
+        })
+            .filter((option) => Boolean(option))
+        : [];
+    const counts = {};
+    if (entry.counts && typeof entry.counts === "object") {
+        for (const [key, value] of Object.entries(entry.counts)) {
+            const n = Number(value);
+            if (Number.isFinite(n))
+                counts[key] = n;
+        }
+    }
+    return (0, shared_1.withPollCompatDefaults)({
+        id: String(entry.id ?? ""),
+        version: typeof entry.version === "number" ? entry.version : 1,
+        active: entry.active === true,
+        surface: entry.surface ?? "home",
+        audiences: Array.isArray(entry.audiences)
+            ? entry.audiences.map(String)
+            : ["all"],
+        question: localized(entry.question),
+        options,
+        allowChange: entry.allowChange === true,
+        showResultsBeforeVote: entry.showResultsBeforeVote === true,
+        dismissible: entry.dismissible !== false,
+        counts,
+        voteCount: typeof entry.voteCount === "number" ? entry.voteCount : 0,
+        startsAt: typeof entry.startsAt === "number" ? entry.startsAt : null,
+        endsAt: typeof entry.endsAt === "number" ? entry.endsAt : null,
+        createdAt: typeof entry.createdAt === "number" ? entry.createdAt : null,
+        updatedAt: typeof entry.updatedAt === "number" ? entry.updatedAt : null,
+        updatedBy: typeof entry.updatedBy === "string" ? entry.updatedBy : null,
+    });
+}
 function createAdminRepository(functions) {
     return {
         async listUsers(filters) {
@@ -340,6 +395,27 @@ function createAdminRepository(functions) {
                 downloadUrl: String(data.downloadUrl),
                 path: String(data.path ?? ""),
             };
+        },
+        async listPolls() {
+            try {
+                const data = await (0, callables_1.callCloudFunction)(functions, "listPolls", {});
+                return {
+                    polls: (data?.polls ?? []).map(mapPoll).filter((poll) => poll.id),
+                };
+            }
+            catch (error) {
+                if (error instanceof callables_1.FunctionsUnavailableError) {
+                    return { polls: [] };
+                }
+                throw error;
+            }
+        },
+        async upsertPoll(input) {
+            const data = await (0, callables_1.callCloudFunction)(functions, "upsertPoll", input);
+            return data?.poll ? mapPoll(data.poll) : null;
+        },
+        async deletePoll(id, hard = false) {
+            await (0, callables_1.callCloudFunction)(functions, "deletePoll", { id, hard });
         },
     };
 }

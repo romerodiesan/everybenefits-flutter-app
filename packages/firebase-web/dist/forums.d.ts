@@ -1,4 +1,4 @@
-import { type UserRole } from "@pulse/shared";
+import { type PublicProfileBadge, type UserRole } from "@pulse/shared";
 export type MappedForumThread = {
     id: string;
     tags: string[];
@@ -8,6 +8,7 @@ export type MappedForumThread = {
     authorName: string;
     authorPhotoUrl: string | null;
     authorRole: UserRole;
+    authorBadge: PublicProfileBadge | null;
     replyCount: number;
     score: number;
     /** Unique users who interacted (author, voters, repliers). */
@@ -25,6 +26,7 @@ export type MappedForumReply = {
     authorName: string;
     authorPhotoUrl: string | null;
     authorRole: UserRole;
+    authorBadge: PublicProfileBadge | null;
     score: number;
     createdAt: Date | null;
     updatedAt: Date | null;

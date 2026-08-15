@@ -3,12 +3,14 @@ export type MappedUserProfile = {
     uid: string;
     email: string | null;
     displayName: string | null;
+    username?: string | null;
     photoUrl: string | null;
     role: UserRole;
     isAnonymous: boolean;
     profileCompleted: boolean;
     productTourVersion?: number;
     phoneCountryCode: string | null;
+    phoneCountryIso2?: string | null;
     phoneNumber: string | null;
     phoneVerified?: boolean;
     npn: string | null;
