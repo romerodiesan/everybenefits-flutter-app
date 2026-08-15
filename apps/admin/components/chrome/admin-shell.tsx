@@ -166,6 +166,30 @@ function IconBanners({ filled, ...props }: IconProps) {
   );
 }
 
+function IconPolls({ filled, ...props }: IconProps) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" {...props}>
+      <path
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        d="M7 16.5V11M12 16.5V7.5M17 16.5v-3"
+      />
+      <rect
+        x="3.5"
+        y="4.5"
+        width="17"
+        height="15"
+        rx="2.5"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        fill={filled ? "currentColor" : "none"}
+        fillOpacity={filled ? 0.12 : 0}
+      />
+    </svg>
+  );
+}
+
 function IconSettings({ filled, ...props }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
@@ -317,6 +341,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
         match: (p: string) => p.startsWith("/banners"),
         adminOnly: true,
         Icon: IconBanners,
+      },
+      {
+        href: "/polls",
+        label: t("navPolls"),
+        match: (p: string) => p.startsWith("/polls"),
+        adminOnly: true,
+        Icon: IconPolls,
       },
       {
         href: "/settings",
