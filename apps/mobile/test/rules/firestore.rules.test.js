@@ -960,5 +960,29 @@ describe('social graph', () => {
     await assertFails(
       db.doc('social/a1/contacts/a2').set({ uid: 'a2', since: new Date() }),
     );
+    await assertFails(
+      db.doc('social/a1/following/a2').set({ uid: 'a2', createdAt: new Date() }),
+    );
+  });
+});
+
+describe('usernames reservation', () => {
+  beforeEach(async () => {
+    await seedUser('agent1', { role: 'agent', username: 'alpha' });
+    await seedUser('agent2', { role: 'agent' });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('usernames/alpha').set({ uid: 'agent1' });
+    });
+  });
+
+  it('lets members read claimed handles', async () => {
+    await assertSucceeds(authedDb('agent2').doc('usernames/alpha').get());
+  });
+
+  it('blocks client writes to usernames and users.username', async () => {
+    const owner = authedDb('agent1');
+    await assertFails(owner.doc('usernames/bravo').set({ uid: 'agent1' }));
+    await assertFails(owner.doc('usernames/alpha').delete());
+    await assertFails(owner.doc('users/agent1').update({ username: 'bravo' }));
   });
 });

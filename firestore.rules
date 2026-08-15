@@ -294,7 +294,8 @@ service cloud.firestore {
           'approvedBy',
           'approvedAt',
           'profileBadge',
-          'email'
+          'email',
+          'username'
         ])
         && optionalBoundedString(request.resource.data.get('bio', null), 280)
         && (
@@ -392,6 +393,11 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    match /usernames/{username} {
+      allow read: if isRegisteredMember();
+      allow write: if false;
+    }
+
     // Social graph: owner-only reads. Contacts and requests are Admin SDK only.
     match /social/{uid} {
       allow read, write: if false;
@@ -438,6 +444,21 @@ service cloud.firestore {
         allow read: if isOwner(uid) && isRegisteredMember();
         allow write: if false;
       }
+
+      match /followers/{otherUid} {
+        allow read: if isOwner(uid) && isRegisteredMember();
+        allow write: if false;
+      }
+
+      match /following/{otherUid} {
+        allow read: if isOwner(uid) && isRegisteredMember();
+        allow write: if false;
+      }
+    }
+
+    // Member reports — Functions write; no client reads.
+    match /moderationReports/{id} {
+      allow read, write: if false;
     }
 
     // Server-only outbound email queue (Resend).
@@ -733,6 +754,15 @@ service cloud.firestore {
     match /promoBanners/{bannerId} {
       allow read: if isRegisteredMember();
       allow write: if false;
+    }
+
+    match /polls/{pollId} {
+      allow read: if isRegisteredMember();
+      allow write: if false;
+      match /votes/{uid} {
+        allow read: if isOwner(uid) && isRegisteredMember();
+        allow write: if false;
+      }
     }
 
     // Org tree — clients may read; mutations go through Cloud Functions.

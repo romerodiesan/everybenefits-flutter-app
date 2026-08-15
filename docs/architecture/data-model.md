@@ -12,7 +12,16 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `users/{uid}/notifications/{id}` | In-app inbox |
 | `users/{uid}/fcmTokens/{id}` | Push tokens |
 | `users/{uid}/notificationState/{id}` | Read/cursor state |
-| `publicProfiles/{uid}` | Directory-safe public card (synced by Functions) |
+| `publicProfiles/{uid}` | Directory-safe public card (synced by Functions): identity, bio, agency, role, badge, optional city/state, join date, follow counts |
+| `usernames/{username}` | Unique handle reservation `{ uid }` (Functions-only writes) |
+| `social/{uid}/contacts/{otherUid}` | Mutual contacts (Functions-only writes; DM gate) |
+| `social/{uid}/incomingRequests/{fromUid}` | Incoming contact requests (Functions-only writes) |
+| `social/{uid}/outgoingRequests/{toUid}` | Outgoing contact requests (Functions-only writes) |
+| `social/{uid}/followers/{otherUid}` | Unidirectional followers (Functions-only writes) |
+| `social/{uid}/following/{otherUid}` | Unidirectional following (Functions-only writes) |
+| `social/{uid}/blocks/{otherUid}` | Blocks (client create/delete) |
+| `social/{uid}/mutes/{otherUid}` | Mutes (client create/delete) |
+| `moderationReports/{id}` | Member reports (`reporterUid`, `targetUid`, `reason`, `details`, `status`) — Functions-only |
 | `threads/{threadId}` | Forum threads (`interactorCount` = unique author/voters/repliers). Spotlight: ≥80% active users + absolute floors (min audience 25). Hot: ≥35% reach + floors. |
 | `threads/{threadId}/replies/{replyId}` | Replies |
 | `threads/{threadId}/votes/{uid}` | Thread votes |
@@ -61,6 +70,7 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `ssoRateLimit/{id}` | SSO abuse counters (configure Firestore TTL on `expiresAt`) |
 | `platformConfig/{id}` | Platform settings |
 | `promoBanners/{id}` | In-app promotional banners (`type`, `format`, `surface`, dismissible/CTA/image toggles, localized copy; Admin-managed). Multiple active banners on the same surface rotate in a Pulse carousel. |
+| `polls/{id}` | In-app polls (question, options, surface, audience, schedule; Admin-managed). Votes live in `polls/{id}/votes/{uid}` and tallies on the poll doc. |
 
 **Payments access:** payments-admin clients may **read** economic / commission collections via Firestore rules (`canAccessPaymentsData`). All **writes** go through Cloud Functions / Admin SDK. Identity for new Commission Runs is Pulse `orgNodes` + `users` ([ADR-008](ADR-008-commission-runs.md)); both **commission** and **override** streams are first-class. Recipient statements in Pulse use scoped callables + `commission.statements.self`, not broad client reads.
 
@@ -76,6 +86,8 @@ Legacy note: some chat-related docs may appear under Firestore `chats/**` rules;
 | `dmIndex/{dmKey}` | DM dedupe |
 | `presence/{uid}` | Online presence |
 | `autoJoinGroups/{roleOrKey}` | Role-based group auto-join |
+
+**Public profile privacy:** `users/{uid}.privacy.showLocationOnProfile` (default `false`) gates city + state on `publicProfiles`. Email, phone, NPN, and street address never sync to the public card. Follows do not unlock DMs — those still require mutual contacts.
 
 ## Storage
 

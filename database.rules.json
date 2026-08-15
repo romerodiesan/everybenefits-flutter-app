@@ -38,6 +38,22 @@
               && (!newData.exists() || newData.isString())"
           }
         },
+        "memberPhotos": {
+          "$uid": {
+            ".write": "auth != null
+              && auth.uid === $uid
+              && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
+              && (!newData.exists() || (newData.isString() && newData.val().length <= 4096))"
+          }
+        },
+        "memberUsernames": {
+          "$uid": {
+            ".write": "auth != null
+              && auth.uid === $uid
+              && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
+              && (!newData.exists() || (newData.isString() && newData.val().length <= 20))"
+          }
+        },
         // Group titles are set by Admin SDK callables only.
         "title": {
           ".write": false
@@ -65,6 +81,9 @@
             && newData.child('senderName').isString()
             && newData.child('senderName').val().length <= 120
             && newData.child('createdAt').isNumber()",
+          "senderPhotoUrl": {
+            ".validate": "!newData.exists() || (newData.isString() && newData.val().length <= 4096)"
+          },
           "reactions": {
             "$uid": {
               ".write": "auth != null
@@ -72,7 +91,34 @@
                 && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
                 && (!newData.exists() || newData.isString())"
             }
+          },
+          "replyTo": {
+            ".validate": "!newData.exists() || (
+              newData.hasChildren(['messageId', 'senderName', 'bodyPreview'])
+              && newData.child('messageId').isString()
+              && newData.child('messageId').val().length > 0
+              && newData.child('messageId').val().length <= 64
+              && newData.child('senderName').isString()
+              && newData.child('senderName').val().length <= 120
+              && newData.child('bodyPreview').isString()
+              && newData.child('bodyPreview').val().length <= 160
+            )"
           }
+        }
+      }
+    },
+
+    "typing": {
+      "$chatId": {
+        ".read": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
+        "$uid": {
+          ".write": "auth != null
+            && auth.uid === $uid
+            && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
+          ".validate": "!newData.exists() || (
+            newData.hasChildren(['at'])
+            && newData.child('at').isNumber()
+          )"
         }
       }
     },

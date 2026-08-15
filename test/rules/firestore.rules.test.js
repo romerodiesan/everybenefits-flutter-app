@@ -1007,6 +1007,18 @@ describe('social graph', () => {
         createdAt: new Date(),
       }),
     );
+    await assertFails(
+      db.doc('social/a1/following/a2').set({
+        uid: 'a2',
+        createdAt: new Date(),
+      }),
+    );
+    await assertFails(
+      db.doc('social/a2/followers/a1').set({
+        uid: 'a1',
+        createdAt: new Date(),
+      }),
+    );
   });
 
   it('denies reading another member social graph', async () => {
@@ -1032,6 +1044,31 @@ describe('social graph', () => {
       }),
     );
   });
+
+  it('lets owners read their follow graph but not write it', async () => {
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('social/a1/following/a2').set({ uid: 'a2' });
+      await ctx.firestore().doc('social/a1/followers/a3').set({ uid: 'a3' });
+    });
+    const db = authedDb('a1', { email: 'a1@example.com' });
+    await assertSucceeds(db.doc('social/a1/following/a2').get());
+    await assertSucceeds(db.doc('social/a1/followers/a3').get());
+    await assertFails(
+      authedDb('a2', { email: 'a2@example.com' }).doc('social/a1/followers/a3').get(),
+    );
+  });
+
+  it('denies client writes to moderation reports', async () => {
+    const db = authedDb('a1', { email: 'a1@example.com' });
+    await assertFails(
+      db.collection('moderationReports').add({
+        reporterUid: 'a1',
+        targetUid: 'a2',
+        reason: 'spam',
+        createdAt: new Date(),
+      }),
+    );
+  });
 });
 
 describe('registered-member catalog reads', () => {
@@ -1051,6 +1088,9 @@ describe('registered-member catalog reads', () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc('roles/agent').set({ permissions: ['forums.participate'] });
       await ctx.firestore().doc('promoBanners/b1').set({ active: true, title: 'Hi' });
+      await ctx.firestore().doc('polls/p1').set({ active: true, question: { en: 'Q' } });
+      await ctx.firestore().doc('polls/p1/votes/member1').set({ optionId: 'o1' });
+      await ctx.firestore().doc('polls/p1/votes/agent1').set({ optionId: 'o2' });
       await ctx.firestore().doc('platformStats/global').set({ activeUsers: 10 });
     });
   });
@@ -1059,15 +1099,45 @@ describe('registered-member catalog reads', () => {
     const db = authedDb('member1', { email: 'member1@example.com' });
     await assertSucceeds(db.doc('roles/agent').get());
     await assertSucceeds(db.doc('promoBanners/b1').get());
+    await assertSucceeds(db.doc('polls/p1').get());
+    await assertSucceeds(db.doc('polls/p1/votes/member1').get());
+    await assertFails(db.doc('polls/p1/votes/agent1').get());
+    await assertFails(db.doc('polls/p1').set({ active: false }));
+    await assertFails(db.doc('polls/p1/votes/member1').set({ optionId: 'x' }));
     await assertSucceeds(db.doc('platformStats/global').get());
   });
 
   it('denies anonymous and guest catalog reads', async () => {
     await assertFails(anonDb('anon-x').doc('roles/agent').get());
     await assertFails(anonDb('anon-x').doc('promoBanners/b1').get());
+    await assertFails(anonDb('anon-x').doc('polls/p1').get());
     await assertFails(anonDb('anon-x').doc('platformStats/global').get());
     await assertFails(
       authedDb('guest1', { email: 'guest1@example.com' }).doc('promoBanners/b1').get(),
     );
+    await assertFails(
+      authedDb('guest1', { email: 'guest1@example.com' }).doc('polls/p1').get(),
+    );
+  });
+});
+
+describe('usernames reservation', () => {
+  beforeEach(async () => {
+    await seedUser('agent1', { role: 'agent', username: 'alpha' });
+    await seedUser('agent2', { role: 'agent' });
+    await testEnv.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc('usernames/alpha').set({ uid: 'agent1' });
+    });
+  });
+
+  it('lets members read claimed handles', async () => {
+    await assertSucceeds(authedDb('agent2').doc('usernames/alpha').get());
+  });
+
+  it('blocks client writes to usernames and users.username', async () => {
+    const owner = authedDb('agent1');
+    await assertFails(owner.doc('usernames/bravo').set({ uid: 'agent1' }));
+    await assertFails(owner.doc('usernames/alpha').delete());
+    await assertFails(owner.doc('users/agent1').update({ username: 'bravo' }));
   });
 });
