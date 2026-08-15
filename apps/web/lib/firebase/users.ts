@@ -65,7 +65,11 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   if (snap.exists()) {
     const data = snap.data() as Record<string, unknown>;
     const profile = profileFromData(user.uid, data);
-    const search = userSearchIndexFields(profile.displayName, profile.email);
+    const search = userSearchIndexFields(
+      profile.displayName,
+      profile.email,
+      profile.username,
+    );
     const tokens = Array.isArray(data.nameTokens)
       ? data.nameTokens.map(String)
       : [];
@@ -111,7 +115,7 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
   await setDoc(refDoc, {
     uid: profile.uid,
     email: profile.email,
-    ...userSearchIndexFields(profile.displayName, profile.email),
+    ...userSearchIndexFields(profile.displayName, profile.email, profile.username),
     photoUrl: profile.photoUrl,
     role: profile.role,
     isAnonymous: profile.isAnonymous,
@@ -160,6 +164,7 @@ const EDITABLE_PROFILE_KEYS = [
   "profileCompleted",
   "productTourVersion",
   "phoneCountryCode",
+  "phoneCountryIso2",
   "phoneNumber",
   "phoneVerified",
   "npn",
@@ -203,6 +208,7 @@ export async function updateUserProfile(
       const fields = userSearchIndexFields(
         typeof value === "string" ? value : null,
         profile.email,
+        profile.username,
       );
       data.displayName = fields.displayName;
       data.displayNameLower = fields.displayNameLower;

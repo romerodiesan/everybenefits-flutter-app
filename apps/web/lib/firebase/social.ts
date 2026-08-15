@@ -1,4 +1,5 @@
 import { parsePublicProfileBadge } from "@pulse/shared";
+import { toDate } from "@pulse/firebase-web";
 import { callCloudFunction } from "./call-function";
 import {
   collection,
@@ -24,7 +25,19 @@ export type SocialRelationship = {
   muted: boolean;
   blockedByMe: boolean;
   isSelf: boolean;
+  following: boolean;
 };
+
+export type MemberReportReason =
+  | "spam"
+  | "harassment"
+  | "impersonation"
+  | "other";
+
+function countOrZero(value: unknown): number {
+  const n = Math.round(Number(value ?? 0));
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
 
 function mapCard(entry: Record<string, unknown>): UserProfile {
   return {
@@ -42,14 +55,16 @@ function mapCard(entry: Record<string, unknown>): UserProfile {
     address: null,
     addressStreet: null,
     addressApt: null,
-    addressCity: null,
-    addressState: null,
+    addressCity: (entry.addressCity as string) ?? null,
+    addressState: (entry.addressState as string) ?? null,
     addressZip: null,
     agency: (entry.agency as string) ?? null,
     bio: (entry.bio as string) ?? null,
     profileBadge: parsePublicProfileBadge(entry.profileBadge),
-    createdAt: null,
-    updatedAt: null,
+    createdAt: toDate(entry.createdAt),
+    updatedAt: toDate(entry.updatedAt),
+    followerCount: countOrZero(entry.followerCount),
+    followingCount: countOrZero(entry.followingCount),
   };
 }
 
@@ -109,6 +124,7 @@ export async function getSocialRelationship(
     muted: Boolean(data.muted),
     blockedByMe: Boolean(data.blockedByMe),
     isSelf: Boolean(data.isSelf),
+    following: Boolean(data.following),
   };
 }
 
@@ -146,16 +162,50 @@ export async function setMuted(otherUid: string, muted: boolean) {
   return callCloudFunction("setMuted", { otherUid, muted });
 }
 
-export async function listContacts(): Promise<UserProfile[]> {
+export async function followUser(otherUid: string) {
+  return callCloudFunction<{ following: boolean }>("followUser", { otherUid });
+}
+
+export async function unfollowUser(otherUid: string) {
+  return callCloudFunction<{ following: boolean }>("unfollowUser", {
+    otherUid,
+  });
+}
+
+export async function reportMember(
+  otherUid: string,
+  reason: MemberReportReason,
+  details?: string,
+) {
+  return callCloudFunction<{ ok: boolean }>("reportMember", {
+    otherUid,
+    reason,
+    details: details?.trim() || undefined,
+  });
+}
+
+async function listCards(
+  name: "listContacts" | "listIncomingContactRequests" | "listFollowers" | "listFollowing",
+  extra: Record<string, unknown> = {},
+): Promise<UserProfile[]> {
   const data = await callCloudFunction<{
     profiles?: Array<Record<string, unknown>>;
-  }>("listContacts", {});
+  }>(name, extra);
   return (data?.profiles ?? []).map(mapCard).filter((p) => p.uid);
 }
 
+export async function listContacts(): Promise<UserProfile[]> {
+  return listCards("listContacts");
+}
+
 export async function listIncomingContactRequests(): Promise<UserProfile[]> {
-  const data = await callCloudFunction<{
-    profiles?: Array<Record<string, unknown>>;
-  }>("listIncomingContactRequests", {});
-  return (data?.profiles ?? []).map(mapCard).filter((p) => p.uid);
+  return listCards("listIncomingContactRequests");
+}
+
+export async function listFollowers(otherUid: string): Promise<UserProfile[]> {
+  return listCards("listFollowers", { otherUid });
+}
+
+export async function listFollowing(otherUid: string): Promise<UserProfile[]> {
+  return listCards("listFollowing", { otherUid });
 }

@@ -82,6 +82,10 @@ export async function updateAccountEmail(email: string): Promise<{ email: string
   return result;
 }
 
+export async function updateUsername(username: string): Promise<{ username: string }> {
+  return callCloudFunction<{ username: string }>("updateUsername", { username });
+}
+
 export async function listPublicProfiles(max = 80): Promise<UserProfile[]> {
   const data = await callCloudFunction<{
     profiles?: Array<Record<string, unknown>>;
@@ -90,6 +94,7 @@ export async function listPublicProfiles(max = 80): Promise<UserProfile[]> {
     uid: String(entry.uid ?? ""),
     email: null,
     displayName: (entry.displayName as string) ?? null,
+    username: (entry.username as string) ?? null,
     photoUrl: (entry.photoUrl as string) ?? null,
     role: parseRole(entry.role),
     isAnonymous: false,
@@ -121,6 +126,7 @@ export async function searchDirectory(
     uid: String(entry.uid ?? ""),
     email: (entry.email as string) ?? null,
     displayName: (entry.displayName as string) ?? null,
+    username: (entry.username as string) ?? null,
     photoUrl: (entry.photoUrl as string) ?? null,
     role: parseRole(entry.role),
     isAnonymous: false,

@@ -7,6 +7,7 @@ import { canAccessTools } from "@/lib/roles";
 import type { ForumThread } from "@/lib/types";
 import { useSavedThreadIds } from "@/lib/saved-threads";
 import { RailPromoBanner } from "@/components/promo/promo-banner";
+import { RailPoll } from "@/components/polls/poll-card";
 
 type TopicStat = [string, number];
 
@@ -44,6 +45,7 @@ export function FeedSideRail({
     <aside className="hidden w-[280px] shrink-0 xl:block">
       <div className="sticky top-4 space-y-4">
         <RailPromoBanner />
+        <RailPoll />
 
         {topicList.length > 0 && (
           <section className="feed-rail-card">

@@ -17,7 +17,8 @@ import {
   updateUserProfile,
   uploadAvatar,
 } from "@/lib/firebase/users";
-import { updateAccountEmail } from "@/lib/firebase/functions";
+import { updateAccountEmail, updateUsername } from "@/lib/firebase/functions";
+import { parseUsername } from "@pulse/shared";
 import {
   clearProfilePhoneRecaptcha,
   confirmProfilePhone,
@@ -38,6 +39,10 @@ export function AccountPanel() {
   const [givenName, setGivenName] = useState(initialParts.givenName);
   const [familyName, setFamilyName] = useState(initialParts.familyName);
   const [email, setEmail] = useState(profile?.email ?? "");
+  const [username, setUsername] = useState(profile?.username ?? "");
+  const [phoneCountryIso2, setPhoneCountryIso2] = useState(
+    profile?.phoneCountryIso2 ?? "",
+  );
   const [bio, setBio] = useState(profile?.bio ?? "");
   const [phoneCountryCode, setPhoneCountryCode] = useState(
     profile?.phoneCountryCode ?? "+1",
@@ -71,6 +76,10 @@ export function AccountPanel() {
   useEffect(() => {
     setEmail(profile?.email ?? "");
   }, [profile?.email]);
+
+  useEffect(() => {
+    setUsername(profile?.username ?? "");
+  }, [profile?.username]);
 
   if (!profile) return null;
 
@@ -120,6 +129,20 @@ export function AccountPanel() {
         await updateAccountEmail(nextEmail);
       }
 
+      const nextUsername = username.trim().toLowerCase();
+      if (
+        nextUsername &&
+        nextUsername !== (profile.username ?? "").trim().toLowerCase()
+      ) {
+        const parsed = parseUsername(nextUsername);
+        if (!parsed.ok) {
+          setError(t("usernameInvalid"));
+          setBusy(false);
+          return;
+        }
+        await updateUsername(parsed.value);
+      }
+
       const nextBio = bio.trim().slice(0, 280) || null;
 
       if (phoneChanged) {
@@ -129,6 +152,7 @@ export function AccountPanel() {
             displayName: nextDisplayName,
             bio: nextBio,
             phoneCountryCode: phoneCountryCode.trim() || null,
+            phoneCountryIso2: phoneCountryIso2.trim() || null,
             phoneNumber: null,
             phoneVerified: false,
           });
@@ -145,6 +169,7 @@ export function AccountPanel() {
             displayName: nextDisplayName,
             bio: nextBio,
             phoneCountryCode: phoneCountryCode.trim() || null,
+            phoneCountryIso2: phoneCountryIso2.trim() || null,
             phoneNumber: phoneNumber.trim() || null,
             phoneVerified: true,
           });
@@ -167,9 +192,17 @@ export function AccountPanel() {
           ? String((err as { code: string }).code)
           : "";
       if (code.includes("already-exists")) {
-        setError(t("errEmailInUse"));
+        setError(
+          err && typeof err === "object" && "message" in err && String((err as { message: string }).message).includes("taken")
+            ? t("usernameTaken")
+            : t("errEmailInUse"),
+        );
       } else if (code.includes("invalid-argument")) {
-        setError(t("validationEmail"));
+        const msg =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : "";
+        setError(msg.includes("invalid") ? t("usernameInvalid") : t("validationEmail"));
       } else if (code.includes("invalid-phone-number")) {
         setError(t("phoneVerifyInvalid"));
       } else if (code.includes("too-many-requests")) {
@@ -281,6 +314,17 @@ export function AccountPanel() {
           <p className="mt-1 text-xs text-muted">{t("profileEmailHint")}</p>
         </div>
         <div className="max-w-md">
+          <Label>{t("usernameLabel")}</Label>
+          <Input
+            value={username}
+            onChange={(e) => setUsername(e.target.value.toLowerCase())}
+            autoComplete="username"
+            spellCheck={false}
+            placeholder={t("usernamePlaceholder")}
+          />
+          <p className="mt-1 text-xs text-muted">{t("usernameHint")}</p>
+        </div>
+        <div className="max-w-md">
           <Label>{t("fieldBio")}</Label>
           <TextArea
             value={bio}
@@ -295,8 +339,10 @@ export function AccountPanel() {
             <Label>{t("phoneCountryCode")}</Label>
             <CountryCodeSelect
               value={phoneCountryCode}
-              onChange={(code) => {
+              iso2={phoneCountryIso2}
+              onChange={(code, nextIso2) => {
                 setPhoneCountryCode(code);
+                setPhoneCountryIso2(nextIso2);
                 setVerificationId(null);
                 setSmsCode("");
               }}

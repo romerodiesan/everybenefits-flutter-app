@@ -20,17 +20,17 @@ export type SettingsNavItem = {
 };
 
 export function SettingsNav({
-  items,
+  groups,
   active,
   onSelect,
 }: {
-  items: SettingsNavItem[];
+  groups: { id: string; label: string; items: SettingsNavItem[] }[];
   active: SettingsSection;
   onSelect: (section: SettingsSection) => void;
 }) {
+  const items = groups.flatMap((group) => group.items);
   return (
     <>
-      {/* Mobile: horizontal chips */}
       <nav
         className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1 lg:hidden"
         aria-label="Settings sections"
@@ -58,57 +58,59 @@ export function SettingsNav({
         })}
       </nav>
 
-      {/* Desktop: vertical rail */}
-      <nav
-        className="hidden space-y-0.5 lg:block"
-        aria-label="Settings sections"
-      >
-        {items.map((item) => {
-          const selected = item.id === active;
-          return (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => onSelect(item.id)}
-              aria-current={selected ? "true" : undefined}
-              className={`group flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition ${
-                selected
-                  ? item.danger
-                    ? "bg-[#B42318]/10 shadow-[inset_3px_0_0_0_#D92D20]"
-                    : "bg-brand/10 shadow-[inset_3px_0_0_0_var(--brand)]"
-                  : "hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"
-              }`}
-            >
-              <span
-                className={`mt-0.5 shrink-0 [&>svg]:h-[18px] [&>svg]:w-[18px] ${
-                  selected
-                    ? item.danger
-                      ? "text-[#D92D20]"
-                      : "text-brand"
-                    : "text-muted group-hover:text-ink"
-                }`}
-              >
-                {item.icon}
-              </span>
-              <span className="min-w-0">
-                <span
-                  className={`block text-sm font-semibold leading-tight ${
-                    selected
-                      ? item.danger
-                        ? "text-[#D92D20]"
-                        : "text-ink"
-                      : "text-muted group-hover:text-ink"
-                  }`}
-                >
-                  {item.label}
-                </span>
-                <span className="mt-0.5 block truncate text-[11px] leading-tight text-muted">
-                  {item.description}
-                </span>
-              </span>
-            </button>
-          );
-        })}
+      <nav className="hidden space-y-4 lg:block" aria-label="Settings sections">
+        {groups.map((group) => (
+          <div key={group.id}>
+            <p className="mb-1 px-2.5 text-[10px] font-extrabold uppercase tracking-[0.16em] text-muted">
+              {group.label}
+            </p>
+            <div className="space-y-0.5">
+              {group.items.map((item) => {
+                const selected = item.id === active;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => onSelect(item.id)}
+                    aria-current={selected ? "true" : undefined}
+                    className={`group flex w-full items-start gap-2.5 rounded-xl px-2.5 py-2.5 text-left transition ${
+                      selected
+                        ? item.danger
+                          ? "bg-[#B42318]/10 shadow-[inset_3px_0_0_0_#D92D20]"
+                          : "bg-brand/10 shadow-[inset_3px_0_0_0_var(--brand)]"
+                        : "hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg [&>svg]:h-[16px] [&>svg]:w-[16px] ${
+                        selected
+                          ? item.danger
+                            ? "bg-[#D92D20]/12 text-[#D92D20]"
+                            : "bg-brand/15 text-brand"
+                          : "bg-ink/[0.06] text-muted group-hover:text-ink dark:bg-white/[0.08]"
+                      }`}
+                    >
+                      {item.icon}
+                    </span>
+                    <span className="min-w-0">
+                      <span
+                        className={`block text-sm font-semibold leading-tight ${
+                          selected
+                            ? item.danger
+                              ? "text-[#D92D20]"
+                              : "text-ink"
+                            : "text-muted group-hover:text-ink"
+                        }`}
+                      >
+                        {item.label}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ))}
       </nav>
     </>
   );

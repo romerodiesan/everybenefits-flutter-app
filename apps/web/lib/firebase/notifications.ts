@@ -96,7 +96,14 @@ export const DEFAULT_PREFS: NotificationPrefs = {
 };
 
 export function channelForType(type: string): NotificationChannelFilter {
-  if (type === "chat_message" || type === "contact_request") return "chats";
+  if (
+    type === "chat_message" ||
+    type === "chat_mention" ||
+    type === "contact_request" ||
+    type === "new_follower"
+  ) {
+    return "chats";
+  }
   if (type.startsWith("forum_")) return "forums";
   if (type === "course_published") return "academy";
   return "all";

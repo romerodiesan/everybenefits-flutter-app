@@ -5,11 +5,10 @@ import { useTranslations, useLocale } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { headlineName } from "@/lib/display-name";
+import { displayHandle, memberPath } from "@pulse/shared";
 import { signOutAndRedirect } from "@/lib/firebase/auth";
 import { can } from "@/lib/roles";
-import type { UserProfile } from "@/lib/types";
 import { Avatar, Button } from "@/components/ui/primitives";
-import { RoleBadgeView } from "@/components/profile/role-badge";
 import { Link } from "@/i18n/navigation";
 import {
   SettingsNav,
@@ -27,21 +26,6 @@ import {
   PROFILE_SECTION_KEY,
   restorePendingLocaleHash,
 } from "@/lib/i18n/switch-locale";
-
-function roleLabel(
-  role: UserProfile["role"],
-  t: ReturnType<typeof useTranslations>,
-) {
-  return {
-    guest: t("roleGuest"),
-    student: t("roleStudent"),
-    agent: t("roleAgent"),
-    instructor: t("roleInstructor"),
-    manager: t("roleManager"),
-    admin: t("roleAdmin"),
-    system: t("roleSystem"),
-  }[role];
-}
 
 const KNOWN_SECTIONS: SettingsSection[] = [
   "account",
@@ -147,6 +131,7 @@ export function ProfilePage() {
   // an effect so we never overwrite a deep-link hash with a stale default.
   const [section, setSection] = useState<SettingsSection>("account");
   const [sectionReady, setSectionReady] = useState(false);
+  const [settingsQuery, setSettingsQuery] = useState("");
   const access = useAccess();
 
   useEffect(() => {
@@ -183,14 +168,8 @@ export function ProfilePage() {
   const canApprove = can(access, "admin.approvals.decide");
   const isAnonymous = profile?.isAnonymous ?? true;
 
-  const navItems = useMemo<SettingsNavItem[]>(() => {
-    const items: SettingsNavItem[] = [
-      {
-        id: "account",
-        label: t("profileAccount"),
-        description: t("profileAccountNav"),
-        icon: ICONS.account,
-      },
+  const navGroups = useMemo(() => {
+    const appItems: SettingsNavItem[] = [
       {
         id: "appearance",
         label: t("profileAppearance"),
@@ -199,44 +178,83 @@ export function ProfilePage() {
       },
     ];
     if (!isAnonymous) {
-      items.push({
+      appItems.push({
         id: "notifications",
         label: t("notificationsPrefsTitle"),
         description: t("profileNotificationsNav"),
         icon: ICONS.notifications,
       });
-      items.push({
+    }
+    const accountItems: SettingsNavItem[] = [
+      {
+        id: "account",
+        label: t("profileAccount"),
+        description: t("profileAccountNav"),
+        icon: ICONS.account,
+      },
+    ];
+    if (!isAnonymous) {
+      accountItems.push({
         id: "security",
         label: t("profileSecurity"),
         description: t("profileSecurityNav"),
         icon: ICONS.security,
       });
     }
-    items.push({
+    accountItems.push({
       id: "privacy",
       label: t("profilePrivacy"),
       description: t("profilePrivacyNav"),
       icon: ICONS.privacy,
     });
-    if (canApprove) {
-      items.push({
-        id: "admin",
-        label: t("profileAdmin"),
-        description: t("profileAdminNav"),
-        icon: ICONS.admin,
-      });
-    }
+    const groups: { id: string; label: string; items: SettingsNavItem[] }[] = [
+      { id: "app", label: t("settingsGroupApp"), items: appItems },
+      { id: "account", label: t("settingsGroupAccount"), items: accountItems },
+    ];
     if (!isAnonymous) {
-      items.push({
+      groups.push({
         id: "danger",
-        label: t("dangerTitle"),
-        description: t("dangerNav"),
-        icon: ICONS.danger,
-        danger: true,
+        label: t("settingsGroupDanger"),
+        items: [
+          {
+            id: "danger",
+            label: t("dangerTitle"),
+            description: t("dangerNav"),
+            icon: ICONS.danger,
+            danger: true,
+          },
+        ],
       });
     }
-    return items;
-  }, [t, canApprove, isAnonymous]);
+    if (canApprove) {
+      groups.push({
+        id: "admin",
+        label: t("settingsGroupAdmin"),
+        items: [
+          {
+            id: "admin",
+            label: t("profileAdmin"),
+            description: t("profileAdminNav"),
+            icon: ICONS.admin,
+          },
+        ],
+      });
+    }
+    const q = settingsQuery.trim().toLowerCase();
+    if (!q) return groups;
+    return groups
+      .map((group) => ({
+        ...group,
+        items: group.items.filter(
+          (item) =>
+            item.label.toLowerCase().includes(q) ||
+            item.description.toLowerCase().includes(q),
+        ),
+      }))
+      .filter((group) => group.items.length > 0);
+  }, [t, canApprove, isAnonymous, settingsQuery]);
+
+  const navItems = navGroups.flatMap((group) => group.items);
 
   if (!profile) return null;
 
@@ -283,24 +301,18 @@ export function ProfilePage() {
                 <p className="truncate font-display text-base font-bold">
                   {headlineName(profile)}
                 </p>
-                <div className="mt-1">
-                  {profile.profileBadge ? (
-                    <RoleBadgeView badge={profile.profileBadge} compact />
-                  ) : (
-                    <p className="text-xs font-semibold text-muted">
-                      {roleLabel(profile.role, t)}
-                    </p>
-                  )}
-                </div>
+                <p className="mt-0.5 truncate text-xs font-semibold text-muted">
+                  @
+                  {displayHandle({
+                    username: profile.username,
+                    email: profile.email,
+                    uid: profile.uid,
+                  })}
+                </p>
               </div>
             </div>
-            {profile.email && (
-              <p className="mt-2.5 break-all text-xs text-muted">
-                {profile.email}
-              </p>
-            )}
             <div className="mt-3 space-y-1.5">
-              <Link href={`/members/${profile.uid}`}>
+              <Link href={memberPath({ uid: profile.uid, username: profile.username })}>
                 <Button variant="secondary" className="h-9 w-full text-xs">
                   {t("profileViewPublic")}
                 </Button>
@@ -321,7 +333,16 @@ export function ProfilePage() {
             </div>
           </div>
 
-          <SettingsNav items={navItems} active={available} onSelect={select} />
+          <label className="block">
+            <span className="sr-only">{t("settingsSearch")}</span>
+            <input
+              value={settingsQuery}
+              onChange={(e) => setSettingsQuery(e.target.value)}
+              placeholder={t("settingsSearch")}
+              className="h-10 w-full rounded-xl border border-glass-border bg-sheet px-3 text-sm outline-none placeholder:text-muted focus:border-brand"
+            />
+          </label>
+          <SettingsNav groups={navGroups} active={available} onSelect={select} />
         </aside>
 
         <div className="min-w-0">

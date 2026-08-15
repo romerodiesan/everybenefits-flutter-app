@@ -5,6 +5,8 @@ export type PrivacyPrefs = {
   showEmailInSearch: boolean;
   showNpnInSearch: boolean;
   allowDirectMessages: boolean;
+  /** Opt-in: city + state on the public profile. Default off. */
+  showLocationOnProfile: boolean;
 };
 
 export const DEFAULT_PRIVACY_PREFS: PrivacyPrefs = {
@@ -14,6 +16,7 @@ export const DEFAULT_PRIVACY_PREFS: PrivacyPrefs = {
   showEmailInSearch: true,
   showNpnInSearch: true,
   allowDirectMessages: true,
+  showLocationOnProfile: false,
 };
 
 export function readPrivacyPrefs(
@@ -28,5 +31,6 @@ export function readPrivacyPrefs(
     showEmailInSearch: data.showEmailInSearch !== false,
     showNpnInSearch: data.showNpnInSearch !== false,
     allowDirectMessages: data.allowDirectMessages !== false,
+    showLocationOnProfile: data.showLocationOnProfile === true,
   };
 }

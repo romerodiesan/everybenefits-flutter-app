@@ -16,6 +16,7 @@ import { callCloudFunction } from "./call-function";
 import type {
   ChatConversation,
   ChatMessage,
+  ChatReplyTo,
   SharedPostPreview,
   UserProfile,
   UserRole,
@@ -27,6 +28,7 @@ import {
   parseRole,
   canCreateChatGroups,
 } from "../roles";
+import { hasClaimedUsername, memberPath } from "@pulse/shared";
 
 const REBUILD_SESSION_KEY = "pulse:rebuild-inbox-once";
 
@@ -112,6 +114,8 @@ export function chatFrom(id: string, data: Record<string, unknown>): ChatConvers
     id,
     memberIds: Object.keys(members).sort(),
     memberNames: stringMap(data.memberNames),
+    memberPhotos: stringMap(data.memberPhotos),
+    memberUsernames: stringMap(data.memberUsernames),
     isGroup: Boolean(data.isGroup),
     title: (data.title as string) ?? null,
     dmKey: (data.dmKey as string) ?? null,
@@ -137,15 +141,27 @@ function messageFrom(
   const shared = data.sharedPost
     ? (asMap(data.sharedPost) as unknown as SharedPostPreview)
     : null;
+  const replyRaw = data.replyTo ? asMap(data.replyTo) : null;
+  const replyTo: ChatReplyTo | null = replyRaw
+    ? {
+        messageId: String(replyRaw.messageId ?? ""),
+        senderName: String(replyRaw.senderName ?? ""),
+        bodyPreview: String(replyRaw.bodyPreview ?? ""),
+      }
+    : null;
   return {
     id,
     chatId,
     body: String(data.body ?? ""),
     senderId: String(data.senderId ?? ""),
     senderName: String(data.senderName ?? ""),
+    senderPhotoUrl: data.senderPhotoUrl
+      ? String(data.senderPhotoUrl)
+      : null,
     createdAt: Number(data.createdAt ?? 0),
     sharedPost: shared,
     reactions: stringMap(data.reactions),
+    replyTo,
   };
 }
 
@@ -312,6 +328,18 @@ export async function getOrCreateDm(me: UserProfile, other: UserProfile) {
     id: chatId,
     memberIds: [...memberIds].sort(),
     memberNames,
+    memberPhotos: {
+      ...(me.photoUrl ? { [me.uid]: me.photoUrl } : {}),
+      ...(other.photoUrl ? { [other.uid]: other.photoUrl } : {}),
+    },
+    memberUsernames: {
+      ...(hasClaimedUsername(me.username) && me.username
+        ? { [me.uid]: me.username }
+        : {}),
+      ...(hasClaimedUsername(other.username) && other.username
+        ? { [other.uid]: other.username }
+        : {}),
+    },
     isGroup: false,
     title: null,
     dmKey: key,
@@ -383,6 +411,16 @@ export async function createGroupChat(input: {
     memberNames: Object.fromEntries(
       all.map((profile) => [profile.uid, headlineName(profile)]),
     ),
+    memberPhotos: Object.fromEntries(
+      all
+        .filter((profile) => profile.photoUrl)
+        .map((profile) => [profile.uid, profile.photoUrl as string]),
+    ),
+    memberUsernames: Object.fromEntries(
+      all
+        .filter((profile) => hasClaimedUsername(profile.username))
+        .map((profile) => [profile.uid, String(profile.username)]),
+    ),
     isGroup: true,
     title,
     dmKey: null,
@@ -406,6 +444,7 @@ export async function sendMessage(input: {
   body: string;
   author: UserProfile;
   sharedPost?: SharedPostPreview | null;
+  replyTo?: ChatReplyTo | null;
   /** When RTDB get hangs, use this membership snapshot to still write. */
   knownChat?: ChatConversation | null;
 }) {
@@ -436,29 +475,84 @@ export async function sendMessage(input: {
   // RTDB rules require non-empty body; shared-post-only uses the preview.
   const bodyForStore = text || preview;
   const msgRef = push(ref(db, `messages/${input.chatId}`));
+  const replyTo = input.replyTo ?? null;
   const message: ChatMessage = {
     id: msgRef.key!,
     chatId: input.chatId,
     body: bodyForStore,
     senderId: input.author.uid,
     senderName: headlineName(input.author),
+    senderPhotoUrl: input.author.photoUrl ?? null,
     createdAt: now,
     sharedPost: input.sharedPost ?? null,
     reactions: {},
+    replyTo,
   };
-  await raceTimeout(
-    set(msgRef, {
+  const photo = input.author.photoUrl?.trim() || "";
+  const username = hasClaimedUsername(input.author.username)
+    ? String(input.author.username).trim().toLowerCase()
+    : "";
+  const fanout: Record<string, unknown> = {
+    [`messages/${input.chatId}/${msgRef.key}`]: {
       body: message.body,
       senderId: message.senderId,
       senderName: message.senderName,
       createdAt: now,
       sharedPost: message.sharedPost ?? null,
-    }),
+      ...(photo ? { senderPhotoUrl: photo } : {}),
+      ...(replyTo ? { replyTo } : {}),
+    },
+  };
+  if (photo) {
+    fanout[`chats/${input.chatId}/memberPhotos/${input.author.uid}`] = photo;
+  }
+  if (username) {
+    fanout[`chats/${input.chatId}/memberUsernames/${input.author.uid}`] =
+      username;
+  }
+  await raceTimeout(
+    update(ref(db), fanout),
     12_000,
     "Send timed out",
   );
+  void setTyping(input.chatId, input.author.uid, false);
   // lastMessage / unreadCounts are applied server-side by syncChatMetadataOnMessage.
   return message;
+}
+
+export const TYPING_STALE_MS = 4_000;
+
+export function watchTyping(
+  chatId: string,
+  onChange: (byUid: Record<string, number>) => void,
+  onError?: (error: Error) => void,
+): Unsubscribe {
+  return onValue(
+    ref(getFirebaseRtdb(), `typing/${chatId}`),
+    (snap) => {
+      const raw = asMap(snap.val());
+      const out: Record<string, number> = {};
+      for (const [uid, value] of Object.entries(raw)) {
+        const at = Number(asMap(value).at ?? 0);
+        if (at) out[uid] = at;
+      }
+      onChange(out);
+    },
+    (error) => onError?.(error),
+  );
+}
+
+export async function setTyping(
+  chatId: string,
+  uid: string,
+  typing: boolean,
+) {
+  const node = ref(getFirebaseRtdb(), `typing/${chatId}/${uid}`);
+  if (typing) {
+    await set(node, { at: Date.now() });
+  } else {
+    await remove(node);
+  }
 }
 
 export async function markChatRead(chatId: string, uid: string) {
@@ -518,6 +612,35 @@ export function chatTitleFor(
   return chat.title || "Chat";
 }
 
+export function chatPhotoFor(chat: ChatConversation, uid: string) {
+  return (chat.memberPhotos?.[uid] ?? "").trim();
+}
+
+export function chatMemberHref(chat: ChatConversation, uid: string) {
+  return memberPath({ uid, username: chat.memberUsernames?.[uid] });
+}
+
+export function chatInboxPhoto(chat: ChatConversation, viewerUid: string) {
+  if (chat.isGroup) return "";
+  const other = chat.memberIds.find((id) => id !== viewerUid);
+  return other ? chatPhotoFor(chat, other) : "";
+}
+
+export function mentionMembersOf(
+  chat: ChatConversation,
+  viewerUid: string,
+) {
+  return chat.memberIds
+    .filter((id) => id !== viewerUid)
+    .map((uid) => ({
+      uid,
+      username: (chat.memberUsernames?.[uid] ?? "").trim().toLowerCase(),
+      name: chat.memberNames[uid] || uid,
+      photoUrl: chat.memberPhotos?.[uid] ?? "",
+    }))
+    .filter((member) => hasClaimedUsername(member.username));
+}
+
 /** Inbox buckets matching Flutter: community → pinned → recent. */
 export type ChatInboxSections = {
   community: ChatConversation[];
@@ -542,4 +665,28 @@ export function partitionChatInbox(
     }
   }
   return { community, pinned, recent };
+}
+
+export type ChatInboxFilter = "all" | "unread" | "groups";
+
+export function chatMatchesInboxFilter(
+  chat: ChatConversation,
+  filter: ChatInboxFilter,
+  viewerUid: string,
+) {
+  if (filter === "unread") return (chat.unreadCounts[viewerUid] ?? 0) > 0;
+  if (filter === "groups") return chat.isGroup;
+  return true;
+}
+
+export function chatMatchesInboxQuery(
+  chat: ChatConversation,
+  query: string,
+  viewerUid: string,
+  title?: string,
+) {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const resolved = (title ?? chatTitleFor(chat, viewerUid, { team: "" })).toLowerCase();
+  return resolved.includes(q) || chat.lastMessage.toLowerCase().includes(q);
 }

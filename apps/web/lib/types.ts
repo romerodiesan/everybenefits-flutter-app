@@ -8,6 +8,7 @@ export type UserProfile = {
   uid: string;
   email: string | null;
   displayName: string | null;
+  username?: string | null;
   photoUrl: string | null;
   role: UserRole;
   isAnonymous: boolean;
@@ -15,6 +16,7 @@ export type UserProfile = {
   /** Last product-tour version finished/skipped; 0 or absent = never seen. */
   productTourVersion?: number;
   phoneCountryCode: string | null;
+  phoneCountryIso2?: string | null;
   phoneNumber: string | null;
   /** True after SMS ownership check; absent means unverified. */
   phoneVerified?: boolean;
@@ -51,12 +53,16 @@ export type UserProfile = {
     showEmailInSearch: boolean;
     showNpnInSearch: boolean;
     allowDirectMessages: boolean;
+    showLocationOnProfile: boolean;
   } | null;
   profileBadge?: {
     text: string;
     icon: string;
     backgroundColor: string;
   } | null;
+  /** Public-card social counts (from `publicProfiles`). */
+  followerCount?: number;
+  followingCount?: number;
 };
 
 export type ForumThread = {
@@ -233,6 +239,8 @@ export type ChatConversation = {
   id: string;
   memberIds: string[];
   memberNames: Record<string, string>;
+  memberPhotos?: Record<string, string>;
+  memberUsernames?: Record<string, string>;
   isGroup: boolean;
   title: string | null;
   dmKey: string | null;
@@ -250,15 +258,23 @@ export type ChatConversation = {
   dmMessagingEnabled: boolean;
 };
 
+export type ChatReplyTo = {
+  messageId: string;
+  senderName: string;
+  bodyPreview: string;
+};
+
 export type ChatMessage = {
   id: string;
   chatId: string;
   body: string;
   senderId: string;
   senderName: string;
+  senderPhotoUrl?: string | null;
   createdAt: number;
   sharedPost?: SharedPostPreview | null;
   reactions?: Record<string, string>;
+  replyTo?: ChatReplyTo | null;
 };
 
 export const AGENTS_DEFAULT_ID = "agents-default";

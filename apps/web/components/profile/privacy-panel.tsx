@@ -24,6 +24,7 @@ import { LegalLinks } from "@/components/chrome/legal-links";
 const DIRECTORY_ROWS = [
   ["discoverableInDirectory", "privacyDiscoverable", "privacyDiscoverableHint"],
   ["allowDirectMessages", "privacyAllowDms", "privacyAllowDmsHint"],
+  ["showLocationOnProfile", "privacyShowLocation", "privacyShowLocationHint"],
 ] as const;
 
 const SEARCH_ROWS = [
@@ -88,6 +89,7 @@ export function PrivacyPanel() {
     profile?.privacy?.showEmailInSearch,
     profile?.privacy?.showNpnInSearch,
     profile?.privacy?.allowDirectMessages,
+    profile?.privacy?.showLocationOnProfile,
   ]);
 
   const toggleAnalytics = async () => {

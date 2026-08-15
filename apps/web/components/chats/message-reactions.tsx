@@ -118,7 +118,8 @@ export function AddReactionButton({
   message,
   uid,
   mine,
-}: ReactionsProps) {
+  className = "",
+}: ReactionsProps & { className?: string }) {
   const t = useTranslations();
   const reduceMotion = useSafeReducedMotion();
   const [open, setOpen] = useState(false);
@@ -176,7 +177,7 @@ export function AddReactionButton({
   };
 
   return (
-    <div ref={containerRef} className="relative shrink-0 self-end pb-0.5">
+    <div ref={containerRef} className={`relative shrink-0 self-end pb-0.5 ${className}`}>
       <button
         type="button"
         onClick={toggleOpen}

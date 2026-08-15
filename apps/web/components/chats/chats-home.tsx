@@ -3,17 +3,15 @@
 import {
   FormEvent,
   useEffect,
-  useMemo,
   useState,
 } from "react";
 import { useTranslations } from "next-intl";
-import { Link, useRouter } from "@/i18n/navigation";
+import { useRouter } from "@/i18n/navigation";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
+import { memberPath } from "@pulse/shared";
 import {
-  chatTitleFor,
   createGroupChat,
   getOrCreateDm,
-  partitionChatInbox,
 } from "@/lib/firebase/chats";
 import { mapCallableError } from "@/lib/firebase/callable-errors";
 import {
@@ -27,18 +25,18 @@ import {
   canParticipateInChats,
 } from "@/lib/roles";
 import {
-  type ChatConversation,
   type UserProfile,
   type UserRole,
 } from "@/lib/types";
 import { useInbox } from "@/lib/providers/inbox-provider";
-import { Button, Avatar } from "@/components/ui/primitives";
+import { Button } from "@/components/ui/primitives";
 import { ChatInboxSkeleton } from "@/components/ui/skeleton";
 import {
   ConversationPane,
   writeChatSeed,
 } from "@/components/chats/conversation-pane";
 import { NewChatComposer } from "@/components/chats/new-chat-composer";
+import { ChatsInbox } from "@/components/chats/chats-inbox";
 
 export { ConversationPane } from "@/components/chats/conversation-pane";
 
@@ -142,15 +140,6 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
       window.clearTimeout(timer);
     };
   }, [searchQuery, showNew, t]);
-
-  const sections = useMemo(() => {
-    if (!profile) return null;
-    return partitionChatInbox(chats, profile.uid);
-  }, [chats, profile]);
-  const showSectionHeaders = Boolean(
-    sections &&
-      (sections.community.length || sections.pinned.length),
-  );
 
   async function startDm(other: UserProfile) {
     if (!profile || composerBusy) return;
@@ -257,50 +246,6 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
     setComposerError(null);
   }
 
-  function renderList(items: ChatConversation[], label?: string) {
-    if (!items.length) return null;
-    return (
-      <div className="space-y-1.5">
-        {label && (
-          <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted">
-            {label}
-          </p>
-        )}
-        {items.map((chat) => {
-          const active = selectedId === chat.id;
-          const title = chatTitleFor(chat, profile!.uid, {
-            team: t("chatsTeam"),
-          });
-          const unread = chat.unreadCounts[profile!.uid] ?? 0;
-          return (
-            <Link
-              key={chat.id}
-              href={`/chats/${chat.id}`}
-              className={`pulse-row flex items-center gap-2.5 px-3 py-3 transition hover:bg-white/[0.03] lg:py-2.5 ${
-                active ? "bg-brand/[0.08] ring-1 ring-brand/25" : ""
-              }`}
-            >
-              <Avatar name={title} size={36} />
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-display text-sm font-bold">
-                  {title}
-                </p>
-                <p className="truncate text-xs text-muted">
-                  {chat.lastMessage || "—"}
-                </p>
-              </div>
-              {unread > 0 && (
-                <span className="shrink-0 rounded-full bg-brand px-2 py-0.5 text-[10px] font-semibold text-on-brand">
-                  {unread}
-                </span>
-              )}
-            </Link>
-          );
-        })}
-      </div>
-    );
-  }
-
   return (
     <div className="flex min-h-0 flex-1">
       <section className="flex min-h-0 w-full flex-col border-r border-glass-border lg:w-[320px] xl:w-[360px]">
@@ -376,7 +321,12 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
               showNew === "dm"
                 ? (person) => {
                     closeComposer();
-                    router.push(`/members/${person.uid}`);
+                    router.push(
+                      memberPath({
+                        uid: person.uid,
+                        username: person.username,
+                      }),
+                    );
                   }
                 : undefined
             }
@@ -385,27 +335,22 @@ export function ChatsHome({ selectedId }: { selectedId?: string }) {
           />
         )}
 
-        <div className="flex-1 space-y-4 overflow-y-auto p-3">
-          {displayInboxError && (
-            <p className="p-4 text-sm text-red-400">{displayInboxError}</p>
-          )}
-          {!displayInboxError && !inboxReady && <ChatInboxSkeleton />}
-          {!displayInboxError && inboxReady && !chats.length && (
-            <p className="p-4 text-sm text-muted">{t("chatsEmpty")}</p>
-          )}
-          {!displayInboxError && inboxReady && sections && showSectionHeaders && (
-            <>
-              {renderList(sections.community, t("chatsSectionCommunity"))}
-              {renderList(sections.pinned, t("chatsPinned"))}
-              {renderList(sections.recent, t("chatsSectionRecent"))}
-            </>
-          )}
-          {!displayInboxError &&
-            inboxReady &&
-            sections &&
-            !showSectionHeaders &&
-            renderList(sections.recent)}
-        </div>
+        {displayInboxError && (
+          <p className="p-4 text-sm text-red-400">{displayInboxError}</p>
+        )}
+        {!displayInboxError && !inboxReady && <ChatInboxSkeleton />}
+        {!displayInboxError && inboxReady && !chats.length && (
+          <p className="p-4 text-sm text-muted">{t("chatsEmpty")}</p>
+        )}
+        {!displayInboxError && inboxReady && chats.length > 0 && profile && (
+          <div className="flex min-h-0 flex-1">
+            <ChatsInbox
+              chats={chats}
+              viewerUid={profile.uid}
+              selectedId={selectedId}
+            />
+          </div>
+        )}
       </section>
 
       <section className="hidden min-h-0 flex-1 lg:flex lg:flex-col">

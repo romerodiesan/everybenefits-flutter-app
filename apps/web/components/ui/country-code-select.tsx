@@ -4,7 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import {
   filterPhoneCountries,
-  phoneCountryByDialCode,
+  resolvePhoneCountry,
   type PhoneCountry,
 } from "@/lib/phone-countries";
 
@@ -17,12 +17,14 @@ const triggerSize: Record<ControlSize, string> = {
 
 export function CountryCodeSelect({
   value,
+  iso2,
   onChange,
   disabled,
   size = "md",
 }: {
   value: string;
-  onChange: (dialCode: string) => void;
+  iso2?: string | null;
+  onChange: (dialCode: string, nextIso2: string) => void;
   disabled?: boolean;
   size?: ControlSize;
 }) {
@@ -32,7 +34,10 @@ export function CountryCodeSelect({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
-  const selected = useMemo(() => phoneCountryByDialCode(value), [value]);
+  const selected = useMemo(
+    () => resolvePhoneCountry({ iso2, dialCode: value }),
+    [iso2, value],
+  );
   const options = useMemo(
     () => filterPhoneCountries(query, locale),
     [query, locale],
@@ -61,7 +66,7 @@ export function CountryCodeSelect({
   }, [open]);
 
   const pick = (country: PhoneCountry) => {
-    onChange(country.dialCode);
+    onChange(country.dialCode, country.iso2);
     setOpen(false);
     setQuery("");
   };
@@ -121,10 +126,9 @@ export function CountryCodeSelect({
               </li>
             ) : (
               options.map((country) => {
-                const active = country.dialCode === selected.dialCode &&
-                  country.flag === selected.flag;
+                const active = country.iso2 === selected.iso2;
                 return (
-                  <li key={`${country.flag}-${country.dialCode}-${country.name}`}>
+                  <li key={country.iso2}>
                     <button
                       type="button"
                       role="option"

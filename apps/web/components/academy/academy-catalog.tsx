@@ -25,6 +25,7 @@ import {
 } from "./shared";
 import { CourseGridSkeleton } from "@/components/ui/skeleton";
 import { AcademyPromoBanner } from "@/components/promo/promo-banner";
+import { AcademyPoll } from "@/components/polls/poll-card";
 
 export function AcademyCatalog() {
   const t = useTranslations();
@@ -123,6 +124,9 @@ export function AcademyCatalog() {
       />
 
       <AcademyPromoBanner />
+      <div className="mt-4">
+        <AcademyPoll />
+      </div>
 
       {keepLearning.length > 0 && (
         <section className="mt-6">

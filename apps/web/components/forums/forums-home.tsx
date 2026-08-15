@@ -43,6 +43,7 @@ import { ShareToChatDialog } from "@/components/forums/share-to-chat-dialog";
 import { TagEditor } from "@/components/forums/tag-controls";
 import { FeedSideRail } from "@/components/forums/feed-side-rail";
 import { HomePromoBanner } from "@/components/promo/promo-banner";
+import { HomePoll } from "@/components/polls/poll-card";
 import { RoleBadgeView } from "@/components/profile/role-badge";
 import { fetchForumAudienceSize } from "@/lib/firebase/forum-audience";
 import { isForumHotThread, pickForumSpotlight } from "@/lib/forums-spotlight";
@@ -570,6 +571,9 @@ export function ForumsHome() {
         )}
 
         <HomePromoBanner />
+        <div className="mt-4">
+          <HomePoll />
+        </div>
 
         {feedError && (
           <p

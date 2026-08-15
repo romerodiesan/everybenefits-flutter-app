@@ -6,5 +6,5 @@ export default async function MemberPage({
   params: Promise<{ uid: string }>;
 }) {
   const { uid } = await params;
-  return <MemberProfile uid={uid} />;
+  return <MemberProfile handle={uid} />;
 }
