@@ -11,13 +11,6 @@ const path = require("node:path");
 const FIREBASE_SERVER_EXTERNAL_PACKAGES = [
   "firebase",
   "firebase-admin",
-  "firebase/app",
-  "firebase/auth",
-  "firebase/database",
-  "firebase/firestore",
-  "firebase/storage",
-  "firebase/functions",
-  "firebase/app-check",
   "@firebase/app",
   "@firebase/auth",
   "@firebase/database",
@@ -45,14 +38,21 @@ function firebaseSdkNodeModules(dir) {
   return null;
 }
 
-/** @returns {Record<string, string>} */
+/**
+ * Webpack accepts absolute paths. Turbopack does not — it treats `/abs/path`
+ * as a server-relative import (`./abs/path`) and the build dies with
+ * "server relative imports are not implemented yet".
+ *
+ * @returns {Record<string, string>}
+ */
 function firebaseResolveAliases(dir) {
   const sdkRoot = firebaseSdkNodeModules(dir);
   /** @type {Record<string, string>} */
   const aliases = {};
   if (!sdkRoot) return aliases;
-  aliases["@firebase/app"] = path.join(sdkRoot, "@firebase/app");
-  aliases["@firebase/database"] = path.join(sdkRoot, "@firebase/database");
+  for (const pkg of ["@firebase/app", "@firebase/database"]) {
+    aliases[pkg] = path.join(sdkRoot, pkg);
+  }
   return aliases;
 }
 

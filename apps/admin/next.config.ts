@@ -7,7 +7,6 @@ import {
 import {
   FIREBASE_SERVER_EXTERNAL_PACKAGES,
   applyFirebaseWebpackAliases,
-  firebaseResolveAliases,
 } from "../../packages/firebase-web/firebase-next.cjs";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
@@ -55,9 +54,6 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   serverExternalPackages: [...FIREBASE_SERVER_EXTERNAL_PACKAGES],
   transpilePackages: ["@pulse/shared", "@pulse/firebase-web", "@pulse/chrome", "@pulse/sso"],
-  turbopack: {
-    resolveAlias: firebaseResolveAliases(process.cwd()),
-  },
   webpack: (config, { dir }) => applyFirebaseWebpackAliases(config, dir),
   experimental: {
     // Do not list "firebase" here — optimizePackageImports auto-adds to
