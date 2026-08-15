@@ -46,6 +46,7 @@ import { HomePromoBanner } from "@/components/promo/promo-banner";
 import { HomePoll } from "@/components/polls/poll-card";
 import { RoleBadgeView } from "@/components/profile/role-badge";
 import { fetchForumAudienceSize } from "@/lib/firebase/forum-audience";
+import { watchOnlineCount } from "@/lib/firebase/presence";
 import { isForumHotThread, pickForumSpotlight } from "@/lib/forums-spotlight";
 import {
   ActionButton,
@@ -296,11 +297,8 @@ export function ForumsHome() {
 
   const [onlineCount, setOnlineCount] = useState(0);
   useEffect(() => {
-    let stop: (() => void) | undefined;
-    void import("@/lib/firebase/presence").then(({ watchOnlineCount }) => {
-      stop = watchOnlineCount(setOnlineCount, () => setOnlineCount(0));
-    });
-    return () => stop?.();
+    const stop = watchOnlineCount(setOnlineCount, () => setOnlineCount(0));
+    return () => stop();
   }, []);
 
   useEffect(() => {

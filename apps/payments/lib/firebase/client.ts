@@ -55,10 +55,14 @@ export function getFirebaseDb(): Firestore {
   return getFirestore(getFirebaseApp());
 }
 
+let rtdb: Database | undefined;
+
 export function getFirebaseRtdb(): Database {
+  if (rtdb) return rtdb;
   const app = getFirebaseApp();
-  const url = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL;
-  return url ? getDatabase(app, url) : getDatabase(app);
+  const url = process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL?.trim();
+  rtdb = url ? getDatabase(app, url) : getDatabase(app);
+  return rtdb;
 }
 
 export function getFirebaseStorage(): FirebaseStorage {
@@ -109,6 +113,13 @@ export function initFirebaseClient() {
 
   getFirebaseApp();
   getFirebaseAppCheck();
+  if (process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL) {
+    try {
+      getFirebaseRtdb();
+    } catch (error) {
+      console.warn("Realtime Database init skipped:", error);
+    }
+  }
 
   const useEmulators =
     process.env.NEXT_PUBLIC_USE_FIREBASE_EMULATORS === "true";

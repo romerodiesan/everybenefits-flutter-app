@@ -1,6 +1,7 @@
 "use client";
 
 import { startTransition, useEffect, useState } from "react";
+import { startPresence } from "@/lib/firebase/presence";
 import {
   countNewFeedThreads,
   listenForegroundMessages,
@@ -55,14 +56,12 @@ export function useShellStats(profile: UserProfile | null) {
 
     let cancelled = false;
     let stopPresence: (() => void) | undefined;
-    void import("@/lib/firebase/presence").then(({ startPresence }) => {
-      void startPresence(uid).then((stop) => {
-        if (cancelled) {
-          stop();
-          return;
-        }
-        stopPresence = stop;
-      });
+    void startPresence(uid).then((stop) => {
+      if (cancelled) {
+        stop();
+        return;
+      }
+      stopPresence = stop;
     });
 
     let pushTimer: ReturnType<typeof setTimeout> | undefined;

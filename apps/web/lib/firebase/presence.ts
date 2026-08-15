@@ -102,7 +102,12 @@ export async function startPresence(uid: string): Promise<() => void> {
     return () => undefined;
   }
 
-  const db = getFirebaseRtdb();
+  let db: ReturnType<typeof getFirebaseRtdb>;
+  try {
+    db = getFirebaseRtdb();
+  } catch {
+    return () => undefined;
+  }
   const clientId = tabClientId();
   const uidRef = ref(db, `presence/${uid}`);
   const statusRef = ref(db, `presence/${uid}/${clientId}`);
@@ -239,6 +244,15 @@ export function watchOnlineCount(
     return () => undefined;
   }
 
+  let db: ReturnType<typeof getFirebaseRtdb>;
+  try {
+    db = getFirebaseRtdb();
+  } catch (error) {
+    onChange(0);
+    onError?.(error instanceof Error ? error : new Error(String(error)));
+    return () => undefined;
+  }
+
   let unsubPresence: Unsubscribe | undefined;
   let usingPresenceFallback = false;
 
@@ -246,7 +260,7 @@ export function watchOnlineCount(
     if (usingPresenceFallback) return;
     usingPresenceFallback = true;
     unsubPresence = onValue(
-      ref(getFirebaseRtdb(), "presence"),
+      ref(db, "presence"),
       (snap) => {
         onChange(countActivePresence(snap.val(), Date.now()));
       },
@@ -258,7 +272,7 @@ export function watchOnlineCount(
   };
 
   const unsubOnline = onValue(
-    ref(getFirebaseRtdb(), "online"),
+    ref(db, "online"),
     (snap) => {
       // If we already fell back, ignore online updates.
       if (usingPresenceFallback) return;

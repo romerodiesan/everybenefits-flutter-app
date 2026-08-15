@@ -10,9 +10,15 @@
       "require": "./dist/index.js",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./firebase-next": {
+      "types": "./firebase-next.cjs.d.ts",
+      "require": "./firebase-next.cjs",
+      "import": "./firebase-next.cjs",
+      "default": "./firebase-next.cjs"
     }
   },
-  "files": ["dist", "src"],
+  "files": ["dist", "src", "firebase-next.cjs", "firebase-next.cjs.d.ts"],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "prepare": "pnpm run build"

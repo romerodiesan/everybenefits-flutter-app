@@ -165,12 +165,23 @@ function messageFrom(
   };
 }
 
+function rtdbOrError(onError?: (error: Error) => void) {
+  try {
+    return getFirebaseRtdb();
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    onError?.(err);
+    return null;
+  }
+}
+
 export function watchInbox(
   uid: string,
   onChange: (chats: ChatConversation[]) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
-  const db = getFirebaseRtdb();
+  const db = rtdbOrError(onError);
+  if (!db) return () => undefined;
   maybeRebuildInboxGuarded();
   // Legacy index rows (only `lastMessageAt`) predate syncChatInbox; their
   // chat meta is soft-read once and refreshed when a newer message lands.
@@ -255,8 +266,10 @@ export function watchChat(
   onChange: (chat: ChatConversation | null) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
+  const db = rtdbOrError(onError);
+  if (!db) return () => undefined;
   return onValue(
-    ref(getFirebaseRtdb(), `chats/${chatId}`),
+    ref(db, `chats/${chatId}`),
     (snap) => {
       if (!snap.exists()) {
         onChange(null);
@@ -274,8 +287,10 @@ export function watchMessages(
   pageSize = 40,
   onError?: (error: Error) => void,
 ): Unsubscribe {
+  const db = rtdbOrError(onError);
+  if (!db) return () => undefined;
   const q = query(
-    ref(getFirebaseRtdb(), `messages/${chatId}`),
+    ref(db, `messages/${chatId}`),
     orderByChild("createdAt"),
     limitToLast(pageSize),
   );
@@ -527,8 +542,10 @@ export function watchTyping(
   onChange: (byUid: Record<string, number>) => void,
   onError?: (error: Error) => void,
 ): Unsubscribe {
+  const db = rtdbOrError(onError);
+  if (!db) return () => undefined;
   return onValue(
-    ref(getFirebaseRtdb(), `typing/${chatId}`),
+    ref(db, `typing/${chatId}`),
     (snap) => {
       const raw = asMap(snap.val());
       const out: Record<string, number> = {};

@@ -4,6 +4,11 @@ import {
   buildContentSecurityPolicy,
   shouldIncludeEmulatorCsp,
 } from "@pulse/shared";
+import {
+  FIREBASE_SERVER_EXTERNAL_PACKAGES,
+  applyFirebaseWebpackAliases,
+  firebaseResolveAliases,
+} from "../../packages/firebase-web/firebase-next.cjs";
 
 const withNextIntl = createNextIntlPlugin("./i18n/request.ts");
 
@@ -82,9 +87,14 @@ const emulatorImagePatterns = useEmulators
 
 const nextConfig: NextConfig = {
   // Keep Firebase out of the RSC/Turbopack CJS interop path (avoids
-  // "require is not defined" when client modules are SSR'd).
-  serverExternalPackages: ["firebase", "@firebase/app", "@firebase/auth"],
+  // "require is not defined" when client modules are SSR'd). Include every
+  // firebase/* subpath — listing only "firebase" does not externalize them.
+  serverExternalPackages: [...FIREBASE_SERVER_EXTERNAL_PACKAGES],
   transpilePackages: ["@pulse/shared", "@pulse/firebase-web", "@pulse/chrome", "@pulse/sso"],
+  turbopack: {
+    resolveAlias: firebaseResolveAliases(process.cwd()),
+  },
+  webpack: (config, { dir }) => applyFirebaseWebpackAliases(config, dir),
   experimental: {
     // Do not list "firebase" here — optimizePackageImports auto-adds to
     // transpilePackages, which conflicts with serverExternalPackages above.
