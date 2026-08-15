@@ -30,17 +30,17 @@ export declare function edgeSearchPrefixes(raw: string, minLen?: number, maxLen?
  * Search tokens for Firestore `array-contains` (name parts + email local-part).
  * Stores edge prefixes so partial typing works at 10k+ users without a full scan.
  */
-export declare function nameSearchTokens(displayName: string | null | undefined, email?: string | null): string[];
+export declare function nameSearchTokens(displayName: string | null | undefined, email?: string | null, username?: string | null): string[];
 /** Normalize a user-typed query token for `nameTokens` lookup. */
 export declare function normalizeSearchQueryToken(raw: string): string;
 /** Fields to keep in sync whenever displayName / email changes. */
-export declare function displayNameSearchFields(displayName: string | null | undefined, email?: string | null): {
+export declare function displayNameSearchFields(displayName: string | null | undefined, email?: string | null, username?: string | null): {
     displayName: string | null;
     displayNameLower: string | null;
     nameTokens: string[];
 };
-/** Full user search index payload (name + emailLower). */
-export declare function userSearchIndexFields(displayName: string | null | undefined, email?: string | null): {
+/** Full user search index payload (name + emailLower + username tokens). */
+export declare function userSearchIndexFields(displayName: string | null | undefined, email?: string | null, username?: string | null): {
     displayName: string | null;
     displayNameLower: string | null;
     emailLower: string | null;

@@ -138,6 +138,7 @@ export function edgeSearchPrefixes(
 export function nameSearchTokens(
   displayName: string | null | undefined,
   email?: string | null,
+  username?: string | null,
 ): string[] {
   const tokens = new Set<string>();
   const addWord = (word: string) => {
@@ -169,6 +170,10 @@ export function nameSearchTokens(
     }
   }
 
+  if (username && tokens.size < SEARCH_TOKEN_CAP) {
+    addWord(String(username).trim().toLowerCase());
+  }
+
   return [...tokens];
 }
 
@@ -181,6 +186,7 @@ export function normalizeSearchQueryToken(raw: string): string {
 export function displayNameSearchFields(
   displayName: string | null | undefined,
   email?: string | null,
+  username?: string | null,
 ): {
   displayName: string | null;
   displayNameLower: string | null;
@@ -191,14 +197,15 @@ export function displayNameSearchFields(
   return {
     displayName: trimmed,
     displayNameLower: trimmed ? foldSearchText(trimmed) : null,
-    nameTokens: nameSearchTokens(trimmed, email),
+    nameTokens: nameSearchTokens(trimmed, email, username),
   };
 }
 
-/** Full user search index payload (name + emailLower). */
+/** Full user search index payload (name + emailLower + username tokens). */
 export function userSearchIndexFields(
   displayName: string | null | undefined,
   email?: string | null,
+  username?: string | null,
 ): {
   displayName: string | null;
   displayNameLower: string | null;
@@ -207,8 +214,10 @@ export function userSearchIndexFields(
 } {
   const emailTrimmed =
     typeof email === "string" ? email.trim() || null : null;
+  const usernameTrimmed =
+    typeof username === "string" ? username.trim().toLowerCase() || null : null;
   return {
-    ...displayNameSearchFields(displayName, emailTrimmed),
+    ...displayNameSearchFields(displayName, emailTrimmed, usernameTrimmed),
     emailLower: emailTrimmed ? foldSearchText(emailTrimmed) : null,
   };
 }

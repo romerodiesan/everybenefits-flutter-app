@@ -24,6 +24,7 @@ export declare const userProfileFixtureSchema: z.ZodObject<{
     uid: z.ZodString;
     email: z.ZodNullable<z.ZodString>;
     displayName: z.ZodNullable<z.ZodString>;
+    username: z.ZodOptional<z.ZodNullable<z.ZodString>>;
     photoUrl: z.ZodNullable<z.ZodString>;
     role: z.ZodEnum<{
         admin: "admin";

@@ -131,7 +131,7 @@ function edgeSearchPrefixes(raw, minLen = SEARCH_PREFIX_MIN, maxLen = SEARCH_PRE
  * Search tokens for Firestore `array-contains` (name parts + email local-part).
  * Stores edge prefixes so partial typing works at 10k+ users without a full scan.
  */
-function nameSearchTokens(displayName, email) {
+function nameSearchTokens(displayName, email, username) {
     const tokens = new Set();
     const addWord = (word) => {
         for (const prefix of edgeSearchPrefixes(word)) {
@@ -163,6 +163,9 @@ function nameSearchTokens(displayName, email) {
             }
         }
     }
+    if (username && tokens.size < SEARCH_TOKEN_CAP) {
+        addWord(String(username).trim().toLowerCase());
+    }
     return [...tokens];
 }
 /** Normalize a user-typed query token for `nameTokens` lookup. */
@@ -170,19 +173,20 @@ function normalizeSearchQueryToken(raw) {
     return foldSearchText(raw).replace(/[^a-z0-9@.]/g, "");
 }
 /** Fields to keep in sync whenever displayName / email changes. */
-function displayNameSearchFields(displayName, email) {
+function displayNameSearchFields(displayName, email, username) {
     const trimmed = typeof displayName === "string" ? displayName.trim() || null : null;
     return {
         displayName: trimmed,
         displayNameLower: trimmed ? foldSearchText(trimmed) : null,
-        nameTokens: nameSearchTokens(trimmed, email),
+        nameTokens: nameSearchTokens(trimmed, email, username),
     };
 }
-/** Full user search index payload (name + emailLower). */
-function userSearchIndexFields(displayName, email) {
+/** Full user search index payload (name + emailLower + username tokens). */
+function userSearchIndexFields(displayName, email, username) {
     const emailTrimmed = typeof email === "string" ? email.trim() || null : null;
+    const usernameTrimmed = typeof username === "string" ? username.trim().toLowerCase() || null : null;
     return {
-        ...displayNameSearchFields(displayName, emailTrimmed),
+        ...displayNameSearchFields(displayName, emailTrimmed, usernameTrimmed),
         emailLower: emailTrimmed ? foldSearchText(emailTrimmed) : null,
     };
 }

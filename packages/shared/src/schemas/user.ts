@@ -22,6 +22,7 @@ export const userProfileFixtureSchema = z.object({
   uid: z.string().min(1),
   email: z.string().nullable(),
   displayName: z.string().nullable(),
+  username: z.string().nullable().optional(),
   photoUrl: z.string().nullable(),
   role: userRoleSchema,
   isAnonymous: z.boolean(),
