@@ -36,6 +36,7 @@ function roleLabel(
     guest: t("roleGuest"),
     student: t("roleStudent"),
     agent: t("roleAgent"),
+    agency_owner: t("roleAgencyOwner"),
     instructor: t("roleInstructor"),
     manager: t("roleManager"),
     admin: t("roleAdmin"),
