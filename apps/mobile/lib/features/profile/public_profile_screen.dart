@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/layout/pulse_constrained.dart';
 import '../../app/theme.dart';
@@ -8,11 +9,13 @@ import '../../app/widgets/pulse_chrome.dart';
 import '../../l10n/l10n.dart';
 import '../../users/social_repository.dart';
 import '../../users/user_profile.dart';
+import '../../users/user_role.dart';
 import '../chats/chat_conversation_screen.dart';
 import '../chats/chat_repository.dart';
 import '../forums/forum_models.dart';
 import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
+import 'widgets/profile_public_extras.dart';
 import 'widgets/profile_social_header.dart';
 
 class PublicProfileScreen extends StatefulWidget {
@@ -50,6 +53,7 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
   var _loading = true;
   var _postsLoading = true;
   var _busy = false;
+  var _tab = 0;
 
   @override
   void initState() {
@@ -181,6 +185,44 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
     );
   }
 
+  void _openMember(UserProfile person) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PublicProfileScreen(
+          uid: person.uid,
+          viewer: widget.viewer,
+          socialRepository: _social,
+          chatRepository: _chats,
+          forumRepository: _forums,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _copyLink(UserProfile person) async {
+    final l10n = context.l10n;
+    await Clipboard.setData(ClipboardData(text: memberShareUrl(context, person)));
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(l10n.profileLinkCopied)),
+    );
+  }
+
+  Future<void> _openFollowList(bool followers) async {
+    final person = _person;
+    if (person == null) return;
+    final l10n = context.l10n;
+    await showFollowListSheet(
+      context: context,
+      title: followers ? l10n.profileStatFollowers : l10n.profileStatFollowing,
+      empty: followers ? l10n.profileFollowersEmpty : l10n.profileFollowingEmpty,
+      load: () => followers
+          ? _social.listFollowers(person.uid)
+          : _social.listFollowing(person.uid),
+      onOpen: _openMember,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
@@ -218,19 +260,119 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                           posts: posts,
                           replies: replies,
                           likes: likes,
-                          topBar: Align(
-                            alignment: Alignment.centerLeft,
-                            child: IconButton(
-                              tooltip: MaterialLocalizations.of(context)
-                                  .backButtonTooltip,
-                              style: IconButton.styleFrom(
-                                backgroundColor:
-                                    colors.glassFill.withValues(alpha: 0.7),
-                                foregroundColor: colors.ink,
+                          roleLabel: roleLabelForId(person.roleId, l10n),
+                          followerCount: person.followerCount,
+                          followingCount: person.followingCount,
+                          onFollowersTap: () => _openFollowList(true),
+                          onFollowingTap: () => _openFollowList(false),
+                          topBar: Row(
+                            children: [
+                              IconButton(
+                                tooltip: MaterialLocalizations.of(context)
+                                    .backButtonTooltip,
+                                style: IconButton.styleFrom(
+                                  backgroundColor:
+                                      colors.glassFill.withValues(alpha: 0.7),
+                                  foregroundColor: colors.ink,
+                                ),
+                                onPressed: () => Navigator.of(context).maybePop(),
+                                icon: const Icon(Icons.arrow_back_rounded),
                               ),
-                              onPressed: () => Navigator.of(context).maybePop(),
-                              icon: const Icon(Icons.arrow_back_rounded),
-                            ),
+                              const Spacer(),
+                              IconButton(
+                                tooltip: l10n.profileShare,
+                                style: IconButton.styleFrom(
+                                  backgroundColor:
+                                      colors.glassFill.withValues(alpha: 0.7),
+                                  foregroundColor: colors.ink,
+                                ),
+                                onPressed: () => sharePublicProfile(context, person),
+                                icon: const Icon(Icons.ios_share_rounded),
+                              ),
+                              if (!isSelf)
+                                PopupMenuButton<String>(
+                                  enabled: !_busy,
+                                  tooltip: l10n.memberProfileTitle,
+                                  style: IconButton.styleFrom(
+                                    backgroundColor:
+                                        colors.glassFill.withValues(alpha: 0.7),
+                                    foregroundColor: colors.ink,
+                                  ),
+                                  onSelected: (value) {
+                                    switch (value) {
+                                      case 'copy':
+                                        _copyLink(person);
+                                      case 'remove':
+                                        _run(() => _social.removeContact(person.uid));
+                                      case 'mute':
+                                        _run(
+                                          () => _social.setMuted(
+                                            person.uid,
+                                            muted: !(rel?.muted ?? false),
+                                          ),
+                                        );
+                                      case 'block':
+                                        _run(
+                                          () => _social.setBlocked(
+                                            person.uid,
+                                            blocked: !(rel?.blockedByMe ?? false),
+                                          ),
+                                        );
+                                      case 'report':
+                                        final messenger =
+                                            ScaffoldMessenger.of(context);
+                                        final sent = l10n.profileReportSent;
+                                        showReportMemberSheet(
+                                          context: context,
+                                          onSubmit: (reason, details) => _run(
+                                            () async {
+                                              await _social.reportMember(
+                                                person.uid,
+                                                reason: reason,
+                                                details: details,
+                                              );
+                                              messenger.showSnackBar(
+                                                SnackBar(content: Text(sent)),
+                                              );
+                                            },
+                                          ),
+                                        );
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    PopupMenuItem(
+                                      value: 'copy',
+                                      child: Text(l10n.profileCopyLink),
+                                    ),
+                                    if (rel?.status == SocialStatus.contact)
+                                      PopupMenuItem(
+                                        value: 'remove',
+                                        child: Text(l10n.memberRemoveContact),
+                                      ),
+                                    if (rel?.blockedByMe != true)
+                                      PopupMenuItem(
+                                        value: 'mute',
+                                        child: Text(
+                                          rel?.muted == true
+                                              ? l10n.memberUnmute
+                                              : l10n.memberMute,
+                                        ),
+                                      ),
+                                    PopupMenuItem(
+                                      value: 'block',
+                                      child: Text(
+                                        rel?.blockedByMe == true
+                                            ? l10n.memberUnblock
+                                            : l10n.memberBlock,
+                                      ),
+                                    ),
+                                    PopupMenuItem(
+                                      value: 'report',
+                                      child: Text(l10n.profileReport),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
                           actions: isSelf
                               ? null
@@ -238,40 +380,37 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                                   busy: _busy,
                                   rel: rel,
                                   l10n: l10n,
+                                  onFollow: () => _run(
+                                    () => rel?.following == true
+                                        ? _social.unfollow(person.uid)
+                                        : _social.follow(person.uid),
+                                  ),
                                   onAdd: () =>
-                                      _run(() => _social.sendRequest(widget.uid)),
+                                      _run(() => _social.sendRequest(person.uid)),
                                   onCancel: () => _run(
-                                    () => _social.cancelRequest(widget.uid),
+                                    () => _social.cancelRequest(person.uid),
                                   ),
                                   onAccept: () => _run(
-                                    () => _social.acceptRequest(widget.uid),
+                                    () => _social.acceptRequest(person.uid),
                                   ),
                                   onDecline: () => _run(
-                                    () => _social.declineRequest(widget.uid),
+                                    () => _social.declineRequest(person.uid),
                                   ),
                                   onMessage: _openDm,
-                                  onRemove: () => _run(
-                                    () => _social.removeContact(widget.uid),
-                                  ),
-                                  onMute: () => _run(
-                                    () => _social.setMuted(
-                                      widget.uid,
-                                      muted: !(rel?.muted ?? false),
-                                    ),
-                                  ),
-                                  onBlock: () => _run(
-                                    () => _social.setBlocked(
-                                      widget.uid,
-                                      blocked: !(rel?.blockedByMe ?? false),
-                                    ),
-                                  ),
                                 ),
                         ),
-                        ProfilePostsSection(
-                          threads: _threads,
-                          loading: _postsLoading,
-                          onOpenThread: _openThread,
+                        ProfileTabBar(
+                          index: _tab,
+                          onChanged: (value) => setState(() => _tab = value),
                         ),
+                        if (_tab == 0)
+                          ProfilePostsSection(
+                            threads: _threads,
+                            loading: _postsLoading,
+                            onOpenThread: _openThread,
+                          )
+                        else
+                          ProfileAboutSection(person: person),
                       ],
                     ),
                   ),
@@ -285,27 +424,23 @@ class _ActionChips extends StatelessWidget {
     required this.busy,
     required this.rel,
     required this.l10n,
+    required this.onFollow,
     required this.onAdd,
     required this.onCancel,
     required this.onAccept,
     required this.onDecline,
     required this.onMessage,
-    required this.onRemove,
-    required this.onMute,
-    required this.onBlock,
   });
 
   final bool busy;
   final SocialRelationship? rel;
   final AppLocalizations l10n;
+  final VoidCallback onFollow;
   final VoidCallback onAdd;
   final VoidCallback onCancel;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
   final VoidCallback onMessage;
-  final VoidCallback onRemove;
-  final VoidCallback onMute;
-  final VoidCallback onBlock;
 
   ButtonStyle get _compact => OutlinedButton.styleFrom(
         visualDensity: VisualDensity.compact,
@@ -321,15 +456,27 @@ class _ActionChips extends StatelessWidget {
       runSpacing: 8,
       alignment: WrapAlignment.end,
       children: [
+        if (rel?.blockedByMe != true)
+          rel?.following == true
+              ? OutlinedButton(
+                  onPressed: busy ? null : onFollow,
+                  style: _compact,
+                  child: Text(l10n.profileFollowing),
+                )
+              : FilledButton(
+                  onPressed: busy ? null : onFollow,
+                  style: FilledButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    minimumSize: const Size(0, 36),
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(l10n.profileFollow),
+                ),
         if (rel?.status == SocialStatus.none && rel?.blockedByMe != true)
-          FilledButton(
+          OutlinedButton(
             onPressed: busy ? null : onAdd,
-            style: FilledButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              minimumSize: const Size(0, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
+            style: _compact,
             child: Text(l10n.memberAddContact),
           ),
         if (rel?.status == SocialStatus.outgoing)
@@ -366,42 +513,6 @@ class _ActionChips extends StatelessWidget {
             ),
             child: Text(l10n.memberMessage),
           ),
-        PopupMenuButton<String>(
-          enabled: !busy,
-          tooltip: l10n.memberProfileTitle,
-          onSelected: (value) {
-            switch (value) {
-              case 'remove':
-                onRemove();
-              case 'mute':
-                onMute();
-              case 'block':
-                onBlock();
-            }
-          },
-          itemBuilder: (context) => [
-            if (rel?.status == SocialStatus.contact)
-              PopupMenuItem(
-                value: 'remove',
-                child: Text(l10n.memberRemoveContact),
-              ),
-            if (rel?.blockedByMe != true)
-              PopupMenuItem(
-                value: 'mute',
-                child: Text(
-                  rel?.muted == true ? l10n.memberUnmute : l10n.memberMute,
-                ),
-              ),
-            PopupMenuItem(
-              value: 'block',
-              child: Text(
-                rel?.blockedByMe == true
-                    ? l10n.memberUnblock
-                    : l10n.memberBlock,
-              ),
-            ),
-          ],
-        ),
       ],
     );
   }

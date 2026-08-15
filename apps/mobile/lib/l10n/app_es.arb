@@ -276,6 +276,17 @@
   "promoBannerDismiss": "Ocultar",
   "promoBannerHide": "Ocultar",
   "promoBannerFromPulse": "Pulse",
+  "pollDismiss": "Ocultar encuesta",
+  "pollSignIn": "Inicia sesión para votar.",
+  "pollVoteError": "No se pudo registrar tu voto.",
+  "pollVoteCount": "{count} votos",
+  "@pollVoteCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "forumsClearFilters": "Limpiar",
   "forumsReadOnlyBanner": "Modo lectura — regístrate para publicar.",
   "forumsFilterYourQuestions": "Tus preguntas",
@@ -441,6 +452,19 @@
   "chatsDefaultGroupBadge": "Comunidad",
   "chatsDefaultGroupTitle": "Equipo",
   "chatsNoMessagesYet": "Sin mensajes todavía",
+  "chatsFilterAll": "Todos",
+  "chatsFilterUnread": "No leídos",
+  "chatsFilterGroups": "Grupos",
+  "chatsSearchHint": "Buscar chats",
+  "chatsInboxFilterEmpty": "Nada coincide con este filtro.",
+  "chatYouPrefix": "Tú: {preview}",
+  "@chatYouPrefix": {
+    "placeholders": {
+      "preview": {
+        "type": "String"
+      }
+    }
+  },
   "chatTypeGroup": "Grupo",
   "newGroupTitle": "Nuevo grupo",
   "newGroupNameLabel": "Nombre del grupo",
@@ -458,8 +482,36 @@
   "newChatContactsHeader": "CONTACTOS",
   "chatEmptyThread": "Di el primero. Los mensajes se sincronizan en vivo.",
   "chatMessageHint": "Escribe un mensaje…",
+  "chatMentionEmpty": "Nadie en este chat coincide con ese @usuario.",
   "chatEmojiPicker": "Emojis",
   "chatReact": "Reaccionar",
+  "chatReply": "Responder",
+  "chatCopy": "Copiar",
+  "chatCopied": "Copiado",
+  "chatReplyTo": "Respondiendo a {name}",
+  "@chatReplyTo": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatReplyDismiss": "Cancelar respuesta",
+  "chatNewMessages": "Mensajes nuevos",
+  "chatJumpToNew": "Ir a nuevos",
+  "chatTypingOne": "{name} está escribiendo…",
+  "@chatTypingOne": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatTypingMany": "Varias personas están escribiendo…",
+  "chatSearchThread": "Buscar en el chat",
+  "chatSearchThreadHint": "Busca un mensaje",
+  "chatSearchThreadEmpty": "Ningún mensaje coincide.",
+  "chatTimeToday": "Hoy",
   "chatInfoTitle": "Info",
   "chatPin": "Fijar chat",
   "chatUnpin": "Quitar de fijados",
@@ -849,5 +901,48 @@
   "memberViewProfile": "Ver perfil",
   "chatsNeedContacts": "Agréguese como contactos para iniciar un chat privado.",
   "chatsDmDisabled": "Agréguese como contactos para seguir escribiendo.",
-  "chatsFindMembers": "Buscar miembros"
+  "chatsFindMembers": "Buscar miembros",
+  "usernameLabel": "Usuario",
+  "usernameHint": "3–20 letras, números o guiones bajos.",
+  "usernameTaken": "Ese usuario ya está en uso.",
+  "usernameInvalid": "Usa 3–20 letras, números o guiones bajos.",
+  "usernameChoose": "Elegir usuario",
+  "phoneCountrySearch": "Buscar país o código",
+  "phoneCountryEmpty": "Ningún país coincide",
+  "settingsGroupNetwork": "Tu red",
+  "settingsGroupApp": "App",
+  "settingsGroupAccount": "Cuenta",
+  "settingsGroupDanger": "Peligro",
+  "settingsGroupAdmin": "Admin",
+  "privacyShowLocation": "Mostrar ciudad y estado en el perfil",
+  "privacyShowLocationHint": "Otros miembros verán tu ciudad y estado — nunca calle, ZIP, teléfono ni NPN.",
+  "profileFollow": "Seguir",
+  "profileFollowing": "Siguiendo",
+  "profileUnfollow": "Dejar de seguir",
+  "profileStatFollowers": "Seguidores",
+  "profileStatFollowing": "Siguiendo",
+  "profileFollowersEmpty": "Aún no hay seguidores.",
+  "profileFollowingEmpty": "Aún no sigue a nadie.",
+  "profileAbout": "Acerca de",
+  "profileJoined": "Se unió en {date}",
+  "@profileJoined": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "profileShare": "Compartir perfil",
+  "profileCopyLink": "Copiar enlace",
+  "profileLinkCopied": "Enlace copiado",
+  "profileReport": "Reportar",
+  "profileReportTitle": "Reportar a este miembro",
+  "profileReportHint": "Cuéntanos qué ocurre. El equipo de Pulse revisará el reporte.",
+  "profileReportSpam": "Spam",
+  "profileReportHarassment": "Acoso",
+  "profileReportImpersonation": "Suplantación",
+  "profileReportOther": "Otra cosa",
+  "profileReportDetails": "Detalles (opcional)",
+  "profileReportSubmit": "Enviar reporte",
+  "profileReportSent": "Gracias — recibimos tu reporte."
 }

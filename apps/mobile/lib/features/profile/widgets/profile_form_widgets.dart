@@ -11,8 +11,10 @@ import '../../../users/users.dart';
 typedef ProfileFormData = ({
   String displayName,
   String? email,
+  String? username,
   String? bio,
   String phoneCountryCode,
+  String? phoneCountryIso2,
   String phoneNumber,
   String? npn,
   String? addressStreet,
@@ -43,36 +45,7 @@ class PhoneCountryField extends StatelessWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) {
-        return SafeArea(
-          child: ListView(
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.lg,
-                  AppSpacing.sm,
-                ),
-                child: Text(
-                  context.l10n.countryCodePickerTitle,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-              ),
-              for (final item in kPhoneCountries)
-                ListTile(
-                  leading: Text(item.flag, style: const TextStyle(fontSize: 22)),
-                  title: Text(item.name),
-                  trailing: Text(
-                    item.dialCode,
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                  onTap: () => Navigator.pop(context, item),
-                ),
-            ],
-          ),
-        );
-      },
+      builder: (context) => _PhoneCountryPickerSheet(selected: country),
     );
     if (selected != null) onChanged(selected);
   }
@@ -93,6 +66,81 @@ class PhoneCountryField extends StatelessWidget {
   }
 }
 
+class _PhoneCountryPickerSheet extends StatefulWidget {
+  const _PhoneCountryPickerSheet({required this.selected});
+
+  final PhoneCountry selected;
+
+  @override
+  State<_PhoneCountryPickerSheet> createState() =>
+      _PhoneCountryPickerSheetState();
+}
+
+class _PhoneCountryPickerSheetState extends State<_PhoneCountryPickerSheet> {
+  String _query = '';
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final filtered = filterPhoneCountries(_query);
+    return SafeArea(
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.lg,
+              AppSpacing.sm,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.countryCodePickerTitle,
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  autofocus: true,
+                  onChanged: (value) => setState(() => _query = value),
+                  decoration: InputDecoration(
+                    hintText: l10n.phoneCountrySearch,
+                    prefixIcon: const Icon(Icons.search_rounded),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: filtered.isEmpty
+                ? Center(child: Text(l10n.phoneCountryEmpty))
+                : ListView.builder(
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final item = filtered[index];
+                      return ListTile(
+                        selected: item.iso2 == widget.selected.iso2,
+                        leading: Text(
+                          item.flag,
+                          style: const TextStyle(fontSize: 22),
+                        ),
+                        title: Text(item.name),
+                        trailing: Text(
+                          item.dialCode,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                        onTap: () => Navigator.pop(context, item),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class ProfileDetailsForm extends StatefulWidget {
   const ProfileDetailsForm({
     super.key,
@@ -100,8 +148,10 @@ class ProfileDetailsForm extends StatefulWidget {
     required this.onSubmit,
     this.initialName,
     this.initialEmail,
+    this.initialUsername,
     this.initialBio,
     this.initialCountryCode,
+    this.initialCountryIso2,
     this.initialPhoneNumber,
     this.initialNpn,
     this.initialAddressStreet,
@@ -115,14 +165,17 @@ class ProfileDetailsForm extends StatefulWidget {
     this.lockName = false,
     this.lockNpn = false,
     this.showEmail = false,
+    this.showUsername = false,
   });
 
   final UserRole accountType;
   final Future<void> Function(ProfileFormData data) onSubmit;
   final String? initialName;
   final String? initialEmail;
+  final String? initialUsername;
   final String? initialBio;
   final String? initialCountryCode;
+  final String? initialCountryIso2;
   final String? initialPhoneNumber;
   final String? initialNpn;
   final String? initialAddressStreet;
@@ -136,6 +189,7 @@ class ProfileDetailsForm extends StatefulWidget {
   final bool lockName;
   final bool lockNpn;
   final bool showEmail;
+  final bool showUsername;
 
   @override
   State<ProfileDetailsForm> createState() => _ProfileDetailsFormState();
@@ -146,6 +200,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
   late final TextEditingController _givenName;
   late final TextEditingController _familyName;
   late final TextEditingController _email;
+  late final TextEditingController _username;
   late final TextEditingController _phone;
   late final TextEditingController _npn;
   late final TextEditingController _street;
@@ -167,6 +222,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
     _givenName = TextEditingController(text: parts.givenName);
     _familyName = TextEditingController(text: parts.familyName);
     _email = TextEditingController(text: widget.initialEmail ?? '');
+    _username = TextEditingController(text: widget.initialUsername ?? '');
     _phone = TextEditingController(text: widget.initialPhoneNumber ?? '');
     _npn = TextEditingController(text: widget.initialNpn ?? '');
     _street = TextEditingController(text: widget.initialAddressStreet ?? '');
@@ -182,7 +238,10 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
           : kDefaultAgency,
     );
     _bio = TextEditingController(text: widget.initialBio ?? '');
-    _country = phoneCountryByDialCode(widget.initialCountryCode);
+    _country = resolvePhoneCountry(
+      iso2: widget.initialCountryIso2,
+      dialCode: widget.initialCountryCode,
+    );
   }
 
   @override
@@ -190,6 +249,7 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
     _givenName.dispose();
     _familyName.dispose();
     _email.dispose();
+    _username.dispose();
     _phone.dispose();
     _npn.dispose();
     _street.dispose();
@@ -210,8 +270,12 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
     await widget.onSubmit((
       displayName: displayName,
       email: widget.showEmail ? _email.text.trim().toLowerCase() : null,
+      username: widget.showUsername
+          ? _username.text.trim().toLowerCase()
+          : null,
       bio: _bio.text.trim().isEmpty ? null : _bio.text.trim(),
       phoneCountryCode: _country.dialCode,
+      phoneCountryIso2: _country.iso2,
       phoneNumber: _phone.text.trim(),
       npn: _isAgent
           ? (widget.lockNpn
@@ -311,6 +375,29 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
                 if (raw.isEmpty || !raw.contains('@') || !raw.contains('.')) {
                   return l10n.validationEmail;
                 }
+                return null;
+              },
+            ),
+          ],
+          if (widget.showUsername) ...[
+            const SizedBox(height: AppSpacing.sm),
+            TextFormField(
+              controller: _username,
+              autocorrect: false,
+              textInputAction: TextInputAction.next,
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[a-zA-Z0-9_]')),
+                LengthLimitingTextInputFormatter(20),
+              ],
+              decoration: InputDecoration(
+                labelText: l10n.usernameLabel,
+                helperText: l10n.usernameHint,
+                prefixText: '@',
+              ),
+              validator: (value) {
+                final raw = (value ?? '').trim();
+                if (raw.isEmpty) return null;
+                if (!parseUsername(raw).ok) return l10n.usernameInvalid;
                 return null;
               },
             ),

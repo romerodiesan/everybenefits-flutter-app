@@ -63,4 +63,26 @@ void main() {
     expect(belongsInDefaultAgentGroup(UserRole.student), isFalse);
     expect(belongsInDefaultAgentGroup(UserRole.guest), isFalse);
   });
+
+  test('inbox filter and query match unread groups and titles', () {
+    final unread = _chat(id: 'g-unread');
+    final withUnread = unread.copyWith(unreadCounts: {'me': 2});
+    expect(
+      chatMatchesInboxFilter(withUnread, ChatInboxFilter.unread, 'me'),
+      isTrue,
+    );
+    expect(
+      chatMatchesInboxFilter(_chat(id: 'dm'), ChatInboxFilter.groups, 'me'),
+      isFalse,
+    );
+    expect(
+      chatMatchesInboxQuery(
+        _chat(id: 'g-miami'),
+        'miami',
+        'me',
+        title: 'Miami cohort',
+      ),
+      isTrue,
+    );
+  });
 }

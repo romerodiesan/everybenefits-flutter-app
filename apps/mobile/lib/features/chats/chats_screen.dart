@@ -1,10 +1,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../app/app_spacing.dart';
-import '../../app/layout/pulse_breakpoints.dart';
 import '../../app/layout/pulse_constrained.dart';
 import '../../app/pulse_haptics.dart';
 import '../../app/theme.dart';
@@ -20,7 +18,7 @@ import 'chat_new_chat_screen.dart';
 import 'chat_new_group_screen.dart';
 import 'chat_repository.dart';
 import '../notifications/notification_bell_button.dart';
-import 'widgets/chat_avatar.dart';
+import 'widgets/chat_inbox_widgets.dart';
 
 /// Chat inbox backed by [ChatRepository].
 class ChatsScreen extends StatefulWidget {
@@ -56,6 +54,8 @@ class ChatsScreenState extends State<ChatsScreen> {
   bool? _listening;
   bool _defaultJoinAttempted = false;
   ChatConversation? _selectedChat;
+  final _search = TextEditingController();
+  ChatInboxFilter _filter = ChatInboxFilter.all;
 
   void selectConversation(ChatConversation chat) {
     if (!pulseUseMasterDetail(context)) {
@@ -120,6 +120,7 @@ class ChatsScreenState extends State<ChatsScreen> {
   void dispose() {
     _sub?.cancel();
     _gate.close();
+    _search.dispose();
     super.dispose();
   }
 
@@ -303,27 +304,20 @@ class ChatsScreenState extends State<ChatsScreen> {
                       ),
                     );
                   } else {
-                    final sections =
-                        partitionChatInbox(chats, profile.uid);
-                    child = ListView.builder(
+                    child = _InboxList(
                       key: const ValueKey('list'),
-                      padding: EdgeInsets.fromLTRB(
-                        dense ? AppSpacing.sm : AppSpacing.md,
-                        AppSpacing.sm,
-                        dense ? AppSpacing.sm : AppSpacing.md,
-                        pulseShellListBottomPad(context, hasFab: true),
-                      ),
-                      itemCount: _inboxItemCount(sections),
-                      itemBuilder: (context, index) {
-                        return _inboxItem(
-                          context,
-                          l10n,
-                          index: index,
-                          sections: sections,
-                          profile: profile,
-                          dense: dense,
-                        );
-                      },
+                      chats: chats,
+                      profile: profile,
+                      dense: dense,
+                      selectedId: _selectedChat?.id,
+                      search: _search,
+                      filter: _filter,
+                      onFilter: (next) => setState(() => _filter = next),
+                      onSearch: (_) => setState(() {}),
+                      onSelect: selectConversation,
+                      onPin: _togglePin,
+                      onDelete: _confirmDelete,
+                      canSwipe: _canSwipe,
                     );
                   }
                 }
@@ -364,109 +358,124 @@ class ChatsScreenState extends State<ChatsScreen> {
             ),
     );
   }
+}
 
-  int _inboxItemCount(ChatInboxSections sections) {
-    if (sections.community.isEmpty && sections.pinned.isEmpty) {
-      return sections.recent.length;
-    }
-    var count = 0;
-    if (sections.community.isNotEmpty) {
-      count += 1 + sections.community.length;
-    }
-    if (sections.pinned.isNotEmpty) {
-      count += 1 + sections.pinned.length;
-    }
-    if (sections.recent.isNotEmpty) {
-      count += 1 + sections.recent.length;
-    }
-    return count;
-  }
+class _InboxList extends StatelessWidget {
+  const _InboxList({
+    super.key,
+    required this.chats,
+    required this.profile,
+    required this.dense,
+    required this.selectedId,
+    required this.search,
+    required this.filter,
+    required this.onFilter,
+    required this.onSearch,
+    required this.onSelect,
+    required this.onPin,
+    required this.onDelete,
+    required this.canSwipe,
+  });
 
-  Widget _inboxItem(
-    BuildContext context,
-    AppLocalizations l10n, {
-    required int index,
-    required ChatInboxSections sections,
-    required UserProfile profile,
-    required bool dense,
-  }) {
-    Widget row(ChatConversation chat, {String? keyPrefix}) {
-      return Padding(
-        key: ValueKey('${keyPrefix ?? ''}${chat.id}'),
-        padding: EdgeInsets.only(bottom: dense ? 4 : 8),
-        child: _ChatRow(
-          chat: chat,
-          viewerUid: profile.uid,
-          selected: _selectedChat?.id == chat.id,
-          dense: dense,
-          swipeEnabled: _canSwipe(chat),
-          onTap: () => selectConversation(chat),
-          onPin: () => _togglePin(chat),
-          onDelete: () => _confirmDelete(chat),
-        ),
-      );
-    }
+  final List<ChatConversation> chats;
+  final UserProfile profile;
+  final bool dense;
+  final String? selectedId;
+  final TextEditingController search;
+  final ChatInboxFilter filter;
+  final ValueChanged<ChatInboxFilter> onFilter;
+  final ValueChanged<String> onSearch;
+  final ValueChanged<ChatConversation> onSelect;
+  final ValueChanged<ChatConversation> onPin;
+  final ValueChanged<ChatConversation> onDelete;
+  final bool Function(ChatConversation) canSwipe;
 
-    if (sections.community.isEmpty && sections.pinned.isEmpty) {
-      return row(sections.recent[index]);
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final uid = profile.uid;
+    final query = search.text;
+    bool matches(ChatConversation chat) {
+      final title = chat.titleFor(uid, l10n: l10n);
+      return chatMatchesInboxFilter(chat, filter, uid) &&
+          chatMatchesInboxQuery(chat, query, uid, title: title);
     }
 
-    var cursor = 0;
+    final sections = partitionChatInbox(chats, uid);
+    final community = sections.community.where(matches).toList();
+    final pinned = sections.pinned.where(matches).toList();
+    final recent = sections.recent.where(matches).toList();
+    final empty = community.isEmpty && pinned.isEmpty && recent.isEmpty;
 
-    if (sections.community.isNotEmpty) {
-      if (index == cursor) {
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 8),
-          child: _SectionLabel(label: l10n.chatsSectionCommunity),
-        );
-      }
-      cursor += 1;
-      if (index < cursor + sections.community.length) {
-        return row(
-          sections.community[index - cursor],
-          keyPrefix: 'community-',
-        );
-      }
-      cursor += sections.community.length;
-    }
-
-    if (sections.pinned.isNotEmpty) {
-      if (index == cursor) {
-        return Padding(
-          padding: EdgeInsets.only(
-            top: sections.community.isEmpty ? 0 : 8,
-            bottom: 8,
-          ),
-          child: _SectionLabel(label: l10n.chatsSectionPinned),
-        );
-      }
-      cursor += 1;
-      if (index < cursor + sections.pinned.length) {
-        return row(
-          sections.pinned[index - cursor],
-          keyPrefix: 'pinned-',
-        );
-      }
-      cursor += sections.pinned.length;
-    }
-
-    if (sections.recent.isNotEmpty) {
-      if (index == cursor) {
-        return Padding(
-          padding: EdgeInsets.only(
-            top: sections.community.isEmpty && sections.pinned.isEmpty
-                ? 0
-                : 8,
-            bottom: 8,
-          ),
-          child: _SectionLabel(label: l10n.chatsSectionRecent),
-        );
-      }
-      cursor += 1;
-      return row(sections.recent[index - cursor]);
-    }
-
-    return const SizedBox.shrink();
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        dense ? AppSpacing.sm : AppSpacing.md,
+        AppSpacing.sm,
+        dense ? AppSpacing.sm : AppSpacing.md,
+        pulseShellListBottomPad(context, hasFab: true),
+      ),
+      children: [
+        ChatInboxSearchBar(controller: search, onChanged: onSearch),
+        const SizedBox(height: 10),
+        ChatInboxFilterChips(value: filter, onChanged: onFilter),
+        const SizedBox(height: 14),
+        if (empty)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 32),
+            child: Text(
+              l10n.chatsInboxFilterEmpty,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.of(context).muted,
+                  ),
+            ),
+          )
+        else ...[
+          for (final chat in community) ...[
+            ChatCommunityHero(
+              chat: chat,
+              viewerUid: uid,
+              selected: selectedId == chat.id,
+              onTap: () => onSelect(chat),
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (pinned.isNotEmpty) ...[
+            ChatPinnedRail(
+              chats: pinned,
+              viewerUid: uid,
+              selectedId: selectedId,
+              onTap: onSelect,
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (recent.isNotEmpty) ...[
+            Text(
+              l10n.chatsSectionRecent.toUpperCase(),
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: AppColors.of(context).muted,
+                    fontSize: 11,
+                    letterSpacing: 1.1,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 4),
+            for (final chat in recent)
+              ChatInboxRow(
+                key: ValueKey(chat.id),
+                chat: chat,
+                viewerUid: uid,
+                selected: selectedId == chat.id,
+                dense: dense,
+                swipeEnabled: canSwipe(chat),
+                onTap: () => onSelect(chat),
+                onPin: () => onPin(chat),
+                onDelete: () => onDelete(chat),
+              ),
+          ],
+        ],
+      ],
+    );
   }
 }
 
@@ -521,241 +530,3 @@ void openChat(
   );
 }
 
-class _SectionLabel extends StatelessWidget {
-  const _SectionLabel({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label.toUpperCase(),
-      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-            color: AppColors.of(context).muted,
-            fontSize: 11,
-            letterSpacing: 1.1,
-            fontWeight: FontWeight.w800,
-          ),
-    );
-  }
-}
-
-class _ChatRow extends StatelessWidget {
-  const _ChatRow({
-    required this.chat,
-    required this.viewerUid,
-    required this.onTap,
-    required this.swipeEnabled,
-    required this.onPin,
-    required this.onDelete,
-    this.selected = false,
-    this.dense = false,
-  });
-
-  final ChatConversation chat;
-  final String viewerUid;
-  final VoidCallback onTap;
-  final bool swipeEnabled;
-  final VoidCallback onPin;
-  final VoidCallback onDelete;
-  final bool selected;
-  final bool dense;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final brand = AppColors.brandOf(context);
-    final l10n = context.l10n;
-    final unread = chat.unreadFor(viewerUid);
-    final hasUnread = unread > 0;
-    final pinned = chat.isPinnedFor(viewerUid);
-    final title = chat.titleFor(viewerUid, l10n: l10n);
-    final preview = chat.isDefaultAgentGroup && chat.lastMessage.isEmpty
-        ? l10n.chatsDefaultGroupBadge
-        : (chat.lastMessage.isEmpty
-            ? l10n.chatsNoMessagesYet
-            : chat.lastMessage);
-
-    final tile = Material(
-      color: selected
-          ? brand.withValues(alpha: 0.10)
-          : colors.sheet,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(18),
-        side: BorderSide(
-          color: selected ? brand.withValues(alpha: 0.35) : colors.border,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(12, dense ? 8 : 12, 14, dense ? 8 : 12),
-          child: Row(
-            children: [
-              ChatAvatar(
-                initials: chat.initialsFor(viewerUid, l10n: l10n),
-                isGroup: chat.isGroup,
-                size: dense ? 44 : 50,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (pinned) ...[
-                          Icon(
-                            Icons.push_pin_rounded,
-                            size: 13,
-                            color: colors.muted,
-                          ),
-                          const SizedBox(width: 4),
-                        ],
-                        Expanded(
-                          child: Text(
-                            title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: hasUnread
-                                  ? FontWeight.w800
-                                  : FontWeight.w700,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          formatChatTime(chat.lastMessageAt, l10n),
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            color: hasUnread ? brand : colors.muted,
-                            fontSize: 11.5,
-                            fontWeight:
-                                hasUnread ? FontWeight.w800 : FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            preview,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: hasUnread
-                                  ? colors.ink.withValues(alpha: 0.78)
-                                  : colors.muted,
-                              fontWeight:
-                                  hasUnread ? FontWeight.w600 : FontWeight.w500,
-                              fontSize: 13.5,
-                            ),
-                          ),
-                        ),
-                        if (hasUnread) ...[
-                          const SizedBox(width: 8),
-                          Container(
-                            constraints: const BoxConstraints(minWidth: 22),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 7,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: brand,
-                              borderRadius: BorderRadius.circular(999),
-                            ),
-                            alignment: Alignment.center,
-                            child: Text(
-                              '$unread',
-                              style: theme.textTheme.labelLarge?.copyWith(
-                                color: AppColors.onBrandOf(context),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-
-    if (!swipeEnabled) return tile;
-
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Slidable(
-        key: ValueKey('slide-${chat.id}'),
-        startActionPane: ActionPane(
-          motion: const DrawerMotion(),
-          extentRatio: 0.28,
-          children: [
-            CustomSlidableAction(
-              onPressed: (_) => onPin(),
-              backgroundColor: brand,
-              foregroundColor: AppColors.onBrandOf(context),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-                    size: 22,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    pinned ? l10n.chatUnpin : l10n.chatPin,
-                    textAlign: TextAlign.center,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      height: 1.15,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        endActionPane: ActionPane(
-          motion: const DrawerMotion(),
-          extentRatio: 0.28,
-          children: [
-            CustomSlidableAction(
-              onPressed: (_) => onDelete(),
-              backgroundColor: const Color(0xFFB42318),
-              foregroundColor: Colors.white,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.delete_outline_rounded, size: 22),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.chatDelete,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        child: tile,
-      ),
-    );
-  }
-}

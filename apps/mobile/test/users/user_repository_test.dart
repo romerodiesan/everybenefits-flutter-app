@@ -50,6 +50,7 @@ class FakeUserStore implements UserProfileStore {
     required String uid,
     required String? displayName,
     required String? email,
+    String? username,
   }) async {
     searchBackfills.add(uid);
   }
@@ -82,6 +83,17 @@ class FakeUserStore implements UserProfileStore {
   Future<String> updateAccountEmail(String email) async {
     throw UnimplementedError();
   }
+
+  @override
+  Future<String> updateUsername(String username) async {
+    throw UnimplementedError();
+  }
+
+  @override
+  Future<void> updateShowLocationOnProfile({
+    required String uid,
+    required bool enabled,
+  }) async {}
 }
 
 void main() {

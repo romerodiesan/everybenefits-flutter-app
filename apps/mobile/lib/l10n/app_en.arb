@@ -276,6 +276,17 @@
   "promoBannerDismiss": "Hide",
   "promoBannerHide": "Hide",
   "promoBannerFromPulse": "Pulse",
+  "pollDismiss": "Hide poll",
+  "pollSignIn": "Sign in to vote.",
+  "pollVoteError": "Could not record your vote.",
+  "pollVoteCount": "{count} votes",
+  "@pollVoteCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "forumsClearFilters": "Clear",
   "forumsReadOnlyBanner": "Read-only — sign up to post.",
   "forumsFilterYourQuestions": "Your questions",
@@ -441,6 +452,19 @@
   "chatsDefaultGroupBadge": "Community",
   "chatsDefaultGroupTitle": "Team",
   "chatsNoMessagesYet": "No messages yet",
+  "chatsFilterAll": "All",
+  "chatsFilterUnread": "Unread",
+  "chatsFilterGroups": "Groups",
+  "chatsSearchHint": "Search chats",
+  "chatsInboxFilterEmpty": "Nothing matches this filter.",
+  "chatYouPrefix": "You: {preview}",
+  "@chatYouPrefix": {
+    "placeholders": {
+      "preview": {
+        "type": "String"
+      }
+    }
+  },
   "chatTypeGroup": "Group",
   "newGroupTitle": "New group",
   "newGroupNameLabel": "Group name",
@@ -458,8 +482,36 @@
   "newChatContactsHeader": "CONTACTS",
   "chatEmptyThread": "Say hello. Messages sync live.",
   "chatMessageHint": "Write a message…",
+  "chatMentionEmpty": "No members match that @username.",
   "chatEmojiPicker": "Emojis",
   "chatReact": "React",
+  "chatReply": "Reply",
+  "chatCopy": "Copy",
+  "chatCopied": "Copied",
+  "chatReplyTo": "Replying to {name}",
+  "@chatReplyTo": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatReplyDismiss": "Cancel reply",
+  "chatNewMessages": "New messages",
+  "chatJumpToNew": "Jump to new",
+  "chatTypingOne": "{name} is typing…",
+  "@chatTypingOne": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "chatTypingMany": "People are typing…",
+  "chatSearchThread": "Search in chat",
+  "chatSearchThreadHint": "Find a message",
+  "chatSearchThreadEmpty": "No messages match.",
+  "chatTimeToday": "Today",
   "chatInfoTitle": "Info",
   "chatPin": "Pin chat",
   "chatUnpin": "Unpin chat",
@@ -849,5 +901,48 @@
   "memberViewProfile": "View profile",
   "chatsNeedContacts": "Add each other as contacts to start a private chat.",
   "chatsDmDisabled": "Add each other as contacts to keep messaging.",
-  "chatsFindMembers": "Find members"
+  "chatsFindMembers": "Find members",
+  "usernameLabel": "Username",
+  "usernameHint": "3–20 letters, numbers, or underscores.",
+  "usernameTaken": "That username is taken.",
+  "usernameInvalid": "Use 3–20 letters, numbers, or underscores.",
+  "usernameChoose": "Choose username",
+  "phoneCountrySearch": "Search country or code",
+  "phoneCountryEmpty": "No countries match",
+  "settingsGroupNetwork": "Your network",
+  "settingsGroupApp": "App",
+  "settingsGroupAccount": "Account",
+  "settingsGroupDanger": "Danger",
+  "settingsGroupAdmin": "Admin",
+  "privacyShowLocation": "Show city and state on profile",
+  "privacyShowLocationHint": "Other members can see your city and state — never street, ZIP, phone, or NPN.",
+  "profileFollow": "Follow",
+  "profileFollowing": "Following",
+  "profileUnfollow": "Unfollow",
+  "profileStatFollowers": "Followers",
+  "profileStatFollowing": "Following",
+  "profileFollowersEmpty": "No followers yet.",
+  "profileFollowingEmpty": "Not following anyone yet.",
+  "profileAbout": "About",
+  "profileJoined": "Joined {date}",
+  "@profileJoined": {
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "profileShare": "Share profile",
+  "profileCopyLink": "Copy link",
+  "profileLinkCopied": "Link copied",
+  "profileReport": "Report",
+  "profileReportTitle": "Report this member",
+  "profileReportHint": "Tell us what’s going on. Reports are reviewed by the Pulse team.",
+  "profileReportSpam": "Spam",
+  "profileReportHarassment": "Harassment",
+  "profileReportImpersonation": "Impersonation",
+  "profileReportOther": "Something else",
+  "profileReportDetails": "Details (optional)",
+  "profileReportSubmit": "Submit report",
+  "profileReportSent": "Thanks — we received your report."
 }

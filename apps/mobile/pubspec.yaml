@@ -52,6 +52,7 @@ dependencies:
   intl: any
   firebase_database: ^12.4.7
   url_launcher: ^6.3.2
+  share_plus: ^13.3.0
   emoji_picker_flutter: ^4.5.3
   flutter_slidable: ^4.0.3
   video_player: ^2.14.0

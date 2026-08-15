@@ -116,6 +116,33 @@ void main() {
         throwsA(isA<ArgumentError>()),
       );
     });
+
+    test('persists replyTo on the stored message', () async {
+      final me = _user('me', name: 'María');
+      final other = _user('other', name: 'Carlos');
+      final chat = await repo.getOrCreateDm(me: me, other: other);
+      final first = await repo.sendMessage(
+        chatId: chat.id,
+        body: 'Hola',
+        author: other,
+      );
+      final reply = await repo.sendMessage(
+        chatId: chat.id,
+        body: 'Qué tal',
+        author: me,
+        replyTo: ChatReplyTo(
+          messageId: first.id,
+          senderName: first.senderName,
+          bodyPreview: ChatReplyTo.previewOf(first),
+        ),
+      );
+      expect(reply.replyTo?.messageId, first.id);
+      expect(reply.replyTo?.bodyPreview, 'Hola');
+      expect(
+        ChatMessage.fromMap(reply.id, reply.toMap()).replyTo?.messageId,
+        first.id,
+      );
+    });
   });
 
   group('sharePost', () {
@@ -139,6 +166,35 @@ void main() {
 
       expect(msg.sharedPost?.threadId, 't1');
       expect(store.chats[chat.id]!.lastMessage, contains('Pregunta'));
+      expect(msg.isSyntheticShareBody, isTrue);
+      expect(msg.showsTextBubble, isFalse);
+    });
+
+    test('isSyntheticShareBody is false for a real caption', () {
+      const post = SharedPostPreview(
+        threadId: 't1',
+        title: 'NPN',
+      );
+      final synthetic = ChatMessage(
+        id: '1',
+        chatId: 'c',
+        body: 'Pregunta: NPN',
+        senderId: 'me',
+        senderName: 'Me',
+        createdAt: DateTime.utc(2026, 1, 1),
+        sharedPost: post,
+      );
+      final captioned = ChatMessage(
+        id: '2',
+        chatId: 'c',
+        body: 'Mira esto',
+        senderId: 'me',
+        senderName: 'Me',
+        createdAt: DateTime.utc(2026, 1, 1),
+        sharedPost: post,
+      );
+      expect(synthetic.isSyntheticShareBody, isTrue);
+      expect(captioned.showsTextBubble, isTrue);
     });
   });
 

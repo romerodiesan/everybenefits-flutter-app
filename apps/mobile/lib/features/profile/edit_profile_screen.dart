@@ -69,12 +69,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         await widget.userRepository.updateAccountEmail(nextEmail);
       }
 
+      final nextUsername = data.username?.trim().toLowerCase() ?? '';
+      final currentUsername = widget.profile.username?.trim().toLowerCase() ?? '';
+      if (nextUsername.isNotEmpty && nextUsername != currentUsername) {
+        await widget.userRepository.updateUsername(nextUsername);
+      }
+
       final next = widget.profile.copyWith(
         displayName: data.displayName,
         email: nextEmail ?? widget.profile.email,
         bio: data.bio,
         clearBio: data.bio == null || data.bio!.isEmpty,
         phoneCountryCode: data.phoneCountryCode,
+        phoneCountryIso2: data.phoneCountryIso2,
         phoneNumber: data.phoneNumber,
         phoneVerified: phoneVerified,
         // Role is frozen after completion — never written from edit.
@@ -99,9 +106,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (!mounted) return;
       final message = error is FirebaseFunctionsException
           ? (error.code.contains('already-exists')
-              ? context.l10n.errEmailInUse
+              ? (error.message?.contains('taken') == true
+                  ? context.l10n.usernameTaken
+                  : context.l10n.errEmailInUse)
               : error.code.contains('invalid-argument')
-                  ? context.l10n.validationEmail
+                  ? (error.message?.contains('invalid') == true
+                      ? context.l10n.usernameInvalid
+                      : context.l10n.validationEmail)
                   : context.l10n.editProfileUpdateFailed(
                       error.message ?? error.code,
                     ))
@@ -203,11 +214,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               lockName: false,
               lockNpn: true,
               showEmail: true,
+              showUsername: true,
               submitLabel: l10n.editProfileSave,
               initialName: profile.displayName,
               initialEmail: profile.email,
+              initialUsername: profile.username,
               initialBio: profile.bio,
               initialCountryCode: profile.phoneCountryCode,
+              initialCountryIso2: profile.phoneCountryIso2,
               initialPhoneNumber: profile.phoneNumber,
               initialNpn: profile.npn,
               initialAddressStreet: profile.effectiveAddressStreet,

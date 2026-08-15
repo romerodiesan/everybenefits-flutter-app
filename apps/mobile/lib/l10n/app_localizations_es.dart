@@ -736,6 +736,20 @@ class AppLocalizationsEs extends AppLocalizations {
   String get promoBannerFromPulse => 'Pulse';
 
   @override
+  String get pollDismiss => 'Ocultar encuesta';
+
+  @override
+  String get pollSignIn => 'Inicia sesión para votar.';
+
+  @override
+  String get pollVoteError => 'No se pudo registrar tu voto.';
+
+  @override
+  String pollVoteCount(int count) {
+    return '$count votos';
+  }
+
+  @override
   String get forumsClearFilters => 'Limpiar';
 
   @override
@@ -1117,6 +1131,26 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatsNoMessagesYet => 'Sin mensajes todavía';
 
   @override
+  String get chatsFilterAll => 'Todos';
+
+  @override
+  String get chatsFilterUnread => 'No leídos';
+
+  @override
+  String get chatsFilterGroups => 'Grupos';
+
+  @override
+  String get chatsSearchHint => 'Buscar chats';
+
+  @override
+  String get chatsInboxFilterEmpty => 'Nada coincide con este filtro.';
+
+  @override
+  String chatYouPrefix(String preview) {
+    return 'Tú: $preview';
+  }
+
+  @override
   String get chatTypeGroup => 'Grupo';
 
   @override
@@ -1170,10 +1204,57 @@ class AppLocalizationsEs extends AppLocalizations {
   String get chatMessageHint => 'Escribe un mensaje…';
 
   @override
+  String get chatMentionEmpty =>
+      'Nadie en este chat coincide con ese @usuario.';
+
+  @override
   String get chatEmojiPicker => 'Emojis';
 
   @override
   String get chatReact => 'Reaccionar';
+
+  @override
+  String get chatReply => 'Responder';
+
+  @override
+  String get chatCopy => 'Copiar';
+
+  @override
+  String get chatCopied => 'Copiado';
+
+  @override
+  String chatReplyTo(String name) {
+    return 'Respondiendo a $name';
+  }
+
+  @override
+  String get chatReplyDismiss => 'Cancelar respuesta';
+
+  @override
+  String get chatNewMessages => 'Mensajes nuevos';
+
+  @override
+  String get chatJumpToNew => 'Ir a nuevos';
+
+  @override
+  String chatTypingOne(String name) {
+    return '$name está escribiendo…';
+  }
+
+  @override
+  String get chatTypingMany => 'Varias personas están escribiendo…';
+
+  @override
+  String get chatSearchThread => 'Buscar en el chat';
+
+  @override
+  String get chatSearchThreadHint => 'Busca un mensaje';
+
+  @override
+  String get chatSearchThreadEmpty => 'Ningún mensaje coincide.';
+
+  @override
+  String get chatTimeToday => 'Hoy';
 
   @override
   String get chatInfoTitle => 'Info';
@@ -1965,4 +2046,116 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get chatsFindMembers => 'Buscar miembros';
+
+  @override
+  String get usernameLabel => 'Usuario';
+
+  @override
+  String get usernameHint => '3–20 letras, números o guiones bajos.';
+
+  @override
+  String get usernameTaken => 'Ese usuario ya está en uso.';
+
+  @override
+  String get usernameInvalid => 'Usa 3–20 letras, números o guiones bajos.';
+
+  @override
+  String get usernameChoose => 'Elegir usuario';
+
+  @override
+  String get phoneCountrySearch => 'Buscar país o código';
+
+  @override
+  String get phoneCountryEmpty => 'Ningún país coincide';
+
+  @override
+  String get settingsGroupNetwork => 'Tu red';
+
+  @override
+  String get settingsGroupApp => 'App';
+
+  @override
+  String get settingsGroupAccount => 'Cuenta';
+
+  @override
+  String get settingsGroupDanger => 'Peligro';
+
+  @override
+  String get settingsGroupAdmin => 'Admin';
+
+  @override
+  String get privacyShowLocation => 'Mostrar ciudad y estado en el perfil';
+
+  @override
+  String get privacyShowLocationHint =>
+      'Otros miembros verán tu ciudad y estado — nunca calle, ZIP, teléfono ni NPN.';
+
+  @override
+  String get profileFollow => 'Seguir';
+
+  @override
+  String get profileFollowing => 'Siguiendo';
+
+  @override
+  String get profileUnfollow => 'Dejar de seguir';
+
+  @override
+  String get profileStatFollowers => 'Seguidores';
+
+  @override
+  String get profileStatFollowing => 'Siguiendo';
+
+  @override
+  String get profileFollowersEmpty => 'Aún no hay seguidores.';
+
+  @override
+  String get profileFollowingEmpty => 'Aún no sigue a nadie.';
+
+  @override
+  String get profileAbout => 'Acerca de';
+
+  @override
+  String profileJoined(String date) {
+    return 'Se unió en $date';
+  }
+
+  @override
+  String get profileShare => 'Compartir perfil';
+
+  @override
+  String get profileCopyLink => 'Copiar enlace';
+
+  @override
+  String get profileLinkCopied => 'Enlace copiado';
+
+  @override
+  String get profileReport => 'Reportar';
+
+  @override
+  String get profileReportTitle => 'Reportar a este miembro';
+
+  @override
+  String get profileReportHint =>
+      'Cuéntanos qué ocurre. El equipo de Pulse revisará el reporte.';
+
+  @override
+  String get profileReportSpam => 'Spam';
+
+  @override
+  String get profileReportHarassment => 'Acoso';
+
+  @override
+  String get profileReportImpersonation => 'Suplantación';
+
+  @override
+  String get profileReportOther => 'Otra cosa';
+
+  @override
+  String get profileReportDetails => 'Detalles (opcional)';
+
+  @override
+  String get profileReportSubmit => 'Enviar reporte';
+
+  @override
+  String get profileReportSent => 'Gracias — recibimos tu reporte.';
 }

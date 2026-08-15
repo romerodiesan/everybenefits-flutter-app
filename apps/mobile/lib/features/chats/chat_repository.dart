@@ -60,6 +60,14 @@ abstract class ChatStore {
     required int count,
   });
 
+  /// Own photo/username on this chat (rules allow self).
+  Future<void> patchChatMemberSelf({
+    required String chatId,
+    required String uid,
+    String? photoUrl,
+    String? username,
+  });
+
   /// Own pin only — `chats/{id}/pinnedBy/{uid}` (rules allow self).
   Future<void> patchOwnPinned({
     required String chatId,
@@ -75,6 +83,15 @@ abstract class ChatStore {
     required String messageId,
     required String uid,
     String? emoji,
+  });
+
+  /// uid → last typing heartbeat (ms).
+  Stream<Map<String, int>> watchTyping(String chatId);
+
+  Future<void> setTyping({
+    required String chatId,
+    required String uid,
+    required bool typing,
   });
 }
 
@@ -332,6 +349,8 @@ class RtdbChatStore implements ChatStore {
         id: chatId,
         memberIds: List<String>.from(chat.memberIds)..sort(),
         memberNames: Map<String, String>.from(chat.memberNames),
+        memberPhotos: Map<String, String>.from(chat.memberPhotos),
+        memberUsernames: Map<String, String>.from(chat.memberUsernames),
         isGroup: true,
         title: chat.title,
         dmKey: null,
@@ -378,6 +397,8 @@ class RtdbChatStore implements ChatStore {
       id: chatId,
       memberIds: memberIds..sort(),
       memberNames: memberNames,
+      memberPhotos: Map<String, String>.from(chat.memberPhotos),
+      memberUsernames: Map<String, String>.from(chat.memberUsernames),
       isGroup: false,
       title: null,
       dmKey: chat.dmKey ?? chatId,
@@ -399,6 +420,25 @@ class RtdbChatStore implements ChatStore {
     required int count,
   }) async {
     await _root.child('chats/$chatId/unreadCounts/$uid').set(count);
+  }
+
+  @override
+  Future<void> patchChatMemberSelf({
+    required String chatId,
+    required String uid,
+    String? photoUrl,
+    String? username,
+  }) async {
+    final updates = <String, Object?>{};
+    if (photoUrl != null) {
+      updates['chats/$chatId/memberPhotos/$uid'] =
+          photoUrl.trim().isEmpty ? null : photoUrl.trim();
+    }
+    if (username != null) {
+      updates['chats/$chatId/memberUsernames/$uid'] =
+          username.trim().isEmpty ? null : username.trim();
+    }
+    if (updates.isNotEmpty) await _root.update(updates);
   }
 
   @override
@@ -475,6 +515,44 @@ class RtdbChatStore implements ChatStore {
     }
   }
 
+  @override
+  Stream<Map<String, int>> watchTyping(String chatId) {
+    return Stream.multi((controller) {
+      final sub = _root.child('typing/$chatId').onValue.listen(
+        (event) {
+          final raw = event.snapshot.value;
+          if (raw is! Map) {
+            controller.add(const {});
+            return;
+          }
+          final out = <String, int>{};
+          for (final entry in raw.entries) {
+            final row = _asStringKeyedMap(entry.value);
+            out['${entry.key}'] = _readMillis(row['at']);
+          }
+          controller.add(out);
+        },
+        onError: controller.addError,
+        onDone: controller.close,
+      );
+      controller.onCancel = sub.cancel;
+    });
+  }
+
+  @override
+  Future<void> setTyping({
+    required String chatId,
+    required String uid,
+    required bool typing,
+  }) async {
+    final ref = _root.child('typing/$chatId/$uid');
+    if (typing) {
+      await ref.set({'at': DateTime.now().toUtc().millisecondsSinceEpoch});
+    } else {
+      await ref.remove();
+    }
+  }
+
   int _readMillis(Object? value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
@@ -506,6 +584,16 @@ class ChatRepository {
   }) =>
       _store.watchMessages(chatId, limit: limit);
 
+  Stream<Map<String, int>> watchTyping(String chatId) =>
+      _store.watchTyping(chatId);
+
+  Future<void> setTyping({
+    required String chatId,
+    required String uid,
+    required bool typing,
+  }) =>
+      _store.setTyping(chatId: chatId, uid: uid, typing: typing);
+
   Future<ChatConversation> getOrCreateDm({
     required UserProfile me,
     required UserProfile other,
@@ -528,6 +616,16 @@ class ChatRepository {
       memberNames: {
         me.uid: me.headlineName,
         other.uid: other.headlineName,
+      },
+      memberPhotos: {
+        if (me.photoUrl != null && me.photoUrl!.trim().isNotEmpty)
+          me.uid: me.photoUrl!,
+        if (other.photoUrl != null && other.photoUrl!.trim().isNotEmpty)
+          other.uid: other.photoUrl!,
+      },
+      memberUsernames: {
+        if (me.hasUsername) me.uid: me.handle,
+        if (other.hasUsername) other.uid: other.handle,
       },
       isGroup: false,
       dmKey: key,
@@ -581,6 +679,15 @@ class ChatRepository {
       memberNames: {
         for (final p in all) p.uid: p.headlineName,
       },
+      memberPhotos: {
+        for (final p in all)
+          if (p.photoUrl != null && p.photoUrl!.trim().isNotEmpty)
+            p.uid: p.photoUrl!,
+      },
+      memberUsernames: {
+        for (final p in all)
+          if (p.hasUsername) p.uid: p.handle,
+      },
       isGroup: true,
       title: trimmed,
       lastMessage: '',
@@ -598,6 +705,7 @@ class ChatRepository {
     required String chatId,
     required String body,
     required UserProfile author,
+    ChatReplyTo? replyTo,
   }) async {
     _ensureCanChat(author);
     final text = body.trim();
@@ -610,6 +718,7 @@ class ChatRepository {
       body: text,
       preview: text,
       sharedPost: null,
+      replyTo: replyTo,
     );
   }
 
@@ -628,6 +737,7 @@ class ChatRepository {
       body: '',
       preview: 'Pregunta: ${preview.title}',
       sharedPost: preview,
+      replyTo: null,
     );
   }
 
@@ -727,6 +837,7 @@ class ChatRepository {
     required String body,
     required String preview,
     required SharedPostPreview? sharedPost,
+    ChatReplyTo? replyTo,
   }) async {
     final chat = await _requireChat(chatId);
     if (!chat.memberIds.contains(author.uid)) {
@@ -743,16 +854,41 @@ class ChatRepository {
         body: bodyForStore,
         senderId: author.uid,
         senderName: author.headlineName,
+        senderPhotoUrl: author.photoUrl,
         createdAt: now,
         sharedPost: sharedPost,
+        replyTo: replyTo,
       ),
+    );
+
+    await _store.patchChatMemberSelf(
+      chatId: chatId,
+      uid: author.uid,
+      photoUrl: author.photoUrl,
+      username: author.hasUsername ? author.handle : null,
     );
 
     // lastMessage / unreadCounts are applied server-side by
     // syncChatMetadataOnMessage (clients cannot forge chat summary fields).
     await _store.ensureUserChatIndexes(chat);
+    await _store.setTyping(chatId: chatId, uid: author.uid, typing: false);
 
     return message;
+  }
+
+  /// Best-effort: rewrite this user's photo on chats they belong to.
+  Future<void> syncOwnMemberPhoto({
+    required String uid,
+    required String? photoUrl,
+  }) async {
+    final chats = await _store.watchChats(uid).first;
+    for (final chat in chats.take(50)) {
+      await _store.patchChatMemberSelf(
+        chatId: chat.id,
+        uid: uid,
+        photoUrl: photoUrl ?? '',
+      );
+    }
   }
 
   Future<ChatConversation> _requireChat(String chatId) async {

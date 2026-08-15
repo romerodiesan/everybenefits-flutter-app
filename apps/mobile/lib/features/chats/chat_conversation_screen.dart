@@ -1,6 +1,8 @@
-import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
-import 'package:flutter/foundation.dart' as foundation;
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_slidable/flutter_slidable.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
@@ -11,13 +13,17 @@ import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
 import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
-import '../forums/widgets/share_to_chat_sheet.dart';
 import '../profile/public_profile_screen.dart';
 import 'chat_contact_info_screen.dart';
 import 'chat_models.dart';
 import 'chat_repository.dart';
+import 'chat_timeline.dart';
 import 'widgets/chat_avatar.dart';
-import 'widgets/reaction_popup.dart';
+import 'widgets/chat_composer.dart';
+import 'widgets/chat_message_menu.dart';
+import 'widgets/chat_thread_widgets.dart';
+
+const _typingStale = Duration(seconds: 4);
 
 class ChatConversationScreen extends StatefulWidget {
   const ChatConversationScreen({
@@ -45,19 +51,45 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _controller = TextEditingController();
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
+  final _threadSearch = TextEditingController();
   late final ChatRepository _repo =
       widget.chatRepository ?? ChatRepository();
   late final Stream<ChatConversation?> _chatStream =
       _repo.watchChat(widget.chat.id);
   late final Stream<List<ChatMessage>> _messagesStream =
       _repo.watchMessages(widget.chat.id);
+  late final Stream<Map<String, int>> _typingStream =
+      _repo.watchTyping(widget.chat.id);
   var _sending = false;
   var _sharedBootstrapped = false;
   var _emojiOpen = false;
+  var _searchOpen = false;
+  ChatMessage? _replyTo;
+  late final int _unreadSnapshot;
+  Timer? _typingIdle;
+  var _typingSent = false;
+  final _unreadKey = GlobalKey();
+  final _messageKeys = <String, GlobalKey>{};
+
+  GlobalKey _keyForMessage(String id) {
+    return _messageKeys.putIfAbsent(id, GlobalKey.new);
+  }
+
+  void _scrollToKey(GlobalKey key) {
+    final ctx = key.currentContext;
+    if (ctx == null) return;
+    Scrollable.ensureVisible(
+      ctx,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOut,
+      alignment: 0.25,
+    );
+  }
 
   @override
   void initState() {
     super.initState();
+    _unreadSnapshot = widget.chat.unreadFor(widget.profile.uid);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _repo.markRead(chatId: widget.chat.id, uid: widget.profile.uid);
       _bootstrapSharedPost();
@@ -85,9 +117,20 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   void dispose() {
+    _typingIdle?.cancel();
+    if (_typingSent) {
+      unawaited(
+        _repo.setTyping(
+          chatId: widget.chat.id,
+          uid: widget.profile.uid,
+          typing: false,
+        ),
+      );
+    }
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
+    _threadSearch.dispose();
     super.dispose();
   }
 
@@ -101,20 +144,66 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
+  void _onComposerChanged(String value) {
+    setState(() {});
+    final typing = value.trim().isNotEmpty;
+    _typingIdle?.cancel();
+    if (typing) {
+      if (!_typingSent) {
+        _typingSent = true;
+        unawaited(
+          _repo.setTyping(
+            chatId: widget.chat.id,
+            uid: widget.profile.uid,
+            typing: true,
+          ),
+        );
+      }
+      _typingIdle = Timer(const Duration(seconds: 3), () {
+        _typingSent = false;
+        unawaited(
+          _repo.setTyping(
+            chatId: widget.chat.id,
+            uid: widget.profile.uid,
+            typing: false,
+          ),
+        );
+      });
+    } else if (_typingSent) {
+      _typingSent = false;
+      unawaited(
+        _repo.setTyping(
+          chatId: widget.chat.id,
+          uid: widget.profile.uid,
+          typing: false,
+        ),
+      );
+    }
+  }
+
   Future<void> _send() async {
     final text = _controller.text.trim();
     if (text.isEmpty || _sending) return;
     PulseHaptics.light();
     final l10n = context.l10n;
+    final reply = _replyTo;
     setState(() {
       _sending = true;
       _emojiOpen = false;
+      _replyTo = null;
     });
     try {
       await _repo.sendMessage(
         chatId: widget.chat.id,
         body: text,
         author: widget.profile,
+        replyTo: reply == null
+            ? null
+            : ChatReplyTo(
+                messageId: reply.id,
+                senderName: reply.senderName,
+                bodyPreview: ChatReplyTo.previewOf(reply),
+              ),
       );
       _controller.clear();
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -152,17 +241,30 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     }
   }
 
-  /// Long-press opens an animated WhatsApp-style bubble anchored to the message.
-  Future<void> _showReactionPicker(ChatMessage msg, Rect anchor) async {
+  Future<void> _showMessageMenu(ChatMessage msg, Rect anchor) async {
     final mine = msg.isMine(widget.profile.uid);
-    final picked = await showReactionPopup(
+    final result = await showChatMessageMenu(
       context: context,
       anchor: anchor,
       mine: mine,
       selected: msg.reactions[widget.profile.uid],
     );
-    if (picked != null) {
-      await _react(msg, picked);
+    if (result == null || !mounted) return;
+    switch (result.action) {
+      case ChatMessageMenuAction.react:
+        if (result.emoji != null) await _react(msg, result.emoji!);
+      case ChatMessageMenuAction.copy:
+        final text = msg.sharedPost?.title.trim().isNotEmpty == true
+            ? msg.sharedPost!.title
+            : msg.body;
+        await Clipboard.setData(ClipboardData(text: text));
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(context.l10n.chatCopied)),
+        );
+      case ChatMessageMenuAction.reply:
+        setState(() => _replyTo = msg);
+        _focusNode.requestFocus();
     }
   }
 
@@ -176,6 +278,35 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
         ),
       ),
     );
+  }
+
+  void _openMember(String memberId) {
+    if (memberId.isEmpty || memberId == widget.profile.uid) return;
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PublicProfileScreen(
+          uid: memberId,
+          viewer: widget.profile,
+          chatRepository: _repo,
+        ),
+      ),
+    );
+  }
+
+  void _jumpToUnread() {
+    _scrollToKey(_unreadKey);
+  }
+
+  List<String> _activeTypers(Map<String, int> raw) {
+    final now = DateTime.now().toUtc().millisecondsSinceEpoch;
+    final names = <String>[];
+    for (final entry in raw.entries) {
+      if (entry.key == widget.profile.uid) continue;
+      if (now - entry.value > _typingStale.inMilliseconds) continue;
+      final name = widget.chat.memberNames[entry.key] ?? '';
+      if (name.isNotEmpty) names.add(name);
+    }
+    return names;
   }
 
   @override
@@ -195,7 +326,6 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   Widget _conversationScaffold(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
-    final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
     final uid = widget.profile.uid;
 
@@ -208,6 +338,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           initialData: widget.chat,
           builder: (context, snapshot) {
             final chat = snapshot.data ?? widget.chat;
+            final title = chat.titleFor(uid, l10n: l10n);
             return InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: () {
@@ -238,7 +369,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 child: Row(
                   children: [
                     ChatAvatar(
-                      initials: chat.initialsFor(uid, l10n: context.l10n),
+                      initials: chat.initialsFor(uid, l10n: l10n),
+                      name: title,
+                      photoUrl: chat.inboxPhotoUrl(uid),
                       isGroup: chat.isGroup,
                       size: 38,
                     ),
@@ -248,7 +381,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            chat.titleFor(uid, l10n: l10n),
+                            title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: theme.textTheme.titleMedium?.copyWith(
@@ -256,17 +389,31 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               letterSpacing: -0.2,
                             ),
                           ),
-                          Text(
-                            chat.isDefaultAgentGroup
-                                ? l10n.chatsDefaultGroupBadge
-                                : (chat.isGroup
-                                    ? l10n.chatTypeGroup
-                                    : l10n.chatTypePrivate),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: colors.muted,
-                              fontWeight: FontWeight.w600,
-                              fontSize: 11,
-                            ),
+                          StreamBuilder<Map<String, int>>(
+                            stream: _typingStream,
+                            builder: (context, typingSnap) {
+                              final typers =
+                                  _activeTypers(typingSnap.data ?? const {});
+                              final subtitle = typers.isEmpty
+                                  ? (chat.isDefaultAgentGroup
+                                      ? l10n.chatsDefaultGroupBadge
+                                      : (chat.isGroup
+                                          ? l10n.chatTypeGroup
+                                          : l10n.chatTypePrivate))
+                                  : (typers.length == 1
+                                      ? l10n.chatTypingOne(typers.first)
+                                      : l10n.chatTypingMany);
+                              return Text(
+                                subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.labelSmall?.copyWith(
+                                  color: typers.isEmpty ? colors.muted : AppColors.brandOf(context),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 11,
+                                ),
+                              );
+                            },
                           ),
                         ],
                       ),
@@ -277,9 +424,37 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             );
           },
         ),
+        actions: [
+          IconButton(
+            tooltip: l10n.chatSearchThread,
+            onPressed: () {
+              setState(() {
+                _searchOpen = !_searchOpen;
+                if (!_searchOpen) _threadSearch.clear();
+              });
+            },
+            icon: Icon(
+              _searchOpen ? Icons.close_rounded : Icons.search_rounded,
+            ),
+          ),
+        ],
       ),
       body: Column(
         children: [
+          if (_searchOpen)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: TextField(
+                controller: _threadSearch,
+                autofocus: true,
+                onChanged: (_) => setState(() {}),
+                decoration: InputDecoration(
+                  hintText: l10n.chatSearchThreadHint,
+                  isDense: true,
+                  prefixIcon: const Icon(Icons.search_rounded),
+                ),
+              ),
+            ),
           Expanded(
             child: StreamBuilder<List<ChatMessage>>(
               stream: _messagesStream,
@@ -310,421 +485,197 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                   );
                 }
 
+                final query = _threadSearch.text.trim().toLowerCase();
+                final visible = query.isEmpty
+                    ? messages
+                    : messages
+                        .where(
+                          (m) =>
+                              m.body.toLowerCase().contains(query) ||
+                              m.senderName.toLowerCase().contains(query),
+                        )
+                        .toList();
+                if (visible.isEmpty) {
+                  return Center(
+                    child: Text(
+                      l10n.chatSearchThreadEmpty,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.muted,
+                      ),
+                    ),
+                  );
+                }
+
                 return StreamBuilder<ChatConversation?>(
                   stream: _chatStream,
                   initialData: widget.chat,
                   builder: (context, chatSnap) {
                     final chat = chatSnap.data ?? widget.chat;
-                    final showSenderNames = chat.isGroup;
+                    final items = buildChatTimelineNewestFirst(
+                      newestFirst: visible,
+                      viewerUid: uid,
+                      isGroup: chat.isGroup,
+                      unreadCount: query.isEmpty ? _unreadSnapshot : 0,
+                    );
+                    final unreadIndex = items.indexWhere(
+                      (i) => i.kind == ChatTimelineKind.unread,
+                    );
 
-                    return ListView.builder(
-                      controller: _scrollController,
-                      reverse: true,
-                      padding: const EdgeInsets.fromLTRB(
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.md,
-                        AppSpacing.sm,
-                      ),
-                      itemCount: messages.length,
-                      itemBuilder: (context, index) {
-                        final msg = messages[index];
-                        final mine = msg.isMine(uid);
-                        final shared = msg.sharedPost;
-                        final time = formatChatTime(msg.createdAt, l10n);
-                        final showName = showSenderNames &&
-                            !mine &&
-                            msg.senderName.trim().isNotEmpty;
-
-                        final reactionsEnabled = true;
-
-                        return _MessageRow(
-                          key: ValueKey(msg.id),
-                          msg: msg,
-                          mine: mine,
-                          time: time,
-                          showName: showName,
-                          shared: shared,
-                          viewerUid: uid,
-                          reactionsEnabled: reactionsEnabled,
-                          onOpenShared: shared == null
-                              ? null
-                              : () => _openSharedPost(shared),
-                          onLongPress: (anchor) =>
-                              _showReactionPicker(msg, anchor),
-                          onTapReaction: (emoji) => _react(msg, emoji),
-                        );
-                      },
+                    return Stack(
+                      children: [
+                        DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              center: Alignment.topCenter,
+                              radius: 1.2,
+                              colors: [
+                                AppColors.brandOf(context)
+                                    .withValues(alpha: 0.05),
+                                colors.canvas,
+                              ],
+                            ),
+                          ),
+                          child: SlidableAutoCloseBehavior(
+                            child: ListView.builder(
+                            controller: _scrollController,
+                            reverse: true,
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.md,
+                              AppSpacing.md,
+                              AppSpacing.md,
+                              AppSpacing.sm,
+                            ),
+                            itemCount: items.length,
+                            itemBuilder: (context, index) {
+                              final item = items[index];
+                              switch (item.kind) {
+                                case ChatTimelineKind.day:
+                                  return ChatDayPill(at: item.day!);
+                                case ChatTimelineKind.unread:
+                                  return ChatUnreadDivider(key: _unreadKey);
+                                case ChatTimelineKind.message:
+                                  final msg = item.message!;
+                                  final shared = msg.sharedPost;
+                                  return ChatBubbleCluster(
+                                    key: _keyForMessage(msg.id),
+                                    msg: msg,
+                                    mine: msg.isMine(uid),
+                                    time: formatChatTime(msg.createdAt, l10n),
+                                    showName: item.showSenderName,
+                                    showTime: item.showTime,
+                                    groupedWithOlder: item.groupedWithOlder,
+                                    viewerUid: uid,
+                                    senderPhotoUrl:
+                                        msg.senderPhotoUrl ??
+                                            chat.photoOf(msg.senderId),
+                                    onTapSender: msg.isMine(uid)
+                                        ? null
+                                        : () => _openMember(msg.senderId),
+                                    onOpenMention: (handle) => _openMember(
+                                      chat.uidForUsername(handle) ?? handle,
+                                    ),
+                                    onOpenShared: shared == null
+                                        ? null
+                                        : () => _openSharedPost(shared),
+                                    onLongPress: (anchor) =>
+                                        _showMessageMenu(msg, anchor),
+                                    onTapReaction: (emoji) =>
+                                        _react(msg, emoji),
+                                    onSwipeReply: () {
+                                      setState(() => _replyTo = msg);
+                                      _focusNode.requestFocus();
+                                    },
+                                    onTapReply: msg.replyTo == null
+                                        ? null
+                                        : () {
+                                            _scrollToKey(
+                                              _keyForMessage(
+                                                msg.replyTo!.messageId,
+                                              ),
+                                            );
+                                          },
+                                  );
+                              }
+                            },
+                          ),
+                          ),
+                        ),
+                        if (unreadIndex > 4)
+                          Positioned(
+                            right: 16,
+                            bottom: 16,
+                            child: FloatingActionButton.small(
+                              heroTag: 'jump-unread-${widget.chat.id}',
+                              onPressed: _jumpToUnread,
+                              tooltip: l10n.chatJumpToNew,
+                              child: const Icon(Icons.arrow_downward_rounded),
+                            ),
+                          ),
+                      ],
                     );
                   },
                 );
               },
             ),
           ),
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: colors.sheet.withValues(alpha: 0.96),
-              border: Border(top: BorderSide(color: colors.border)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: StreamBuilder<ChatConversation?>(
-                stream: _chatStream,
-                initialData: widget.chat,
-                builder: (context, snap) {
-                  final liveChat = snap.data ?? widget.chat;
-                  if (!liveChat.canSendMessages) {
-                    return Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-                      child: Column(
-                        children: [
-                          Text(
-                            l10n.chatsDmDisabled,
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: colors.muted,
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              final other = liveChat.memberIds
-                                  .where((id) => id != uid)
-                                  .toList();
-                              if (other.isEmpty) return;
-                              Navigator.of(context).push(
-                                MaterialPageRoute<void>(
-                                  builder: (_) => PublicProfileScreen(
-                                    uid: other.first,
-                                    viewer: widget.profile,
-                                    chatRepository: _repo,
-                                  ),
-                                ),
-                              );
-                            },
-                            child: Text(l10n.memberViewProfile),
-                          ),
-                        ],
-                      ),
-                    );
-                  }
-                  return Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(8, 10, 10, 10),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+          SafeArea(
+            top: false,
+            child: StreamBuilder<ChatConversation?>(
+              stream: _chatStream,
+              initialData: widget.chat,
+              builder: (context, snap) {
+                final liveChat = snap.data ?? widget.chat;
+                if (!liveChat.canSendMessages) {
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    child: Column(
                       children: [
-                        IconButton(
-                          tooltip: l10n.chatEmojiPicker,
-                          onPressed: _toggleEmojiPicker,
-                          icon: Icon(
-                            _emojiOpen
-                                ? Icons.keyboard_rounded
-                                : Icons.emoji_emotions_outlined,
-                            color: _emojiOpen ? brand : colors.muted,
+                        Text(
+                          l10n.chatsDmDisabled,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: colors.muted,
                           ),
                         ),
-                        Expanded(
-                          child: TextField(
-                            controller: _controller,
-                            focusNode: _focusNode,
-                            minLines: 1,
-                            maxLines: 4,
-                            textCapitalization: TextCapitalization.sentences,
-                            enabled: !_sending,
-                            onTap: () {
-                              if (_emojiOpen) {
-                                setState(() => _emojiOpen = false);
-                              }
-                            },
-                            decoration: InputDecoration(
-                              hintText: l10n.chatMessageHint,
-                              hintStyle: theme.textTheme.bodyMedium?.copyWith(
-                                color: colors.muted,
+                        TextButton(
+                          onPressed: () {
+                            final other = liveChat.memberIds
+                                .where((id) => id != uid)
+                                .toList();
+                            if (other.isEmpty) return;
+                            Navigator.of(context).push(
+                              MaterialPageRoute<void>(
+                                builder: (_) => PublicProfileScreen(
+                                  uid: other.first,
+                                  viewer: widget.profile,
+                                  chatRepository: _repo,
+                                ),
                               ),
-                              filled: true,
-                              fillColor: colors.glassFill,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(22),
-                                borderSide: BorderSide(color: colors.border),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(22),
-                                borderSide: BorderSide(color: colors.border),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(22),
-                                borderSide:
-                                    BorderSide(color: brand, width: 1.4),
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 12,
-                              ),
-                            ),
-                            onSubmitted: (_) => _send(),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Material(
-                          color: brand,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: InkWell(
-                            onTap: _sending ? null : _send,
-                            borderRadius: BorderRadius.circular(16),
-                            child: SizedBox(
-                              width: 48,
-                              height: 48,
-                              child: _sending
-                                  ? Padding(
-                                      padding: const EdgeInsets.all(14),
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                        color: AppColors.onBrandOf(context),
-                                      ),
-                                    )
-                                  : Icon(
-                                      Icons.send_rounded,
-                                      size: 20,
-                                      color: AppColors.onBrandOf(context),
-                                    ),
-                            ),
-                          ),
+                            );
+                          },
+                          child: Text(l10n.memberViewProfile),
                         ),
                       ],
                     ),
-                  ),
-                  if (_emojiOpen)
-                    SizedBox(
-                      height: 280,
-                      child: EmojiPicker(
-                        textEditingController: _controller,
-                        config: Config(
-                          height: 280,
-                          checkPlatformCompatibility: true,
-                          emojiViewConfig: EmojiViewConfig(
-                            backgroundColor: colors.sheet,
-                            columns: 8,
-                            emojiSizeMax: 28 *
-                                (foundation.defaultTargetPlatform ==
-                                        TargetPlatform.iOS
-                                    ? 1.2
-                                    : 1.0),
-                          ),
-                          categoryViewConfig: CategoryViewConfig(
-                            backgroundColor: colors.sheet,
-                            indicatorColor: brand,
-                            iconColorSelected: brand,
-                          ),
-                          bottomActionBarConfig: const BottomActionBarConfig(
-                            enabled: false,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
                   );
-                },
-              ),
+                }
+                return ChatComposer(
+                  controller: _controller,
+                  focusNode: _focusNode,
+                  sending: _sending,
+                  emojiOpen: _emojiOpen,
+                  onToggleEmoji: _toggleEmojiPicker,
+                  onSend: _send,
+                  replyTo: _replyTo,
+                  onClearReply: () => setState(() => _replyTo = null),
+                  onChanged: _onComposerChanged,
+                  mentionMembers: liveChat.mentionCandidates(uid),
+                  viewerUid: uid,
+                );
+              },
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _MessageRow extends StatefulWidget {
-  const _MessageRow({
-    super.key,
-    required this.msg,
-    required this.mine,
-    required this.time,
-    required this.showName,
-    required this.shared,
-    required this.viewerUid,
-    required this.reactionsEnabled,
-    this.onLongPress,
-    this.onTapReaction,
-    this.onOpenShared,
-  });
-
-  final ChatMessage msg;
-  final bool mine;
-  final String time;
-  final bool showName;
-  final SharedPostPreview? shared;
-  final String viewerUid;
-  final bool reactionsEnabled;
-
-  /// Passes the on-screen rect of the pressed bubble so the picker can anchor.
-  final ValueChanged<Rect>? onLongPress;
-  final ValueChanged<String>? onTapReaction;
-  final VoidCallback? onOpenShared;
-
-  @override
-  State<_MessageRow> createState() => _MessageRowState();
-}
-
-class _MessageRowState extends State<_MessageRow> {
-  final _bubbleKey = GlobalKey();
-
-  void _handleLongPress() {
-    final onLongPress = widget.onLongPress;
-    if (onLongPress == null) return;
-    final box = _bubbleKey.currentContext?.findRenderObject() as RenderBox?;
-    if (box == null || !box.hasSize) return;
-    final topLeft = box.localToGlobal(Offset.zero);
-    onLongPress(topLeft & box.size);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final brand = AppColors.brandOf(context);
-    final msg = widget.msg;
-    final mine = widget.mine;
-    final shared = widget.shared;
-    final showName = widget.showName;
-    final time = widget.time;
-    final onTapReaction = widget.onTapReaction;
-    final onOpenShared = widget.onOpenShared;
-    final counts =
-        widget.reactionsEnabled ? msg.reactionCounts() : const <String, int>{};
-    final myEmoji =
-        widget.reactionsEnabled ? msg.reactions[widget.viewerUid] : null;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: Align(
-        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-          ),
-          child: GestureDetector(
-            onLongPress: widget.onLongPress == null ? null : _handleLongPress,
-            child: Column(
-              key: _bubbleKey,
-              crossAxisAlignment:
-                  mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
-                if (showName)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 4, bottom: 4),
-                    child: Text(
-                      msg.senderName,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: colors.muted,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                if (shared != null)
-                  SharedPostCard(
-                    preview: shared,
-                    onTap: onOpenShared,
-                  ),
-                if (shared != null && msg.body.trim().isNotEmpty)
-                  const SizedBox(height: 6),
-                if (msg.body.trim().isNotEmpty || shared == null)
-                  _MessageBubble(text: msg.body, mine: mine),
-                if (counts.isNotEmpty) ...[
-                  const SizedBox(height: 4),
-                  Wrap(
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: [
-                      for (final entry in counts.entries)
-                        InkWell(
-                          onTap: onTapReaction == null
-                              ? null
-                              : () => onTapReaction(entry.key),
-                          borderRadius: BorderRadius.circular(999),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: myEmoji == entry.key
-                                  ? brand.withValues(alpha: 0.16)
-                                  : colors.glassFill,
-                              borderRadius: BorderRadius.circular(999),
-                              border: Border.all(
-                                color: myEmoji == entry.key
-                                    ? brand.withValues(alpha: 0.45)
-                                    : colors.border,
-                              ),
-                            ),
-                            child: Text(
-                              '${entry.key} ${entry.value}',
-                              style: theme.textTheme.labelSmall?.copyWith(
-                                fontWeight: FontWeight.w700,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: colors.muted,
-                    fontSize: 11,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MessageBubble extends StatelessWidget {
-  const _MessageBubble({required this.text, required this.mine});
-
-  final String text;
-  final bool mine;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    final brand = AppColors.brandOf(context);
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 11, 14, 11),
-      decoration: BoxDecoration(
-        color: mine ? brand.withValues(alpha: 0.16) : colors.sheet,
-        borderRadius: BorderRadius.only(
-          topLeft: const Radius.circular(18),
-          topRight: const Radius.circular(18),
-          bottomLeft: Radius.circular(mine ? 18 : 5),
-          bottomRight: Radius.circular(mine ? 5 : 18),
-        ),
-        border: Border.all(
-          color: mine ? brand.withValues(alpha: 0.22) : colors.border,
-        ),
-      ),
-      child: Text(
-        text,
-        style: theme.textTheme.bodyLarge?.copyWith(
-          color: colors.ink,
-          height: 1.4,
-          fontSize: 15,
-          fontWeight: FontWeight.w500,
-        ),
       ),
     );
   }

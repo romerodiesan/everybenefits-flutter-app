@@ -82,6 +82,8 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
               Center(
                 child: ChatAvatar(
                   initials: chat.initialsFor(uid, l10n: l10n),
+                  name: chat.titleFor(uid, l10n: l10n),
+                  photoUrl: chat.inboxPhotoUrl(uid),
                   isGroup: chat.isGroup,
                   size: 84,
                 ),
@@ -105,6 +107,42 @@ class _ChatContactInfoScreenState extends State<ChatContactInfoScreen> {
                 style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
               ),
               const SizedBox(height: AppSpacing.xl),
+              PulseSheet(
+                child: Column(
+                  children: [
+                    for (final memberId in chat.memberIds)
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: ChatAvatar(
+                          initials: chatInitials(
+                            chat.memberNames[memberId] ?? memberId,
+                          ),
+                          name: chat.memberNames[memberId] ?? memberId,
+                          photoUrl: chat.photoOf(memberId),
+                          size: 40,
+                        ),
+                        title: Text(chat.memberNames[memberId] ?? memberId),
+                        subtitle: chat.memberUsernames[memberId] != null
+                            ? Text('@${chat.memberUsernames[memberId]}')
+                            : null,
+                        onTap: memberId == uid
+                            ? null
+                            : () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => PublicProfileScreen(
+                                      uid: memberId,
+                                      viewer: widget.profile,
+                                      chatRepository: _repo,
+                                    ),
+                                  ),
+                                );
+                              },
+                      ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
               if (!chat.isDefaultAgentGroup)
                 PulseSheet(
                   child: Column(

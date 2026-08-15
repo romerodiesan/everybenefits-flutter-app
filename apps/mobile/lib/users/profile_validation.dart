@@ -59,7 +59,11 @@ String composeDisplayName(String givenName, String familyName) {
 }
 
 /// Lowercased edge-prefix tokens for Firestore `array-contains` search.
-List<String> nameSearchTokens(String? displayName, [String? email]) {
+List<String> nameSearchTokens(
+  String? displayName, [
+  String? email,
+  String? username,
+]) {
   const minLen = 2;
   const maxLen = 40;
   const cap = 120;
@@ -109,11 +113,178 @@ List<String> nameSearchTokens(String? displayName, [String? email]) {
     }
   }
 
+  final handle = username?.trim().toLowerCase();
+  if (handle != null && handle.isNotEmpty && tokens.length < cap) {
+    addWord(handle);
+  }
+
   return tokens.toList();
 }
 
+final _usernamePattern = RegExp(r'^[a-z0-9_]{3,20}$');
+
+({bool ok, String value}) parseUsername(String raw) {
+  final value = raw.trim().toLowerCase();
+  if (!_usernamePattern.hasMatch(value)) {
+    return (ok: false, value: value);
+  }
+  return (ok: true, value: value);
+}
+
+final _mentionInBody = RegExp(
+  r'(^|[^a-z0-9_])@([a-z0-9_]{1,20})(?![a-z0-9_])',
+  caseSensitive: false,
+);
+final _urlInBody = RegExp(r'https?:\/\/[^\s]+', caseSensitive: false);
+final _mentionQuery = RegExp(
+  r'(^|[^a-z0-9_])@([a-z0-9_]{0,20})$',
+  caseSensitive: false,
+);
+
+List<String> parseMentions(String body) {
+  final found = <String>{};
+  for (final match in _mentionInBody.allMatches(body)) {
+    final parsed = parseUsername(match.group(2) ?? '');
+    if (parsed.ok) found.add(parsed.value);
+  }
+  return found.toList();
+}
+
+class MentionQuery {
+  const MentionQuery({required this.start, required this.prefix});
+  final int start;
+  final String prefix;
+}
+
+MentionQuery? mentionQueryAt(String text, int cursor) {
+  final safe = cursor.clamp(0, text.length);
+  final upto = text.substring(0, safe);
+  final match = _mentionQuery.firstMatch(upto);
+  if (match == null) return null;
+  final prefix = (match.group(2) ?? '').toLowerCase();
+  final start = safe - prefix.length - 1;
+  return MentionQuery(start: start, prefix: prefix);
+}
+
+({String text, int cursor}) insertMention(
+  String text,
+  int cursor,
+  String handle,
+) {
+  final parsed = parseUsername(handle);
+  final token = parsed.ok ? parsed.value : handle.trim().toLowerCase();
+  final insert = '@$token ';
+  final query = mentionQueryAt(text, cursor);
+  if (query == null) {
+    final at = cursor.clamp(0, text.length);
+    return (
+      text: '${text.substring(0, at)}$insert${text.substring(at)}',
+      cursor: at + insert.length,
+    );
+  }
+  return (
+    text: '${text.substring(0, query.start)}$insert${text.substring(cursor)}',
+    cursor: query.start + insert.length,
+  );
+}
+
+class MentionCandidate {
+  const MentionCandidate({
+    required this.uid,
+    required this.username,
+    required this.name,
+    this.photoUrl,
+  });
+  final String uid;
+  final String username;
+  final String name;
+  final String? photoUrl;
+}
+
+List<MentionCandidate> filterMentionCandidates(
+  List<MentionCandidate> members,
+  String prefix,
+  String viewerUid,
+) {
+  final q = prefix.trim().toLowerCase();
+  return members.where((member) {
+    if (member.uid == viewerUid) return false;
+    if (!_usernamePattern.hasMatch(member.username.trim().toLowerCase())) {
+      return false;
+    }
+    if (q.isEmpty) return true;
+    final username = member.username.trim().toLowerCase();
+    final name = member.name.trim().toLowerCase();
+    return username.startsWith(q) || name.contains(q);
+  }).toList();
+}
+
+sealed class ChatBodySpan {
+  const ChatBodySpan();
+}
+
+class ChatBodyText extends ChatBodySpan {
+  const ChatBodyText(this.value);
+  final String value;
+}
+
+class ChatBodyUrl extends ChatBodySpan {
+  const ChatBodyUrl(this.value);
+  final String value;
+}
+
+class ChatBodyMention extends ChatBodySpan {
+  const ChatBodyMention({required this.handle, required this.raw});
+  final String handle;
+  final String raw;
+}
+
+List<ChatBodySpan> splitChatBody(String text) {
+  if (text.isEmpty) return const [ChatBodyText('')];
+  final hits = <({int start, int end, ChatBodySpan span})>[];
+  for (final match in _urlInBody.allMatches(text)) {
+    hits.add((
+      start: match.start,
+      end: match.end,
+      span: ChatBodyUrl(match.group(0)!),
+    ));
+  }
+  for (final match in _mentionInBody.allMatches(text)) {
+    final parsed = parseUsername(match.group(2) ?? '');
+    if (!parsed.ok) continue;
+    final handle = parsed.value;
+    final at = match.start + (match.group(1)?.length ?? 0);
+    final end = at + 1 + (match.group(2)?.length ?? 0);
+    if (hits.any((hit) => at < hit.end && end > hit.start)) continue;
+    hits.add((
+      start: at,
+      end: end,
+      span: ChatBodyMention(handle: handle, raw: '@$handle'),
+    ));
+  }
+  hits.sort((a, b) => a.start.compareTo(b.start));
+  final out = <ChatBodySpan>[];
+  var last = 0;
+  for (final hit in hits) {
+    if (hit.start < last) continue;
+    if (hit.start > last) {
+      out.add(ChatBodyText(text.substring(last, hit.start)));
+    }
+    out.add(hit.span);
+    last = hit.end;
+  }
+  if (last < text.length) {
+    out.add(ChatBodyText(text.substring(last)));
+  }
+  return out.isEmpty ? [ChatBodyText(text)] : out;
+}
+
 /// Same shape as web `userSearchIndexFields` (@pulse/shared).
-Map<String, Object?> userSearchIndexFields(String? displayName, String? email) {
+Map<String, Object?> userSearchIndexFields(
+  String? displayName,
+  String? email, [
+  String? username,
+]) {
   final normalized = displayName?.trim();
   final name =
       normalized == null || normalized.isEmpty ? null : normalized;
@@ -131,7 +302,7 @@ Map<String, Object?> userSearchIndexFields(String? displayName, String? email) {
     'displayName': name,
     'displayNameLower': foldedName,
     'emailLower': emailTrim?.toLowerCase(),
-    'nameTokens': nameSearchTokens(name, emailTrim),
+    'nameTokens': nameSearchTokens(name, emailTrim, username),
   };
 }
 

@@ -214,18 +214,22 @@ Future<void> showShareToChatSheet({
   );
 }
 
-/// Quiet, tappable post preview used inside chat bubbles / share sheet.
+/// Editorial shared-question card (not a speech bubble).
 class SharedPostCard extends StatelessWidget {
   const SharedPostCard({
     super.key,
     required this.preview,
     this.onTap,
+    this.onLongPress,
     this.compact = false,
+    this.time,
   });
 
   final SharedPostPreview preview;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
   final bool compact;
+  final String? time;
 
   @override
   Widget build(BuildContext context) {
@@ -233,109 +237,123 @@ class SharedPostCard extends StatelessWidget {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
+    final eyebrow = preview.authorName == null
+        ? l10n.sharedPostLabel
+        : l10n.sharedPostLabelAuthor(preview.authorName!);
 
     return Material(
-      color: colors.glassFill,
+      color: colors.sheet,
+      elevation: 0,
+      shadowColor: Colors.black.withValues(alpha: 0.18),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(20),
         side: BorderSide(color: colors.border),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
-        child: IntrinsicHeight(
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Container(width: 3, color: brand.withValues(alpha: 0.55)),
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.fromLTRB(
-                    10,
-                    compact ? 8 : 10,
-                    10,
-                    compact ? 8 : 10,
+        onLongPress: onLongPress,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              height: 4,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [brand, brand.withValues(alpha: 0.2)],
+                ),
+              ),
+            ),
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                compact ? 12 : 16,
+                compact ? 10 : 14,
+                compact ? 12 : 16,
+                compact ? 10 : 14,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    eyebrow.toUpperCase(),
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: brand,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.2,
+                      fontSize: 10,
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.help_outline_rounded,
-                            size: 13,
-                            color: colors.muted,
-                          ),
-                          const SizedBox(width: 4),
-                          Expanded(
+                  const SizedBox(height: 6),
+                  Text(
+                    preview.title,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      height: 1.25,
+                      letterSpacing: -0.3,
+                      fontSize: compact ? 14.5 : 16,
+                      color: colors.ink,
+                    ),
+                  ),
+                  if (preview.excerpt.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Text(
+                      preview.excerpt,
+                      maxLines: compact ? 1 : 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: colors.muted,
+                        height: 1.4,
+                        fontSize: compact ? 12 : 13.5,
+                      ),
+                    ),
+                  ],
+                  if (preview.tags.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: [
+                        for (final tag in preview.tags.take(3))
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: brand.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
                             child: Text(
-                              preview.authorName == null
-                                  ? l10n.sharedPostLabel
-                                  : l10n.sharedPostLabelAuthor(
-                                      preview.authorName!,
-                                    ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              '#$tag',
                               style: theme.textTheme.labelSmall?.copyWith(
-                                color: colors.muted,
-                                fontWeight: FontWeight.w600,
-                                fontSize: 11,
-                                letterSpacing: 0.15,
+                                color: brand,
+                                fontWeight: FontWeight.w800,
+                                fontSize: 10.5,
                               ),
                             ),
                           ),
-                          Icon(
-                            Icons.chevron_right_rounded,
-                            size: 16,
-                            color: colors.muted.withValues(alpha: 0.7),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        preview.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                          letterSpacing: -0.15,
-                          fontSize: 13.5,
-                          color: colors.ink,
+                      ],
+                    ),
+                  ],
+                  if (time != null) ...[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        time!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.muted,
+                          fontSize: 10.5,
                         ),
                       ),
-                      if (preview.excerpt.isNotEmpty) ...[
-                        const SizedBox(height: 3),
-                        Text(
-                          preview.excerpt,
-                          maxLines: compact ? 1 : 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colors.muted,
-                            height: 1.3,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                      if (preview.tags.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Text(
-                          preview.tags.map((t) => '#$t').join('  '),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: brand.withValues(alpha: 0.85),
-                            fontWeight: FontWeight.w600,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+                    ),
+                  ],
+                ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

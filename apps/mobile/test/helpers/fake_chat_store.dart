@@ -17,6 +17,9 @@ class FakeChatStore implements ChatStore {
     for (final c in _messageControllers.values) {
       c.close();
     }
+    for (final c in _typingControllers.values) {
+      c.close();
+    }
   }
 
   void _bumpChats() => _chatsController.add(null);
@@ -168,6 +171,38 @@ class FakeChatStore implements ChatStore {
   }
 
   @override
+  Future<void> patchChatMemberSelf({
+    required String chatId,
+    required String uid,
+    String? photoUrl,
+    String? username,
+  }) async {
+    final chat = chats[chatId];
+    if (chat == null) return;
+    final photos = Map<String, String>.from(chat.memberPhotos);
+    final usernames = Map<String, String>.from(chat.memberUsernames);
+    if (photoUrl != null) {
+      if (photoUrl.trim().isEmpty) {
+        photos.remove(uid);
+      } else {
+        photos[uid] = photoUrl.trim();
+      }
+    }
+    if (username != null) {
+      if (username.trim().isEmpty) {
+        usernames.remove(uid);
+      } else {
+        usernames[uid] = username.trim();
+      }
+    }
+    chats[chatId] = chat.copyWith(
+      memberPhotos: photos,
+      memberUsernames: usernames,
+    );
+    _bumpChats();
+  }
+
+  @override
   Future<void> patchOwnPinned({
     required String chatId,
     required String uid,
@@ -191,9 +226,11 @@ class FakeChatStore implements ChatStore {
       body: message.body,
       senderId: message.senderId,
       senderName: message.senderName,
+      senderPhotoUrl: message.senderPhotoUrl,
       createdAt: message.createdAt,
       sharedPost: message.sharedPost,
       reactions: message.reactions,
+      replyTo: message.replyTo,
     );
     final list = messages.putIfAbsent(message.chatId, () => []);
     list.add(saved);
@@ -242,5 +279,37 @@ class FakeChatStore implements ChatStore {
     }
     list[index] = list[index].copyWith(reactions: current);
     _messagesBump(chatId).add(null);
+  }
+
+  final Map<String, Map<String, int>> typing = {};
+  final Map<String, StreamController<void>> _typingControllers = {};
+
+  StreamController<void> _typingBump(String chatId) {
+    return _typingControllers.putIfAbsent(
+      chatId,
+      () => StreamController<void>.broadcast(),
+    );
+  }
+
+  @override
+  Stream<Map<String, int>> watchTyping(String chatId) async* {
+    Map<String, int> current() => Map<String, int>.from(typing[chatId] ?? {});
+    yield current();
+    yield* _typingBump(chatId).stream.map((_) => current());
+  }
+
+  @override
+  Future<void> setTyping({
+    required String chatId,
+    required String uid,
+    required bool typing,
+  }) async {
+    final row = this.typing.putIfAbsent(chatId, () => {});
+    if (typing) {
+      row[uid] = DateTime.now().toUtc().millisecondsSinceEpoch;
+    } else {
+      row.remove(uid);
+    }
+    _typingBump(chatId).add(null);
   }
 }

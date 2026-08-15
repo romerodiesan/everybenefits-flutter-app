@@ -1460,6 +1460,30 @@ abstract class AppLocalizations {
   /// **'Pulse'**
   String get promoBannerFromPulse;
 
+  /// No description provided for @pollDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide poll'**
+  String get pollDismiss;
+
+  /// No description provided for @pollSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to vote.'**
+  String get pollSignIn;
+
+  /// No description provided for @pollVoteError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not record your vote.'**
+  String get pollVoteError;
+
+  /// No description provided for @pollVoteCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} votes'**
+  String pollVoteCount(int count);
+
   /// No description provided for @forumsClearFilters.
   ///
   /// In en, this message translates to:
@@ -2156,6 +2180,42 @@ abstract class AppLocalizations {
   /// **'No messages yet'**
   String get chatsNoMessagesYet;
 
+  /// No description provided for @chatsFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get chatsFilterAll;
+
+  /// No description provided for @chatsFilterUnread.
+  ///
+  /// In en, this message translates to:
+  /// **'Unread'**
+  String get chatsFilterUnread;
+
+  /// No description provided for @chatsFilterGroups.
+  ///
+  /// In en, this message translates to:
+  /// **'Groups'**
+  String get chatsFilterGroups;
+
+  /// No description provided for @chatsSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search chats'**
+  String get chatsSearchHint;
+
+  /// No description provided for @chatsInboxFilterEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing matches this filter.'**
+  String get chatsInboxFilterEmpty;
+
+  /// No description provided for @chatYouPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'You: {preview}'**
+  String chatYouPrefix(String preview);
+
   /// No description provided for @chatTypeGroup.
   ///
   /// In en, this message translates to:
@@ -2258,6 +2318,12 @@ abstract class AppLocalizations {
   /// **'Write a message…'**
   String get chatMessageHint;
 
+  /// No description provided for @chatMentionEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No members match that @username.'**
+  String get chatMentionEmpty;
+
   /// No description provided for @chatEmojiPicker.
   ///
   /// In en, this message translates to:
@@ -2269,6 +2335,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'React'**
   String get chatReact;
+
+  /// No description provided for @chatReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get chatReply;
+
+  /// No description provided for @chatCopy.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy'**
+  String get chatCopy;
+
+  /// No description provided for @chatCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get chatCopied;
+
+  /// No description provided for @chatReplyTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Replying to {name}'**
+  String chatReplyTo(String name);
+
+  /// No description provided for @chatReplyDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel reply'**
+  String get chatReplyDismiss;
+
+  /// No description provided for @chatNewMessages.
+  ///
+  /// In en, this message translates to:
+  /// **'New messages'**
+  String get chatNewMessages;
+
+  /// No description provided for @chatJumpToNew.
+  ///
+  /// In en, this message translates to:
+  /// **'Jump to new'**
+  String get chatJumpToNew;
+
+  /// No description provided for @chatTypingOne.
+  ///
+  /// In en, this message translates to:
+  /// **'{name} is typing…'**
+  String chatTypingOne(String name);
+
+  /// No description provided for @chatTypingMany.
+  ///
+  /// In en, this message translates to:
+  /// **'People are typing…'**
+  String get chatTypingMany;
+
+  /// No description provided for @chatSearchThread.
+  ///
+  /// In en, this message translates to:
+  /// **'Search in chat'**
+  String get chatSearchThread;
+
+  /// No description provided for @chatSearchThreadHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Find a message'**
+  String get chatSearchThreadHint;
+
+  /// No description provided for @chatSearchThreadEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No messages match.'**
+  String get chatSearchThreadEmpty;
+
+  /// No description provided for @chatTimeToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get chatTimeToday;
 
   /// No description provided for @chatInfoTitle.
   ///
@@ -3679,6 +3823,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Find members'**
   String get chatsFindMembers;
+
+  /// No description provided for @usernameLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Username'**
+  String get usernameLabel;
+
+  /// No description provided for @usernameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'3–20 letters, numbers, or underscores.'**
+  String get usernameHint;
+
+  /// No description provided for @usernameTaken.
+  ///
+  /// In en, this message translates to:
+  /// **'That username is taken.'**
+  String get usernameTaken;
+
+  /// No description provided for @usernameInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Use 3–20 letters, numbers, or underscores.'**
+  String get usernameInvalid;
+
+  /// No description provided for @usernameChoose.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose username'**
+  String get usernameChoose;
+
+  /// No description provided for @phoneCountrySearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Search country or code'**
+  String get phoneCountrySearch;
+
+  /// No description provided for @phoneCountryEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No countries match'**
+  String get phoneCountryEmpty;
+
+  /// No description provided for @settingsGroupNetwork.
+  ///
+  /// In en, this message translates to:
+  /// **'Your network'**
+  String get settingsGroupNetwork;
+
+  /// No description provided for @settingsGroupApp.
+  ///
+  /// In en, this message translates to:
+  /// **'App'**
+  String get settingsGroupApp;
+
+  /// No description provided for @settingsGroupAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Account'**
+  String get settingsGroupAccount;
+
+  /// No description provided for @settingsGroupDanger.
+  ///
+  /// In en, this message translates to:
+  /// **'Danger'**
+  String get settingsGroupDanger;
+
+  /// No description provided for @settingsGroupAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'Admin'**
+  String get settingsGroupAdmin;
+
+  /// No description provided for @privacyShowLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Show city and state on profile'**
+  String get privacyShowLocation;
+
+  /// No description provided for @privacyShowLocationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Other members can see your city and state — never street, ZIP, phone, or NPN.'**
+  String get privacyShowLocationHint;
+
+  /// No description provided for @profileFollow.
+  ///
+  /// In en, this message translates to:
+  /// **'Follow'**
+  String get profileFollow;
+
+  /// No description provided for @profileFollowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Following'**
+  String get profileFollowing;
+
+  /// No description provided for @profileUnfollow.
+  ///
+  /// In en, this message translates to:
+  /// **'Unfollow'**
+  String get profileUnfollow;
+
+  /// No description provided for @profileStatFollowers.
+  ///
+  /// In en, this message translates to:
+  /// **'Followers'**
+  String get profileStatFollowers;
+
+  /// No description provided for @profileStatFollowing.
+  ///
+  /// In en, this message translates to:
+  /// **'Following'**
+  String get profileStatFollowing;
+
+  /// No description provided for @profileFollowersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No followers yet.'**
+  String get profileFollowersEmpty;
+
+  /// No description provided for @profileFollowingEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Not following anyone yet.'**
+  String get profileFollowingEmpty;
+
+  /// No description provided for @profileAbout.
+  ///
+  /// In en, this message translates to:
+  /// **'About'**
+  String get profileAbout;
+
+  /// No description provided for @profileJoined.
+  ///
+  /// In en, this message translates to:
+  /// **'Joined {date}'**
+  String profileJoined(String date);
+
+  /// No description provided for @profileShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share profile'**
+  String get profileShare;
+
+  /// No description provided for @profileCopyLink.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy link'**
+  String get profileCopyLink;
+
+  /// No description provided for @profileLinkCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Link copied'**
+  String get profileLinkCopied;
+
+  /// No description provided for @profileReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Report'**
+  String get profileReport;
+
+  /// No description provided for @profileReportTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Report this member'**
+  String get profileReportTitle;
+
+  /// No description provided for @profileReportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Tell us what’s going on. Reports are reviewed by the Pulse team.'**
+  String get profileReportHint;
+
+  /// No description provided for @profileReportSpam.
+  ///
+  /// In en, this message translates to:
+  /// **'Spam'**
+  String get profileReportSpam;
+
+  /// No description provided for @profileReportHarassment.
+  ///
+  /// In en, this message translates to:
+  /// **'Harassment'**
+  String get profileReportHarassment;
+
+  /// No description provided for @profileReportImpersonation.
+  ///
+  /// In en, this message translates to:
+  /// **'Impersonation'**
+  String get profileReportImpersonation;
+
+  /// No description provided for @profileReportOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Something else'**
+  String get profileReportOther;
+
+  /// No description provided for @profileReportDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Details (optional)'**
+  String get profileReportDetails;
+
+  /// No description provided for @profileReportSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit report'**
+  String get profileReportSubmit;
+
+  /// No description provided for @profileReportSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks — we received your report.'**
+  String get profileReportSent;
 }
 
 class _AppLocalizationsDelegate

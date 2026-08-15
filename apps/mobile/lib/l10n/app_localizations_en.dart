@@ -731,6 +731,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get promoBannerFromPulse => 'Pulse';
 
   @override
+  String get pollDismiss => 'Hide poll';
+
+  @override
+  String get pollSignIn => 'Sign in to vote.';
+
+  @override
+  String get pollVoteError => 'Could not record your vote.';
+
+  @override
+  String pollVoteCount(int count) {
+    return '$count votes';
+  }
+
+  @override
   String get forumsClearFilters => 'Clear';
 
   @override
@@ -1109,6 +1123,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatsNoMessagesYet => 'No messages yet';
 
   @override
+  String get chatsFilterAll => 'All';
+
+  @override
+  String get chatsFilterUnread => 'Unread';
+
+  @override
+  String get chatsFilterGroups => 'Groups';
+
+  @override
+  String get chatsSearchHint => 'Search chats';
+
+  @override
+  String get chatsInboxFilterEmpty => 'Nothing matches this filter.';
+
+  @override
+  String chatYouPrefix(String preview) {
+    return 'You: $preview';
+  }
+
+  @override
   String get chatTypeGroup => 'Group';
 
   @override
@@ -1161,10 +1195,56 @@ class AppLocalizationsEn extends AppLocalizations {
   String get chatMessageHint => 'Write a message…';
 
   @override
+  String get chatMentionEmpty => 'No members match that @username.';
+
+  @override
   String get chatEmojiPicker => 'Emojis';
 
   @override
   String get chatReact => 'React';
+
+  @override
+  String get chatReply => 'Reply';
+
+  @override
+  String get chatCopy => 'Copy';
+
+  @override
+  String get chatCopied => 'Copied';
+
+  @override
+  String chatReplyTo(String name) {
+    return 'Replying to $name';
+  }
+
+  @override
+  String get chatReplyDismiss => 'Cancel reply';
+
+  @override
+  String get chatNewMessages => 'New messages';
+
+  @override
+  String get chatJumpToNew => 'Jump to new';
+
+  @override
+  String chatTypingOne(String name) {
+    return '$name is typing…';
+  }
+
+  @override
+  String get chatTypingMany => 'People are typing…';
+
+  @override
+  String get chatSearchThread => 'Search in chat';
+
+  @override
+  String get chatSearchThreadHint => 'Find a message';
+
+  @override
+  String get chatSearchThreadEmpty => 'No messages match.';
+
+  @override
+  String get chatTimeToday => 'Today';
 
   @override
   String get chatInfoTitle => 'Info';
@@ -1950,4 +2030,116 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatsFindMembers => 'Find members';
+
+  @override
+  String get usernameLabel => 'Username';
+
+  @override
+  String get usernameHint => '3–20 letters, numbers, or underscores.';
+
+  @override
+  String get usernameTaken => 'That username is taken.';
+
+  @override
+  String get usernameInvalid => 'Use 3–20 letters, numbers, or underscores.';
+
+  @override
+  String get usernameChoose => 'Choose username';
+
+  @override
+  String get phoneCountrySearch => 'Search country or code';
+
+  @override
+  String get phoneCountryEmpty => 'No countries match';
+
+  @override
+  String get settingsGroupNetwork => 'Your network';
+
+  @override
+  String get settingsGroupApp => 'App';
+
+  @override
+  String get settingsGroupAccount => 'Account';
+
+  @override
+  String get settingsGroupDanger => 'Danger';
+
+  @override
+  String get settingsGroupAdmin => 'Admin';
+
+  @override
+  String get privacyShowLocation => 'Show city and state on profile';
+
+  @override
+  String get privacyShowLocationHint =>
+      'Other members can see your city and state — never street, ZIP, phone, or NPN.';
+
+  @override
+  String get profileFollow => 'Follow';
+
+  @override
+  String get profileFollowing => 'Following';
+
+  @override
+  String get profileUnfollow => 'Unfollow';
+
+  @override
+  String get profileStatFollowers => 'Followers';
+
+  @override
+  String get profileStatFollowing => 'Following';
+
+  @override
+  String get profileFollowersEmpty => 'No followers yet.';
+
+  @override
+  String get profileFollowingEmpty => 'Not following anyone yet.';
+
+  @override
+  String get profileAbout => 'About';
+
+  @override
+  String profileJoined(String date) {
+    return 'Joined $date';
+  }
+
+  @override
+  String get profileShare => 'Share profile';
+
+  @override
+  String get profileCopyLink => 'Copy link';
+
+  @override
+  String get profileLinkCopied => 'Link copied';
+
+  @override
+  String get profileReport => 'Report';
+
+  @override
+  String get profileReportTitle => 'Report this member';
+
+  @override
+  String get profileReportHint =>
+      'Tell us what’s going on. Reports are reviewed by the Pulse team.';
+
+  @override
+  String get profileReportSpam => 'Spam';
+
+  @override
+  String get profileReportHarassment => 'Harassment';
+
+  @override
+  String get profileReportImpersonation => 'Impersonation';
+
+  @override
+  String get profileReportOther => 'Something else';
+
+  @override
+  String get profileReportDetails => 'Details (optional)';
+
+  @override
+  String get profileReportSubmit => 'Submit report';
+
+  @override
+  String get profileReportSent => 'Thanks — we received your report.';
 }

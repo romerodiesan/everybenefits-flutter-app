@@ -45,9 +45,11 @@ class UserProfile {
     required this.profileCompleted,
     this.productTourVersion = 0,
     this.email,
+    this.username,
     this.displayName,
     this.photoUrl,
     this.phoneCountryCode,
+    this.phoneCountryIso2,
     this.phoneNumber,
     this.phoneVerified = false,
     this.npn,
@@ -66,11 +68,15 @@ class UserProfile {
     this.displayNameLower,
     this.emailLower,
     this.nameTokens,
+    this.showLocationOnProfile = false,
+    this.followerCount = 0,
+    this.followingCount = 0,
     String? roleId,
   }) : roleId = roleId ?? role.wireValue;
 
   final String uid;
   final String? email;
+  final String? username;
   final String? displayName;
 
   /// Firestore search index (read for ensureProfile self-heal).
@@ -91,6 +97,7 @@ class UserProfile {
   /// Last product-tour version the user finished or skipped (0 = never).
   final int productTourVersion;
   final String? phoneCountryCode;
+  final String? phoneCountryIso2;
   final String? phoneNumber;
   final bool phoneVerified;
   final String? npn;
@@ -117,6 +124,13 @@ class UserProfile {
   final DateTime createdAt;
   final DateTime updatedAt;
 
+  /// Opt-in city/state on the public profile.
+  final bool showLocationOnProfile;
+
+  /// Counts from `publicProfiles` (0 on private user docs).
+  final int followerCount;
+  final int followingCount;
+
   String get initials {
     final source = displayName?.trim().isNotEmpty == true
         ? displayName!
@@ -129,6 +143,20 @@ class UserProfile {
     if (isAnonymous) return false;
     if (normalizeRoleId(roleId) == 'guest') return false;
     return accountStatus != 'deactivated' && accountStatus != 'pendingDeletion';
+  }
+
+  String get handle {
+    final claimed = username?.trim().toLowerCase() ?? '';
+    if (RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(claimed)) return claimed;
+    final local = email?.split('@').first.trim();
+    if (local != null && local.isNotEmpty) return local;
+    final prefix = uid.length >= 4 ? uid.substring(0, 4) : uid;
+    return 'user$prefix';
+  }
+
+  bool get hasUsername {
+    final claimed = username?.trim().toLowerCase() ?? '';
+    return RegExp(r'^[a-z0-9_]{3,20}$').hasMatch(claimed);
   }
 
   String get headlineName {
@@ -175,8 +203,19 @@ class UserProfile {
 
   bool get hasAddressDetails => formattedAddress != null;
 
+  /// City/state for the public card (already gated by sync when from publicProfiles).
+  String? get publicLocation {
+    final city = addressCity?.trim() ?? '';
+    final state = (addressState?.trim() ?? '').toUpperCase();
+    if (city.isEmpty && state.isEmpty) return null;
+    if (city.isEmpty) return state;
+    if (state.isEmpty) return city;
+    return '$city, $state';
+  }
+
   UserProfile copyWith({
     String? email,
+    String? username,
     String? displayName,
     String? photoUrl,
     UserRole? role,
@@ -185,6 +224,7 @@ class UserProfile {
     bool? profileCompleted,
     int? productTourVersion,
     String? phoneCountryCode,
+    String? phoneCountryIso2,
     String? phoneNumber,
     bool? phoneVerified,
     String? npn,
@@ -204,6 +244,10 @@ class UserProfile {
     String? emailLower,
     List<String>? nameTokens,
     DateTime? updatedAt,
+    DateTime? createdAt,
+    bool? showLocationOnProfile,
+    int? followerCount,
+    int? followingCount,
     bool clearPhotoUrl = false,
     bool clearNpn = false,
     bool clearAddress = false,
@@ -236,6 +280,7 @@ class UserProfile {
     return UserProfile(
       uid: uid,
       email: email ?? this.email,
+      username: username ?? this.username,
       displayName: displayName ?? this.displayName,
       photoUrl: clearPhotoUrl ? null : (photoUrl ?? this.photoUrl),
       role: nextRole,
@@ -244,6 +289,7 @@ class UserProfile {
       profileCompleted: profileCompleted ?? this.profileCompleted,
       productTourVersion: productTourVersion ?? this.productTourVersion,
       phoneCountryCode: phoneCountryCode ?? this.phoneCountryCode,
+      phoneCountryIso2: phoneCountryIso2 ?? this.phoneCountryIso2,
       phoneNumber: phoneNumber ?? this.phoneNumber,
       phoneVerified: phoneVerified ?? this.phoneVerified,
       npn: clearNpn ? null : (npn ?? this.npn),
@@ -262,8 +308,12 @@ class UserProfile {
       displayNameLower: displayNameLower ?? this.displayNameLower,
       emailLower: emailLower ?? this.emailLower,
       nameTokens: nameTokens ?? this.nameTokens,
-      createdAt: createdAt,
+      createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      showLocationOnProfile:
+          showLocationOnProfile ?? this.showLocationOnProfile,
+      followerCount: followerCount ?? this.followerCount,
+      followingCount: followingCount ?? this.followingCount,
     );
   }
 
@@ -271,6 +321,7 @@ class UserProfile {
     return {
       'uid': uid,
       'email': email,
+      'username': username,
       'displayName': displayName,
       'photoUrl': photoUrl,
       'role': roleId,
@@ -278,6 +329,7 @@ class UserProfile {
       'profileCompleted': profileCompleted,
       'productTourVersion': productTourVersion,
       'phoneCountryCode': phoneCountryCode,
+      'phoneCountryIso2': phoneCountryIso2,
       'phoneNumber': phoneNumber,
       'phoneVerified': phoneVerified,
       'npn': npn,
@@ -322,8 +374,9 @@ class UserProfile {
     final known = UserRole.tryParseBuiltin(roleId) ?? UserRole.guest;
 
     return UserProfile(
-      uid: data['uid'] as String,
+      uid: '${data['uid'] ?? ''}',
       email: data['email'] as String?,
+      username: data['username'] == null ? null : '${data['username']}',
       displayName: data['displayName'] as String?,
       photoUrl: sanitizeOptionalAvatarDownloadUrl(data['photoUrl'] as String?),
       role: known,
@@ -332,6 +385,7 @@ class UserProfile {
       profileCompleted: data['profileCompleted'] as bool? ?? true,
       productTourVersion: _readInt(data['productTourVersion']) ?? 0,
       phoneCountryCode: data['phoneCountryCode'] as String?,
+      phoneCountryIso2: data['phoneCountryIso2'] as String?,
       phoneNumber: data['phoneNumber'] as String?,
       phoneVerified: data['phoneVerified'] as bool? ?? false,
       npn: data['npn'] as String?,
@@ -352,6 +406,12 @@ class UserProfile {
       nameTokens: (data['nameTokens'] as List?)?.map((e) => '$e').toList(),
       createdAt: _readDate(data['createdAt']) ?? DateTime.now().toUtc(),
       updatedAt: _readDate(data['updatedAt']) ?? DateTime.now().toUtc(),
+      showLocationOnProfile: _readPrivacyFlag(
+        data['privacy'],
+        'showLocationOnProfile',
+      ),
+      followerCount: _readInt(data['followerCount']) ?? 0,
+      followingCount: _readInt(data['followingCount']) ?? 0,
     );
   }
 
@@ -369,5 +429,10 @@ class UserProfile {
     if (value is num) return value.toInt();
     if (value is String) return int.tryParse(value);
     return null;
+  }
+
+  static bool _readPrivacyFlag(Object? privacy, String key) {
+    if (privacy is! Map) return false;
+    return privacy[key] == true;
   }
 }

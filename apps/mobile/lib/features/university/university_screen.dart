@@ -21,6 +21,7 @@ import '../notifications/notification_bell_button.dart';
 import '../promo/promo_banner_models.dart';
 import '../promo/promo_banner_repository.dart';
 import '../promo/widgets/promo_banner_slot.dart';
+import '../polls/widgets/poll_slot.dart';
 import 'widgets/course_card.dart';
 import 'widgets/course_cover.dart';
 import 'widgets/course_manage_menu.dart';
@@ -294,6 +295,11 @@ class _UniversityScreenState extends State<UniversityScreen> {
               repository: widget.promoBannerRepository,
               courseRepository: _repository,
               padding: EdgeInsets.zero,
+            ),
+            PollSlot(
+              surface: PromoBannerSurface.academy,
+              profile: widget.profile,
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
             ),
             const SizedBox(height: AppSpacing.md),
             Row(

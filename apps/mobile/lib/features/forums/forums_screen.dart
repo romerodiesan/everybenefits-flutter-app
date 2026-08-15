@@ -16,6 +16,7 @@ import '../notifications/notification_bell_button.dart';
 import '../promo/promo_banner_models.dart';
 import '../promo/promo_banner_repository.dart';
 import '../promo/widgets/promo_banner_slot.dart';
+import '../polls/widgets/poll_slot.dart';
 import '../profile/public_profile_screen.dart';
 import 'create_thread_screen.dart';
 import 'forum_audience.dart';
@@ -730,6 +731,12 @@ class ForumsScreenState extends State<ForumsScreen> {
           chatRepository: widget.chatRepository,
         ),
       );
+      headers.add(
+        PollSlot(
+          surface: PromoBannerSurface.home,
+          profile: widget.profile,
+        ),
+      );
       if (PulseWindowClass.of(context).useRail) {
         headers.add(
           PromoBannerSlot(
@@ -738,6 +745,12 @@ class ForumsScreenState extends State<ForumsScreen> {
             repository: widget.promoBannerRepository,
             forumRepository: _repository,
             chatRepository: widget.chatRepository,
+          ),
+        );
+        headers.add(
+          PollSlot(
+            surface: PromoBannerSurface.rail,
+            profile: widget.profile,
           ),
         );
       }

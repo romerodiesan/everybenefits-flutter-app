@@ -38,8 +38,6 @@ class SettingsScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
-    final themeController = ThemeScope.of(context);
-    final localeController = LocaleScope.of(context);
     final l10n = context.l10n;
 
     return PulseScaffold(
@@ -65,77 +63,52 @@ class SettingsScreen extends StatelessWidget {
             onEdit: onEditProfile,
           ),
           const SizedBox(height: AppSpacing.lg),
-          PulseSheet(
+          _SectionLabel(label: l10n.settingsGroupNetwork),
+          const SizedBox(height: 8),
+          _HubTile(
+            icon: Icons.person_add_alt_1_rounded,
+            label: l10n.memberRequestsTitle,
             onTap: () {
+              PulseHaptics.light();
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) => ContactRequestsScreen(profile: profile),
                 ),
               );
             },
-            child: Row(
-              children: [
-                const Icon(Icons.person_add_alt_1_rounded),
-                const SizedBox(width: 12),
-                Expanded(child: Text(l10n.memberRequestsTitle)),
-                Icon(Icons.chevron_right_rounded, color: colors.muted),
-              ],
-            ),
           ),
           const SizedBox(height: AppSpacing.xl),
-          _SectionLabel(label: l10n.settingsAppearance),
-          const SizedBox(height: 6),
-          Text(
-            l10n.settingsThemeHint,
-            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+          _SectionLabel(label: l10n.settingsGroupApp),
+          const SizedBox(height: 8),
+          _HubTile(
+            icon: Icons.palette_outlined,
+            label: l10n.settingsAppearance,
+            onTap: () {
+              PulseHaptics.light();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const AppearanceSettingsScreen(),
+                ),
+              );
+            },
           ),
-          const SizedBox(height: AppSpacing.md),
-          _ThemeModeDropdown(
-            selected: themeController.mode,
-            onChanged: (mode) {
-              PulseHaptics.selection();
-              themeController.setMode(mode);
+          const SizedBox(height: 8),
+          _HubTile(
+            icon: Icons.notifications_outlined,
+            label: l10n.notificationsPrefsTitle,
+            onTap: () {
+              PulseHaptics.light();
+              Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => NotificationPrefsScreen(uid: profile.uid),
+                ),
+              );
             },
           ),
           const SizedBox(height: AppSpacing.xl),
-          _SectionLabel(label: l10n.settingsAccentStudio),
-          const SizedBox(height: 6),
-          Text(
-            l10n.settingsAccentHint,
-            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _AccentRibbon(
-            selectedId: themeController.primarySeedId,
-            onSelect: (id) {
-              PulseHaptics.selection();
-              themeController.setPrimarySeed(id);
-            },
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          _SectionLabel(label: l10n.settingsPreferences),
-          const SizedBox(height: 6),
-          Text(
-            l10n.settingsLanguageHint,
-            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _LanguageDropdown(
-            selected: localeController.locale?.languageCode ?? 'system',
-            onChanged: (code) {
-              PulseHaptics.selection();
-              localeController.setLanguageCode(code);
-            },
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          _SectionLabel(label: l10n.settingsSecurity),
-          const SizedBox(height: 6),
-          Text(
-            l10n.settingsSecurityHint,
-            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _SettingsNavTile(
+          _SectionLabel(label: l10n.settingsGroupAccount),
+          const SizedBox(height: 8),
+          _HubTile(
             icon: Icons.shield_outlined,
             label: l10n.settingsSecurity,
             onTap: () {
@@ -149,44 +122,26 @@ class SettingsScreen extends StatelessWidget {
               );
             },
           ),
-          const SizedBox(height: AppSpacing.xl),
-          _SectionLabel(label: l10n.notificationsPrefsTitle),
-          const SizedBox(height: 6),
-          Text(
-            l10n.notificationsPrefsHint,
-            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _SettingsNavTile(
-            icon: Icons.notifications_outlined,
-            label: l10n.notificationsPrefsTitle,
+          const SizedBox(height: 8),
+          _HubTile(
+            icon: Icons.lock_outline_rounded,
+            label: l10n.settingsPrivacy,
             onTap: () {
               PulseHaptics.light();
               Navigator.of(context).push(
                 MaterialPageRoute<void>(
-                  builder: (_) => NotificationPrefsScreen(uid: profile.uid),
+                  builder: (_) => PrivacySettingsScreen(
+                    profile: profile,
+                    userRepository: userRepository,
+                  ),
                 ),
               );
             },
           ),
           const SizedBox(height: AppSpacing.xl),
-          _SectionLabel(label: l10n.settingsPrivacy),
-          const SizedBox(height: 6),
-          Text(
-            l10n.settingsPrivacyHint,
-            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          const _AnalyticsConsentTile(),
-          const SizedBox(height: AppSpacing.xl),
-          _SectionLabel(label: l10n.dangerTitle),
-          const SizedBox(height: 6),
-          Text(
-            l10n.dangerSubtitle,
-            style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          _SettingsNavTile(
+          _SectionLabel(label: l10n.settingsGroupDanger),
+          const SizedBox(height: 8),
+          _HubTile(
             icon: Icons.warning_amber_rounded,
             label: l10n.dangerNav,
             danger: true,
@@ -201,14 +156,9 @@ class SettingsScreen extends StatelessWidget {
           ),
           if (canAccessAdmin(AccessScope.accessOf(context, fallbackRoleId: profile.roleId))) ...[
             const SizedBox(height: AppSpacing.xl),
-            _SectionLabel(label: l10n.settingsAdmin),
-            const SizedBox(height: 6),
-            Text(
-              l10n.settingsAdminHint,
-              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _SettingsNavTile(
+            _SectionLabel(label: l10n.settingsGroupAdmin),
+            const SizedBox(height: 8),
+            _HubTile(
               icon: Icons.admin_panel_settings_outlined,
               label: l10n.settingsAdminPromote,
               onTap: () {
@@ -267,8 +217,206 @@ class SettingsScreen extends StatelessWidget {
   }
 }
 
-class _SettingsNavTile extends StatelessWidget {
-  const _SettingsNavTile({
+class AppearanceSettingsScreen extends StatelessWidget {
+  const AppearanceSettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final themeController = ThemeScope.of(context);
+    final localeController = LocaleScope.of(context);
+    final l10n = context.l10n;
+
+    return PulseScaffold(
+      appBar: AppBar(title: Text(l10n.settingsAppearance)),
+      body: PulseConstrained(
+        maxWidth: PulseContentWidth.form,
+        padding: EdgeInsets.zero,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xl + 24,
+          ),
+          children: [
+            _SectionLabel(label: l10n.settingsAppearance),
+            const SizedBox(height: 6),
+            Text(
+              l10n.settingsThemeHint,
+              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ThemeModeDropdown(
+              selected: themeController.mode,
+              onChanged: (mode) {
+                PulseHaptics.selection();
+                themeController.setMode(mode);
+              },
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            _SectionLabel(label: l10n.settingsAccentStudio),
+            const SizedBox(height: 6),
+            Text(
+              l10n.settingsAccentHint,
+              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _AccentRibbon(
+              selectedId: themeController.primarySeedId,
+              onSelect: (id) {
+                PulseHaptics.selection();
+                themeController.setPrimarySeed(id);
+              },
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            _SectionLabel(label: l10n.settingsPreferences),
+            const SizedBox(height: 6),
+            Text(
+              l10n.settingsLanguageHint,
+              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _LanguageDropdown(
+              selected: localeController.locale?.languageCode ?? 'system',
+              onChanged: (code) {
+                PulseHaptics.selection();
+                localeController.setLanguageCode(code);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class PrivacySettingsScreen extends StatelessWidget {
+  const PrivacySettingsScreen({
+    super.key,
+    required this.profile,
+    required this.userRepository,
+  });
+
+  final UserProfile profile;
+  final UserRepository userRepository;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    return PulseScaffold(
+      appBar: AppBar(title: Text(l10n.settingsPrivacy)),
+      body: PulseConstrained(
+        maxWidth: PulseContentWidth.form,
+        padding: EdgeInsets.zero,
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.lg,
+            AppSpacing.sm,
+            AppSpacing.lg,
+            AppSpacing.xl + 24,
+          ),
+          children: [
+            Text(
+              l10n.settingsPrivacyHint,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: AppColors.of(context).muted,
+                  ),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _LocationVisibilityTile(
+              profile: profile,
+              userRepository: userRepository,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const _AnalyticsConsentTile(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LocationVisibilityTile extends StatefulWidget {
+  const _LocationVisibilityTile({
+    required this.profile,
+    required this.userRepository,
+  });
+
+  final UserProfile profile;
+  final UserRepository userRepository;
+
+  @override
+  State<_LocationVisibilityTile> createState() =>
+      _LocationVisibilityTileState();
+}
+
+class _LocationVisibilityTileState extends State<_LocationVisibilityTile> {
+  late bool _enabled = widget.profile.showLocationOnProfile;
+  var _busy = false;
+
+  Future<void> _onChanged(bool next) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _enabled = next;
+    });
+    PulseHaptics.selection();
+    try {
+      await widget.userRepository.updateShowLocationOnProfile(
+        uid: widget.profile.uid,
+        enabled: next,
+      );
+    } catch (_) {
+      if (mounted) setState(() => _enabled = !next);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final l10n = context.l10n;
+
+    return Material(
+      color: colors.glassFill,
+      borderRadius: BorderRadius.circular(18),
+      child: Ink(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colors.border),
+        ),
+        child: SwitchListTile.adaptive(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 4,
+          ),
+          title: Text(
+            l10n.privacyShowLocation,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          subtitle: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              l10n.privacyShowLocationHint,
+              style: theme.textTheme.bodySmall?.copyWith(color: colors.muted),
+            ),
+          ),
+          value: _enabled,
+          onChanged: _busy ? null : _onChanged,
+        ),
+      ),
+    );
+  }
+}
+
+class _HubTile extends StatelessWidget {
+  const _HubTile({
     required this.icon,
     required this.label,
     required this.onTap,
@@ -309,7 +457,15 @@ class _SettingsNavTile extends StatelessWidget {
             ),
             child: Row(
               children: [
-                Icon(icon, color: accent),
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: accent.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, color: accent, size: 20),
+                ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
@@ -508,11 +664,12 @@ class _AccountStrip extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        profile.email ?? l10n.settingsNoEmail,
+                        '@${profile.handle}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           color: colors.muted,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                       if (onEdit != null) ...[

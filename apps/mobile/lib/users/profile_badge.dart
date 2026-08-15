@@ -13,15 +13,18 @@ class ProfileBadge {
 
   static ProfileBadge? fromMap(Object? raw) {
     if (raw is! Map) return null;
-    if (raw['enabled'] == false) return null;
-    final assigned = raw['assigned'] == true || raw['enabled'] == true;
-    if (!assigned) return null;
-    final text = '${raw['text'] ?? ''}'.trim();
+    final data = Map<Object?, Object?>.from(raw);
+    // Public cards store `{ text, icon, backgroundColor, assigned }`.
+    // User docs store `{ enabled, text, icon, color }`. Show either when
+    // there is inscription text — same as web `parsePublicBadge`.
+    if (data['enabled'] == false) return null;
+    final text = '${data['text'] ?? ''}'.trim();
     if (text.isEmpty) return null;
-    final background = raw['backgroundColor'] ?? raw['color'] ?? '#1F6B4A';
+    final background =
+        data['backgroundColor'] ?? data['color'] ?? '#1F6B4A';
     return ProfileBadge(
       text: text.length > 40 ? text.substring(0, 40) : text,
-      icon: '${raw['icon'] ?? 'badge'}',
+      icon: '${data['icon'] ?? 'badge'}',
       backgroundColor: parseBadgeColor('$background'),
     );
   }

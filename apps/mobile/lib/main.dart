@@ -76,13 +76,18 @@ Future<void> main() async {
   final localeController = results[2]! as LocaleController;
 
   final forumRepository = ForumRepository();
+  final chatRepository = ChatRepository();
   runApp(
     EveryInsuranceApp(
       authService: AuthService(),
       userRepository: UserRepository(
-        onAuthorPhotoChanged: ({required authorId, required photoUrl}) {
-          return forumRepository.syncAuthorPhotoUrl(
+        onAuthorPhotoChanged: ({required authorId, required photoUrl}) async {
+          await forumRepository.syncAuthorPhotoUrl(
             authorId: authorId,
+            photoUrl: photoUrl,
+          );
+          await chatRepository.syncOwnMemberPhoto(
+            uid: authorId,
             photoUrl: photoUrl,
           );
         },
@@ -90,7 +95,7 @@ Future<void> main() async {
       themeController: themeController,
       localeController: localeController,
       forumRepository: forumRepository,
-      chatRepository: ChatRepository(),
+      chatRepository: chatRepository,
       courseRepository: CourseRepository(),
     ),
   );

@@ -1,4 +1,5 @@
 import '../../l10n/app_localizations.dart';
+import '../../users/profile_validation.dart';
 
 /// Compact post reference shared into a private chat.
 class SharedPostPreview {
@@ -41,11 +42,24 @@ class SharedPostPreview {
   }
 }
 
+Map<String, String> _chatStringMap(Object? raw) {
+  final out = <String, String>{};
+  if (raw is Map) {
+    for (final entry in raw.entries) {
+      final value = '${entry.value}'.trim();
+      if (value.isNotEmpty) out['${entry.key}'] = value;
+    }
+  }
+  return out;
+}
+
 class ChatConversation {
   const ChatConversation({
     required this.id,
     required this.memberIds,
     required this.memberNames,
+    this.memberPhotos = const {},
+    this.memberUsernames = const {},
     required this.isGroup,
     required this.lastMessage,
     required this.lastMessageAt,
@@ -66,6 +80,8 @@ class ChatConversation {
   final String id;
   final List<String> memberIds;
   final Map<String, String> memberNames;
+  final Map<String, String> memberPhotos;
+  final Map<String, String> memberUsernames;
   final bool isGroup;
   final String? title;
   final String? dmKey;
@@ -103,6 +119,52 @@ class ChatConversation {
     return chatInitials(titleFor(viewerUid, l10n: l10n));
   }
 
+  String? photoOf(String uid) {
+    final url = memberPhotos[uid]?.trim();
+    return (url != null && url.isNotEmpty) ? url : null;
+  }
+
+  String? peerId(String viewerUid) {
+    for (final id in memberIds) {
+      if (id != viewerUid) return id;
+    }
+    return null;
+  }
+
+  String? inboxPhotoUrl(String viewerUid) {
+    if (isGroup) return null;
+    final other = peerId(viewerUid);
+    return other == null ? null : photoOf(other);
+  }
+
+  String? uidForUsername(String handle) {
+    final parsed = parseUsername(handle);
+    if (!parsed.ok) return null;
+    for (final entry in memberUsernames.entries) {
+      final reserved = parseUsername(entry.value);
+      if (reserved.ok && reserved.value == parsed.value) return entry.key;
+    }
+    return null;
+  }
+
+  List<MentionCandidate> mentionCandidates(String viewerUid) {
+    final out = <MentionCandidate>[];
+    for (final id in memberIds) {
+      if (id == viewerUid) continue;
+      final parsed = parseUsername(memberUsernames[id] ?? '');
+      if (!parsed.ok) continue;
+      out.add(
+        MentionCandidate(
+          uid: id,
+          username: parsed.value,
+          name: memberNames[id] ?? id,
+          photoUrl: photoOf(id),
+        ),
+      );
+    }
+    return out;
+  }
+
   ChatConversation copyWith({
     String? lastMessage,
     DateTime? lastMessageAt,
@@ -110,6 +172,8 @@ class ChatConversation {
     Map<String, int>? unreadCounts,
     Map<String, bool>? pinnedBy,
     Map<String, String>? memberNames,
+    Map<String, String>? memberPhotos,
+    Map<String, String>? memberUsernames,
     String? title,
     bool? isDefaultAgentGroup,
     bool? dmMessagingEnabled,
@@ -118,6 +182,8 @@ class ChatConversation {
       id: id,
       memberIds: memberIds,
       memberNames: memberNames ?? this.memberNames,
+      memberPhotos: memberPhotos ?? this.memberPhotos,
+      memberUsernames: memberUsernames ?? this.memberUsernames,
       isGroup: isGroup,
       title: title ?? this.title,
       dmKey: dmKey,
@@ -139,6 +205,8 @@ class ChatConversation {
       'members': {for (final id in memberIds) id: true},
       'memberCount': memberIds.length,
       'memberNames': memberNames,
+      'memberPhotos': memberPhotos,
+      'memberUsernames': memberUsernames,
       'isGroup': isGroup,
       'title': title,
       'dmKey': dmKey,
@@ -161,6 +229,8 @@ class ChatConversation {
     return {
       'memberIds': memberIds,
       'memberNames': memberNames,
+      'memberPhotos': memberPhotos,
+      'memberUsernames': memberUsernames,
       'isGroup': isGroup,
       'title': title,
       'dmKey': dmKey,
@@ -219,6 +289,8 @@ class ChatConversation {
       id: id,
       memberIds: memberIds,
       memberNames: names,
+      memberPhotos: _chatStringMap(data['memberPhotos']),
+      memberUsernames: _chatStringMap(data['memberUsernames']),
       isGroup: data['isGroup'] as bool? ?? false,
       title: data['title'] as String?,
       dmKey: data['dmKey'] as String?,
@@ -273,6 +345,73 @@ ChatInboxSections partitionChatInbox(
   );
 }
 
+class ChatReplyTo {
+  const ChatReplyTo({
+    required this.messageId,
+    required this.senderName,
+    required this.bodyPreview,
+  });
+
+  final String messageId;
+  final String senderName;
+  final String bodyPreview;
+
+  static const maxPreviewLength = 140;
+
+  static String previewOf(ChatMessage message) {
+    final title = message.sharedPost?.title.trim();
+    final source =
+        (title != null && title.isNotEmpty) ? title : message.body.trim();
+    if (source.length <= maxPreviewLength) return source;
+    return '${source.substring(0, maxPreviewLength)}…';
+  }
+
+  Map<String, Object?> toMap() {
+    return {
+      'messageId': messageId,
+      'senderName': senderName,
+      'bodyPreview': bodyPreview,
+    };
+  }
+
+  factory ChatReplyTo.fromMap(Map<String, dynamic> data) {
+    return ChatReplyTo(
+      messageId: data['messageId'] as String? ?? '',
+      senderName: data['senderName'] as String? ?? '',
+      bodyPreview: data['bodyPreview'] as String? ?? '',
+    );
+  }
+}
+
+enum ChatInboxFilter { all, unread, groups }
+
+bool chatMatchesInboxFilter(
+  ChatConversation chat,
+  ChatInboxFilter filter,
+  String viewerUid,
+) {
+  switch (filter) {
+    case ChatInboxFilter.all:
+      return true;
+    case ChatInboxFilter.unread:
+      return chat.unreadFor(viewerUid) > 0;
+    case ChatInboxFilter.groups:
+      return chat.isGroup;
+  }
+}
+
+bool chatMatchesInboxQuery(
+  ChatConversation chat,
+  String query,
+  String viewerUid, {
+  String? title,
+}) {
+  final q = query.trim().toLowerCase();
+  if (q.isEmpty) return true;
+  final resolved = (title ?? chat.titleFor(viewerUid)).toLowerCase();
+  return resolved.contains(q) || chat.lastMessage.toLowerCase().contains(q);
+}
+
 class ChatMessage {
   const ChatMessage({
     required this.id,
@@ -280,9 +419,11 @@ class ChatMessage {
     required this.body,
     required this.senderId,
     required this.senderName,
+    this.senderPhotoUrl,
     required this.createdAt,
     this.sharedPost,
     this.reactions = const {},
+    this.replyTo,
   });
 
   /// Quick-reaction strip shown on long-press.
@@ -293,13 +434,28 @@ class ChatMessage {
   final String body;
   final String senderId;
   final String senderName;
+  final String? senderPhotoUrl;
   final DateTime createdAt;
   final SharedPostPreview? sharedPost;
 
   /// uid → emoji (one reaction per user).
   final Map<String, String> reactions;
+  final ChatReplyTo? replyTo;
 
   bool isMine(String uid) => senderId == uid;
+
+  /// RTDB requires a non-empty body; share-only messages store a title preview.
+  bool get isSyntheticShareBody {
+    final post = sharedPost;
+    if (post == null) return false;
+    final trimmed = body.trim();
+    if (trimmed.isEmpty) return true;
+    final title = post.title.trim();
+    return trimmed == 'Pregunta: $title' || trimmed == 'Question: $title';
+  }
+
+  bool get showsTextBubble =>
+      body.trim().isNotEmpty && !isSyntheticShareBody;
 
   /// Aggregated emoji → count for chips.
   Map<String, int> reactionCounts() {
@@ -316,14 +472,18 @@ class ChatMessage {
       'body': body,
       'senderId': senderId,
       'senderName': senderName,
+      if (senderPhotoUrl != null && senderPhotoUrl!.trim().isNotEmpty)
+        'senderPhotoUrl': senderPhotoUrl,
       'createdAt': createdAt.toUtc().millisecondsSinceEpoch,
       if (sharedPost != null) 'sharedPost': sharedPost!.toMap(),
       if (reactions.isNotEmpty) 'reactions': reactions,
+      if (replyTo != null) 'replyTo': replyTo!.toMap(),
     };
   }
 
   factory ChatMessage.fromMap(String id, Map<String, dynamic> data) {
     final sharedRaw = data['sharedPost'];
+    final replyRaw = data['replyTo'];
     final reactionsRaw = data['reactions'];
     final reactions = <String, String>{};
     if (reactionsRaw is Map) {
@@ -338,6 +498,7 @@ class ChatMessage {
       body: data['body'] as String? ?? '',
       senderId: data['senderId'] as String? ?? '',
       senderName: data['senderName'] as String? ?? '',
+      senderPhotoUrl: data['senderPhotoUrl'] as String?,
       createdAt: _readDate(data['createdAt']) ?? DateTime.now().toUtc(),
       sharedPost: sharedRaw is Map<String, dynamic>
           ? SharedPostPreview.fromMap(sharedRaw)
@@ -345,19 +506,29 @@ class ChatMessage {
               ? SharedPostPreview.fromMap(Map<String, dynamic>.from(sharedRaw))
               : null,
       reactions: reactions,
+      replyTo: replyRaw is Map<String, dynamic>
+          ? ChatReplyTo.fromMap(replyRaw)
+          : replyRaw is Map
+              ? ChatReplyTo.fromMap(Map<String, dynamic>.from(replyRaw))
+              : null,
     );
   }
 
-  ChatMessage copyWith({Map<String, String>? reactions}) {
+  ChatMessage copyWith({
+    Map<String, String>? reactions,
+    ChatReplyTo? replyTo,
+  }) {
     return ChatMessage(
       id: id,
       chatId: chatId,
       body: body,
       senderId: senderId,
       senderName: senderName,
+      senderPhotoUrl: senderPhotoUrl,
       createdAt: createdAt,
       sharedPost: sharedPost,
       reactions: reactions ?? this.reactions,
+      replyTo: replyTo ?? this.replyTo,
     );
   }
 }
@@ -401,6 +572,31 @@ String formatChatTime(
     final m = local.minute.toString().padLeft(2, '0');
     return '$h:$m';
   }
+  if (diff == 1) return l10n.chatTimeYesterday;
+  final weekdays = [
+    l10n.weekdayMon,
+    l10n.weekdayTue,
+    l10n.weekdayWed,
+    l10n.weekdayThu,
+    l10n.weekdayFri,
+    l10n.weekdaySat,
+    l10n.weekdaySun,
+  ];
+  if (diff < 7) return weekdays[local.weekday - 1];
+  return '${local.day}/${local.month}';
+}
+
+String formatChatDayLabel(
+  DateTime at,
+  AppLocalizations l10n, {
+  DateTime? now,
+}) {
+  final local = at.toLocal();
+  final n = (now ?? DateTime.now()).toLocal();
+  final today = DateTime(n.year, n.month, n.day);
+  final day = DateTime(local.year, local.month, local.day);
+  final diff = today.difference(day).inDays;
+  if (diff == 0) return l10n.chatTimeToday;
   if (diff == 1) return l10n.chatTimeYesterday;
   final weekdays = [
     l10n.weekdayMon,

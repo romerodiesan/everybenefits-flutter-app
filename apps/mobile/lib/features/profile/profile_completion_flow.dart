@@ -68,6 +68,7 @@ class _ProfileCompletionFlowState extends State<ProfileCompletionFlow> {
         displayName: data.displayName,
         bio: data.bio,
         phoneCountryCode: data.phoneCountryCode,
+        phoneCountryIso2: data.phoneCountryIso2,
         phoneNumber: data.phoneNumber,
         phoneVerified: phoneVerified,
         role: type,

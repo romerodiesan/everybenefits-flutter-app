@@ -22,6 +22,7 @@ abstract class UserProfileStore {
     required String uid,
     required String? displayName,
     required String? email,
+    String? username,
   });
 
   Stream<UserProfile?> watch(String uid);
@@ -34,6 +35,15 @@ abstract class UserProfileStore {
 
   /// Updates Firebase Auth + `users/{uid}.email` via Cloud Functions.
   Future<String> updateAccountEmail(String email);
+
+  /// Claims a unique `@username` via Cloud Functions.
+  Future<String> updateUsername(String username);
+
+  /// Patch `users/{uid}.privacy.showLocationOnProfile` without wiping other prefs.
+  Future<void> updateShowLocationOnProfile({
+    required String uid,
+    required bool enabled,
+  });
 }
 
 class FirestoreUserProfileStore implements UserProfileStore {
@@ -51,7 +61,11 @@ class FirestoreUserProfileStore implements UserProfileStore {
       _firestore.collection('users');
 
   Map<String, Object?> _payload(UserProfile profile) {
-    final search = _searchFields(profile.displayName, profile.email);
+    final search = _searchFields(
+      profile.displayName,
+      profile.email,
+      profile.username,
+    );
     return {
       'uid': profile.uid,
       'email': profile.email,
@@ -62,6 +76,7 @@ class FirestoreUserProfileStore implements UserProfileStore {
       'profileCompleted': profile.profileCompleted,
       'productTourVersion': profile.productTourVersion,
       'phoneCountryCode': profile.phoneCountryCode,
+      'phoneCountryIso2': profile.phoneCountryIso2,
       'phoneNumber': profile.phoneNumber,
       'phoneVerified': profile.phoneVerified,
       'npn': profile.npn,
@@ -78,8 +93,12 @@ class FirestoreUserProfileStore implements UserProfileStore {
     };
   }
 
-  Map<String, Object?> _searchFields(String? displayName, String? email) {
-    return userSearchIndexFields(displayName, email);
+  Map<String, Object?> _searchFields(
+    String? displayName,
+    String? email, [
+    String? username,
+  ]) {
+    return userSearchIndexFields(displayName, email, username);
   }
 
   @override
@@ -90,7 +109,7 @@ class FirestoreUserProfileStore implements UserProfileStore {
             const GetOptions(source: Source.cache),
           );
       if (cached.exists && cached.data() != null) {
-        return UserProfile.fromMap(cached.data()!);
+        return UserProfile.fromMap({...cached.data()!, 'uid': uid});
       }
     } catch (_) {
       // Cache miss is expected on first launch / emulator without persistence.
@@ -99,7 +118,7 @@ class FirestoreUserProfileStore implements UserProfileStore {
           const GetOptions(source: Source.serverAndCache),
         );
     if (!snapshot.exists || snapshot.data() == null) return null;
-    return UserProfile.fromMap(snapshot.data()!);
+    return UserProfile.fromMap({...snapshot.data()!, 'uid': uid});
   }
 
   @override
@@ -118,7 +137,8 @@ class FirestoreUserProfileStore implements UserProfileStore {
   @override
   Future<void> update(UserProfile profile) async {
     final payload = Map<String, Object?>.from(_payload(profile))
-      ..remove('email');
+      ..remove('email')
+      ..remove('username');
     await _users.doc(profile.uid).update(payload);
   }
 
@@ -127,9 +147,10 @@ class FirestoreUserProfileStore implements UserProfileStore {
     required String uid,
     required String? displayName,
     required String? email,
+    String? username,
   }) async {
     await _users.doc(uid).update({
-      ..._searchFields(displayName, email),
+      ..._searchFields(displayName, email, username),
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -138,7 +159,7 @@ class FirestoreUserProfileStore implements UserProfileStore {
   Stream<UserProfile?> watch(String uid) {
     return _users.doc(uid).snapshots().map((snapshot) {
       if (!snapshot.exists || snapshot.data() == null) return null;
-      return UserProfile.fromMap(snapshot.data()!);
+      return UserProfile.fromMap({...snapshot.data()!, 'uid': uid});
     });
   }
 
@@ -175,6 +196,26 @@ class FirestoreUserProfileStore implements UserProfileStore {
     final next = '${data['email'] ?? email}'.trim().toLowerCase();
     await FirebaseAuth.instance.currentUser?.reload();
     return next;
+  }
+
+  @override
+  Future<String> updateUsername(String username) async {
+    final result = await _functions.httpsCallable('updateUsername').call(
+      <String, dynamic>{'username': username.trim().toLowerCase()},
+    );
+    final data = result.data is Map ? result.data as Map : const {};
+    return '${data['username'] ?? username}'.trim().toLowerCase();
+  }
+
+  @override
+  Future<void> updateShowLocationOnProfile({
+    required String uid,
+    required bool enabled,
+  }) async {
+    await _users.doc(uid).update({
+      'privacy.showLocationOnProfile': enabled,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
   }
 }
 
@@ -287,7 +328,11 @@ class UserRepository {
 
   /// Mirrors web ensureProfile search self-heal when tokens/lower fields drift.
   Future<void> _maybeBackfillSearchIndex(UserProfile profile) async {
-    final expected = userSearchIndexFields(profile.displayName, profile.email);
+    final expected = userSearchIndexFields(
+      profile.displayName,
+      profile.email,
+      profile.username,
+    );
     final expectedTokens =
         (expected['nameTokens'] as List?)?.cast<String>() ?? const <String>[];
     final expectedDisplayLower = expected['displayNameLower'] as String?;
@@ -306,6 +351,7 @@ class UserRepository {
         uid: profile.uid,
         displayName: profile.displayName,
         email: profile.email,
+        username: profile.username,
       );
     } catch (error) {
       debugPrint('Search index backfill skipped: $error');
@@ -337,6 +383,17 @@ class UserRepository {
 
   Future<String> updateAccountEmail(String email) {
     return _store.updateAccountEmail(email);
+  }
+
+  Future<String> updateUsername(String username) {
+    return _store.updateUsername(username);
+  }
+
+  Future<void> updateShowLocationOnProfile({
+    required String uid,
+    required bool enabled,
+  }) {
+    return _store.updateShowLocationOnProfile(uid: uid, enabled: enabled);
   }
 
   Future<UserProfile> updateAvatar({

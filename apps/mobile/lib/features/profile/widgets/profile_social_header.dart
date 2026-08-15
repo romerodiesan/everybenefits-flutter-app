@@ -19,8 +19,15 @@ class ProfileSocialHeader extends StatelessWidget {
     this.topBar,
     this.actions,
     this.onAvatarTap,
+    this.onChooseUsername,
     this.avatarBusy = false,
     this.showEditBadge = false,
+    this.roleLabel,
+    this.showLocation = true,
+    this.followerCount = 0,
+    this.followingCount = 0,
+    this.onFollowersTap,
+    this.onFollowingTap,
   });
 
   final UserProfile person;
@@ -30,14 +37,17 @@ class ProfileSocialHeader extends StatelessWidget {
   final Widget? topBar;
   final Widget? actions;
   final VoidCallback? onAvatarTap;
+  final VoidCallback? onChooseUsername;
   final bool avatarBusy;
   final bool showEditBadge;
+  final String? roleLabel;
+  final bool showLocation;
+  final int followerCount;
+  final int followingCount;
+  final VoidCallback? onFollowersTap;
+  final VoidCallback? onFollowingTap;
 
-  String get _handle {
-    final local = person.email?.split('@').first.trim();
-    if (local != null && local.isNotEmpty) return local;
-    return person.uid.length <= 8 ? person.uid : person.uid.substring(0, 8);
-  }
+  String get _handle => person.handle;
 
   @override
   Widget build(BuildContext context) {
@@ -45,6 +55,8 @@ class ProfileSocialHeader extends StatelessWidget {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
+    final cover = person.profileBadge?.backgroundColor ?? brand;
+    final location = showLocation ? person.publicLocation : null;
     final top = MediaQuery.paddingOf(context).top;
 
     return Column(
@@ -63,8 +75,8 @@ class ProfileSocialHeader extends StatelessWidget {
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                       colors: [
-                        brand.withValues(alpha: 0.55),
-                        brand.withValues(alpha: 0.18),
+                        cover.withValues(alpha: 0.62),
+                        cover.withValues(alpha: 0.22),
                         colors.meshDeep,
                       ],
                     ),
@@ -154,6 +166,26 @@ class ProfileSocialHeader extends StatelessWidget {
                     badge: person.profileBadge,
                     dense: true,
                   ),
+                  if (roleLabel != null && roleLabel!.trim().isNotEmpty)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: brand.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                      child: Text(
+                        roleLabel!.toUpperCase(),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: brand,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.7,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
                 ],
               ),
               const SizedBox(height: 4),
@@ -164,11 +196,31 @@ class ProfileSocialHeader extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (onChooseUsername != null && !person.hasUsername)
+                TextButton(
+                  onPressed: onChooseUsername,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    minimumSize: const Size(0, 28),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(l10n.usernameChoose),
+                ),
               if (person.agency?.trim().isNotEmpty == true)
                 Padding(
                   padding: const EdgeInsets.only(top: 6),
                   child: Text(
-                    '◎ ${person.agency!.trim()}',
+                    person.agency!.trim(),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              if (location != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Text(
+                    location,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colors.muted,
                     ),
@@ -190,10 +242,70 @@ class ProfileSocialHeader extends StatelessWidget {
                   _Stat(value: likes, label: l10n.profileStatLikes),
                 ],
               ),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 16,
+                runSpacing: 4,
+                children: [
+                  _FollowCount(
+                    value: followerCount,
+                    label: l10n.profileStatFollowers,
+                    onTap: onFollowersTap,
+                  ),
+                  _FollowCount(
+                    value: followingCount,
+                    label: l10n.profileStatFollowing,
+                    onTap: onFollowingTap,
+                  ),
+                ],
+              ),
             ],
           ),
         ),
       ],
+    );
+  }
+}
+
+class _FollowCount extends StatelessWidget {
+  const _FollowCount({
+    required this.value,
+    required this.label,
+    this.onTap,
+  });
+
+  final int value;
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colors = AppColors.of(context);
+    final child = Text.rich(
+      TextSpan(
+        children: [
+          TextSpan(
+            text: '$value ',
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          TextSpan(
+            text: label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: colors.muted,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (onTap == null) return child;
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: child,
     );
   }
 }
@@ -284,7 +396,7 @@ class ProfilePostsSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              AppSpacing.sm,
+              4,
               AppSpacing.lg,
               AppSpacing.xl,
             ),
@@ -294,11 +406,25 @@ class ProfilePostsSection extends StatelessWidget {
             ),
           )
         else
-          for (final thread in threads)
-            ProfilePostTile(
-              thread: thread,
-              onTap: () => onOpenThread(thread),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                for (var i = 0; i < threads.length; i++) ...[
+                  if (i > 0)
+                    Divider(
+                      height: 1,
+                      color: colors.border.withValues(alpha: 0.8),
+                    ),
+                  ProfilePostTile(
+                    thread: threads[i],
+                    onTap: () => onOpenThread(threads[i]),
+                  ),
+                ],
+              ],
             ),
+          ),
         SizedBox(height: bottomPad),
       ],
     );
@@ -319,107 +445,74 @@ class ProfilePostTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
-    final brand = AppColors.brandOf(context);
     final l10n = context.l10n;
-    final body = thread.body.trim().replaceAll(RegExp(r'\s+'), ' ');
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppSpacing.md,
-        0,
-        AppSpacing.md,
-        AppSpacing.sm,
-      ),
-      child: Material(
-        color: colors.meshDeep,
-        borderRadius: BorderRadius.circular(18),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Ink(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colors.border),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 13, 14, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    thread.title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      height: 1.25,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  if (body.isNotEmpty) ...[
-                    const SizedBox(height: 6),
-                    Text(
-                      body,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colors.muted,
-                        height: 1.35,
-                      ),
-                    ),
-                  ],
-                  if (thread.tags.isNotEmpty) ...[
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        for (final tag in thread.tags.take(3))
-                          Text(
-                            '#$tag',
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: brand,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 10),
-                  Row(
-                    children: [
-                      Icon(Icons.favorite_rounded, size: 14, color: colors.muted),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${thread.score < 0 ? 0 : thread.score}',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colors.muted,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Icon(Icons.mode_comment_outlined, size: 14, color: colors.muted),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${thread.replyCount}',
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colors.muted,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        formatRelativeTime(thread.createdAt, l10n),
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: colors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              thread.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w700,
+                height: 1.3,
+                letterSpacing: -0.15,
+                fontSize: 14.5,
               ),
             ),
-          ),
+            if (thread.body.trim().isNotEmpty) ...[
+              const SizedBox(height: 4),
+              Text(
+                thread.body.replaceAll(RegExp(r'\s+'), ' ').trim(),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: colors.muted,
+                  height: 1.35,
+                ),
+              ),
+            ],
+            const SizedBox(height: 3),
+            Row(
+              children: [
+                Text(
+                  formatRelativeTime(thread.createdAt, l10n),
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(Icons.favorite_rounded, size: 12, color: colors.muted),
+                const SizedBox(width: 3),
+                Text(
+                  '${thread.score < 0 ? 0 : thread.score}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(Icons.mode_comment_outlined, size: 12, color: colors.muted),
+                const SizedBox(width: 3),
+                Text(
+                  '${thread.replyCount}',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.muted,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
     );

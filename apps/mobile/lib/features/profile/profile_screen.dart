@@ -19,7 +19,9 @@ import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
 import '../notifications/notification_bell_button.dart';
 import 'edit_profile_screen.dart';
+import 'public_profile_screen.dart';
 import 'settings_screen.dart';
+import 'widgets/profile_public_extras.dart';
 import 'widgets/profile_social_header.dart';
 
 /// Identity tab — social cover, stats, and the member's posts.
@@ -49,14 +51,18 @@ class ProfileScreenState extends State<ProfileScreen> {
   bool _uploading = false;
   late final ForumRepository _forums =
       widget.forumRepository ?? ForumRepository();
+  final _social = SocialRepository();
   StreamSubscription<ForumThreadPage>? _postsSub;
   List<ForumThread> _threads = const [];
   var _postsLoading = true;
+  var _tab = 0;
+  UserProfile? _publicCard;
 
   @override
   void initState() {
     super.initState();
     _listenPosts();
+    _loadPublicBadge();
   }
 
   @override
@@ -64,6 +70,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile.uid != widget.profile.uid) {
       _listenPosts();
+      _loadPublicBadge();
     }
   }
 
@@ -94,6 +101,17 @@ class ProfileScreenState extends State<ProfileScreen> {
             setState(() => _postsLoading = false);
           },
         );
+  }
+
+  Future<void> _loadPublicBadge() async {
+    try {
+      final card = await _social.fetchPublicProfile(widget.profile.uid);
+      if (!mounted) return;
+      setState(() => _publicCard = card);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _publicCard = null);
+    }
   }
 
   Future<void> _pickAvatar() async {
@@ -345,11 +363,42 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
+  void _openMember(UserProfile person) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => PublicProfileScreen(
+          uid: person.uid,
+          viewer: widget.profile,
+          socialRepository: _social,
+          forumRepository: _forums,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openFollowList(bool followers) async {
+    final l10n = context.l10n;
+    await showFollowListSheet(
+      context: context,
+      title: followers ? l10n.profileStatFollowers : l10n.profileStatFollowing,
+      empty: followers ? l10n.profileFollowersEmpty : l10n.profileFollowingEmpty,
+      load: () => followers
+          ? _social.listFollowers(widget.profile.uid)
+          : _social.listFollowing(widget.profile.uid),
+      onOpen: _openMember,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colors = AppColors.of(context);
     final l10n = context.l10n;
-    final profile = widget.profile;
+    final profile = widget.profile.copyWith(
+      profileBadge: _publicCard?.profileBadge ?? widget.profile.profileBadge,
+      followerCount: _publicCard?.followerCount ?? widget.profile.followerCount,
+      followingCount: _publicCard?.followingCount ?? widget.profile.followingCount,
+      createdAt: _publicCard?.createdAt ?? widget.profile.createdAt,
+    );
     final bottomPad = pulseShellListBottomPad(context, hasFab: true);
     final posts = _threads.length;
     final replies = _threads.fold<int>(0, (sum, item) => sum + item.replyCount);
@@ -371,9 +420,16 @@ class ProfileScreenState extends State<ProfileScreen> {
               posts: posts,
               replies: replies,
               likes: likes,
+              roleLabel: roleLabelForId(profile.roleId, l10n),
+              showLocation: profile.showLocationOnProfile,
+              followerCount: profile.followerCount,
+              followingCount: profile.followingCount,
+              onFollowersTap: () => _openFollowList(true),
+              onFollowingTap: () => _openFollowList(false),
               avatarBusy: _uploading,
               showEditBadge: true,
               onAvatarTap: _uploading ? null : _pickAvatar,
+              onChooseUsername: openEdit,
               topBar: Row(
                 children: [
                   const Spacer(),
@@ -387,6 +443,16 @@ class ProfileScreenState extends State<ProfileScreen> {
                         foregroundColor: colors.ink,
                       ),
                     ),
+                  IconButton(
+                    tooltip: l10n.profileShare,
+                    onPressed: () => sharePublicProfile(context, profile),
+                    style: IconButton.styleFrom(
+                      backgroundColor:
+                          colors.glassFill.withValues(alpha: 0.7),
+                      foregroundColor: colors.ink,
+                    ),
+                    icon: const Icon(Icons.ios_share_rounded),
+                  ),
                   IconButton(
                     tooltip: l10n.profileSettingsTooltip,
                     onPressed: _openSettings,
@@ -410,12 +476,23 @@ class ProfileScreenState extends State<ProfileScreen> {
                 child: Text(l10n.fabEditProfile),
               ),
             ),
-            ProfilePostsSection(
-              threads: _threads,
-              loading: _postsLoading,
-              onOpenThread: _openThread,
-              bottomPad: bottomPad,
+            ProfileTabBar(
+              index: _tab,
+              onChanged: (value) => setState(() => _tab = value),
             ),
+            if (_tab == 0)
+              ProfilePostsSection(
+                threads: _threads,
+                loading: _postsLoading,
+                onOpenThread: _openThread,
+                bottomPad: bottomPad,
+              )
+            else
+              ProfileAboutSection(
+                person: profile,
+                showLocation: profile.showLocationOnProfile,
+                bottomPad: bottomPad,
+              ),
           ],
         ),
       ),

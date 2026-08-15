@@ -6,18 +6,22 @@ import '../users/user_role.dart';
 
 enum SocialStatus { none, outgoing, incoming, contact }
 
+enum MemberReportReason { spam, harassment, impersonation, other }
+
 class SocialRelationship {
   const SocialRelationship({
     required this.status,
     required this.muted,
     required this.blockedByMe,
     required this.isSelf,
+    this.following = false,
   });
 
   final SocialStatus status;
   final bool muted;
   final bool blockedByMe;
   final bool isSelf;
+  final bool following;
 
   factory SocialRelationship.fromMap(Map<dynamic, dynamic> data) {
     final raw = '${data['status'] ?? 'none'}';
@@ -30,13 +34,14 @@ class SocialRelationship {
       muted: data['muted'] == true,
       blockedByMe: data['blockedByMe'] == true,
       isSelf: data['isSelf'] == true,
+      following: data['following'] == true,
     );
   }
 }
 
 UserProfile publicCardFromMap(Map<dynamic, dynamic> data) {
-    return UserProfile.fromMap({
-      'uid': '${data['uid'] ?? ''}',
+  return UserProfile.fromMap({
+    'uid': '${data['uid'] ?? ''}',
     'displayName': data['displayName'],
     'username': data['username'],
     'photoUrl': data['photoUrl'],
@@ -44,10 +49,14 @@ UserProfile publicCardFromMap(Map<dynamic, dynamic> data) {
     'agency': data['agency'],
     'bio': data['bio'],
     'profileBadge': data['profileBadge'],
+    'addressCity': data['addressCity'],
+    'addressState': data['addressState'],
+    'followerCount': data['followerCount'] ?? 0,
+    'followingCount': data['followingCount'] ?? 0,
     'isAnonymous': false,
     'profileCompleted': data['profileCompleted'] ?? true,
-    'createdAt': DateTime.now().toUtc().toIso8601String(),
-    'updatedAt': DateTime.now().toUtc().toIso8601String(),
+    'createdAt': data['createdAt'] ?? DateTime.now().toUtc().toIso8601String(),
+    'updatedAt': data['updatedAt'] ?? DateTime.now().toUtc().toIso8601String(),
   });
 }
 
@@ -144,6 +153,33 @@ class SocialRepository {
     );
   }
 
+  Future<void> follow(String otherUid) async {
+    await _functions.httpsCallable('followUser').call(
+      <String, dynamic>{'otherUid': otherUid},
+    );
+  }
+
+  Future<void> unfollow(String otherUid) async {
+    await _functions.httpsCallable('unfollowUser').call(
+      <String, dynamic>{'otherUid': otherUid},
+    );
+  }
+
+  Future<void> reportMember(
+    String otherUid, {
+    required MemberReportReason reason,
+    String? details,
+  }) async {
+    await _functions.httpsCallable('reportMember').call(
+      <String, dynamic>{
+        'otherUid': otherUid,
+        'reason': reason.name,
+        if (details != null && details.trim().isNotEmpty)
+          'details': details.trim(),
+      },
+    );
+  }
+
   Future<List<UserProfile>> listContacts() async {
     final result = await _functions.httpsCallable('listContacts').call();
     return _cards(result.data);
@@ -152,6 +188,20 @@ class SocialRepository {
   Future<List<UserProfile>> listIncomingRequests() async {
     final result =
         await _functions.httpsCallable('listIncomingContactRequests').call();
+    return _cards(result.data);
+  }
+
+  Future<List<UserProfile>> listFollowers(String otherUid) async {
+    final result = await _functions.httpsCallable('listFollowers').call(
+      <String, dynamic>{'otherUid': otherUid},
+    );
+    return _cards(result.data);
+  }
+
+  Future<List<UserProfile>> listFollowing(String otherUid) async {
+    final result = await _functions.httpsCallable('listFollowing').call(
+      <String, dynamic>{'otherUid': otherUid},
+    );
     return _cards(result.data);
   }
 
