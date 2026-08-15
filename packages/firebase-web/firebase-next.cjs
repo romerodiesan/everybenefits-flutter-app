@@ -39,25 +39,33 @@ function firebaseSdkNodeModules(dir) {
 }
 
 /**
- * Webpack accepts absolute paths. Turbopack does not — it treats `/abs/path`
- * as a server-relative import (`./abs/path`) and the build dies with
- * "server relative imports are not implemented yet".
+ * Webpack accepts absolute filesystem paths. Turbopack does not — it treats
+ * `/abs/path` as a server-relative import and the build dies.
  *
+ * @param {string} dir Next.js project directory (apps/web, etc.)
+ * @param {"webpack" | "turbopack"} kind
  * @returns {Record<string, string>}
  */
-function firebaseResolveAliases(dir) {
+function firebaseResolveAliases(dir, kind) {
   const sdkRoot = firebaseSdkNodeModules(dir);
   /** @type {Record<string, string>} */
   const aliases = {};
   if (!sdkRoot) return aliases;
   for (const pkg of ["@firebase/app", "@firebase/database"]) {
-    aliases[pkg] = path.join(sdkRoot, pkg);
+    const abs = fs.realpathSync(path.join(sdkRoot, pkg));
+    if (kind === "turbopack") {
+      let rel = path.relative(dir, abs).replaceAll("\\", "/");
+      if (!rel.startsWith(".")) rel = `./${rel}`;
+      aliases[pkg] = rel;
+    } else {
+      aliases[pkg] = abs;
+    }
   }
   return aliases;
 }
 
 function applyFirebaseWebpackAliases(config, dir) {
-  const aliases = firebaseResolveAliases(dir);
+  const aliases = firebaseResolveAliases(dir, "webpack");
   if (!Object.keys(aliases).length) return config;
   config.resolve ??= {};
   const prev = config.resolve.alias;
