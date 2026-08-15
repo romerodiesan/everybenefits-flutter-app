@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, useRouter } from "@/i18n/navigation";
 import { useAuth } from "@/lib/providers/auth-provider";
@@ -34,6 +42,7 @@ import {
   formatRelative,
   IconComment,
   IconHeart,
+  IconShare,
 } from "@/components/forums/forum-ui";
 
 const ROLE_KEY: Record<UserRole, string> = {
@@ -62,6 +71,13 @@ function excerpt(body: string, max = 140) {
   if (!cleaned) return "";
   if (cleaned.length <= max) return cleaned;
   return `${cleaned.slice(0, max - 1)}…`;
+}
+
+function splitDisplayName(name: string): [string, string | null] {
+  const trimmed = name.trim();
+  const space = trimmed.indexOf(" ");
+  if (space === -1) return [trimmed || "—", null];
+  return [trimmed.slice(0, space), trimmed.slice(space + 1).trim() || null];
 }
 
 function publicLocation(person: UserProfile) {
@@ -143,9 +159,7 @@ export function MemberProfile({ handle }: { handle: string }) {
 
   const stats = useMemo(() => {
     const posts = threads.length;
-    const replies = threads.reduce((sum, item) => sum + (item.replyCount ?? 0), 0);
-    const likes = threads.reduce((sum, item) => sum + Math.max(0, item.score), 0);
-    return { posts, replies, likes };
+    return { posts };
   }, [threads]);
 
   function errMessage(caught: unknown) {
@@ -225,17 +239,19 @@ export function MemberProfile({ handle }: { handle: string }) {
 
   if (loading) {
     return (
-      <div className="mx-auto w-full max-w-[720px] px-3 py-10 md:px-4">
-        <div className="profile-cover animate-pulse" />
-        <p className="mt-6 text-sm text-muted">{t("loading")}</p>
+      <div className="profile-page">
+        <div className="profile-masthead">
+          <div className="profile-portrait animate-pulse" />
+        </div>
+        <p className="mt-8 px-5 text-sm text-muted">{t("loading")}</p>
       </div>
     );
   }
 
   if (!person) {
     return (
-      <div className="mx-auto w-full max-w-[720px] px-4 py-10">
-        <p className="mt-3 text-sm text-muted">{t("memberNotFound")}</p>
+      <div className="profile-page px-5 py-10">
+        <p className="text-sm text-muted">{t("memberNotFound")}</p>
       </div>
     );
   }
@@ -255,209 +271,213 @@ export function MemberProfile({ handle }: { handle: string }) {
       )
     : null;
   const coverTint = person.profileBadge?.backgroundColor;
+  const givenName = headlineName(person);
+  const [firstName, lastName] = splitDisplayName(givenName);
+  const mark = (firstName.trim() || givenName).charAt(0).toUpperCase();
+  const metaLine = [t(ROLE_KEY[person.role]), location, person.agency]
+    .filter((part): part is string => Boolean(part?.trim()))
+    .join(" · ");
+  const quote = person.bio?.trim() ?? "";
 
   return (
-    <div className="mx-auto w-full max-w-[720px] px-3 pb-16 pt-4 md:px-4">
-      <article className="overflow-hidden rounded-[22px] border border-glass-border bg-sheet">
-        <div
-          className="profile-cover"
-          style={
-            coverTint
-              ? ({ ["--profile-cover-tint"]: coverTint } as CSSProperties)
-              : undefined
-          }
-        />
-        <div className="px-4 pb-5 md:px-5">
-          <div className="-mt-12 flex items-end justify-between gap-3">
-            <div className="rounded-full bg-sheet p-1 shadow-[0_8px_24px_rgba(0,0,0,0.18)] ring-2 ring-sheet">
-              <Avatar
-                name={headlineName(person)}
-                photoUrl={person.photoUrl}
-                size={96}
+    <div
+      className="profile-page"
+      style={
+        coverTint
+          ? ({ ["--profile-cover-tint"]: coverTint } as CSSProperties)
+          : undefined
+      }
+    >
+      <article>
+        <div className="profile-masthead">
+          <div className="profile-portrait-wrap">
+          <div className="profile-portrait">
+            <span className="profile-portrait-mark" aria-hidden>
+              {mark}
+            </span>
+            {person.photoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element -- emulator/LAN photo URLs
+              <img
+                src={person.photoUrl}
+                alt=""
+                decoding="async"
+                referrerPolicy="no-referrer"
               />
-            </div>
-            <div className="mb-1 flex flex-wrap items-center justify-end gap-2">
-              {isSelf ? (
-                <Link href="/account">
-                  <Button variant="secondary" className="h-9 px-4 text-xs">
-                    {t("memberEditProfile")}
-                  </Button>
-                </Link>
-              ) : (
-                <>
-                  {rel && !rel.blockedByMe ? (
-                    <Button
-                      variant={rel.following ? "secondary" : "primary"}
-                      className="h-9 px-4 text-xs"
-                      disabled={busy}
-                      onClick={() =>
-                        run(() =>
-                          rel.following ? unfollowUser(uid) : followUser(uid),
-                        )
-                      }
-                    >
-                      {rel.following ? t("profileFollowing") : t("profileFollow")}
-                    </Button>
-                  ) : null}
-                  <ActionRow
-                    busy={busy}
-                    rel={rel}
-                    canMessage={canMessage}
-                    onAdd={() => run(() => sendContactRequest(uid))}
-                    onCancel={() => run(() => cancelContactRequest(uid))}
-                    onAccept={() => run(() => acceptContactRequest(uid))}
-                    onDecline={() => run(() => declineContactRequest(uid))}
-                    onMessage={async () => {
-                      if (!me || !canMessage) return;
-                      setBusy(true);
-                      try {
-                        const chat = await getOrCreateDm(me, person);
-                        router.push(`/chats/${chat.id}`);
-                      } catch (e) {
-                        setError(errMessage(e));
-                        setBusy(false);
-                      }
-                    }}
-                  />
-                </>
-              )}
-              <div className="relative" ref={menuRef}>
-                <Button
-                  variant="ghost"
-                  className="h-9 w-9 px-0 text-lg"
-                  aria-label={t("profileMore")}
-                  aria-expanded={menuOpen}
-                  onClick={() => setMenuOpen((open) => !open)}
-                >
-                  ⋯
-                </Button>
-                {menuOpen ? (
-                  <div className="absolute right-0 z-20 mt-1 min-w-[13rem] overflow-hidden rounded-xl border border-glass-border bg-sheet py-1 shadow-lg">
-                    <MenuItem
-                      onClick={() => {
-                        setMenuOpen(false);
-                        void shareProfile();
-                      }}
-                    >
-                      {t("profileShare")}
-                    </MenuItem>
-                    <MenuItem
-                      onClick={() => {
-                        setMenuOpen(false);
-                        void copyLink();
-                      }}
-                    >
-                      {copied ? t("profileLinkCopied") : t("profileCopyLink")}
-                    </MenuItem>
-                    {!isSelf && rel ? (
-                      <>
-                        {rel.status === "contact" ? (
-                          <MenuItem
-                            onClick={() => {
-                              setMenuOpen(false);
-                              void run(() => removeContact(uid));
-                            }}
-                          >
-                            {t("memberRemoveContact")}
-                          </MenuItem>
-                        ) : null}
-                        {!rel.blockedByMe ? (
-                          <MenuItem
-                            onClick={() => {
-                              setMenuOpen(false);
-                              void run(() => setMuted(uid, !rel.muted));
-                            }}
-                          >
-                            {rel.muted ? t("memberUnmute") : t("memberMute")}
-                          </MenuItem>
-                        ) : null}
-                        <MenuItem
-                          danger
-                          onClick={() => {
-                            setMenuOpen(false);
-                            void run(() => setBlocked(uid, !rel.blockedByMe));
-                          }}
-                        >
-                          {rel.blockedByMe ? t("memberUnblock") : t("memberBlock")}
-                        </MenuItem>
-                        <MenuItem
-                          danger
-                          onClick={() => {
-                            setMenuOpen(false);
-                            setReportOpen(true);
-                          }}
-                        >
-                          {t("profileReport")}
-                        </MenuItem>
-                      </>
-                    ) : null}
-                  </div>
-                ) : null}
+            ) : null}
+            {person.profileBadge ? (
+              <div className="profile-portrait-stamp">
+                <RoleBadgeView compact badge={person.profileBadge} />
               </div>
+            ) : null}
+          </div>
+            <div className="profile-portrait-tools" ref={menuRef}>
+              <button
+                type="button"
+                className="profile-tool"
+                aria-label={t("profileMore")}
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((open) => !open)}
+              >
+                ⋯
+              </button>
+              {menuOpen ? (
+                <div className="absolute right-0 top-11 z-20 min-w-[13rem] overflow-hidden rounded-xl border border-glass-border bg-sheet py-1 shadow-lg">
+                  <MenuItem
+                    onClick={() => {
+                      setMenuOpen(false);
+                      void copyLink();
+                    }}
+                  >
+                    {copied ? t("profileLinkCopied") : t("profileCopyLink")}
+                  </MenuItem>
+                  {!isSelf && rel ? (
+                    <>
+                      {rel.status === "contact" ? (
+                        <MenuItem
+                          onClick={() => {
+                            setMenuOpen(false);
+                            void run(() => removeContact(uid));
+                          }}
+                        >
+                          {t("memberRemoveContact")}
+                        </MenuItem>
+                      ) : null}
+                      {!rel.blockedByMe ? (
+                        <MenuItem
+                          onClick={() => {
+                            setMenuOpen(false);
+                            void run(() => setMuted(uid, !rel.muted));
+                          }}
+                        >
+                          {rel.muted ? t("memberUnmute") : t("memberMute")}
+                        </MenuItem>
+                      ) : null}
+                      <MenuItem
+                        danger
+                        onClick={() => {
+                          setMenuOpen(false);
+                          void run(() => setBlocked(uid, !rel.blockedByMe));
+                        }}
+                      >
+                        {rel.blockedByMe ? t("memberUnblock") : t("memberBlock")}
+                      </MenuItem>
+                      <MenuItem
+                        danger
+                        onClick={() => {
+                          setMenuOpen(false);
+                          setReportOpen(true);
+                        }}
+                      >
+                        {t("profileReport")}
+                      </MenuItem>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
 
-          <div className="mt-3">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="font-display text-2xl font-bold tracking-tight">
-                {headlineName(person)}
-              </h1>
-              <RoleBadgeView compact badge={person.profileBadge} />
-              <span className="rounded-full bg-brand/12 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-brand">
-                {t(ROLE_KEY[person.role])}
-              </span>
-            </div>
-            <p className="mt-0.5 text-sm font-semibold text-muted">@{atHandle}</p>
+          <div className="profile-type">
+            <p className="profile-kicker">@{atHandle}</p>
+            <h1 className="profile-name">
+              <span>{firstName}</span>
+              {lastName ? <span>{lastName}</span> : null}
+            </h1>
             {isSelf && !hasClaimedUsername(person.username) ? (
               <Link
                 href="/account"
-                className="mt-1 inline-block text-xs font-bold text-brand"
+                className="mt-2 inline-block text-xs font-bold text-brand"
               >
                 {t("usernameChoose")}
               </Link>
             ) : null}
-            {person.agency ? (
-              <p className="mt-2 flex items-center gap-1.5 text-sm font-semibold">
-                <span aria-hidden>◎</span>
-                {person.agency}
-              </p>
-            ) : null}
-            {location ? (
-              <p className="mt-1 text-sm text-muted">{location}</p>
-            ) : null}
-            {person.bio ? (
-              <p className="mt-3 max-w-xl text-[15px] leading-relaxed">
-                {person.bio}
-              </p>
+            {metaLine ? <p className="profile-meta">{metaLine}</p> : null}
+            {quote ? (
+              <blockquote className="profile-quote">
+                <p className="line-clamp-3">{quote}</p>
+              </blockquote>
             ) : null}
           </div>
-
-          <div className="mt-4 flex flex-wrap gap-1 border-y border-glass-border py-3">
-            <Stat value={stats.posts} label={t("profileStatPosts")} />
-            <Stat value={stats.replies} label={t("profileStatReplies")} />
-            <Stat value={stats.likes} label={t("profileStatLikes")} />
-            <Stat
-              value={person.followerCount ?? 0}
-              label={t("profileStatFollowers")}
-              onClick={() => void openList("followers")}
-            />
-            <Stat
-              value={person.followingCount ?? 0}
-              label={t("profileStatFollowing")}
-              onClick={() => void openList("following")}
-            />
-          </div>
-
-          {error ? (
-            <p className="mt-3 text-sm text-red-400">{error}</p>
-          ) : null}
-          {notice ? (
-            <p className="mt-3 text-sm text-brand">{notice}</p>
-          ) : null}
         </div>
+
+        <div className="profile-stats">
+          <Stat
+            value={person.followerCount ?? 0}
+            label={t("profileStatFollowers")}
+            onClick={() => void openList("followers")}
+          />
+          <Stat
+            value={person.followingCount ?? 0}
+            label={t("profileStatFollowing")}
+            onClick={() => void openList("following")}
+          />
+          <Stat value={stats.posts} label={t("profileStatPosts")} />
+        </div>
+
+        <div className="profile-dock">
+          {isSelf ? (
+            <Link href="/account" className="profile-dock-primary">
+              <Button variant="secondary" className="w-full">
+                {t("memberEditProfile")}
+              </Button>
+            </Link>
+          ) : (
+            <>
+              {rel && !rel.blockedByMe ? (
+                <Button
+                  variant={rel.following ? "secondary" : "primary"}
+                  className="profile-dock-primary"
+                  disabled={busy}
+                  onClick={() =>
+                    run(() =>
+                      rel.following ? unfollowUser(uid) : followUser(uid),
+                    )
+                  }
+                >
+                  {rel.following ? t("profileFollowing") : t("profileFollow")}
+                </Button>
+              ) : null}
+              <ActionRow
+                busy={busy}
+                rel={rel}
+                canMessage={canMessage}
+                onAdd={() => run(() => sendContactRequest(uid))}
+                onCancel={() => run(() => cancelContactRequest(uid))}
+                onAccept={() => run(() => acceptContactRequest(uid))}
+                onDecline={() => run(() => declineContactRequest(uid))}
+                onMessage={async () => {
+                  if (!me || !canMessage) return;
+                  setBusy(true);
+                  try {
+                    const chat = await getOrCreateDm(me, person);
+                    router.push(`/chats/${chat.id}`);
+                  } catch (e) {
+                    setError(errMessage(e));
+                    setBusy(false);
+                  }
+                }}
+              />
+            </>
+          )}
+          <Button
+            variant="secondary"
+            className="h-10 w-10 shrink-0 px-0"
+            aria-label={t("profileShare")}
+            onClick={() => void shareProfile()}
+          >
+            <IconShare width={16} height={16} />
+          </Button>
+        </div>
+
+        {error ? (
+          <p className="mt-3 px-[1.15rem] text-sm text-red-400 md:px-6">{error}</p>
+        ) : null}
+        {notice ? (
+          <p className="mt-3 px-[1.15rem] text-sm text-brand md:px-6">{notice}</p>
+        ) : null}
       </article>
 
-      <div className="profile-tabs mt-5 px-1" role="tablist">
+      <div className="profile-tabs" role="tablist">
         <button
           type="button"
           role="tab"
@@ -479,59 +499,62 @@ export function MemberProfile({ handle }: { handle: string }) {
       </div>
 
       {tab === "posts" ? (
-        <section className="mt-1">
+        <section className="profile-mosaic">
           {threads.length === 0 ? (
-            <p className="mt-3 px-1 text-sm text-muted">{t("profilePostsEmpty")}</p>
-          ) : (
-            <div>
-              {threads.map((thread) => {
-                const preview = excerpt(thread.body);
-                return (
-                  <Link
-                    key={thread.id}
-                    href={`/home/${thread.id}`}
-                    className="profile-post"
-                  >
-                    <p className="profile-post-title line-clamp-2">{thread.title}</p>
-                    {preview ? (
-                      <p className="profile-post-excerpt line-clamp-2">{preview}</p>
-                    ) : null}
-                    <div className="profile-post-meta">
-                      <span className="tabular-nums">
-                        {formatRelative(thread.createdAt, t("forumsJustNow"))}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <IconHeart width={12} height={12} />
-                        {Math.max(0, thread.score)}
-                      </span>
-                      <span className="inline-flex items-center gap-1">
-                        <IconComment width={12} height={12} />
-                        {thread.replyCount}
-                      </span>
-                    </div>
-                  </Link>
-                );
-              })}
+            <div className="feed-card profile-empty">
+              <p className="font-display text-2xl font-extrabold tracking-tight">
+                {t("profilePosts")}
+              </p>
+              <p className="mt-1 text-sm text-muted">{t("profilePostsEmpty")}</p>
             </div>
+          ) : (
+            threads.map((thread) => {
+              const preview = excerpt(thread.body);
+              return (
+                <Link
+                  key={thread.id}
+                  href={`/home/${thread.id}`}
+                  className="profile-post feed-card"
+                >
+                  <p className="profile-post-title line-clamp-3">{thread.title}</p>
+                  {preview ? (
+                    <p className="profile-post-excerpt line-clamp-3">{preview}</p>
+                  ) : null}
+                  <div className="profile-post-meta">
+                    <span className="tabular-nums">
+                      {formatRelative(thread.createdAt, t("forumsJustNow"))}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <IconHeart width={13} height={13} />
+                      {Math.max(0, thread.score)}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <IconComment width={13} height={13} />
+                      {thread.replyCount}
+                    </span>
+                  </div>
+                </Link>
+              );
+            })
           )}
         </section>
       ) : (
-        <section className="mt-2 px-1">
-          <AboutRow label={t("profileRole")} value={t(ROLE_KEY[person.role])} />
+        <section className="profile-about">
+          <AboutBlock
+            kicker={t("profileRole")}
+            value={t(ROLE_KEY[person.role])}
+          />
           {person.agency ? (
-            <AboutRow label={t("agency")} value={person.agency} />
+            <AboutBlock kicker={t("agency")} value={person.agency} />
           ) : null}
           {location ? (
-            <AboutRow label={t("profileLocation")} value={location} />
+            <AboutBlock kicker={t("profileLocation")} value={location} />
           ) : null}
           {joined ? (
-            <AboutRow
-              label={t("profileJoined", { date: joined })}
-              value={null}
-            />
+            <AboutBlock value={t("profileJoined", { date: joined })} />
           ) : null}
-          {person.bio ? (
-            <p className="mt-4 text-[15px] leading-relaxed">{person.bio}</p>
+          {quote ? (
+            <AboutBlock kicker={t("profileAbout")} value={quote} body />
           ) : null}
         </section>
       )}
@@ -582,29 +605,37 @@ function Stat({
 }) {
   const inner = (
     <>
-      <span className="font-display text-lg font-bold tabular-nums">{value}</span>
-      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
+      <span className="font-display text-[1.85rem] font-extrabold tabular-nums leading-none tracking-tight md:text-[2.15rem]">
+        {value}
+      </span>
+      <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
         {label}
       </span>
     </>
   );
   if (onClick) {
     return (
-      <button type="button" className="profile-stat profile-stat-btn flex-1" onClick={onClick}>
+      <button type="button" className="profile-stat-btn" onClick={onClick}>
         {inner}
       </button>
     );
   }
-  return <div className="profile-stat flex-1">{inner}</div>;
+  return <div className="profile-stat">{inner}</div>;
 }
 
-function AboutRow({ label, value }: { label: string; value: string | null }) {
+function AboutBlock({
+  kicker,
+  value,
+  body = false,
+}: {
+  kicker?: string;
+  value: string;
+  body?: boolean;
+}) {
   return (
-    <div className="profile-about-row">
-      <p className="min-w-[6rem] text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted">
-        {value ? label : null}
-      </p>
-      <p className="text-sm font-semibold">{value ?? label}</p>
+    <div>
+      {kicker ? <p className="profile-about-kicker">{kicker}</p> : null}
+      <p className={body ? "profile-about-bio" : "profile-about-value"}>{value}</p>
     </div>
   );
 }
@@ -614,7 +645,7 @@ function MenuItem({
   onClick,
   danger = false,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   onClick: () => void;
   danger?: boolean;
 }) {
@@ -654,24 +685,14 @@ function ActionRow({
   if (!rel) return null;
   if (rel.status === "none" && !rel.blockedByMe) {
     return (
-      <Button
-        variant="secondary"
-        className="h-9 px-4 text-xs"
-        disabled={busy}
-        onClick={onAdd}
-      >
+      <Button variant="secondary" disabled={busy} onClick={onAdd}>
         {t("memberAddContact")}
       </Button>
     );
   }
   if (rel.status === "outgoing") {
     return (
-      <Button
-        variant="secondary"
-        className="h-9 px-4 text-xs"
-        disabled={busy}
-        onClick={onCancel}
-      >
+      <Button variant="secondary" disabled={busy} onClick={onCancel}>
         {t("memberCancelRequest")}
       </Button>
     );
@@ -679,15 +700,10 @@ function ActionRow({
   if (rel.status === "incoming") {
     return (
       <>
-        <Button className="h-9 px-4 text-xs" disabled={busy} onClick={onAccept}>
+        <Button disabled={busy} onClick={onAccept}>
           {t("memberAcceptRequest")}
         </Button>
-        <Button
-          variant="secondary"
-          className="h-9 px-4 text-xs"
-          disabled={busy}
-          onClick={onDecline}
-        >
+        <Button variant="secondary" disabled={busy} onClick={onDecline}>
           {t("memberDeclineRequest")}
         </Button>
       </>
@@ -695,11 +711,7 @@ function ActionRow({
   }
   if (rel.status === "contact") {
     return (
-      <Button
-        className="h-9 px-4 text-xs"
-        disabled={busy || !canMessage}
-        onClick={onMessage}
-      >
+      <Button disabled={busy || !canMessage} onClick={onMessage}>
         {t("memberMessage")}
       </Button>
     );
@@ -843,12 +855,12 @@ function ReportDialog({
             <Button
               type="button"
               variant="secondary"
-              className="h-9 flex-1 text-xs"
+              className="flex-1"
               onClick={onClose}
             >
               {t("dialogClose")}
             </Button>
-            <Button type="submit" className="h-9 flex-1 text-xs" disabled={busy}>
+            <Button type="submit" className="flex-1" disabled={busy}>
               {t("profileReportSubmit")}
             </Button>
           </div>

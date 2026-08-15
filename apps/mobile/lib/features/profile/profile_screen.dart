@@ -401,11 +401,6 @@ class ProfileScreenState extends State<ProfileScreen> {
     );
     final bottomPad = pulseShellListBottomPad(context, hasFab: true);
     final posts = _threads.length;
-    final replies = _threads.fold<int>(0, (sum, item) => sum + item.replyCount);
-    final likes = _threads.fold<int>(
-      0,
-      (sum, item) => sum + (item.score < 0 ? 0 : item.score),
-    );
 
     return PulseScaffold(
       body: PulseConstrained(
@@ -418,8 +413,6 @@ class ProfileScreenState extends State<ProfileScreen> {
             ProfileSocialHeader(
               person: profile,
               posts: posts,
-              replies: replies,
-              likes: likes,
               roleLabel: roleLabelForId(profile.roleId, l10n),
               showLocation: profile.showLocationOnProfile,
               followerCount: profile.followerCount,
@@ -430,6 +423,7 @@ class ProfileScreenState extends State<ProfileScreen> {
               showEditBadge: true,
               onAvatarTap: _uploading ? null : _pickAvatar,
               onChooseUsername: openEdit,
+              onShare: () => sharePublicProfile(context, profile),
               topBar: Row(
                 children: [
                   const Spacer(),
@@ -443,16 +437,6 @@ class ProfileScreenState extends State<ProfileScreen> {
                         foregroundColor: colors.ink,
                       ),
                     ),
-                  IconButton(
-                    tooltip: l10n.profileShare,
-                    onPressed: () => sharePublicProfile(context, profile),
-                    style: IconButton.styleFrom(
-                      backgroundColor:
-                          colors.glassFill.withValues(alpha: 0.7),
-                      foregroundColor: colors.ink,
-                    ),
-                    icon: const Icon(Icons.ios_share_rounded),
-                  ),
                   IconButton(
                     tooltip: l10n.profileSettingsTooltip,
                     onPressed: _openSettings,
@@ -468,10 +452,7 @@ class ProfileScreenState extends State<ProfileScreen> {
               actions: OutlinedButton(
                 onPressed: openEdit,
                 style: OutlinedButton.styleFrom(
-                  visualDensity: VisualDensity.compact,
-                  minimumSize: const Size(0, 36),
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  minimumSize: const Size.fromHeight(44),
                 ),
                 child: Text(l10n.fabEditProfile),
               ),

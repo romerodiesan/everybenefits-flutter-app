@@ -1,23 +1,34 @@
+import 'dart:math' as math;
+
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/role_badge.dart';
 import '../../../l10n/l10n.dart';
+import '../../../users/avatar_storage.dart';
 import '../../../users/user_profile.dart';
 import '../../forums/forum_models.dart';
 import '../../forums/widgets/relative_time.dart';
-import 'profile_avatar.dart';
+
+(String, String?) splitDisplayName(String name) {
+  final trimmed = name.trim();
+  final space = trimmed.indexOf(' ');
+  if (space == -1) return (trimmed.isEmpty ? '—' : trimmed, null);
+  final rest = trimmed.substring(space + 1).trim();
+  return (trimmed.substring(0, space), rest.isEmpty ? null : rest);
+}
 
 class ProfileSocialHeader extends StatelessWidget {
   const ProfileSocialHeader({
     super.key,
     required this.person,
     required this.posts,
-    required this.replies,
-    required this.likes,
     this.topBar,
     this.actions,
+    this.portraitMenu,
+    this.onShare,
     this.onAvatarTap,
     this.onChooseUsername,
     this.avatarBusy = false,
@@ -32,10 +43,10 @@ class ProfileSocialHeader extends StatelessWidget {
 
   final UserProfile person;
   final int posts;
-  final int replies;
-  final int likes;
   final Widget? topBar;
   final Widget? actions;
+  final Widget? portraitMenu;
+  final VoidCallback? onShare;
   final VoidCallback? onAvatarTap;
   final VoidCallback? onChooseUsername;
   final bool avatarBusy;
@@ -58,217 +69,332 @@ class ProfileSocialHeader extends StatelessWidget {
     final cover = person.profileBadge?.backgroundColor ?? brand;
     final location = showLocation ? person.publicLocation : null;
     final top = MediaQuery.paddingOf(context).top;
+    final given = person.headlineName;
+    final split = splitDisplayName(given);
+    final source = split.$1.trim().isNotEmpty ? split.$1.trim() : given.trim();
+    final mark = source.isEmpty ? 'P' : source[0].toUpperCase();
+    final role = roleLabel?.trim();
+    final agency = person.agency?.trim();
+    final meta = [
+      if (role != null && role.isNotEmpty) role,
+      ?location,
+      if (agency != null && agency.isNotEmpty) agency,
+    ].join(' · ');
+    final quote = person.bio?.trim();
+    final portraitW = math.min(
+      280.0,
+      MediaQuery.sizeOf(context).width - AppSpacing.lg * 2,
+    );
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          height: 128 + top * 0.25,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned.fill(
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        cover.withValues(alpha: 0.62),
-                        cover.withValues(alpha: 0.22),
-                        colors.meshDeep,
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: RadialGradient(
+          center: const Alignment(-0.7, -1.05),
+          radius: 1.15,
+          colors: [
+            cover.withValues(alpha: 0.28),
+            colors.meshBase.withValues(alpha: 0),
+          ],
+        ),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(height: top + 8),
+          if (topBar != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: topBar!,
+            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _Portrait(
+                  person: person,
+                  cover: cover,
+                  mark: mark,
+                  width: portraitW,
+                  busy: avatarBusy,
+                  showEditBadge: showEditBadge,
+                  onTap: onAvatarTap,
+                  menu: portraitMenu,
+                ),
+                const SizedBox(height: 22),
+                Text(
+                  '@$_handle',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: colors.muted,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2.2,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  split.$1,
+                  style: theme.textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -1.8,
+                    height: 0.88,
+                    fontSize: 44,
+                    color: colors.ink,
+                  ),
+                ),
+                if (split.$2 != null)
+                  Text(
+                    split.$2!,
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: -1.8,
+                      height: 0.88,
+                      fontSize: 44,
+                      color: colors.ink,
+                    ),
+                  ),
+                if (onChooseUsername != null && !person.hasUsername)
+                  TextButton(
+                    onPressed: onChooseUsername,
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: const Size(0, 28),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(l10n.usernameChoose),
+                  ),
+                if (meta.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    meta,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: colors.ink,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+                if (quote != null && quote.isNotEmpty) ...[
+                  const SizedBox(height: 18),
+                  Text(
+                    '“',
+                    style: theme.textTheme.displaySmall?.copyWith(
+                      fontSize: 42,
+                      height: 0.55,
+                      color: cover.withValues(alpha: 0.7),
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    quote,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                      height: 1.4,
+                      fontSize: 18,
+                      color: colors.ink,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    _Stat(
+                      value: followerCount,
+                      label: l10n.profileStatFollowers,
+                      onTap: onFollowersTap,
+                    ),
+                    _Stat(
+                      value: followingCount,
+                      label: l10n.profileStatFollowing,
+                      onTap: onFollowingTap,
+                    ),
+                    _Stat(value: posts, label: l10n.profileStatPosts),
+                  ],
+                ),
+                if (actions != null || onShare != null) ...[
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      if (actions != null)
+                        Expanded(child: actions!),
+                      if (onShare != null) ...[
+                        if (actions != null) const SizedBox(width: 8),
+                        IconButton.filledTonal(
+                          tooltip: l10n.profileShare,
+                          onPressed: onShare,
+                          style: IconButton.styleFrom(
+                            backgroundColor: colors.sheet,
+                            foregroundColor: colors.ink,
+                            side: BorderSide(color: colors.border),
+                            minimumSize: const Size(44, 44),
+                          ),
+                          icon: const Icon(Icons.ios_share_rounded),
+                        ),
                       ],
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                right: -28,
-                top: top + 8,
-                child: IgnorePointer(
-                  child: Container(
-                    width: 150,
-                    height: 150,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withValues(alpha: 0.08),
-                    ),
-                  ),
-                ),
-              ),
-              if (topBar != null)
-                Positioned(
-                  top: top + 4,
-                  left: 8,
-                  right: 8,
-                  child: topBar!,
-                ),
-              Positioned(
-                left: AppSpacing.lg,
-                bottom: -36,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: colors.meshDeep,
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.22),
-                        blurRadius: 16,
-                        offset: const Offset(0, 6),
-                      ),
                     ],
                   ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(3),
-                    child: ProfileAvatar(
-                      profile: person,
-                      size: 86,
-                      busy: avatarBusy,
-                      showEditBadge: showEditBadge,
-                      onTap: onAvatarTap,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            44,
-            AppSpacing.lg,
-            0,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (actions != null) ...[
-                Align(alignment: Alignment.centerRight, child: actions!),
-                const SizedBox(height: 8),
+                ],
               ],
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  Text(
-                    person.headlineName,
-                    style: theme.textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.6,
-                      height: 1.1,
-                    ),
-                  ),
-                  RoleBadge(
-                    badge: person.profileBadge,
-                    dense: true,
-                  ),
-                  if (roleLabel != null && roleLabel!.trim().isNotEmpty)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: brand.withValues(alpha: 0.14),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(
-                        roleLabel!.toUpperCase(),
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: brand,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 0.7,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                '@$_handle',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colors.muted,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              if (onChooseUsername != null && !person.hasUsername)
-                TextButton(
-                  onPressed: onChooseUsername,
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 28),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(l10n.usernameChoose),
-                ),
-              if (person.agency?.trim().isNotEmpty == true)
-                Padding(
-                  padding: const EdgeInsets.only(top: 6),
-                  child: Text(
-                    person.agency!.trim(),
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              if (location != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text(
-                    location,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: colors.muted,
-                    ),
-                  ),
-                ),
-              if (person.bio?.trim().isNotEmpty == true)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Text(
-                    person.bio!.trim(),
-                    style: theme.textTheme.bodyLarge?.copyWith(height: 1.4),
-                  ),
-                ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  _Stat(value: posts, label: l10n.profileStatPosts),
-                  _Stat(value: replies, label: l10n.profileStatReplies),
-                  _Stat(value: likes, label: l10n.profileStatLikes),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 16,
-                runSpacing: 4,
-                children: [
-                  _FollowCount(
-                    value: followerCount,
-                    label: l10n.profileStatFollowers,
-                    onTap: onFollowersTap,
-                  ),
-                  _FollowCount(
-                    value: followingCount,
-                    label: l10n.profileStatFollowing,
-                    onTap: onFollowingTap,
-                  ),
-                ],
-              ),
-            ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
-class _FollowCount extends StatelessWidget {
-  const _FollowCount({
+class _Portrait extends StatelessWidget {
+  const _Portrait({
+    required this.person,
+    required this.cover,
+    required this.mark,
+    required this.width,
+    required this.busy,
+    required this.showEditBadge,
+    this.onTap,
+    this.menu,
+  });
+
+  final UserProfile person;
+  final Color cover;
+  final String mark;
+  final double width;
+  final bool busy;
+  final bool showEditBadge;
+  final VoidCallback? onTap;
+  final Widget? menu;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = AppColors.of(context);
+    final photoUrl = sanitizeOptionalAvatarDownloadUrl(person.photoUrl);
+    final height = width * 4 / 3;
+
+    final plate = ClipRRect(
+      borderRadius: BorderRadius.circular(28),
+      child: SizedBox(
+        width: width,
+        height: height,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    cover.withValues(alpha: 0.92),
+                    cover.withValues(alpha: 0.42),
+                    colors.meshDeep,
+                  ],
+                ),
+              ),
+            ),
+            Positioned(
+              right: -18,
+              bottom: -36,
+              child: IgnorePointer(
+                child: Text(
+                  mark,
+                  style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                        fontSize: 168,
+                        height: 0.8,
+                        color: Colors.white.withValues(alpha: 0.16),
+                      ),
+                ),
+              ),
+            ),
+            if (photoUrl != null)
+              CachedNetworkImage(
+                imageUrl: photoUrl,
+                fit: BoxFit.cover,
+                fadeInDuration: const Duration(milliseconds: 120),
+                errorWidget: (context, url, error) => const SizedBox.shrink(),
+                placeholder: (context, url) => const SizedBox.shrink(),
+              ),
+            if (person.profileBadge != null)
+              Positioned(
+                left: 12,
+                bottom: 12,
+                child: RoleBadge(badge: person.profileBadge, dense: true),
+              ),
+            if (busy)
+              const ColoredBox(
+                color: Color(0x73000000),
+                child: Center(
+                  child: SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                ),
+              ),
+            if (showEditBadge && !busy)
+              Positioned(
+                right: 12,
+                bottom: 12,
+                child: Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: AppColors.brandOf(context),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: colors.meshBase, width: 2),
+                  ),
+                  child: Icon(
+                    Icons.camera_alt_rounded,
+                    size: 18,
+                    color: onBrandFor(AppColors.brandOf(context)),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+
+    final framed = DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        boxShadow: [
+          BoxShadow(
+            color: cover.withValues(alpha: 0.35),
+            blurRadius: 28,
+            offset: const Offset(0, 16),
+          ),
+        ],
+      ),
+      child: plate,
+    );
+
+    return SizedBox(
+      width: width,
+      height: height,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          if (onTap == null)
+            framed
+          else
+            GestureDetector(onTap: busy ? null : onTap, child: framed),
+          if (menu != null)
+            Positioned(
+              top: 8,
+              right: 8,
+              child: menu!,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Stat extends StatelessWidget {
+  const _Stat({
     required this.value,
     required this.label,
     this.onTap,
@@ -282,66 +408,41 @@ class _FollowCount extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
-    final child = Text.rich(
-      TextSpan(
-        children: [
-          TextSpan(
-            text: '$value ',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-          TextSpan(
-            text: label,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: colors.muted,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-    if (onTap == null) return child;
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: child,
-    );
-  }
-}
-
-class _Stat extends StatelessWidget {
-  const _Stat({required this.value, required this.label});
-
-  final int value;
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
-    return Expanded(
+    final child = Padding(
+      padding: const EdgeInsets.only(right: 12, top: 4, bottom: 4),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             '$value',
-            style: theme.textTheme.titleLarge?.copyWith(
+            style: theme.textTheme.headlineMedium?.copyWith(
               fontWeight: FontWeight.w800,
-              letterSpacing: -0.4,
+              letterSpacing: -1.1,
+              fontSize: 28,
+              color: colors.ink,
             ),
           ),
-          const SizedBox(height: 2),
+          const SizedBox(height: 4),
           Text(
             label.toUpperCase(),
             style: theme.textTheme.labelSmall?.copyWith(
               color: colors.muted,
               fontWeight: FontWeight.w800,
-              letterSpacing: 0.9,
+              letterSpacing: 1.1,
               fontSize: 10,
             ),
           ),
         ],
       ),
+    );
+    return Expanded(
+      child: onTap == null
+          ? child
+          : InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(12),
+              child: child,
+            ),
     );
   }
 }
@@ -370,23 +471,6 @@ class ProfilePostsSection extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.lg,
-            AppSpacing.sm,
-          ),
-          child: Text(
-            l10n.profilePosts.toUpperCase(),
-            style: theme.textTheme.labelLarge?.copyWith(
-              color: colors.muted,
-              letterSpacing: 1.6,
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
         if (loading)
           const Padding(
             padding: EdgeInsets.symmetric(vertical: 32),
@@ -396,27 +480,43 @@ class ProfilePostsSection extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.fromLTRB(
               AppSpacing.lg,
-              4,
+              AppSpacing.md,
               AppSpacing.lg,
               AppSpacing.xl,
             ),
-            child: Text(
-              l10n.profilePostsEmpty,
-              style: theme.textTheme.bodyMedium?.copyWith(color: colors.muted),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  l10n.profilePosts,
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.8,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  l10n.profilePostsEmpty,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: colors.muted,
+                  ),
+                ),
+              ],
             ),
           )
         else
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.md,
+              AppSpacing.lg,
+              0,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 for (var i = 0; i < threads.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      color: colors.border.withValues(alpha: 0.8),
-                    ),
+                  if (i > 0) const SizedBox(height: 10),
                   ProfilePostTile(
                     thread: threads[i],
                     onTap: () => onOpenThread(threads[i]),
@@ -447,72 +547,86 @@ class ProfilePostTile extends StatelessWidget {
     final colors = AppColors.of(context);
     final l10n = context.l10n;
 
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              thread.title,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-                height: 1.3,
-                letterSpacing: -0.15,
-                fontSize: 14.5,
-              ),
-            ),
-            if (thread.body.trim().isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                thread.body.replaceAll(RegExp(r'\s+'), ' ').trim(),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colors.muted,
-                  height: 1.35,
-                ),
-              ),
-            ],
-            const SizedBox(height: 3),
-            Row(
+    return Material(
+      color: colors.sheet,
+      borderRadius: BorderRadius.circular(18),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colors.border),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  formatRelativeTime(thread.createdAt, l10n),
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colors.muted,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 11,
+                  thread.title,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontFamily: 'Outfit',
+                    fontWeight: FontWeight.w800,
+                    height: 1.2,
+                    letterSpacing: -0.35,
+                    fontSize: 18,
+                    color: colors.ink,
                   ),
                 ),
-                const SizedBox(width: 10),
-                Icon(Icons.favorite_rounded, size: 12, color: colors.muted),
-                const SizedBox(width: 3),
-                Text(
-                  '${thread.score < 0 ? 0 : thread.score}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colors.muted,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 11,
+                if (thread.body.trim().isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    thread.body.replaceAll(RegExp(r'\s+'), ' ').trim(),
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.muted,
+                      height: 1.4,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
-                Icon(Icons.mode_comment_outlined, size: 12, color: colors.muted),
-                const SizedBox(width: 3),
-                Text(
-                  '${thread.replyCount}',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: colors.muted,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 11,
-                  ),
+                ],
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Text(
+                      formatRelativeTime(thread.createdAt, l10n),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(Icons.favorite_rounded, size: 13, color: colors.muted),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${thread.score < 0 ? 0 : thread.score}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Icon(
+                      Icons.mode_comment_outlined,
+                      size: 13,
+                      color: colors.muted,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${thread.replyCount}',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colors.muted,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );

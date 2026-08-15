@@ -56,8 +56,6 @@ class ProfileAboutSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colors = AppColors.of(context);
     final l10n = context.l10n;
     final location = showLocation ? person.publicLocation : null;
     final locale = Localizations.localeOf(context);
@@ -73,75 +71,68 @@ class ProfileAboutSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AboutRow(
-            label: roleLabelForId(person.roleId, l10n),
-            title: true,
-          ),
+          _AboutBlock(value: roleLabelForId(person.roleId, l10n)),
           if (person.agency?.trim().isNotEmpty == true)
-            _AboutRow(label: l10n.fieldAgency, value: person.agency!.trim()),
-          if (location != null) _AboutRow(label: location),
-          _AboutRow(label: l10n.profileJoined(joined)),
-          if (person.bio?.trim().isNotEmpty == true)
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: Text(
-                person.bio!.trim(),
-                style: theme.textTheme.bodyLarge?.copyWith(
-                  height: 1.4,
-                  color: colors.ink,
-                ),
-              ),
+            _AboutBlock(
+              kicker: l10n.fieldAgency,
+              value: person.agency!.trim(),
             ),
+          if (location != null) _AboutBlock(value: location),
+          _AboutBlock(value: l10n.profileJoined(joined)),
+          if (person.bio?.trim().isNotEmpty == true)
+            _AboutBlock(value: person.bio!.trim(), body: true),
         ],
       ),
     );
   }
 }
 
-class _AboutRow extends StatelessWidget {
-  const _AboutRow({
-    required this.label,
-    this.value,
-    this.title = false,
+class _AboutBlock extends StatelessWidget {
+  const _AboutBlock({
+    required this.value,
+    this.kicker,
+    this.body = false,
   });
 
-  final String label;
-  final String? value;
-  final bool title;
+  final String value;
+  final String? kicker;
+  final bool body;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = AppColors.of(context);
-    if (value == null) {
-      return Padding(
-        padding: const EdgeInsets.only(bottom: 10),
-        child: Text(
-          label,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: title ? FontWeight.w800 : FontWeight.w600,
-            color: title ? colors.ink : colors.muted,
-          ),
-        ),
-      );
-    }
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label.toUpperCase(),
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: colors.muted,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.9,
+          if (kicker != null)
+            Text(
+              kicker!.toUpperCase(),
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: colors.muted,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.6,
+                fontSize: 11,
+              ),
             ),
-          ),
-          const SizedBox(height: 2),
+          if (kicker != null) const SizedBox(height: 4),
           Text(
-            value!,
-            style: theme.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+            value,
+            style: body
+                ? theme.textTheme.bodyLarge?.copyWith(
+                    height: 1.5,
+                    fontSize: 17,
+                    color: colors.ink,
+                  )
+                : theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.7,
+                    height: 1.15,
+                    fontSize: 26,
+                    color: colors.ink,
+                  ),
           ),
         ],
       ),
@@ -165,25 +156,32 @@ class ProfileTabBar extends StatelessWidget {
     final colors = AppColors.of(context);
     final brand = AppColors.brandOf(context);
     return Padding(
-      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 8, AppSpacing.lg, 0),
-      child: Row(
-        children: [
-          _Tab(
-            label: l10n.profilePosts,
-            selected: index == 0,
-            color: brand,
-            muted: colors.muted,
-            onTap: () => onChanged(0),
+      padding: const EdgeInsets.fromLTRB(AppSpacing.lg, 20, AppSpacing.lg, 0),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(
+            bottom: BorderSide(color: colors.border),
           ),
-          const SizedBox(width: 8),
-          _Tab(
-            label: l10n.profileAbout,
-            selected: index == 1,
-            color: brand,
-            muted: colors.muted,
-            onTap: () => onChanged(1),
-          ),
-        ],
+        ),
+        child: Row(
+          children: [
+            _Tab(
+              label: l10n.profilePosts,
+              selected: index == 0,
+              color: brand,
+              muted: colors.muted,
+              onTap: () => onChanged(0),
+            ),
+            const SizedBox(width: 22),
+            _Tab(
+              label: l10n.profileAbout,
+              selected: index == 1,
+              color: brand,
+              muted: colors.muted,
+              onTap: () => onChanged(1),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -210,24 +208,23 @@ class _Tab extends StatelessWidget {
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 8, top: 8, right: 8),
+        padding: const EdgeInsets.only(bottom: 10, top: 4),
         child: Column(
           children: [
             Text(
               label,
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontFamily: 'Outfit',
                     fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
                     color: selected ? color : muted,
                   ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Container(
               height: 2,
               width: 28,
-              decoration: BoxDecoration(
-                color: selected ? color : Colors.transparent,
-                borderRadius: BorderRadius.circular(99),
-              ),
+              color: selected ? color : Colors.transparent,
             ),
           ],
         ),

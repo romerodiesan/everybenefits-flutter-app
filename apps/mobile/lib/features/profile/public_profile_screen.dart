@@ -233,11 +233,6 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
         rel?.isSelf == true ||
         (person != null && widget.viewer.uid == person.uid);
     final posts = _threads.length;
-    final replies = _threads.fold<int>(0, (sum, item) => sum + item.replyCount);
-    final likes = _threads.fold<int>(
-      0,
-      (sum, item) => sum + (item.score < 0 ? 0 : item.score),
-    );
 
     return PulseScaffold(
       body: _loading
@@ -258,44 +253,20 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                         ProfileSocialHeader(
                           person: person,
                           posts: posts,
-                          replies: replies,
-                          likes: likes,
                           roleLabel: roleLabelForId(person.roleId, l10n),
                           followerCount: person.followerCount,
                           followingCount: person.followingCount,
                           onFollowersTap: () => _openFollowList(true),
                           onFollowingTap: () => _openFollowList(false),
-                          topBar: Row(
-                            children: [
-                              IconButton(
-                                tooltip: MaterialLocalizations.of(context)
-                                    .backButtonTooltip,
-                                style: IconButton.styleFrom(
-                                  backgroundColor:
-                                      colors.glassFill.withValues(alpha: 0.7),
-                                  foregroundColor: colors.ink,
-                                ),
-                                onPressed: () => Navigator.of(context).maybePop(),
-                                icon: const Icon(Icons.arrow_back_rounded),
-                              ),
-                              const Spacer(),
-                              IconButton(
-                                tooltip: l10n.profileShare,
-                                style: IconButton.styleFrom(
-                                  backgroundColor:
-                                      colors.glassFill.withValues(alpha: 0.7),
-                                  foregroundColor: colors.ink,
-                                ),
-                                onPressed: () => sharePublicProfile(context, person),
-                                icon: const Icon(Icons.ios_share_rounded),
-                              ),
-                              if (!isSelf)
-                                PopupMenuButton<String>(
+                          onShare: () => sharePublicProfile(context, person),
+                          portraitMenu: isSelf
+                              ? null
+                              : PopupMenuButton<String>(
                                   enabled: !_busy,
                                   tooltip: l10n.memberProfileTitle,
                                   style: IconButton.styleFrom(
                                     backgroundColor:
-                                        colors.glassFill.withValues(alpha: 0.7),
+                                        colors.glassFill.withValues(alpha: 0.82),
                                     foregroundColor: colors.ink,
                                   ),
                                   onSelected: (value) {
@@ -372,7 +343,19 @@ class _PublicProfileScreenState extends State<PublicProfileScreen> {
                                     ),
                                   ],
                                 ),
-                            ],
+                          topBar: Align(
+                            alignment: Alignment.centerLeft,
+                            child: IconButton(
+                              tooltip: MaterialLocalizations.of(context)
+                                  .backButtonTooltip,
+                              style: IconButton.styleFrom(
+                                backgroundColor:
+                                    colors.glassFill.withValues(alpha: 0.7),
+                                foregroundColor: colors.ink,
+                              ),
+                              onPressed: () => Navigator.of(context).maybePop(),
+                              icon: const Icon(Icons.arrow_back_rounded),
+                            ),
                           ),
                           actions: isSelf
                               ? null
@@ -442,77 +425,92 @@ class _ActionChips extends StatelessWidget {
   final VoidCallback onDecline;
   final VoidCallback onMessage;
 
-  ButtonStyle get _compact => OutlinedButton.styleFrom(
-        visualDensity: VisualDensity.compact,
-        minimumSize: const Size(0, 36),
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  ButtonStyle get _filled => FilledButton.styleFrom(
+        minimumSize: const Size.fromHeight(44),
+      );
+
+  ButtonStyle get _outline => OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(44),
       );
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      alignment: WrapAlignment.end,
-      children: [
-        if (rel?.blockedByMe != true)
-          rel?.following == true
-              ? OutlinedButton(
-                  onPressed: busy ? null : onFollow,
-                  style: _compact,
-                  child: Text(l10n.profileFollowing),
-                )
-              : FilledButton(
-                  onPressed: busy ? null : onFollow,
-                  style: FilledButton.styleFrom(
-                    visualDensity: VisualDensity.compact,
-                    minimumSize: const Size(0, 36),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: Text(l10n.profileFollow),
+    if (rel?.blockedByMe == true) return const SizedBox.shrink();
+
+    Widget follow() {
+      if (rel?.following == true) {
+        return OutlinedButton(
+          onPressed: busy ? null : onFollow,
+          style: _outline,
+          child: Text(l10n.profileFollowing),
+        );
+      }
+      return FilledButton(
+        onPressed: busy ? null : onFollow,
+        style: _filled,
+        child: Text(l10n.profileFollow),
+      );
+    }
+
+    Widget? secondary;
+    if (rel?.status == SocialStatus.none && rel?.blockedByMe != true) {
+      secondary = OutlinedButton(
+        onPressed: busy ? null : onAdd,
+        style: _outline,
+        child: Text(l10n.memberAddContact),
+      );
+    } else if (rel?.status == SocialStatus.outgoing) {
+      secondary = OutlinedButton(
+        onPressed: busy ? null : onCancel,
+        style: _outline,
+        child: Text(l10n.memberCancelRequest),
+      );
+    } else if (rel?.status == SocialStatus.incoming) {
+      secondary = null;
+    } else if (rel?.status == SocialStatus.contact) {
+      secondary = FilledButton(
+        onPressed: busy ? null : onMessage,
+        style: _filled,
+        child: Text(l10n.memberMessage),
+      );
+    }
+
+    if (rel?.status == SocialStatus.incoming) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          follow(),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: busy ? null : onAccept,
+                  style: _filled,
+                  child: Text(l10n.memberAcceptRequest),
                 ),
-        if (rel?.status == SocialStatus.none && rel?.blockedByMe != true)
-          OutlinedButton(
-            onPressed: busy ? null : onAdd,
-            style: _compact,
-            child: Text(l10n.memberAddContact),
-          ),
-        if (rel?.status == SocialStatus.outgoing)
-          OutlinedButton(
-            onPressed: busy ? null : onCancel,
-            style: _compact,
-            child: Text(l10n.memberCancelRequest),
-          ),
-        if (rel?.status == SocialStatus.incoming) ...[
-          FilledButton(
-            onPressed: busy ? null : onAccept,
-            style: FilledButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              minimumSize: const Size(0, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(l10n.memberAcceptRequest),
-          ),
-          OutlinedButton(
-            onPressed: busy ? null : onDecline,
-            style: _compact,
-            child: Text(l10n.memberDeclineRequest),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: busy ? null : onDecline,
+                  style: _outline,
+                  child: Text(l10n.memberDeclineRequest),
+                ),
+              ),
+            ],
           ),
         ],
-        if (rel?.status == SocialStatus.contact)
-          FilledButton(
-            onPressed: busy ? null : onMessage,
-            style: FilledButton.styleFrom(
-              visualDensity: VisualDensity.compact,
-              minimumSize: const Size(0, 36),
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-            child: Text(l10n.memberMessage),
-          ),
+      );
+    }
+
+    return Row(
+      children: [
+        Expanded(child: follow()),
+        if (secondary != null) ...[
+          const SizedBox(width: 8),
+          Expanded(child: secondary),
+        ],
       ],
     );
   }
