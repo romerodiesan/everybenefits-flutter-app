@@ -38,29 +38,19 @@ service cloud.firestore {
         );
     }
 
-    function isManagerOrAdmin() {
-      return isAccountActive()
-        && (
-          callerRole() in ['manager', 'admin', 'system']
-          || hasPermission('admin.access')
-          || hasPermission('admin.orgs.read')
-          || hasPermission('org.tree.read')
-        );
-    }
-
-    /// Guests / anonymous Auth may bootstrap a profile but cannot browse
-    /// forums, academy, or the member directory.
+    /// Registered members: signed-in, account active, not anonymous Auth.
+    /// Profile create cannot be born anonymous, so leftover `role: guest`
+    /// docs are orphan data (ops may delete) and are not a live guest mode.
     function isRegisteredMember() {
       return isAccountActive()
-        && userDoc(request.auth.uid).data.get('isAnonymous', true) == false
-        && userDoc(request.auth.uid).data.get('role', 'guest') != 'guest';
+        && userDoc(request.auth.uid).data.get('isAnonymous', true) == false;
     }
 
     function isForumParticipant() {
       return isRegisteredMember()
         && (
           callerRole() in
-            ['student', 'agent', 'instructor', 'teacher', 'manager', 'admin', 'system']
+            ['student', 'agent', 'agency_owner', 'instructor', 'teacher', 'manager', 'admin', 'system']
           || hasPermission('forums.participate')
         );
     }
@@ -136,7 +126,7 @@ service cloud.firestore {
     }
 
     function callerRole() {
-      return callerProfile().get('role', 'guest');
+      return callerProfile().get('role', 'student');
     }
 
     function normalizedCallerRole() {
@@ -159,6 +149,8 @@ service cloud.firestore {
     }
 
     /// Permission check against Firestore `roles/{roleId}` when seeded.
+    /// Seed built-in roles (`seedSystemRoles`) in every environment; missing
+    /// docs make this fail closed (empty list) except the hardcoded role lists.
     function hasPermission(key) {
       return isAccountActive()
         && (
@@ -255,23 +247,13 @@ service cloud.firestore {
       allow read: if isOwner(uid) || isAdmin();
 
       allow create: if isOwner(uid)
+        && !isAnonymousAuth()
         && request.resource.data.uid == uid
         && request.resource.data.isAnonymous is bool
-        && (
-          (
-            isAnonymousAuth()
-            && request.resource.data.role == 'guest'
-            && request.resource.data.isAnonymous == true
-            && request.resource.data.get('approvalStatus', 'approved') == 'approved'
-          )
-          || (
-            !isAnonymousAuth()
-            && request.resource.data.role == 'student'
-            && request.resource.data.isAnonymous == false
-            && request.resource.data.get('approvalStatus', '') == 'pending'
-            && !isProtectedRole(request.resource.data.role)
-          )
-        );
+        && request.resource.data.isAnonymous == false
+        && request.resource.data.role == 'student'
+        && request.resource.data.get('approvalStatus', '') == 'pending'
+        && !isProtectedRole(request.resource.data.role);
 
       // Owners may edit profile fields. Role is frozen except a one-time
       // student → student|agent transition when completing the profile.
@@ -745,6 +727,7 @@ service cloud.firestore {
     }
 
     // Role permission documents — registered members hydrate Auth; writes via Functions.
+    // Seed `roles/{id}` in every environment (`seedSystemRoles`).
     match /roles/{roleId} {
       allow read: if isRegisteredMember();
       allow write: if false;
@@ -752,7 +735,8 @@ service cloud.firestore {
 
     // Promo banners — registered members hydrate active promos; writes via Functions.
     match /promoBanners/{bannerId} {
-      allow read: if isRegisteredMember();
+      allow read: if isRegisteredMember()
+        && resource.data.get('active', false) == true;
       allow write: if false;
     }
 
@@ -765,10 +749,9 @@ service cloud.firestore {
       }
     }
 
-    // Org tree — clients may read; mutations go through Cloud Functions.
+    // Org tree — mutations and reads go through Cloud Functions (Admin SDK).
     match /orgNodes/{nodeId} {
-      allow read: if isSignedIn() && isManagerOrAdmin();
-      allow write: if false;
+      allow read, write: if false;
     }
 
     // Payments / Override Management — admin read; all writes via Functions.

@@ -3,6 +3,7 @@ import {
   onSnapshot,
   query,
   where,
+  limit,
   type Unsubscribe,
 } from "firebase/firestore";
 import {
@@ -74,6 +75,7 @@ export function watchActivePromoBanners(
   const q = query(
     collection(getFirebaseDb(), "promoBanners"),
     where("active", "==", true),
+    limit(50),
   );
   return onSnapshot(
     q,

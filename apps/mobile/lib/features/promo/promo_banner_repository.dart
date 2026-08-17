@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 
 import '../../firebase/firebase_emulators.dart';
 import 'promo_banner_models.dart';
@@ -33,9 +34,15 @@ class FirestorePromoBannerStore implements PromoBannerStore {
           .where('active', isEqualTo: true)
           .snapshots()
           .map((snap) {
-        return snap.docs
-            .map((doc) => promoBannerFromMap(doc.id, doc.data()))
-            .toList();
+        final banners = <PromoBanner>[];
+        for (final doc in snap.docs) {
+          try {
+            banners.add(promoBannerFromMap(doc.id, doc.data()));
+          } catch (error, stack) {
+            debugPrint('promoBanner parse ${doc.id}: $error\n$stack');
+          }
+        }
+        return banners;
       });
     } catch (_) {
       // Firebase not initialized (widget tests) — treat as no promos.

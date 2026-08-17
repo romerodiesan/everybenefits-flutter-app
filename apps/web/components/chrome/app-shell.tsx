@@ -92,7 +92,6 @@ function ThemeToggle() {
 }
 
 const ROLE_KEY: Record<UserRole, string> = {
-  guest: "roleGuest",
   student: "roleStudent",
   agent: "roleAgent",
   agency_owner: "roleAgencyOwner",
@@ -436,15 +435,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             <ThemeToggle />
           </div>
         </div>
-
-        {profile.isAnonymous && (
-          <div className="shrink-0 border-b border-brand/30 bg-brand/10 px-4 py-1.5 text-xs text-ink">
-            {t("guestBanner")}{" "}
-            <Link href="/login" className="font-semibold text-brand underline">
-              {t("navLogin")}
-            </Link>
-          </div>
-        )}
 
         {pushToast && (
           <div

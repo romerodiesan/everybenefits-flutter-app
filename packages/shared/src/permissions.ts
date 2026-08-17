@@ -445,7 +445,7 @@ export function resolveAccess(
 ): string | readonly string[] {
   if (permissions && permissions.length > 0) return permissions;
   const trimmed = role?.trim();
-  return trimmed || "guest";
+  return trimmed || "student";
 }
 
 export function filterValidPermissions(keys: readonly string[]): string[] {
@@ -460,7 +460,7 @@ export function filterValidPermissions(keys: readonly string[]): string[] {
 export function getDefaultPermissionsForRole(
   roleId: string | null | undefined,
 ): readonly string[] {
-  if (!roleId) return DEFAULT_ROLE_PERMISSIONS.guest;
+  if (!roleId) return DEFAULT_ROLE_PERMISSIONS.student;
   const normalized = roleId === "teacher" ? "instructor" : roleId;
   if (normalized === SYSTEM_MEGA_ROLE_ID) return ALL_PERMISSION_KEYS;
   if (isBuiltinRoleId(normalized)) return DEFAULT_ROLE_PERMISSIONS[normalized];
@@ -490,7 +490,7 @@ export function resolvePermissionsFromRoleDoc(
   data: { permissions?: unknown; active?: unknown } | null | undefined,
 ): string[] {
   const normalized =
-    roleId === "teacher" ? "instructor" : roleId.trim() || "guest";
+    roleId === "teacher" ? "instructor" : roleId.trim() || "student";
   if (normalized === SYSTEM_MEGA_ROLE_ID) {
     return [...getDefaultPermissionsForRole(normalized)];
   }
@@ -591,7 +591,6 @@ export const BUILTIN_ROLE_IDS = [
   "agent",
   "student",
   "instructor",
-  "guest",
 ] as const;
 
 export type BuiltinRoleId = (typeof BUILTIN_ROLE_IDS)[number];
@@ -756,7 +755,6 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<
     "apps.web.access",
     "apps.studio.access",
   ],
-  guest: ["apps.web.access"],
 };
 
 export const DEFAULT_ROLE_META: Record<
@@ -824,14 +822,6 @@ export const DEFAULT_ROLE_META: Record<
     description: "Course author in Studio (legacy built-in).",
     category: "learning",
     sortOrder: 50,
-    locked: false,
-    editableBySystemOnly: true,
-  },
-  guest: {
-    name: "Guest",
-    description: "Anonymous or unregistered visitor (legacy built-in).",
-    category: "member",
-    sortOrder: 60,
     locked: false,
     editableBySystemOnly: true,
   },

@@ -29,6 +29,7 @@ import {
   canCreateChatGroups,
 } from "../roles";
 import { hasClaimedUsername, memberPath } from "@pulse/shared";
+import { isFirebasePermissionDenied } from "./permission-error";
 
 const REBUILD_SESSION_KEY = "pulse:rebuild-inbox-once";
 
@@ -555,7 +556,13 @@ export function watchTyping(
       }
       onChange(out);
     },
-    (error) => onError?.(error),
+    (error) => {
+      if (isFirebasePermissionDenied(error)) {
+        onChange({});
+        return;
+      }
+      onError?.(error);
+    },
   );
 }
 
@@ -564,11 +571,15 @@ export async function setTyping(
   uid: string,
   typing: boolean,
 ) {
-  const node = ref(getFirebaseRtdb(), `typing/${chatId}/${uid}`);
-  if (typing) {
-    await set(node, { at: Date.now() });
-  } else {
-    await remove(node);
+  try {
+    const node = ref(getFirebaseRtdb(), `typing/${chatId}/${uid}`);
+    if (typing) {
+      await set(node, { at: Date.now() });
+    } else {
+      await remove(node);
+    }
+  } catch {
+    // Best-effort: membership race or typing rules not yet readable.
   }
 }
 

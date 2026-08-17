@@ -3,9 +3,9 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { db, callableOpts } from "./init";
 import { DEFAULT_QUIZ_PASS_PERCENT, MAX_QUIZ_OPTIONS } from "./constants";
-import { requireCaller } from "./auth";
+import { requireActor, requireCaller } from "./guards";
 import { notifyUser } from "./notifications";
-import { loadPermissionsForUid } from "./permissions";
+import { hasPermission } from "./permissions";
 
 /** Normalizes a submitted answer into a sorted, deduped list of option indexes. */
 export function parseSelectedOptions(raw: unknown): number[] {
@@ -32,7 +32,7 @@ export const enrollInCourse = onCall(callableOpts, async (request) => {
 
   const userSnap = await db.doc(`users/${uid}`).get();
   const user = userSnap.data();
-  if (!user || user.isAnonymous === true || user.role === "guest") {
+  if (!user || user.isAnonymous === true) {
     throw new HttpsError("permission-denied", "Sign in required.");
   }
 
@@ -158,7 +158,8 @@ export const saveCourseProgress = onCall(callableOpts, async (request) => {
  * `quizAttempts` / quiz completion on an enrollment.
  */
 export const submitQuizAttempt = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "submitQuizAttempt");
+  const actor = await requireActor(request, "submitQuizAttempt");
+  const uid = actor.uid;
   const courseId = String(request.data?.courseId ?? "");
   const lessonId = String(request.data?.lessonId ?? "");
   const rawAnswers = request.data?.answers;
@@ -190,12 +191,10 @@ export const submitQuizAttempt = onCall(callableOpts, async (request) => {
 
   // Drafts are only answerable by their author or someone with edit-any.
   if (course.status !== "published") {
-    const { permissions } = await loadPermissionsForUid(uid);
     const owns = String(course.createdBy ?? "") === uid;
-    const { hasPermission } = await import("@pulse/shared");
     if (
-      !hasPermission(permissions, "courses.edit.any") &&
-      !(owns && hasPermission(permissions, "courses.author"))
+      !hasPermission(actor.permissions, "courses.edit.any") &&
+      !(owns && hasPermission(actor.permissions, "courses.author"))
     ) {
       throw new HttpsError("permission-denied", "Course is not published.");
     }

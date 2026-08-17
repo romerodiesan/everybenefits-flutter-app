@@ -7,7 +7,6 @@ const promoBannerTypes = ['promo', 'product_update', 'education'];
 const promoBannerFormats = ['card', 'tile', 'strip', 'text'];
 const promoBannerAudiences = [
   'all',
-  'guest',
   'student',
   'agent',
   'agency_owner',
@@ -142,18 +141,23 @@ class PromoBanner {
   final String? updatedBy;
 }
 
+String? stringOrNull(Object? value) => value is String ? value : null;
+
+bool? boolOrNull(Object? value) => value is bool ? value : null;
+
 PromoBannerLocalizedString localizedBannerString(Object? value) {
   if (value is! Map) return (en: '', es: '');
-  final map = Map<String, dynamic>.from(value);
+  String read(Object? raw) => raw is String ? raw : '';
   return (
-    en: (map['en'] as String?) ?? '',
-    es: (map['es'] as String?) ?? '',
+    en: read(value['en']),
+    es: read(value['es']),
   );
 }
 
 int? millisOrNull(Object? value) {
   if (value == null) return null;
   if (value is Timestamp) return value.millisecondsSinceEpoch;
+  if (value is DateTime) return value.millisecondsSinceEpoch;
   if (value is int) return value;
   if (value is num) return value.toInt();
   return null;
@@ -220,38 +224,37 @@ PromoBanner withBannerCompatDefaults({
 }
 
 PromoBanner promoBannerFromMap(String id, Map<String, dynamic> data) {
-  final surface = parsePromoBannerSurface(data['surface'] as String?);
-  final rawFormat = data['format'] as String?;
+  final surface = parsePromoBannerSurface(stringOrNull(data['surface']));
+  final rawFormat = stringOrNull(data['format']);
   final format = rawFormat == null ? null : parsePromoBannerFormat(rawFormat);
-  final imageUrl = data['imageUrl'] as String?;
-  final imagePath = data['imagePath'] as String?;
+  final imageUrl = stringOrNull(data['imageUrl']);
+  final imagePath = stringOrNull(data['imagePath']);
+  final rawType = stringOrNull(data['type']);
 
   return withBannerCompatDefaults(
     id: id,
-    version: (data['version'] as num?)?.toInt(),
+    version: (data['version'] is num) ? (data['version'] as num).toInt() : null,
     active: data['active'] == true,
-    type: data['type'] is String
-        ? parsePromoBannerType(data['type'] as String)
-        : null,
+    type: rawType == null ? null : parsePromoBannerType(rawType),
     format: format,
     surface: surface,
     audiences: data['audiences'] is List
         ? (data['audiences'] as List).map((e) => e.toString()).toList()
         : const ['all'],
-    dismissible: data['dismissible'] as bool?,
-    showCta: data['showCta'] as bool?,
-    showImage: data['showImage'] as bool?,
+    dismissible: boolOrNull(data['dismissible']),
+    showCta: boolOrNull(data['showCta']),
+    showImage: boolOrNull(data['showImage']),
     eyebrow: localizedBannerString(data['eyebrow']),
     title: localizedBannerString(data['title']),
     body: localizedBannerString(data['body']),
     ctaLabel: localizedBannerString(data['ctaLabel']),
-    href: data['href'] as String? ?? '',
+    href: stringOrNull(data['href']) ?? '',
     imageUrl: imageUrl,
     imagePath: imagePath,
     startsAt: millisOrNull(data['startsAt']),
     endsAt: millisOrNull(data['endsAt']),
     createdAt: millisOrNull(data['createdAt']),
     updatedAt: millisOrNull(data['updatedAt']),
-    updatedBy: data['updatedBy'] as String?,
+    updatedBy: stringOrNull(data['updatedBy']),
   );
 }

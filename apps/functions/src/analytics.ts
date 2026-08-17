@@ -25,8 +25,8 @@ import {
   type AcademyAnalyticsSource,
 } from "@pulse/shared";
 import { callableOpts, db } from "./init";
-import { requireCaller } from "./auth";
-import { requirePermission } from "./permissions";
+import { requireActor, requireCaller } from "./guards";
+import { mapPool } from "./batch-utils";
 
 const MAX_EVENTS_PER_CALL = 20;
 const MAX_WATCH_DELTA = 120;
@@ -34,6 +34,8 @@ const MAX_SESSION_ID = 64;
 const MAX_TRAFFIC = 80;
 const REALTIME_WINDOW_MS = 60 * 60 * 1000;
 const DEDUPE_TTL_MS = 24 * 60 * 60 * 1000;
+const ANALYTICS_COURSE_CONCURRENCY = 8;
+const ANALYTICS_COURSE_PAGE = 200;
 
 const EVENT_SET = new Set<string>(ACADEMY_ANALYTICS_EVENT_NAMES);
 const SOURCE_SET = new Set<string>(ACADEMY_ANALYTICS_SOURCES);
@@ -416,20 +418,22 @@ export async function recomputeEnrollmentRollup(courseId: string): Promise<void>
 }
 
 export const backfillCourseAnalytics = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "backfillCourseAnalytics");
-  await requirePermission(uid, [
-    "academy.analytics.read",
-    "platform.manage",
-  ]);
+  await requireActor(request, "backfillCourseAnalytics", {
+    permission: "academy.analytics.read",
+  });
   const courseId = String(request.data?.courseId ?? "").trim();
   if (courseId) {
     await recomputeEnrollmentRollup(courseId);
     return { ok: true, courses: 1 };
   }
-  const courses = await db.collection("courses").select().get();
-  for (const doc of courses.docs) {
-    await recomputeEnrollmentRollup(doc.id);
-  }
+  const courses = await db
+    .collection("courses")
+    .select()
+    .limit(ANALYTICS_COURSE_PAGE)
+    .get();
+  await mapPool(courses.docs, ANALYTICS_COURSE_CONCURRENCY, (doc) =>
+    recomputeEnrollmentRollup(doc.id),
+  );
   return { ok: true, courses: courses.size };
 });
 
@@ -444,13 +448,18 @@ export const refreshAcademyAnalyticsRealtime = onSchedule(
     timeoutSeconds: 120,
   },
   async () => {
-    const courses = await db.collection("courses").select().limit(200).get();
+    const courses = await db
+      .collection("courses")
+      .select()
+      .limit(ANALYTICS_COURSE_PAGE)
+      .get();
     const cutoff = Timestamp.fromMillis(Date.now() - REALTIME_WINDOW_MS);
-    for (const course of courses.docs) {
+    await mapPool(courses.docs, ANALYTICS_COURSE_CONCURRENCY, async (course) => {
       const sessions = await db
         .collection(`courses/${course.id}/analyticsSessions`)
         .where("lastSeenAt", ">=", cutoff)
         .select()
+        .limit(500)
         .get();
       const topLessons = new Map<string, number>();
       for (const s of sessions.docs) {
@@ -505,7 +514,7 @@ export const refreshAcademyAnalyticsRealtime = onSchedule(
           { merge: true },
         );
       }
-    }
+    });
   },
 );
 

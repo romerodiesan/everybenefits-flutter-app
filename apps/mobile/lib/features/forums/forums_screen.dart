@@ -642,6 +642,7 @@ class ForumsScreenState extends State<ForumsScreen> {
                 ),
               ),
           ],
+          if (!_isSavedMode) ..._promoAndPollSlots(context),
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
@@ -701,6 +702,39 @@ class ForumsScreenState extends State<ForumsScreen> {
     return parts.join(' · ');
   }
 
+  List<Widget> _promoAndPollSlots(BuildContext context) {
+    return [
+      PromoBannerSlot(
+        key: const ValueKey('promo-home'),
+        surface: PromoBannerSurface.home,
+        profile: widget.profile,
+        repository: widget.promoBannerRepository,
+        forumRepository: _repository,
+        chatRepository: widget.chatRepository,
+      ),
+      PollSlot(
+        key: const ValueKey('poll-home'),
+        surface: PromoBannerSurface.home,
+        profile: widget.profile,
+      ),
+      if (PulseWindowClass.of(context).useRail) ...[
+        PromoBannerSlot(
+          key: const ValueKey('promo-rail'),
+          surface: PromoBannerSurface.rail,
+          profile: widget.profile,
+          repository: widget.promoBannerRepository,
+          forumRepository: _repository,
+          chatRepository: widget.chatRepository,
+        ),
+        PollSlot(
+          key: const ValueKey('poll-rail'),
+          surface: PromoBannerSurface.rail,
+          profile: widget.profile,
+        ),
+      ],
+    ];
+  }
+
   Widget _buildFeed(
     BuildContext context,
     AppLocalizations l10n,
@@ -721,47 +755,13 @@ class ForumsScreenState extends State<ForumsScreen> {
     }
 
     final headers = <Widget>[];
-    if (!_isSavedMode) {
+    if (!_isSavedMode && spotlight != null) {
       headers.add(
-        PromoBannerSlot(
-          surface: PromoBannerSurface.home,
-          profile: widget.profile,
-          repository: widget.promoBannerRepository,
-          forumRepository: _repository,
-          chatRepository: widget.chatRepository,
+        ForumSpotlightCard(
+          thread: spotlight,
+          onTap: () => _openThread(spotlight),
         ),
       );
-      headers.add(
-        PollSlot(
-          surface: PromoBannerSurface.home,
-          profile: widget.profile,
-        ),
-      );
-      if (PulseWindowClass.of(context).useRail) {
-        headers.add(
-          PromoBannerSlot(
-            surface: PromoBannerSurface.rail,
-            profile: widget.profile,
-            repository: widget.promoBannerRepository,
-            forumRepository: _repository,
-            chatRepository: widget.chatRepository,
-          ),
-        );
-        headers.add(
-          PollSlot(
-            surface: PromoBannerSurface.rail,
-            profile: widget.profile,
-          ),
-        );
-      }
-      if (spotlight != null) {
-        headers.add(
-          ForumSpotlightCard(
-            thread: spotlight,
-            onTap: () => _openThread(spotlight),
-          ),
-        );
-      }
     }
 
     if (_threads.isEmpty) {

@@ -15,9 +15,8 @@ import {
   type UserRole,
 } from "@pulse/shared";
 import { admin, db, callableOpts } from "./init";
-import { requireCaller } from "./auth";
+import { requireActor } from "./guards";
 import { assertAssignableRoleId } from "./role-management";
-import { loadPermissionsForUid } from "./permissions";
 import { syncUserEmail } from "./account";
 
 const DEFAULT_AGENCY = "Every Benefits";
@@ -80,18 +79,14 @@ function decodePageToken(
 async function requireAdminCaller(
   request: { auth?: { uid: string } },
   operation: string,
-  platformOnly = false,
+  permission: string | string[] = "admin.access",
 ): Promise<{ uid: string; role: UserRole; permissions: string[] }> {
-  const uid = await requireCaller(request, operation);
-  const { role, permissions } = await loadPermissionsForUid(uid);
-  const { canAccessAdmin, canManagePlatform } = await import("@pulse/shared");
-  const allowed = platformOnly
-    ? canManagePlatform(permissions)
-    : canAccessAdmin(permissions);
-  if (!allowed) {
-    throw new HttpsError("permission-denied", "Admin access required.");
-  }
-  return { uid, role: parseRole(role), permissions };
+  const actor = await requireActor(request, operation, { permission });
+  return {
+    uid: actor.uid,
+    role: parseRole(actor.role),
+    permissions: actor.permissions,
+  };
 }
 
 function prefixRange(query: string): { start: string; end: string } {
@@ -175,7 +170,7 @@ function buildUsersBaseQuery(filters: {
 }
 
 export const listUsersForAdmin = onCall(callableOpts, async (request) => {
-  await requireAdminCaller(request, "listUsersForAdmin");
+  await requireAdminCaller(request, "listUsersForAdmin", "admin.users.read");
   const roleFilter = String(request.data?.role ?? "").trim();
   const approvalFilter = String(request.data?.approvalStatus ?? "").trim();
   const accountFilter = String(request.data?.accountStatus ?? "").trim();
@@ -275,7 +270,7 @@ export const adminDeactivateUser = onCall(callableOpts, async (request) => {
   const { uid: actorUid } = await requireAdminCaller(
     request,
     "adminDeactivateUser",
-    true,
+    "admin.users.deactivate",
   );
   const targetUid = String(request.data?.uid ?? "").trim();
   if (!targetUid) throw new HttpsError("invalid-argument", "uid required");
@@ -318,7 +313,7 @@ export const adminReactivateUser = onCall(callableOpts, async (request) => {
   const { uid: actorUid } = await requireAdminCaller(
     request,
     "adminReactivateUser",
-    true,
+    "admin.users.deactivate",
   );
   const targetUid = String(request.data?.uid ?? "").trim();
   if (!targetUid) throw new HttpsError("invalid-argument", "uid required");
@@ -348,7 +343,7 @@ export const adminReactivateUser = onCall(callableOpts, async (request) => {
 });
 
 export const adminCreateUser = onCall(callableOpts, async (request) => {
-  await requireAdminCaller(request, "adminCreateUser", true);
+  await requireAdminCaller(request, "adminCreateUser", "admin.users.create");
   const email = String(request.data?.email ?? "").trim().toLowerCase();
   const displayName = String(request.data?.displayName ?? "").trim();
   const password = String(request.data?.password ?? "");
@@ -446,7 +441,7 @@ export const adminCreateUser = onCall(callableOpts, async (request) => {
 });
 
 export const adminUpdateUser = onCall(callableOpts, async (request) => {
-  await requireAdminCaller(request, "adminUpdateUser", true);
+  await requireAdminCaller(request, "adminUpdateUser", "admin.users.update");
   const targetUid = String(request.data?.uid ?? "").trim();
   if (!targetUid) throw new HttpsError("invalid-argument", "uid required");
 
@@ -564,7 +559,7 @@ async function countQuery(query: Query): Promise<number> {
 }
 
 export const getAdminInsights = onCall(callableOpts, async (request) => {
-  await requireAdminCaller(request, "getAdminInsights");
+  await requireAdminCaller(request, "getAdminInsights", "platform.stats.read");
 
   const { getOverviewStats } = await import("./platform-stats");
   let stats = await getOverviewStats();
@@ -633,7 +628,11 @@ export const getAdminInsights = onCall(callableOpts, async (request) => {
 export const backfillUserSearchFields = onCall(
   { ...callableOpts, timeoutSeconds: 300 },
   async (request) => {
-    await requireAdminCaller(request, "backfillUserSearchFields", true);
+    await requireAdminCaller(
+      request,
+      "backfillUserSearchFields",
+      "platform.manage",
+    );
     const pageSize = Math.max(
       50,
       Math.min(500, Math.round(Number(request.data?.pageSize ?? 400))),

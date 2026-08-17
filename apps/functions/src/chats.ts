@@ -22,9 +22,8 @@ import {
 import {
   headlineName,
   isUserApprovedForJoin,
-  requireCaller,
 } from "./auth";
-import { loadPermissionsForUid, callerHasPermission } from "./permissions";
+import { actorHasPermission, requireActor, requireCaller } from "./guards";
 import { notifyUser } from "./notifications";
 import {
   areMutualContacts,
@@ -191,7 +190,7 @@ export async function ensureAutoJoinMemberships(
   displayName: string,
   isAnonymous: boolean,
 ) {
-  if (isAnonymous || role === "guest") return;
+  if (isAnonymous) return;
   if (approvalStatus !== "approved") return;
   const indexSnap = await rtdb.ref(`autoJoinGroups/${role}`).get();
   const chatIds = Object.keys(
@@ -220,7 +219,7 @@ export async function collectUsersByRoles(
         if (byUid.size >= cap) break;
         const data = doc.data();
         if (!isUserApprovedForJoin(data)) continue;
-        if (parseRole(data.role) === "guest") continue;
+        if (data.isAnonymous === true) continue;
         byUid.set(doc.id, data);
       }
     }),
@@ -617,7 +616,10 @@ export const rebuildChatInbox = onCall(callableOpts, async (request) => {
 });
 
 export const createGroupChat = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "createGroupChat");
+  const actor = await requireActor(request, "createGroupChat", {
+    permission: "chats.groups.create",
+  });
+  const uid = actor.uid;
   const title = String(request.data?.title ?? "").trim();
   const requested = Array.isArray(request.data?.memberIds)
     ? request.data.memberIds.map(String)
@@ -641,7 +643,7 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
     throw new HttpsError("invalid-argument", "Valid group title required.");
   }
 
-  const { permissions: creatorPerms } = await loadPermissionsForUid(uid);
+  const creatorPerms = actor.permissions;
   if (!canCreateChatGroups(creatorPerms)) {
     throw new HttpsError("permission-denied", "Not allowed to create groups.");
   }
@@ -767,12 +769,13 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
  * Ensures the caller (staff) is a member of the default community RTDB chat.
  */
 export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
-  const callerUid = await requireCaller(request, "ensureDefaultAgentGroup");
+  const actor = await requireActor(request, "ensureDefaultAgentGroup");
+  const callerUid = actor.uid;
   const targetUid = String(request.data?.uid ?? callerUid);
 
   if (
     targetUid !== callerUid &&
-    !(await callerHasPermission(callerUid, "platform.manage"))
+    !actorHasPermission(actor.permissions, "platform.manage")
   ) {
     throw new HttpsError("permission-denied", "Admins only for other users.");
   }

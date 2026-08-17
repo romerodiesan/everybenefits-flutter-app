@@ -59,14 +59,14 @@ void main() {
       );
     });
 
-    test('guest matches anonymous', () {
+    test('anonymous audience never matches role targeting', () {
       expect(
         bannerAudienceMatches(
-          const ['guest'],
-          role: 'guest',
+          const ['student'],
+          role: 'student',
           isAnonymous: true,
         ),
-        isTrue,
+        isFalse,
       );
       expect(
         bannerAudienceMatches(
@@ -135,6 +135,54 @@ void main() {
     test('text format never shows media', () {
       final banner = _banner(format: PromoBannerFormat.text);
       expect(bannerShouldShowImage(banner), isFalse);
+    });
+  });
+
+  group('promoBannerFromMap', () {
+    test('parses production-shaped docs without throwing', () {
+      final banner = promoBannerFromMap('welcome-everybenefits', {
+        'active': true,
+        'surface': 'home',
+        'audiences': ['all'],
+        'version': 4,
+        'type': 'product_update',
+        'format': 'card',
+        'dismissible': true,
+        'showCta': true,
+        'showImage': false,
+        'eyebrow': {'en': 'New', 'es': 'Nuevo'},
+        'title': {'en': 'Welcome to Pulse', 'es': 'Bienvenidos a Pulse'},
+        'body': {'en': 'Body', 'es': 'Cuerpo'},
+        'ctaLabel': {'en': 'Privacy', 'es': 'Privacidad'},
+        'href': 'https://legal.everybenefits.us',
+        'imageUrl': null,
+        'imagePath': null,
+        'startsAt': null,
+        'endsAt': null,
+        'updatedBy': 'uid',
+      });
+      expect(banner.active, isTrue);
+      expect(banner.surface, PromoBannerSurface.home);
+      expect(banner.audiences, ['all']);
+      expect(banner.title.en, 'Welcome to Pulse');
+    });
+
+    test('tolerates non-string fields that used to throw', () {
+      final banner = promoBannerFromMap('b1', {
+        'active': true,
+        'surface': 'home',
+        'href': 123,
+        'dismissible': 1,
+        'version': '2',
+        'title': {'en': 'Hi', 'es': 'Hola'},
+        'body': 'not-a-map',
+        'updatedAt': DateTime.utc(2026, 8, 15),
+      });
+      expect(banner.href, isEmpty);
+      expect(banner.dismissible, isTrue);
+      expect(banner.version, 1);
+      expect(banner.body.en, isEmpty);
+      expect(banner.updatedAt, DateTime.utc(2026, 8, 15).millisecondsSinceEpoch);
     });
   });
 }

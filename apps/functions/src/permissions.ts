@@ -4,32 +4,54 @@ import {
   filterValidPermissions,
   getDefaultPermissionsForRole,
   hasPermission,
+  isBuiltinRoleId,
   parseRole,
   SYSTEM_MEGA_ROLE_ID,
 } from "@pulse/shared";
 import { db } from "./init";
 
+/**
+ * Resolve permissions from a `roles/{id}` snapshot.
+ * Seeded docs win. Missing docs: builtins → DEFAULT_ROLE_PERMISSIONS;
+ * custom slugs → [] (fail closed). Matches Firestore `hasPermission` once
+ * roles are seeded (required in every environment).
+ */
+export function resolveRolePermissions(
+  roleId: string,
+  roleDoc: { exists: boolean; active?: unknown; permissions?: unknown } | null,
+): string[] {
+  const normalized =
+    roleId === "teacher" ? "instructor" : roleId.trim() || "student";
+  if (normalized === SYSTEM_MEGA_ROLE_ID) {
+    return [...ALL_PERMISSION_KEYS];
+  }
+  if (roleDoc?.exists && roleDoc.active !== false) {
+    const raw = Array.isArray(roleDoc.permissions)
+      ? roleDoc.permissions.map(String)
+      : [];
+    return filterValidPermissions(raw);
+  }
+  if (isBuiltinRoleId(normalized)) {
+    return [...getDefaultPermissionsForRole(normalized)];
+  }
+  return [];
+}
+
 export async function loadPermissionsForRole(
   roleId: string,
 ): Promise<string[]> {
   const normalized =
-    roleId === "teacher" ? "instructor" : roleId.trim() || "guest";
+    roleId === "teacher" ? "instructor" : roleId.trim() || "student";
   if (normalized === SYSTEM_MEGA_ROLE_ID) {
     return [...ALL_PERMISSION_KEYS];
   }
 
   const snap = await db.doc(`roles/${normalized}`).get();
-  if (snap.exists && snap.data()?.active !== false) {
-    const raw = Array.isArray(snap.data()?.permissions)
-      ? snap.data()!.permissions.map(String)
-      : [];
-    const filtered = filterValidPermissions(raw);
-    if (filtered.length > 0 || snap.exists) {
-      return filtered;
-    }
-  }
-
-  return [...getDefaultPermissionsForRole(normalized)];
+  return resolveRolePermissions(normalized, {
+    exists: snap.exists,
+    active: snap.data()?.active,
+    permissions: snap.data()?.permissions,
+  });
 }
 
 export async function loadPermissionsForUid(uid: string): Promise<{
@@ -37,7 +59,7 @@ export async function loadPermissionsForUid(uid: string): Promise<{
   permissions: string[];
 }> {
   const snap = await db.doc(`users/${uid}`).get();
-  const role = String(snap.data()?.role ?? "guest");
+  const role = String(snap.data()?.role ?? "student");
   const permissions = await loadPermissionsForRole(role);
   return { role, permissions };
 }
@@ -66,7 +88,7 @@ export async function callerHasPermission(
 
 /** Normalize stored role for stats / chat helpers without collapsing custom slugs. */
 export function parseStoredRoleSlug(value: unknown): string {
-  if (typeof value !== "string" || !value.trim()) return "guest";
+  if (typeof value !== "string" || !value.trim()) return "student";
   if (value === "teacher") return "instructor";
   return value.trim();
 }

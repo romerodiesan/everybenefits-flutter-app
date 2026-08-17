@@ -10,6 +10,8 @@
 **/.vagrant/
 **/DerivedData/
 Icon?
+!AppIcon.icon/
+!AppIcon.icon/**
 **/Pods/
 **/.symlinks/
 profile

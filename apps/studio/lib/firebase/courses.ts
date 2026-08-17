@@ -207,7 +207,11 @@ export function watchCourseContent(
   const emit = () => onChange({ modules, lessons });
 
   const stopModules = onSnapshot(
-    query(collection(db, "courses", courseId, "modules"), orderBy("order")),
+    query(
+      collection(db, "courses", courseId, "modules"),
+      orderBy("order"),
+      limit(200),
+    ),
     (snap) => {
       modules = snap.docs.map((d) =>
         moduleFrom(d.id, d.data() as Record<string, unknown>),
@@ -217,7 +221,11 @@ export function watchCourseContent(
     (error) => onError?.(error),
   );
   const stopLessons = onSnapshot(
-    query(collection(db, "courses", courseId, "lessons"), orderBy("order")),
+    query(
+      collection(db, "courses", courseId, "lessons"),
+      orderBy("order"),
+      limit(500),
+    ),
     (snap) => {
       lessons = snap.docs.map((d) =>
         lessonFrom(d.id, d.data() as Record<string, unknown>),
@@ -260,6 +268,7 @@ export function watchAuthoredPaths(
     collection(getFirebaseDb(), "paths"),
     where("createdBy", "==", uid),
     orderBy("updatedAt", "desc"),
+    limit(200),
   );
   return onSnapshot(
     q,
@@ -632,11 +641,13 @@ export function watchAuthoredCourses(
     collection(db, "courses"),
     where("createdBy", "==", uid),
     orderBy("updatedAt", "desc"),
+    limit(200),
   );
   const instructed = query(
     collection(db, "courses"),
     where("instructorIds", "array-contains", uid),
     orderBy("updatedAt", "desc"),
+    limit(200),
   );
 
   let ownedRows: Course[] = [];

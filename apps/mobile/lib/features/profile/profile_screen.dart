@@ -180,12 +180,12 @@ class ProfileScreenState extends State<ProfileScreen> {
         bytes: bytes,
       );
       if (previousUrl != null) {
-        PaintingBinding.instance.imageCache
-            .evict(NetworkImage(previousUrl));
+        PaintingBinding.instance.imageCache.evict(NetworkImage(previousUrl));
       }
       if (updated.photoUrl != null) {
-        PaintingBinding.instance.imageCache
-            .evict(NetworkImage(updated.photoUrl!));
+        PaintingBinding.instance.imageCache.evict(
+          NetworkImage(updated.photoUrl!),
+        );
       }
     } on PlatformException catch (error) {
       if (!mounted) return;
@@ -223,9 +223,7 @@ class ProfileScreenState extends State<ProfileScreen> {
     final uri = Uri(
       scheme: 'mailto',
       path: email,
-      queryParameters: {
-        'subject': l10n.supportSheetEmailSubject,
-      },
+      queryParameters: {'subject': l10n.supportSheetEmailSubject},
     );
     // Uri.queryParameters encodes spaces as +; mailto prefers %20.
     final mailto = Uri.parse(uri.toString().replaceAll('+', '%20'));
@@ -235,15 +233,15 @@ class ProfileScreenState extends State<ProfileScreen> {
         mode: LaunchMode.externalApplication,
       );
       if (!launched && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(l10n.supportSheetEmailFailed)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(l10n.supportSheetEmailFailed)));
       }
     } catch (_) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.supportSheetEmailFailed)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.supportSheetEmailFailed)));
     }
   }
 
@@ -288,10 +286,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                     const SizedBox(width: 10),
                     Text(
                       l10n.supportSheetTitle,
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineMedium
-                          ?.copyWith(fontSize: 22),
+                      style: Theme.of(
+                        context,
+                      ).textTheme.headlineMedium?.copyWith(fontSize: 22),
                     ),
                   ],
                 ),
@@ -299,9 +296,9 @@ class ProfileScreenState extends State<ProfileScreen> {
                 Text(
                   l10n.supportSheetBody,
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: colors.muted,
-                        height: 1.4,
-                      ),
+                    color: colors.muted,
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: AppSpacing.md),
                 Align(
@@ -313,13 +310,13 @@ class ProfileScreenState extends State<ProfileScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: Text(
                         l10n.supportSheetEmail,
-                        style:
-                            Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: brand,
-                                  decoration: TextDecoration.underline,
-                                  decorationColor: brand,
-                                ),
+                        style: Theme.of(context).textTheme.titleMedium
+                            ?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: brand,
+                              decoration: TextDecoration.underline,
+                              decorationColor: brand,
+                            ),
                       ),
                     ),
                   ),
@@ -381,7 +378,9 @@ class ProfileScreenState extends State<ProfileScreen> {
     await showFollowListSheet(
       context: context,
       title: followers ? l10n.profileStatFollowers : l10n.profileStatFollowing,
-      empty: followers ? l10n.profileFollowersEmpty : l10n.profileFollowingEmpty,
+      empty: followers
+          ? l10n.profileFollowersEmpty
+          : l10n.profileFollowingEmpty,
       load: () => followers
           ? _social.listFollowers(widget.profile.uid)
           : _social.listFollowing(widget.profile.uid),
@@ -391,12 +390,12 @@ class ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colors = AppColors.of(context);
     final l10n = context.l10n;
     final profile = widget.profile.copyWith(
       profileBadge: _publicCard?.profileBadge ?? widget.profile.profileBadge,
       followerCount: _publicCard?.followerCount ?? widget.profile.followerCount,
-      followingCount: _publicCard?.followingCount ?? widget.profile.followingCount,
+      followingCount:
+          _publicCard?.followingCount ?? widget.profile.followingCount,
       createdAt: _publicCard?.createdAt ?? widget.profile.createdAt,
     );
     final bottomPad = pulseShellListBottomPad(context, hasFab: true);
@@ -407,6 +406,7 @@ class ProfileScreenState extends State<ProfileScreen> {
         maxWidth: PulseContentWidth.feed,
         padding: EdgeInsets.zero,
         child: ListView(
+          clipBehavior: Clip.none,
           physics: const BouncingScrollPhysics(),
           padding: EdgeInsets.zero,
           children: [
@@ -423,7 +423,6 @@ class ProfileScreenState extends State<ProfileScreen> {
               showEditBadge: true,
               onAvatarTap: _uploading ? null : _pickAvatar,
               onChooseUsername: openEdit,
-              onShare: () => sharePublicProfile(context, profile),
               topBar: Row(
                 children: [
                   const Spacer(),
@@ -432,48 +431,57 @@ class ProfileScreenState extends State<ProfileScreen> {
                       unreadCount: widget.notificationUnread,
                       onPressed: widget.onOpenNotifications!,
                       style: IconButton.styleFrom(
-                        backgroundColor:
-                            colors.glassFill.withValues(alpha: 0.7),
-                        foregroundColor: colors.ink,
+                        backgroundColor: const Color(0x6B0C0D10),
+                        foregroundColor: const Color(0xFFF4F3F0),
                       ),
                     ),
                   IconButton(
                     tooltip: l10n.profileSettingsTooltip,
                     onPressed: _openSettings,
                     style: IconButton.styleFrom(
-                      backgroundColor:
-                          colors.glassFill.withValues(alpha: 0.7),
-                      foregroundColor: colors.ink,
+                      backgroundColor: const Color(0x6B0C0D10),
+                      foregroundColor: const Color(0xFFF4F3F0),
                     ),
                     icon: const Icon(Icons.settings_outlined),
                   ),
                 ],
               ),
-              actions: OutlinedButton(
-                onPressed: openEdit,
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(44),
+            ),
+            ProfileOverlapSheet(
+              dock: ProfileDock(
+                actions: OutlinedButton(
+                  onPressed: openEdit,
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  child: Text(l10n.fabEditProfile),
                 ),
-                child: Text(l10n.fabEditProfile),
+                onShare: () => sharePublicProfile(context, profile),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  ProfileTabBar(
+                    index: _tab,
+                    onChanged: (value) => setState(() => _tab = value),
+                  ),
+                  if (_tab == 0)
+                    ProfilePostsSection(
+                      threads: _threads,
+                      loading: _postsLoading,
+                      onOpenThread: _openThread,
+                      bottomPad: bottomPad,
+                    )
+                  else
+                    ProfileAboutSection(
+                      person: profile,
+                      showLocation: profile.showLocationOnProfile,
+                      bottomPad: bottomPad,
+                    ),
+                ],
               ),
             ),
-            ProfileTabBar(
-              index: _tab,
-              onChanged: (value) => setState(() => _tab = value),
-            ),
-            if (_tab == 0)
-              ProfilePostsSection(
-                threads: _threads,
-                loading: _postsLoading,
-                onOpenThread: _openThread,
-                bottomPad: bottomPad,
-              )
-            else
-              ProfileAboutSection(
-                person: profile,
-                showLocation: profile.showLocationOnProfile,
-                bottomPad: bottomPad,
-              ),
           ],
         ),
       ),

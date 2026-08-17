@@ -34,9 +34,17 @@ class FirestorePollStore implements PollStore {
           .where('active', isEqualTo: true)
           .snapshots()
           .map(
-            (snap) => snap.docs
-                .map((doc) => pollFromMap(doc.id, doc.data()))
-                .toList(),
+            (snap) {
+              final polls = <Poll>[];
+              for (final doc in snap.docs) {
+                try {
+                  polls.add(pollFromMap(doc.id, doc.data()));
+                } catch (error, stack) {
+                  debugPrint('poll parse ${doc.id}: $error\n$stack');
+                }
+              }
+              return polls;
+            },
           );
     } catch (_) {
       return Stream.value(const []);

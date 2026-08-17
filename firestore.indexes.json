@@ -107,27 +107,6 @@
       ]
     },
     {
-      "collectionGroup": "enrollments",
-      "queryScope": "COLLECTION_GROUP",
-      "fields": [
-        { "fieldPath": "courseId", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "analyticsSessions",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "lastSeenAt", "order": "ASCENDING" }
-      ]
-    },
-    {
-      "collectionGroup": "analyticsDays",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "day", "order": "ASCENDING" }
-      ]
-    },
-    {
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
@@ -299,6 +278,15 @@
       "collectionGroup": "messages",
       "fieldPath": "sources",
       "indexes": []
+    },
+    {
+      "collectionGroup": "enrollments",
+      "fieldPath": "courseId",
+      "indexes": [
+        { "order": "ASCENDING", "queryScope": "COLLECTION" },
+        { "order": "DESCENDING", "queryScope": "COLLECTION" },
+        { "order": "ASCENDING", "queryScope": "COLLECTION_GROUP" }
+      ]
     }
   ]
 }

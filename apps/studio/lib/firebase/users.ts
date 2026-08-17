@@ -85,21 +85,23 @@ function appearanceFrom(
 }
 
 export async function ensureProfile(user: User): Promise<UserProfile> {
+  if (user.isAnonymous) {
+    throw new Error("Anonymous sessions are not supported.");
+  }
   const refDoc = doc(getFirebaseDb(), "users", user.uid);
   const snap = await getDoc(refDoc);
   if (snap.exists()) {
     return profileFromData(user.uid, snap.data() as Record<string, unknown>);
   }
 
-  const isAnonymous = user.isAnonymous;
   const profile: UserProfile = {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName,
     photoUrl: user.photoURL,
-    role: isAnonymous ? "guest" : "student",
-    isAnonymous,
-    profileCompleted: isAnonymous,
+    role: "student",
+    isAnonymous: false,
+    profileCompleted: false,
     phoneCountryCode: null,
     phoneNumber: null,
     npn: null,
@@ -109,10 +111,10 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     addressCity: null,
     addressState: null,
     addressZip: null,
-    agency: isAnonymous ? null : DEFAULT_AGENCY,
+    agency: DEFAULT_AGENCY,
     createdAt: new Date(),
     updatedAt: new Date(),
-    approvalStatus: isAnonymous ? "approved" : "pending",
+    approvalStatus: "pending",
   };
 
   await setDoc(refDoc, {
@@ -162,7 +164,7 @@ export function watchProfile(
 export async function listDirectory(excludeUid?: string, max = 80) {
   const profiles = await listPublicProfiles(max + (excludeUid ? 1 : 0));
   return profiles
-    .filter((p) => p.uid !== excludeUid && p.role !== "guest")
+    .filter((p) => p.uid !== excludeUid)
     .slice(0, max)
     .sort((a, b) =>
       headlineName(a).toLowerCase().localeCompare(headlineName(b).toLowerCase()),

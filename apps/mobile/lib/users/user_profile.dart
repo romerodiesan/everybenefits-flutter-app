@@ -88,7 +88,7 @@ class UserProfile {
   /// Canonical Firestore `users.role` wire value (may be a custom slug).
   final String roleId;
 
-  /// Built-in enum for UI; custom [roleId] maps to [UserRole.guest] here —
+  /// Built-in enum for UI; custom [roleId] maps to [UserRole.student] here —
   /// use [roleId] + permissions for authorization.
   final UserRole role;
   final bool isAnonymous;
@@ -141,7 +141,6 @@ class UserProfile {
   /// Client mirror of `isRegisteredMember()` in firestore.rules.
   bool get isRegisteredMember {
     if (isAnonymous) return false;
-    if (normalizeRoleId(roleId) == 'guest') return false;
     return accountStatus != 'deactivated' && accountStatus != 'pendingDeletion';
   }
 
@@ -162,7 +161,7 @@ class UserProfile {
   String get headlineName {
     if (displayName?.trim().isNotEmpty == true) return displayName!.trim();
     if (email != null) return email!;
-    return isAnonymous ? 'Invitado' : 'Usuario';
+    return 'Usuario';
   }
 
   String? get fullPhone {
@@ -371,7 +370,7 @@ class UserProfile {
         : 'active';
     final rawRole = data['role'] as String?;
     final roleId = normalizeRoleId(rawRole);
-    final known = UserRole.tryParseBuiltin(roleId) ?? UserRole.guest;
+    final known = UserRole.tryParseBuiltin(roleId) ?? UserRole.student;
 
     return UserProfile(
       uid: '${data['uid'] ?? ''}',

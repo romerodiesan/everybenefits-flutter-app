@@ -63,14 +63,13 @@ class _PollSlotState extends State<PollSlot> {
   }
 
   Future<void> _boot() async {
-    await _dismiss.warm();
-    if (!mounted) return;
     _pollsSub = _repository.watchActivePolls().listen(
       (polls) {
         _all = polls;
         _recompute();
       },
-      onError: (_) {
+      onError: (Object error, StackTrace stack) {
+        debugPrint('PollSlot: $error\n$stack');
         if (!mounted) return;
         setState(() {
           _all = const [];
@@ -79,12 +78,16 @@ class _PollSlotState extends State<PollSlot> {
         });
       },
     );
+    await _dismiss.warm();
+    if (mounted) _recompute();
   }
 
   @override
   void didUpdateWidget(covariant PollSlot oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.profile.uid != widget.profile.uid ||
+        oldWidget.profile.roleId != widget.profile.roleId ||
+        oldWidget.profile.isAnonymous != widget.profile.isAnonymous ||
         oldWidget.surface != widget.surface) {
       _recompute();
     }
@@ -92,9 +95,7 @@ class _PollSlotState extends State<PollSlot> {
 
   void _recompute() {
     if (!mounted) return;
-    final role = widget.profile.isAnonymous
-        ? 'guest'
-        : widget.profile.role.wireValue;
+    final role = widget.profile.roleId;
     final matched = pickPollsForSurface(
       _all,
       widget.surface,
@@ -179,6 +180,7 @@ class _PollSlotState extends State<PollSlot> {
     return Padding(
       padding: widget.padding,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           PulseSheet(

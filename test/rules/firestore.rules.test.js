@@ -1088,10 +1088,16 @@ describe('registered-member catalog reads', () => {
     await testEnv.withSecurityRulesDisabled(async (ctx) => {
       await ctx.firestore().doc('roles/agent').set({ permissions: ['forums.participate'] });
       await ctx.firestore().doc('promoBanners/b1').set({ active: true, title: 'Hi' });
+      await ctx.firestore().doc('promoBanners/draft').set({ active: false, title: 'Secret' });
       await ctx.firestore().doc('polls/p1').set({ active: true, question: { en: 'Q' } });
       await ctx.firestore().doc('polls/p1/votes/member1').set({ optionId: 'o1' });
       await ctx.firestore().doc('polls/p1/votes/agent1').set({ optionId: 'o2' });
       await ctx.firestore().doc('platformStats/global').set({ activeUsers: 10 });
+      await ctx.firestore().doc('orgNodes/root').set({
+        type: 'organization',
+        name: 'Root',
+        ein: '12-3456789',
+      });
     });
   });
 
@@ -1105,6 +1111,17 @@ describe('registered-member catalog reads', () => {
     await assertFails(db.doc('polls/p1').set({ active: false }));
     await assertFails(db.doc('polls/p1/votes/member1').set({ optionId: 'x' }));
     await assertSucceeds(db.doc('platformStats/global').get());
+  });
+
+  it('hides inactive promo banners from members', async () => {
+    const db = authedDb('member1', { email: 'member1@example.com' });
+    await assertFails(db.doc('promoBanners/draft').get());
+  });
+
+  it('denies client reads of orgNodes (Functions/Admin SDK only)', async () => {
+    const db = authedDb('member1', { email: 'member1@example.com' });
+    await assertFails(db.doc('orgNodes/root').get());
+    await assertFails(db.collection('orgNodes').get());
   });
 
   it('denies anonymous and guest catalog reads', async () => {

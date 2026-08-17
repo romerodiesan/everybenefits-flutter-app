@@ -14,13 +14,11 @@ import {
 } from "firebase/storage";
 import { updateProfile, type User } from "firebase/auth";
 import { mapUserProfile, toDate } from "@pulse/firebase-web";
-import { userSearchIndexFields } from "@pulse/shared";
+import { userSearchIndexFields, headlineName, composeUsAddress } from "@pulse/shared";
 import { getFirebaseAuth, getFirebaseDb, getFirebaseStorage } from "./client";
 import { listPublicProfiles, searchDirectory as searchDirectoryFn } from "./functions";
 import type { UserProfile } from "../types";
 import { DEFAULT_AGENCY } from "../types";
-import { headlineName } from "../display-name";
-import { composeUsAddress } from "../us-address";
 import { parseApprovalStatus } from "../roles";
 import { readPrivacyPrefs } from "../privacy/prefs";
 
@@ -60,6 +58,9 @@ function appearanceFrom(
 }
 
 export async function ensureProfile(user: User): Promise<UserProfile> {
+  if (user.isAnonymous) {
+    throw new Error("Anonymous sessions are not supported.");
+  }
   const refDoc = doc(getFirebaseDb(), "users", user.uid);
   const snap = await getDoc(refDoc);
   if (snap.exists()) {
@@ -86,15 +87,14 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     return profile;
   }
 
-  const isAnonymous = user.isAnonymous;
   const profile: UserProfile = {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName,
     photoUrl: user.photoURL,
-    role: isAnonymous ? "guest" : "student",
-    isAnonymous,
-    profileCompleted: isAnonymous,
+    role: "student",
+    isAnonymous: false,
+    profileCompleted: false,
     productTourVersion: 0,
     phoneCountryCode: null,
     phoneNumber: null,
@@ -106,10 +106,10 @@ export async function ensureProfile(user: User): Promise<UserProfile> {
     addressCity: null,
     addressState: null,
     addressZip: null,
-    agency: isAnonymous ? null : DEFAULT_AGENCY,
+    agency: DEFAULT_AGENCY,
     createdAt: new Date(),
     updatedAt: new Date(),
-    approvalStatus: isAnonymous ? "approved" : "pending",
+    approvalStatus: "pending",
   };
 
   await setDoc(refDoc, {
@@ -282,7 +282,7 @@ function isAllowedAvatarType(type: string) {
 export async function listDirectory(excludeUid?: string, max = 80) {
   const profiles = await listPublicProfiles(max + (excludeUid ? 1 : 0));
   return profiles
-    .filter((p) => p.uid !== excludeUid && p.role !== "guest")
+    .filter((p) => p.uid !== excludeUid)
     .slice(0, max)
     .sort((a, b) =>
       headlineName(a).toLowerCase().localeCompare(headlineName(b).toLowerCase()),

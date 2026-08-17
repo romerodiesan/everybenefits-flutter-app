@@ -9,7 +9,7 @@ import { Button, Input, Avatar } from "@/components/ui/primitives";
 import { ChatDirectorySkeleton } from "@/components/ui/skeleton";
 
 const ROLE_LABEL_KEYS: Record<
-  Exclude<UserRole, "guest">,
+  UserRole,
   | "chatsRoleStudent"
   | "chatsRoleAgent"
   | "roleAgencyOwner"

@@ -54,11 +54,6 @@ export function CommandPalette({
         label: t("navPolls"),
         run: () => router.push("/polls"),
       },
-      {
-        id: "settings",
-        label: t("navSettings"),
-        run: () => router.push("/settings"),
-      },
     ],
     [router, t],
   );

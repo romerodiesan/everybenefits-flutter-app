@@ -8,6 +8,7 @@ export type SsoErrorCode =
   | "code-required"
   | "invalid-code"
   | "account-disabled"
+  | "origin-not-allowed"
   | "network"
   | "missing-token"
   | "unknown";

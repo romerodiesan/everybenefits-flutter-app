@@ -66,6 +66,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return;
       }
 
+      if (next.isAnonymous) {
+        void getFirebaseAuth().signOut();
+        return;
+      }
+
       const uid = next.uid;
       const cached = readCachedProfile(uid);
       if (cached) setProfile(cached);

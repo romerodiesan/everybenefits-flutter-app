@@ -1,5 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-
 import '../promo/promo_banner_models.dart';
 
 typedef PollLocalizedString = PromoBannerLocalizedString;
@@ -59,7 +57,7 @@ Poll pollFromMap(String id, Map<String, dynamic> data) {
       final raw = optionsRaw[i];
       if (raw is! Map) continue;
       final map = Map<String, dynamic>.from(raw);
-      final optionId = (map['id'] as String?)?.trim();
+      final optionId = stringOrNull(map['id'])?.trim();
       options.add(
         PollOption(
           id: (optionId != null && optionId.isNotEmpty) ? optionId : 'o${i + 1}',
@@ -84,9 +82,9 @@ Poll pollFromMap(String id, Map<String, dynamic> data) {
 
   return Poll(
     id: id,
-    version: (data['version'] as num?)?.toInt() ?? 1,
+    version: (data['version'] is num) ? (data['version'] as num).toInt() : 1,
     active: data['active'] == true,
-    surface: parsePromoBannerSurface(data['surface'] as String?),
+    surface: parsePromoBannerSurface(stringOrNull(data['surface'])),
     audiences: audiences.isEmpty ? const ['all'] : audiences,
     question: localizedBannerString(data['question']),
     options: options,
@@ -94,11 +92,11 @@ Poll pollFromMap(String id, Map<String, dynamic> data) {
     showResultsBeforeVote: data['showResultsBeforeVote'] == true,
     dismissible: data['dismissible'] != false,
     counts: counts,
-    voteCount: (data['voteCount'] as num?)?.toInt() ?? 0,
+    voteCount: (data['voteCount'] is num) ? (data['voteCount'] as num).toInt() : 0,
     startsAt: millisOrNull(data['startsAt']),
     endsAt: millisOrNull(data['endsAt']),
     createdAt: millisOrNull(data['createdAt']),
     updatedAt: millisOrNull(data['updatedAt']),
-    updatedBy: data['updatedBy'] as String?,
+    updatedBy: stringOrNull(data['updatedBy']),
   );
 }

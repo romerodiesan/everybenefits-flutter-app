@@ -15,8 +15,7 @@ import {
   type PayMode,
 } from "@pulse/shared";
 import { db, callableOpts } from "./init";
-import { requireCaller } from "./auth";
-import { loadPermissionsForUid } from "./permissions";
+import { requireActor } from "./guards";
 import { parseListPage } from "./payments-shared";
 
 type CommissionPerm =
@@ -36,15 +35,14 @@ async function requireCommissionPermission(
   operation: string,
   permission: CommissionPerm,
 ) {
-  const uid = await requireCaller(request, operation);
-  const { permissions } = await loadPermissionsForUid(uid);
-  if (!hasCommissionPermission(permissions, permission)) {
+  const actor = await requireActor(request, operation);
+  if (!hasCommissionPermission(actor.permissions, permission)) {
     throw new HttpsError(
       "permission-denied",
       `Missing permission: ${permission}`,
     );
   }
-  return uid;
+  return actor.uid;
 }
 
 function serializeCommissionRun(
@@ -257,7 +255,7 @@ export const listCommissionParties = onCall(callableOpts, async (request) => {
   if (usersSnap && enrichAgencies) {
     for (const doc of usersSnap.docs) {
       const data = doc.data();
-      const role = String(data.role ?? "guest");
+      const role = String(data.role ?? "student");
       if (!AGENT_PARTY_ROLES.has(role)) continue;
       if (String(data.approvalStatus ?? "approved") !== "approved") continue;
       if (data.isAnonymous === true) continue;
@@ -331,7 +329,7 @@ export const listCommissionParties = onCall(callableOpts, async (request) => {
   if (includeAgents && usersSnap) {
     for (const doc of usersSnap.docs) {
       const data = doc.data();
-      const role = String(data.role ?? "guest");
+      const role = String(data.role ?? "student");
       if (!AGENT_PARTY_ROLES.has(role)) continue;
       if (String(data.approvalStatus ?? "approved") !== "approved") continue;
       if (data.isAnonymous === true) continue;

@@ -301,17 +301,17 @@ export async function markFeedSeen(uid: string) {
   );
 }
 
-/** New forum threads since lastFeedSeenAt (capped). */
+/** New forum threads since lastFeedSeenAt (capped to a 30-day window). */
 export async function countNewFeedThreads(
   lastFeedSeenAt: Date | null,
 ): Promise<number> {
   try {
-    const q = lastFeedSeenAt
-      ? query(
-          collection(getFirebaseDb(), "threads"),
-          where("createdAt", ">", Timestamp.fromDate(lastFeedSeenAt)),
-        )
-      : query(collection(getFirebaseDb(), "threads"));
+    const lookbackMs = 30 * 24 * 60 * 60 * 1000;
+    const since = lastFeedSeenAt ?? new Date(Date.now() - lookbackMs);
+    const q = query(
+      collection(getFirebaseDb(), "threads"),
+      where("createdAt", ">", Timestamp.fromDate(since)),
+    );
     const snap = await getCountFromServer(q);
     return Math.min(99, snap.data().count);
   } catch {

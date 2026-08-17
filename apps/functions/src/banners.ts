@@ -2,7 +2,6 @@ import { FieldValue, type DocumentData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { randomUUID } from "node:crypto";
 import {
-  canManagePlatform,
   defaultFormatForSurface,
   promoBannerUpsertSchema,
   withBannerCompatDefaults,
@@ -13,9 +12,8 @@ import {
   type PromoBannerSurface,
   type PromoBannerType,
 } from "@pulse/shared";
-import { requireCaller } from "./auth";
+import { requireActor } from "./guards";
 import { db, callableOpts, storageBucket } from "./init";
-import { loadPermissionsForUid } from "./permissions";
 
 const COLLECTION = "promoBanners";
 const BANNER_IMAGE_TYPES = new Set([
@@ -81,12 +79,10 @@ async function requireBannerAdmin(
   request: { auth?: { uid: string } },
   operation: string,
 ): Promise<string> {
-  const uid = await requireCaller(request, operation);
-  const { permissions } = await loadPermissionsForUid(uid);
-  if (!canManagePlatform(permissions)) {
-    throw new HttpsError("permission-denied", "Platform admin required.");
-  }
-  return uid;
+  const actor = await requireActor(request, operation, {
+    permission: "platform.manage",
+  });
+  return actor.uid;
 }
 
 function slugId(input?: string): string {
@@ -98,7 +94,11 @@ function slugId(input?: string): string {
 /** Admin list — all banners, including inactive. */
 export const listPromoBanners = onCall(callableOpts, async (request) => {
   await requireBannerAdmin(request, "listPromoBanners");
-  const snap = await db.collection(COLLECTION).orderBy("updatedAt", "desc").get();
+  const snap = await db
+    .collection(COLLECTION)
+    .orderBy("updatedAt", "desc")
+    .limit(200)
+    .get();
   const banners = snap.docs.map((doc) => mapPromoBanner(doc.id, doc.data()));
   return { banners };
 });

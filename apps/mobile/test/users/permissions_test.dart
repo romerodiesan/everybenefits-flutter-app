@@ -22,10 +22,9 @@ void main() {
       expect(perms, isNot(contains(Perm.licenseProfileRequired)));
     });
 
-    test('guest is read-only web access', () {
+    test('orphan guest slug is fail-closed', () {
       final perms = getDefaultPermissionsForRole('guest');
-      expect(perms, isNot(contains(Perm.forumsParticipate)));
-      expect(perms, isNot(contains(Perm.chatsParticipate)));
+      expect(perms, isEmpty);
     });
 
     test('custom role has empty defaults until hydration', () {
@@ -70,8 +69,7 @@ void main() {
       expect(profile().isRegisteredMember, isTrue);
     });
 
-    test('guests and anonymous are not', () {
-      expect(profile(role: UserRole.guest).isRegisteredMember, isFalse);
+    test('anonymous is not a member', () {
       expect(profile(anonymous: true).isRegisteredMember, isFalse);
     });
 

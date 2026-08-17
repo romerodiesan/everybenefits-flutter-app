@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { buildCallableCors, resolveEnforceAppCheck } from "./callable-cors";
+import {
+  buildCallableCors,
+  isAllowedCallableOrigin,
+  resolveEnforceAppCheck,
+} from "./callable-cors";
 
 describe("buildCallableCors", () => {
   afterEach(() => {
@@ -19,9 +23,19 @@ describe("buildCallableCors", () => {
     });
     expect(Array.isArray(cors)).toBe(true);
     if (!Array.isArray(cors)) return;
-    expect(cors.some((o) => o.includes("localhost"))).toBe(false);
+    expect(cors.some((o) => typeof o === "string" && o.includes("localhost"))).toBe(
+      false,
+    );
     expect(cors).toContain("https://pulse.everybenefits.us");
+    expect(cors).toContain("https://admin.everybenefits.us");
     expect(cors).toContain("https://payments.everybenefits.us");
+    expect(
+      cors.some(
+        (o) => o instanceof RegExp && o.test(
+          "https://pulse-web-app--pr12-abcd-every-benefits-us.us-central1.hosted.app",
+        ),
+      ),
+    ).toBe(true);
   });
 
   it("includes localhost when explicitly allowed", () => {
@@ -44,6 +58,26 @@ describe("buildCallableCors", () => {
     if (!Array.isArray(cors)) return;
     expect(cors).toContain("https://staging.example.com");
     expect(cors).toContain("https://other.example.com");
+  });
+});
+
+describe("isAllowedCallableOrigin", () => {
+  it("allows App Hosting preview hosts", () => {
+    expect(
+      isAllowedCallableOrigin(
+        "https://pulse-web-app--pr12-abcd-every-benefits-us.us-central1.hosted.app",
+        { allowLocalhost: false, extraOrigins: "" },
+      ),
+    ).toBe(true);
+  });
+
+  it("rejects unknown origins", () => {
+    expect(
+      isAllowedCallableOrigin("https://evil.example", {
+        allowLocalhost: false,
+        extraOrigins: "",
+      }),
+    ).toBe(false);
   });
 });
 

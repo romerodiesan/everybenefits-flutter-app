@@ -7,7 +7,6 @@ import {
   reauthenticateWithPopup,
   sendPasswordResetEmail,
   sendSignInLinkToEmail,
-  signInAnonymously,
   signInWithCredential,
   signInWithEmailAndPassword,
   signInWithEmailLink,
@@ -77,10 +76,6 @@ export async function signInWithGoogle() {
     return signInWithCredential(auth, emulatorGoogleCredential(email));
   }
   return signInWithPopup(auth, googleProvider);
-}
-
-export async function signInAsGuest() {
-  return signInAnonymously(getFirebaseAuth());
 }
 
 export async function resetPassword(email: string) {

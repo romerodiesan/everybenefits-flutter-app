@@ -3,14 +3,13 @@
 import { useMemo } from "react";
 import { useTranslations } from "next-intl";
 import { Link } from "@/i18n/navigation";
-import { useAuth, useAccess } from "@/lib/providers/auth-provider";
-import { canManagePlatform, headlineName } from "@/lib/roles";
+import { useAuth } from "@/lib/providers/auth-provider";
+import { headlineName } from "@/lib/roles";
 import { ALL_ROLES, type UserRole } from "@/lib/types";
 import { KpiGridSkeleton } from "@/components/ui/data-table-skeleton";
 import { useAdminInsightsQuery } from "@/lib/hooks/use-admin-queries";
 
 const ROLE_KEYS: Record<UserRole, string> = {
-  guest: "roleGuest",
   student: "roleStudent",
   agent: "roleAgent",
   agency_owner: "roleAgencyOwner",
@@ -93,8 +92,6 @@ export function OverviewHome() {
   const t = useTranslations();
   const { profile } = useAuth();
   const { data: insights, isLoading, isFetching } = useAdminInsightsQuery();
-  const access = useAccess();
-  const isAdmin = canManagePlatform(access);
   const name = profile ? headlineName(profile) : "";
 
   const roleRows = useMemo(() => {
@@ -208,13 +205,6 @@ export function OverviewHome() {
             }
             accent={pending > 0}
           />
-          {isAdmin ? (
-            <WorkspaceLink
-              href="/settings"
-              title={t("navSettings")}
-              body={t("overviewLinkSettings")}
-            />
-          ) : null}
         </div>
       </section>
 

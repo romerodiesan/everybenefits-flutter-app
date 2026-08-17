@@ -82,7 +82,11 @@ export const getStatement = onCall(callableOpts, async (request) => {
 });
 
 export const importStatement = onCall(callableOpts, async (request) => {
-  const uid = await requirePaymentsAdmin(request, "importStatement");
+  const uid = await requirePaymentsAdmin(
+    request,
+    "importStatement",
+    "commission.upload",
+  );
   const parsed = importStatementInputSchema.safeParse(request.data ?? {});
   if (!parsed.success) {
     throw new HttpsError("invalid-argument", parsed.error.message);

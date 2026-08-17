@@ -1,6 +1,14 @@
-import { FieldValue, type DocumentData } from "firebase-admin/firestore";
+import {
+  FieldValue,
+  type DocumentData,
+  type Query,
+  type QueryDocumentSnapshot,
+} from "firebase-admin/firestore";
 import { isUserAssignableOrgType } from "@pulse/shared";
 import { db } from "./init";
+
+const SYNC_PAGE_SIZE = 400;
+const SYNC_MAX_PAGES = 25;
 
 const AGENT_SYNC_ROLES = new Set([
   "agent",
@@ -24,16 +32,81 @@ function headlineName(data: DocumentData | undefined): string {
   return "Agent";
 }
 
+type ParticipantIndex = {
+  byOrg: Map<string, QueryDocumentSnapshot>;
+  byUser: Map<string, QueryDocumentSnapshot>;
+};
+
 async function findParticipantByField(
   field: "linkedOrgNodeId" | "userId",
   value: string,
+  index?: ParticipantIndex,
 ) {
+  if (index) {
+    const hit =
+      field === "linkedOrgNodeId" ? index.byOrg.get(value) : index.byUser.get(value);
+    if (hit) return hit;
+  }
   const snap = await db
     .collection("paymentsParticipants")
     .where(field, "==", value)
     .limit(1)
     .get();
-  return snap.docs[0] ?? null;
+  const doc = snap.docs[0] ?? null;
+  if (doc && index) {
+    if (field === "linkedOrgNodeId") index.byOrg.set(value, doc);
+    else index.byUser.set(value, doc);
+  }
+  return doc;
+}
+
+function rememberParticipant(
+  index: ParticipantIndex | undefined,
+  field: "linkedOrgNodeId" | "userId",
+  value: string,
+  doc: QueryDocumentSnapshot,
+) {
+  if (!index) return;
+  if (field === "linkedOrgNodeId") index.byOrg.set(value, doc);
+  else index.byUser.set(value, doc);
+}
+
+async function loadParticipantIndex(): Promise<ParticipantIndex> {
+  const byOrg = new Map<string, QueryDocumentSnapshot>();
+  const byUser = new Map<string, QueryDocumentSnapshot>();
+  const snap = await db.collection("paymentsParticipants").limit(2000).get();
+  for (const doc of snap.docs) {
+    const data = doc.data();
+    const orgId = stringOrNull(data.linkedOrgNodeId);
+    const userId = stringOrNull(data.userId);
+    if (orgId && String(data.type ?? "") === "agency") byOrg.set(orgId, doc);
+    if (userId && String(data.type ?? "") === "agent") byUser.set(userId, doc);
+  }
+  return { byOrg, byUser };
+}
+
+async function collectPagedDocs(
+  collectionPath: string,
+  pageSize = SYNC_PAGE_SIZE,
+  maxPages = SYNC_MAX_PAGES,
+  whereField?: { field: string; value: string },
+): Promise<QueryDocumentSnapshot[]> {
+  const docs: QueryDocumentSnapshot[] = [];
+  let last: QueryDocumentSnapshot | undefined;
+  for (let page = 0; page < maxPages; page += 1) {
+    let query: Query = db.collection(collectionPath);
+    if (whereField) {
+      query = query.where(whereField.field, "==", whereField.value);
+    }
+    query = query.orderBy("__name__").limit(pageSize);
+    if (last) query = query.startAfter(last);
+    const snap = await query.get();
+    if (snap.empty) break;
+    docs.push(...snap.docs);
+    last = snap.docs[snap.docs.length - 1];
+    if (snap.size < pageSize) break;
+  }
+  return docs;
 }
 
 /**
@@ -43,13 +116,18 @@ async function findParticipantByField(
 export async function ensureAgencyParticipant(
   orgNodeId: string,
   data: DocumentData,
+  index?: ParticipantIndex,
 ): Promise<string | null> {
   if (!isUserAssignableOrgType(data.type)) return null;
 
   const name = stringOrNull(data.name) || "Agency";
   const npn = stringOrNull(data.npn);
   const active = data.active !== false;
-  const existing = await findParticipantByField("linkedOrgNodeId", orgNodeId);
+  const existing = await findParticipantByField(
+    "linkedOrgNodeId",
+    orgNodeId,
+    index,
+  );
 
   const payload: Record<string, unknown> = {
     name,
@@ -63,6 +141,7 @@ export async function ensureAgencyParticipant(
 
   if (existing) {
     await existing.ref.set(payload, { merge: true });
+    rememberParticipant(index, "linkedOrgNodeId", orgNodeId, existing);
     return existing.id;
   }
 
@@ -71,12 +150,21 @@ export async function ensureAgencyParticipant(
     ...payload,
     createdAt: FieldValue.serverTimestamp(),
   });
+  const created = await ref.get();
+  if (created.exists) {
+    rememberParticipant(
+      index,
+      "linkedOrgNodeId",
+      orgNodeId,
+      created as QueryDocumentSnapshot,
+    );
+  }
   return ref.id;
 }
 
 function isAgentSyncEligible(data: DocumentData | undefined): boolean {
   if (!data) return false;
-  const role = String(data.role ?? "guest");
+  const role = String(data.role ?? "student");
   if (!AGENT_SYNC_ROLES.has(role)) return false;
   const approval = String(data.approvalStatus ?? "approved");
   if (approval !== "approved") return false;
@@ -96,8 +184,9 @@ function isUserAccountActive(data: DocumentData | undefined): boolean {
 export async function ensureAgentParticipant(
   uid: string,
   data: DocumentData,
+  index?: ParticipantIndex,
 ): Promise<string | null> {
-  const existing = await findParticipantByField("userId", uid);
+  const existing = await findParticipantByField("userId", uid, index);
   const eligible = isAgentSyncEligible(data);
 
   if (!eligible) {
@@ -130,6 +219,7 @@ export async function ensureAgentParticipant(
 
   if (existing) {
     await existing.ref.set(payload, { merge: true });
+    rememberParticipant(index, "userId", uid, existing);
     return existing.id;
   }
 
@@ -138,6 +228,10 @@ export async function ensureAgentParticipant(
     ...payload,
     createdAt: FieldValue.serverTimestamp(),
   });
+  const created = await ref.get();
+  if (created.exists) {
+    rememberParticipant(index, "userId", uid, created as QueryDocumentSnapshot);
+  }
   return ref.id;
 }
 
@@ -177,6 +271,7 @@ async function findDerivedEdgesForDownline(
     .collection("businessRelationships")
     .where("downlineParticipantId", "==", downlineParticipantId)
     .where("relationshipType", "==", relationshipType)
+    .limit(20)
     .get();
   return snap.docs.filter((d) => d.data()?.source === "org_hierarchy");
 }
@@ -267,12 +362,14 @@ async function upsertDerivedRelationship(args: {
 export async function ensureAgencyAgencyRelationship(
   childOrgNodeId: string,
   childData: DocumentData,
+  index?: ParticipantIndex,
 ): Promise<"created" | "updated" | "noop" | "deactivated"> {
   if (!isUserAssignableOrgType(childData.type)) return "noop";
 
   const childParticipantId = await ensureAgencyParticipant(
     childOrgNodeId,
     childData,
+    index,
   );
   if (!childParticipantId) return "noop";
 
@@ -307,6 +404,7 @@ export async function ensureAgencyAgencyRelationship(
   const parentParticipantId = await ensureAgencyParticipant(
     parentId,
     parentData,
+    index,
   );
   if (!parentParticipantId) return "noop";
 
@@ -323,8 +421,9 @@ export async function ensureAgencyAgencyRelationship(
 export async function ensureAgencyMemberRelationship(
   uid: string,
   userData: DocumentData,
+  index?: ParticipantIndex,
 ): Promise<"created" | "updated" | "noop" | "deactivated"> {
-  const memberParticipantId = await ensureAgentParticipant(uid, userData);
+  const memberParticipantId = await ensureAgentParticipant(uid, userData, index);
   if (!memberParticipantId) return "noop";
 
   if (!isAgentSyncEligible(userData) || !isUserAccountActive(userData)) {
@@ -373,7 +472,11 @@ export async function ensureAgencyMemberRelationship(
   const orgSnap = await db.doc(`orgNodes/${orgNodeId}`).get();
   if (!orgSnap.exists) return "noop";
   const orgData = orgSnap.data() ?? {};
-  const agencyParticipantId = await ensureAgencyParticipant(orgNodeId, orgData);
+  const agencyParticipantId = await ensureAgencyParticipant(
+    orgNodeId,
+    orgData,
+    index,
+  );
   if (!agencyParticipantId) return "noop";
 
   return upsertDerivedRelationship({
@@ -430,41 +533,55 @@ export async function syncPaymentsGraph(): Promise<SyncPaymentsGraphResult> {
   let relationshipsUpserted = 0;
   let deactivated = 0;
 
-  const orgSnaps = await Promise.all([
-    db.collection("orgNodes").where("type", "==", "organization").get(),
-    db.collection("orgNodes").where("type", "==", "agency").get(),
-    db.collection("orgNodes").where("type", "==", "sub_agency").get(),
-  ]);
+  const index = await loadParticipantIndex();
+  const orgDocs = (
+    await Promise.all([
+      collectPagedDocs("orgNodes", SYNC_PAGE_SIZE, SYNC_MAX_PAGES, {
+        field: "type",
+        value: "organization",
+      }),
+      collectPagedDocs("orgNodes", SYNC_PAGE_SIZE, SYNC_MAX_PAGES, {
+        field: "type",
+        value: "agency",
+      }),
+      collectPagedDocs("orgNodes", SYNC_PAGE_SIZE, SYNC_MAX_PAGES, {
+        field: "type",
+        value: "sub_agency",
+      }),
+    ])
+  ).flat();
 
-  for (const snap of orgSnaps) {
-    for (const doc of snap.docs) {
-      const data = doc.data();
-      const before = await findParticipantByField("linkedOrgNodeId", doc.id);
-      const id = await ensureAgencyParticipant(doc.id, data);
-      if (id && (!before || before.id !== id || before.data()?.active === false)) {
-        agenciesUpserted += 1;
-      } else if (id) {
-        agenciesUpserted += 1;
-      }
-      const rel = await ensureAgencyAgencyRelationship(doc.id, data);
-      if (rel === "created" || rel === "updated") relationshipsUpserted += 1;
-      if (rel === "deactivated") deactivated += 1;
-      if (data.active === false) deactivated += 1;
+  for (const doc of orgDocs) {
+    const data = doc.data();
+    const before = await findParticipantByField(
+      "linkedOrgNodeId",
+      doc.id,
+      index,
+    );
+    const id = await ensureAgencyParticipant(doc.id, data, index);
+    if (id && (!before || before.id !== id || before.data()?.active === false)) {
+      agenciesUpserted += 1;
+    } else if (id) {
+      agenciesUpserted += 1;
     }
+    const rel = await ensureAgencyAgencyRelationship(doc.id, data, index);
+    if (rel === "created" || rel === "updated") relationshipsUpserted += 1;
+    if (rel === "deactivated") deactivated += 1;
+    if (data.active === false) deactivated += 1;
   }
 
-  const usersSnap = await db.collection("users").get();
-  for (const doc of usersSnap.docs) {
+  const usersSnap = await collectPagedDocs("users");
+  for (const doc of usersSnap) {
     const data = doc.data();
     const wasEligible = isAgentSyncEligible(data);
-    const before = await findParticipantByField("userId", doc.id);
-    await ensureAgentParticipant(doc.id, data);
+    const before = await findParticipantByField("userId", doc.id, index);
+    await ensureAgentParticipant(doc.id, data, index);
     if (wasEligible) {
       agentsUpserted += 1;
     } else if (before && before.data()?.active !== false) {
       deactivated += 1;
     }
-    const rel = await ensureAgencyMemberRelationship(doc.id, data);
+    const rel = await ensureAgencyMemberRelationship(doc.id, data, index);
     if (rel === "created" || rel === "updated") relationshipsUpserted += 1;
     if (rel === "deactivated") deactivated += 1;
   }
@@ -520,29 +637,38 @@ export async function checkPaymentsParticipantsDrift(): Promise<PaymentsParticip
   let staleAgentLinksCount = 0;
   let nameMismatchesCount = 0;
 
-  const orgSnaps = await Promise.all([
-    db.collection("orgNodes").where("type", "==", "organization").get(),
-    db.collection("orgNodes").where("type", "==", "agency").get(),
-    db.collection("orgNodes").where("type", "==", "sub_agency").get(),
-  ]);
+  const orgDocs = (
+    await Promise.all([
+      collectPagedDocs("orgNodes", SYNC_PAGE_SIZE, SYNC_MAX_PAGES, {
+        field: "type",
+        value: "organization",
+      }),
+      collectPagedDocs("orgNodes", SYNC_PAGE_SIZE, SYNC_MAX_PAGES, {
+        field: "type",
+        value: "agency",
+      }),
+      collectPagedDocs("orgNodes", SYNC_PAGE_SIZE, SYNC_MAX_PAGES, {
+        field: "type",
+        value: "sub_agency",
+      }),
+    ])
+  ).flat();
   const orgById = new Map<string, DocumentData>();
-  for (const snap of orgSnaps) {
-    for (const doc of snap.docs) {
-      orgById.set(doc.id, doc.data());
-    }
+  for (const doc of orgDocs) {
+    orgById.set(doc.id, doc.data());
   }
 
-  const usersSnap = await db.collection("users").get();
+  const usersSnap = await collectPagedDocs("users");
   const userById = new Map<string, DocumentData>();
-  for (const doc of usersSnap.docs) {
+  for (const doc of usersSnap) {
     userById.set(doc.id, doc.data());
   }
 
-  const participantsSnap = await db.collection("paymentsParticipants").get();
+  const participantsSnap = await collectPagedDocs("paymentsParticipants");
   const agencyByOrg = new Map<string, { id: string; data: DocumentData }>();
   const agentByUser = new Map<string, { id: string; data: DocumentData }>();
 
-  for (const doc of participantsSnap.docs) {
+  for (const doc of participantsSnap) {
     const data = doc.data();
     const linkedOrg = stringOrNull(data.linkedOrgNodeId);
     const userId = stringOrNull(data.userId);
@@ -665,7 +791,7 @@ export async function checkPaymentsParticipantsDrift(): Promise<PaymentsParticip
     checkedAt: new Date().toISOString(),
     orgNodesScanned: orgById.size,
     usersScanned: userById.size,
-    participantsScanned: participantsSnap.size,
+    participantsScanned: participantsSnap.length,
     missingAgencies,
     missingAgents,
     staleAgencyLinks,
@@ -706,6 +832,7 @@ export async function syncPaymentsGraphIncremental(opts: {
   let deactivated = 0;
   let nextOrgCursor: string | null = null;
   let nextUserCursor: string | null = null;
+  const index = await loadParticipantIndex();
 
   if (phase === "org" || phase === "all") {
     let query = db.collection("orgNodes").orderBy("__name__").limit(pageSize);
@@ -719,9 +846,9 @@ export async function syncPaymentsGraphIncremental(opts: {
     for (const doc of snap.docs) {
       const data = doc.data();
       if (!isUserAssignableOrgType(data.type)) continue;
-      await ensureAgencyParticipant(doc.id, data);
+      await ensureAgencyParticipant(doc.id, data, index);
       agenciesUpserted += 1;
-      const rel = await ensureAgencyAgencyRelationship(doc.id, data);
+      const rel = await ensureAgencyAgencyRelationship(doc.id, data, index);
       if (rel === "created" || rel === "updated") relationshipsUpserted += 1;
       if (rel === "deactivated") deactivated += 1;
       if (data.active === false) deactivated += 1;
@@ -744,14 +871,14 @@ export async function syncPaymentsGraphIncremental(opts: {
     for (const doc of snap.docs) {
       const data = doc.data();
       const wasEligible = isAgentSyncEligible(data);
-      const before = await findParticipantByField("userId", doc.id);
-      await ensureAgentParticipant(doc.id, data);
+      const before = await findParticipantByField("userId", doc.id, index);
+      await ensureAgentParticipant(doc.id, data, index);
       if (wasEligible) {
         agentsUpserted += 1;
       } else if (before && before.data()?.active !== false) {
         deactivated += 1;
       }
-      const rel = await ensureAgencyMemberRelationship(doc.id, data);
+      const rel = await ensureAgencyMemberRelationship(doc.id, data, index);
       if (rel === "created" || rel === "updated") relationshipsUpserted += 1;
       if (rel === "deactivated") deactivated += 1;
     }

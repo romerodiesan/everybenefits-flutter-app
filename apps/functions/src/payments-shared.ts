@@ -1,7 +1,5 @@
 import { type DocumentData, type Query } from "firebase-admin/firestore";
-import { HttpsError } from "firebase-functions/v2/https";
 import {
-  canAccessPayments,
   normalizeParticipantType,
   type BusinessRelationship,
   type CarrierMarket,
@@ -9,19 +7,15 @@ import {
   type ContractTerm,
   type StatementLine,
 } from "@pulse/shared";
-import { requireCaller } from "./auth";
-import { loadPermissionsForUid } from "./permissions";
+import { requireActor } from "./guards";
 
 export async function requirePaymentsAdmin(
   request: { auth?: { uid: string } },
   operation: string,
+  permission: string | string[] = "apps.payments.access",
 ) {
-  const uid = await requireCaller(request, operation);
-  const { permissions } = await loadPermissionsForUid(uid);
-  if (!canAccessPayments(permissions)) {
-    throw new HttpsError("permission-denied", "Payments access required.");
-  }
-  return uid;
+  const actor = await requireActor(request, operation, { permission });
+  return actor.uid;
 }
 
 export function serializeParticipant(id: string, data: DocumentData) {

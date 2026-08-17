@@ -34,8 +34,8 @@
     "build:payments": "turbo run build --filter=@pulse/payments",
     "dev:payments": "pnpm --filter @pulse/payments dev",
     "deploy:payments": "firebase deploy --only apphosting:payments-web-app",
-    "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore --project every-benefits-us \"pnpm --dir test/rules test\"",
-    "test:integration": "pnpm test:rules"
+    "test:rules": "npx -y firebase-tools@latest emulators:exec --only firestore,storage,database --project every-benefits-us \"pnpm --dir test/rules test:emulators\"",
+    "test:integration": "pnpm --filter @pulse/functions test && pnpm test:rules"
   },
   "devDependencies": {
     "turbo": "^2.10.8",

@@ -9,7 +9,7 @@ import {
   pulseHubLoginUrl,
 } from "./urls";
 import { parseSsoErrorCode, ssoMessageKeyForCode } from "./errors";
-import { rateLimitDocId } from "./server";
+import { assertAllowedSsoOrigin, rateLimitDocId, SsoHttpError } from "./server";
 
 describe("isSafeInternalPath", () => {
   it("accepts normal relative paths", () => {
@@ -121,11 +121,25 @@ describe("error mapping", () => {
   });
 });
 
-describe("rateLimitDocId", () => {
-  it("is stable within a minute for the same identity", () => {
-    const a = rateLimitDocId("exchange_ip", "1.2.3.4");
-    const b = rateLimitDocId("exchange_ip", "1.2.3.4");
-    expect(a).toBe(b);
-    expect(a).toContain("exchange_ip_");
+describe("assertAllowedSsoOrigin", () => {
+  it("allows missing origin (non-browser)", () => {
+    expect(() => assertAllowedSsoOrigin(null)).not.toThrow();
+    expect(() => assertAllowedSsoOrigin(undefined)).not.toThrow();
+  });
+
+  it("allows Pulse-family origins", () => {
+    expect(() => assertAllowedSsoOrigin("http://localhost:3000")).not.toThrow();
+    expect(() => assertAllowedSsoOrigin("http://localhost:3002")).not.toThrow();
+  });
+
+  it("rejects foreign origins", () => {
+    try {
+      assertAllowedSsoOrigin("https://evil.example");
+      throw new Error("expected throw");
+    } catch (error) {
+      expect(error).toBeInstanceOf(SsoHttpError);
+      expect((error as SsoHttpError).code).toBe("origin-not-allowed");
+      expect((error as SsoHttpError).status).toBe(403);
+    }
   });
 });

@@ -27,12 +27,12 @@ jobs:
       - name: Check Functions @pulse/shared vendor
         run: pnpm --filter @pulse/functions run check:shared
       - run: pnpm exec turbo run test --filter=./apps/* --filter=./packages/* --continue
-      - name: Firestore rules tests
+      - name: Security rules tests (Firestore, Storage, RTDB)
         run: |
           npx -y firebase-tools@latest emulators:exec \
-            --only firestore \
+            --only firestore,storage,database \
             --project every-benefits-us \
-            "pnpm --dir test/rules test"
+            "pnpm --dir test/rules test:emulators"
 
   audit:
     name: Dependency audit

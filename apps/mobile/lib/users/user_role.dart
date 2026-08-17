@@ -2,7 +2,6 @@ import '../l10n/app_localizations.dart';
 import 'permissions.dart';
 
 enum UserRole {
-  guest,
   student,
   agent,
   agencyOwner,
@@ -18,7 +17,6 @@ enum UserRole {
       };
 
   String label(AppLocalizations l10n) => switch (this) {
-        UserRole.guest => l10n.roleGuest,
         UserRole.student => l10n.roleStudent,
         UserRole.agent => l10n.roleAgent,
         UserRole.agencyOwner => l10n.roleAgencyOwner,
@@ -31,16 +29,17 @@ enum UserRole {
   /// Built-in only. Returns null for custom / unknown slugs.
   static UserRole? tryParseBuiltin(String? value) {
     final normalized = normalizeRoleId(value);
+    if (normalized == 'guest') return UserRole.student;
     for (final role in UserRole.values) {
       if (role.wireValue == normalized) return role;
     }
     return null;
   }
 
-  /// Legacy / UI helper: unknown custom slugs map to [guest] for enum-typed
+  /// Legacy / UI helper: unknown custom slugs map to [student] for enum-typed
   /// call sites. Prefer [roleId] + permissions for authorization.
   static UserRole parse(String? value) {
-    return tryParseBuiltin(value) ?? UserRole.guest;
+    return tryParseBuiltin(value) ?? UserRole.student;
   }
 }
 
@@ -49,7 +48,7 @@ String roleLabelForId(String? roleId, AppLocalizations l10n) {
   final known = UserRole.tryParseBuiltin(roleId);
   if (known != null) return known.label(l10n);
   final raw = (roleId ?? '').trim();
-  if (raw.isEmpty) return l10n.roleGuest;
+  if (raw.isEmpty) return l10n.roleStudent;
   return raw
       .split(RegExp(r'[_\s]+'))
       .where((p) => p.isNotEmpty)
@@ -86,7 +85,7 @@ bool canParticipateInForums({
   final access = _asAccess(roleOrPermissions);
   if (access is String) {
     final id = normalizeRoleId(access);
-    if (id == 'guest') return false;
+    if (id.isEmpty) return false;
   }
   return can(access, Perm.forumsParticipate);
 }

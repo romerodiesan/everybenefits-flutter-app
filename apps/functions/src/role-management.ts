@@ -6,10 +6,7 @@ import {
   DEFAULT_ROLE_META,
   DEFAULT_ROLE_PERMISSIONS,
   SYSTEM_MEGA_ROLE_ID,
-  canAccessAdmin,
-  canManagePlatform,
   filterValidPermissions,
-  hasPermission,
   isBuiltinRoleId,
   isProfileBadgeIcon,
   isRoleCategory,
@@ -21,8 +18,7 @@ import {
   type RoleDoc,
 } from "@pulse/shared";
 import { db, callableOpts } from "./init";
-import { requireCaller } from "./auth";
-import { loadPermissionsForUid } from "./permissions";
+import { requireActor } from "./guards";
 
 const SLUG_RE = /^[a-z][a-z0-9-]{1,62}$/;
 
@@ -64,13 +60,10 @@ export function mapRoleDoc(id: string, data: DocumentData): RoleDoc {
 async function requireRolesReader(
   request: { auth?: { uid: string } },
   operation: string,
+  permission: string | string[] = "admin.roles.read",
 ): Promise<{ uid: string; role: string; permissions: string[] }> {
-  const uid = await requireCaller(request, operation);
-  const { role, permissions } = await loadPermissionsForUid(uid);
-  if (!canAccessAdmin(permissions)) {
-    throw new HttpsError("permission-denied", "Admin access required.");
-  }
-  return { uid, role, permissions };
+  const actor = await requireActor(request, operation, { permission });
+  return { uid: actor.uid, role: actor.role, permissions: actor.permissions };
 }
 
 /**
@@ -165,15 +158,13 @@ export async function upsertBuiltinRoles(actorUid: string | null) {
 }
 
 export const seedSystemRoles = onCall(callableOpts, async (request) => {
-  const { uid, permissions } = await requireRolesReader(
+  const { uid } = await requireRolesReader(
     request,
     "seedSystemRoles",
+    "platform.manage",
   );
-  if (!canManagePlatform(permissions)) {
-    throw new HttpsError("permission-denied", "Admins only.");
-  }
   await upsertBuiltinRoles(uid);
-  const snap = await db.collection("roles").get();
+  const snap = await db.collection("roles").limit(200).get();
   const roles = snap.docs
     .map((doc) => mapRoleDoc(doc.id, doc.data()))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
@@ -187,12 +178,7 @@ export const listRoles = onCall(callableOpts, async (request) => {
   const includeInactive = request.data?.includeInactive === true;
   const includeSystem = request.data?.includeSystem === true;
 
-  let snap = await db.collection("roles").get();
-  if (snap.empty) {
-    // Auto-seed once so Admin UI works out of the box.
-    await upsertBuiltinRoles(null);
-    snap = await db.collection("roles").get();
-  }
+  const snap = await db.collection("roles").limit(200).get();
 
   let roles = snap.docs.map((doc) => mapRoleDoc(doc.id, doc.data()));
   if (!includeInactive) {
@@ -209,16 +195,11 @@ export const listRoles = onCall(callableOpts, async (request) => {
 });
 
 export const createRole = onCall(callableOpts, async (request) => {
-  const { uid, permissions: callerPerms } = await requireRolesReader(
+  const { uid } = await requireRolesReader(
     request,
     "createRole",
+    "admin.roles.create",
   );
-  if (
-    !canManagePlatform(callerPerms) &&
-    !hasPermission(callerPerms, "admin.roles.create")
-  ) {
-    throw new HttpsError("permission-denied", "Admins only.");
-  }
 
   const id = String(request.data?.id ?? "")
     .trim()
@@ -293,9 +274,10 @@ export const createRole = onCall(callableOpts, async (request) => {
 });
 
 export const updateRole = onCall(callableOpts, async (request) => {
-  const { uid, role: actorRole, permissions } = await requireRolesReader(
+  const { uid, role: actorRole } = await requireRolesReader(
     request,
     "updateRole",
+    "admin.roles.update",
   );
   const id = String(request.data?.id ?? "").trim();
   if (!id) throw new HttpsError("invalid-argument", "id required");
@@ -323,11 +305,6 @@ export const updateRole = onCall(callableOpts, async (request) => {
         "Only the System role can edit this role.",
       );
     }
-  } else if (
-    !canManagePlatform(permissions) &&
-    !hasPermission(permissions, "admin.roles.update")
-  ) {
-    throw new HttpsError("permission-denied", "Admins only.");
   }
 
   const updates: Record<string, unknown> = {
@@ -386,13 +363,11 @@ export const updateRole = onCall(callableOpts, async (request) => {
 });
 
 export const deleteRole = onCall(callableOpts, async (request) => {
-  const { uid, permissions } = await requireRolesReader(request, "deleteRole");
-  if (
-    !canManagePlatform(permissions) &&
-    !hasPermission(permissions, "admin.roles.delete")
-  ) {
-    throw new HttpsError("permission-denied", "Admins only.");
-  }
+  const { uid } = await requireRolesReader(
+    request,
+    "deleteRole",
+    "admin.roles.delete",
+  );
 
   const id = String(request.data?.id ?? "").trim();
   const hard = request.data?.hard === true;

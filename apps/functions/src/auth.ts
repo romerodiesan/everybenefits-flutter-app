@@ -1,7 +1,8 @@
-import { FieldValue, Timestamp, type DocumentData } from "firebase-admin/firestore";
+import { type DocumentData } from "firebase-admin/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { db } from "./init";
-import { MAX_FUNCTION_CALLS_PER_MINUTE } from "./constants";
+
+export { consumeFunctionQuota, requireActor, requireCaller } from "./guards";
 
 export function headlineName(data: DocumentData | undefined): string {
   const display =
@@ -10,29 +11,6 @@ export function headlineName(data: DocumentData | undefined): string {
   const email = typeof data?.email === "string" ? data.email.trim() : "";
   if (email) return email;
   return "Usuario";
-}
-
-export async function consumeFunctionQuota(uid: string, operation: string) {
-  const minute = Math.floor(Date.now() / 60_000);
-  const ref = db.doc(`functionUsage/${uid}_${minute}`);
-  await db.runTransaction(async (tx) => {
-    const snap = await tx.get(ref);
-    const count = Number(snap.data()?.count ?? 0);
-    if (count >= MAX_FUNCTION_CALLS_PER_MINUTE) {
-      throw new HttpsError("resource-exhausted", "Too many requests.");
-    }
-    tx.set(
-      ref,
-      {
-        uid,
-        minute,
-        count: count + 1,
-        operations: FieldValue.arrayUnion(operation),
-        expiresAt: Timestamp.fromMillis((minute + 2) * 60_000),
-      },
-      { merge: true },
-    );
-  });
 }
 
 export async function requireActiveAccount(uid: string): Promise<void> {
@@ -44,20 +22,6 @@ export async function requireActiveAccount(uid: string): Promise<void> {
       "Account is deactivated or pending deletion.",
     );
   }
-}
-
-export async function requireCaller(
-  request: { auth?: { uid: string } },
-  operation: string,
-  options?: { allowInactive?: boolean },
-): Promise<string> {
-  const uid = request.auth?.uid;
-  if (!uid) throw new HttpsError("unauthenticated", "Sign in required.");
-  await consumeFunctionQuota(uid, operation);
-  if (!options?.allowInactive) {
-    await requireActiveAccount(uid);
-  }
-  return uid;
 }
 
 export function isUserApprovedForJoin(data: DocumentData | undefined) {

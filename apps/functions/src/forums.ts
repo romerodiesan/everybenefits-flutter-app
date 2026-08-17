@@ -1,20 +1,15 @@
-import { FieldValue, type DocumentReference } from "firebase-admin/firestore";
+import { FieldValue, type CollectionReference } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { db, callableOpts } from "./init";
 import type { VoteValue } from "./constants";
-import { headlineName, requireCaller } from "./auth";
+import { headlineName } from "./auth";
+import { actorHasPermission, requireActor } from "./guards";
 import {
   ensureThreadParticipant,
   listThreadNotifyTargets,
   notifyUser,
 } from "./notifications";
-import {
-  callerHasPermission,
-  hasPermission,
-  loadPermissionsForUid,
-} from "./permissions";
-import { chunkArray } from "./batch-utils";
 
 export function parseVote(raw: unknown): VoteValue {
   const n = typeof raw === "number" ? raw : Number(raw);
@@ -22,11 +17,26 @@ export function parseVote(raw: unknown): VoteValue {
   throw new HttpsError("invalid-argument", "vote must be -1, 0, or 1");
 }
 
+const DELETE_PAGE = 400;
+
+async function deleteCollectionInPages(col: CollectionReference) {
+  while (true) {
+    const snap = await col.limit(DELETE_PAGE).get();
+    if (snap.empty) return;
+    const batch = db.batch();
+    for (const doc of snap.docs) batch.delete(doc.ref);
+    await batch.commit();
+  }
+}
+
 /**
  * Trusted vote path: updates vote doc + score increment under Admin SDK.
  */
 export const castForumVote = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "castForumVote");
+  const actor = await requireActor(request, "castForumVote", {
+    permission: "forums.participate",
+  });
+  const uid = actor.uid;
   const threadId = String(request.data?.threadId ?? "");
   const replyId =
     request.data?.replyId == null ? null : String(request.data.replyId);
@@ -36,13 +46,8 @@ export const castForumVote = onCall(callableOpts, async (request) => {
     throw new HttpsError("invalid-argument", "threadId required");
   }
 
-  const userSnap = await db.doc(`users/${uid}`).get();
-  const user = userSnap.data();
+  const user = actor.userData;
   if (!user || user.isAnonymous === true) {
-    throw new HttpsError("permission-denied", "Forum participants only.");
-  }
-  const { permissions } = await loadPermissionsForUid(uid);
-  if (!hasPermission(permissions, "forums.participate")) {
     throw new HttpsError("permission-denied", "Forum participants only.");
   }
 
@@ -136,23 +141,21 @@ export const castForumVote = onCall(callableOpts, async (request) => {
 });
 
 export const addForumReply = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "addForumReply");
+  const actor = await requireActor(request, "addForumReply", {
+    permission: "forums.participate",
+  });
+  const uid = actor.uid;
   const threadId = String(request.data?.threadId ?? "");
   const body = String(request.data?.body ?? "").trim();
   if (!threadId || !body || body.length > 20_000) {
     throw new HttpsError("invalid-argument", "Valid reply required.");
   }
-  const [user, thread] = await Promise.all([
-    db.doc(`users/${uid}`).get(),
-    db.doc(`threads/${threadId}`).get(),
-  ]);
-  const profile = user.data();
-  const { permissions } = await loadPermissionsForUid(uid);
+  const thread = await db.doc(`threads/${threadId}`).get();
+  const profile = actor.userData;
   if (
     !thread.exists ||
     !profile ||
-    profile.isAnonymous === true ||
-    !hasPermission(permissions, "forums.participate")
+    profile.isAnonymous === true
   ) {
     throw new HttpsError("permission-denied", "Forum participants only.");
   }
@@ -202,7 +205,8 @@ export const addForumReply = onCall(callableOpts, async (request) => {
 });
 
 export const deleteForumReply = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "deleteForumReply");
+  const actor = await requireActor(request, "deleteForumReply");
+  const uid = actor.uid;
   const threadId = String(request.data?.threadId ?? "");
   const replyId = String(request.data?.replyId ?? "");
   const threadRef = db.doc(`threads/${threadId}`);
@@ -215,7 +219,7 @@ export const deleteForumReply = onCall(callableOpts, async (request) => {
     throw new HttpsError("not-found", "Reply not found.");
   }
   if (
-    !(await callerHasPermission(uid, "forums.moderate")) &&
+    !actorHasPermission(actor.permissions, "forums.moderate") &&
     reply.data()?.authorId !== uid
   ) {
     throw new HttpsError("permission-denied", "Not allowed to delete this reply.");
@@ -244,7 +248,8 @@ export const deleteForumReply = onCall(callableOpts, async (request) => {
 });
 
 export const deleteForumThread = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "deleteForumThread");
+  const actor = await requireActor(request, "deleteForumThread");
+  const uid = actor.uid;
   const threadId = String(request.data?.threadId ?? "");
   if (!threadId) {
     throw new HttpsError("invalid-argument", "threadId required");
@@ -254,42 +259,26 @@ export const deleteForumThread = onCall(callableOpts, async (request) => {
   if (!thread.exists) {
     throw new HttpsError("not-found", "Thread not found.");
   }
-  const canModerate = await callerHasPermission(uid, "forums.moderate");
+  const canModerate = actorHasPermission(actor.permissions, "forums.moderate");
   if (!canModerate && thread.data()?.authorId !== uid) {
     throw new HttpsError("permission-denied", "Not allowed to delete this thread.");
   }
 
-  const [repliesSnap, threadVotesSnap, participantsSnap] = await Promise.all([
-    threadRef.collection("replies").get(),
-    threadRef.collection("votes").get(),
-    threadRef.collection("participants").get(),
-  ]);
-
-  // Fetch reply votes in parallel (avoid N+1 sequential gets).
-  const replyVoteSnaps = await Promise.all(
-    repliesSnap.docs.map((reply) => reply.ref.collection("votes").get()),
-  );
-
-  // Firestore batches cap at 500 ops; chunk if a thread is unusually large.
-  const refsToDelete: DocumentReference[] = [];
-  for (let i = 0; i < repliesSnap.docs.length; i++) {
-    const reply = repliesSnap.docs[i]!;
-    for (const vote of replyVoteSnaps[i]!.docs) refsToDelete.push(vote.ref);
-    refsToDelete.push(reply.ref);
-  }
-  for (const vote of threadVotesSnap.docs) refsToDelete.push(vote.ref);
-  for (const participant of participantsSnap.docs) {
-    refsToDelete.push(participant.ref);
-  }
-  refsToDelete.push(threadRef);
-
-  for (const slice of chunkArray(refsToDelete)) {
+  while (true) {
+    const repliesSnap = await threadRef.collection("replies").limit(DELETE_PAGE).get();
+    if (repliesSnap.empty) break;
+    await Promise.all(
+      repliesSnap.docs.map((reply) =>
+        deleteCollectionInPages(reply.ref.collection("votes")),
+      ),
+    );
     const batch = db.batch();
-    for (const ref of slice) {
-      batch.delete(ref);
-    }
+    for (const reply of repliesSnap.docs) batch.delete(reply.ref);
     await batch.commit();
   }
+  await deleteCollectionInPages(threadRef.collection("votes"));
+  await deleteCollectionInPages(threadRef.collection("participants"));
+  await threadRef.delete();
   return { ok: true };
 });
 

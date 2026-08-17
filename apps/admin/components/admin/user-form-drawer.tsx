@@ -13,7 +13,6 @@ import { Drawer } from "@/components/ui/drawer";
 import { useAdminRolesQuery } from "@/lib/hooks/use-admin-queries";
 
 const ROLE_KEYS: Partial<Record<UserRole, string>> = {
-  guest: "roleGuest",
   student: "roleStudent",
   agent: "roleAgent",
   agency_owner: "roleAgencyOwner",

@@ -34,7 +34,6 @@ const PULSE_URL =
   process.env.NEXT_PUBLIC_PULSE_WEB_URL ?? "http://localhost:3000";
 
 const ROLE_KEY: Record<UserRole, string> = {
-  guest: "roleGuest",
   student: "roleStudent",
   agent: "roleAgent",
   agency_owner: "roleAgencyOwner",
@@ -190,22 +189,6 @@ function IconPolls({ filled, ...props }: IconProps) {
   );
 }
 
-function IconSettings({ filled, ...props }: IconProps) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" {...props}>
-      <path
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        fill={filled ? "currentColor" : "none"}
-        fillOpacity={filled ? 0.12 : 0}
-        d="M12 15.2a3.2 3.2 0 1 0 0-6.4 3.2 3.2 0 0 0 0 6.4ZM4.5 12.8v-1.6l1.7-.4a6.6 6.6 0 0 1 .6-1.4l-1-1.5 1.1-1.1 1.5 1a6.6 6.6 0 0 1 1.4-.6l.4-1.7h1.6l.4 1.7c.5.1 1 .3 1.4.6l1.5-1 1.1 1.1-1 1.5c.3.4.5.9.6 1.4l1.7.4v1.6l-1.7.4a6.6 6.6 0 0 1-.6 1.4l1 1.5-1.1 1.1-1.5-1a6.6 6.6 0 0 1-1.4.6l-.4 1.7H11l-.4-1.7a6.6 6.6 0 0 1-1.4-.6l-1.5 1-1.1-1.1 1-1.5a6.6 6.6 0 0 1-.6-1.4L4.5 12.8Z"
-      />
-    </svg>
-  );
-}
-
 function IconCommand(props: SVGProps<SVGSVGElement>) {
   return (
     <svg viewBox="0 0 24 24" fill="none" {...props}>
@@ -230,7 +213,7 @@ export function AdminShell({ children }: { children: ReactNode }) {
   const [ssoRedirecting, setSsoRedirecting] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
-  const role = profile?.role ?? "guest";
+  const role = profile?.role ?? "student";
   const access = useAccess();
   const allowed = canAccessAdmin(access);
   const blocked =
@@ -348,13 +331,6 @@ export function AdminShell({ children }: { children: ReactNode }) {
         match: (p: string) => p.startsWith("/polls"),
         adminOnly: true,
         Icon: IconPolls,
-      },
-      {
-        href: "/settings",
-        label: t("navSettings"),
-        match: (p: string) => p.startsWith("/settings"),
-        adminOnly: true,
-        Icon: IconSettings,
       },
     ],
     [t],

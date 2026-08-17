@@ -26,11 +26,9 @@ export function bannerAudienceMatches(
 ): boolean {
   if (!audiences.length) return false;
   if (audiences.includes("all")) return true;
-  if (isAnonymous || role === "guest") {
-    return audiences.includes("guest");
-  }
+  if (isAnonymous) return false;
   const normalized = (role ?? "").trim();
-  if (!normalized) return false;
+  if (!normalized || normalized === "guest") return false;
   return audiences.includes(normalized as PromoBannerAudience);
 }
 

@@ -55,7 +55,7 @@ export function RolesHome() {
   const t = useTranslations();
   const alerts = useAlerts();
   const { profile } = useAuth();
-  const viewerRole = profile?.role ?? "guest";
+  const viewerRole = profile?.role ?? "student";
   const access = useAccess();
   const isSystem = isSystemRole(viewerRole);
   const isAdmin = canManagePlatform(access);
@@ -175,22 +175,6 @@ export function RolesHome() {
     }
   };
 
-  const onSeed = async () => {
-    if (!isAdmin && !isSystem) return;
-    setRowBusy("__seed__");
-    try {
-      await getAdminRepository().seedSystemRoles();
-      await invalidate.invalidateRoles();
-      alerts.success(t("rolesSeeded"));
-    } catch (error) {
-      alerts.error(
-        error instanceof Error ? error.message : t("rolesSeedError"),
-      );
-    } finally {
-      setRowBusy(null);
-    }
-  };
-
   const columns = useMemo<ColumnDef<RoleDoc>[]>(
     () => [
       {
@@ -275,11 +259,6 @@ export function RolesHome() {
           <p className="mt-1 text-sm text-muted">{t("rolesSubtitle")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {canMutateCustom ? (
-            <Button size="sm" variant="secondary" disabled={rowBusy === "__seed__"} onClick={() => void onSeed()}>
-              {t("rolesSeed")}
-            </Button>
-          ) : null}
           {canMutateCustom ? (
             <Button size="sm" onClick={openCreate}>{t("rolesCreate")}</Button>
           ) : null}

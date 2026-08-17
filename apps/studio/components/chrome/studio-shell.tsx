@@ -31,7 +31,6 @@ const PULSE_URL =
   process.env.NEXT_PUBLIC_PULSE_WEB_URL ?? "http://localhost:3000";
 
 const ROLE_KEY: Record<UserRole, string> = {
-  guest: "roleGuest",
   student: "roleStudent",
   agent: "roleAgent",
   agency_owner: "roleAgencyOwner",
@@ -150,7 +149,7 @@ export function StudioShell({ children }: { children: ReactNode }) {
   const [ssoRedirecting, setSsoRedirecting] = useState(false);
   const [navOpen, setNavOpen] = useState(false);
 
-  const role = profile?.role ?? "guest";
+  const role = profile?.role ?? "student";
   const access = useAccess();
   const canEnterStudio = canAccessStudio(access);
   const blocked =

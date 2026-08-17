@@ -21,8 +21,8 @@ migrate_working_dir/
 # VS Code (keep commented if the team wants shared launch configs)
 #.vscode/
 
-# Cursor local index / tooling
-.cursor/
+# Local git worktrees (never ship)
+.worktrees/
 
 # Flutter / Dart
 **/doc/api/
@@ -66,6 +66,8 @@ app.*.map.json
 **/ios/**/.vagrant/
 **/ios/**/DerivedData/
 **/ios/**/Icon?
+!**/ios/**/AppIcon.icon/
+!**/ios/**/AppIcon.icon/**
 **/ios/**/Pods/
 **/ios/**/.symlinks/
 **/ios/**/profile

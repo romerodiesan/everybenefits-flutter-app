@@ -211,7 +211,7 @@ class SocialRepository {
     return (raw is List ? raw : const [])
         .whereType<Map>()
         .map(publicCardFromMap)
-        .where((p) => p.uid.isNotEmpty && p.role != UserRole.guest)
+        .where((p) => p.uid.isNotEmpty)
         .toList();
   }
 }

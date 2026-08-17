@@ -53,7 +53,6 @@ export function CompleteProfileForm() {
   const lockedRole =
     profile &&
     profile.role !== "student" &&
-    profile.role !== "guest" &&
     profile.role !== "agent"
       ? profile.role
       : null;

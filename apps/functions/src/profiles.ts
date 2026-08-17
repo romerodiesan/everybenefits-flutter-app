@@ -261,8 +261,6 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     if (matched.size >= limit) return;
     const data = doc.data();
     if (data.isAnonymous === true) return;
-    const role = parseRole(data.role);
-    if (role === "guest") return;
     if (!isUserApprovedForJoin(data) && String(data.approvalStatus ?? "") === "rejected") {
       return;
     }

@@ -39,7 +39,7 @@ export function InstructorMultiSelect({ value, onChange, disabled }: Props) {
         if (cancelled) return;
         setCandidates(
           profiles.filter((profile) => {
-            const roleId = profile.role.trim() || "guest";
+            const roleId = profile.role.trim() || "student";
             return canAuthorCourses(rolePerms[roleId] ?? roleId);
           }),
         );

@@ -290,6 +290,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
           ),
           children: [
             PromoBannerSlot(
+              key: const ValueKey('promo-academy'),
               surface: PromoBannerSurface.academy,
               profile: widget.profile,
               repository: widget.promoBannerRepository,
@@ -297,6 +298,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
               padding: EdgeInsets.zero,
             ),
             PollSlot(
+              key: const ValueKey('poll-academy'),
               surface: PromoBannerSurface.academy,
               profile: widget.profile,
               padding: const EdgeInsets.only(top: AppSpacing.sm),

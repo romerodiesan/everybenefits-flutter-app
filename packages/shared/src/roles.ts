@@ -6,7 +6,6 @@ import {
 } from "./permissions";
 
 export type UserRole =
-  | "guest"
   | "student"
   | "agent"
   | "agency_owner"
@@ -17,7 +16,6 @@ export type UserRole =
 
 /** Built-in role slugs used across clients and Firestore rules. */
 export const ALL_ROLES: readonly UserRole[] = [
-  "guest",
   "student",
   "agent",
   "agency_owner",
@@ -39,7 +37,6 @@ export const SYSTEM_ROLE_IDS = [
 
 /** Legacy built-ins kept for compatibility. */
 export const LEGACY_ROLE_IDS = [
-  "guest",
   "instructor",
 ] as const satisfies readonly UserRole[];
 
@@ -65,18 +62,20 @@ export type RoleOrPermissions =
   | undefined;
 
 export function parseRole(value: unknown): UserRole {
-  if (typeof value !== "string") return "guest";
+  if (typeof value !== "string") return "student";
   // Legacy every-benefits-us used "teacher" for course authors.
   if (value === "teacher") return "instructor";
+  // Orphan anonymous-era docs; never treat as a live role.
+  if (value === "guest") return "student";
   if ((ALL_ROLES as readonly string[]).includes(value)) {
     return value as UserRole;
   }
   // Custom role slugs are stored as-is on users; treat as opaque string
   // typed through UserRole for backwards compatibility with call sites.
-  if (value.trim() && value !== "guest") {
+  if (value.trim()) {
     return value as UserRole;
   }
-  return "guest";
+  return "student";
 }
 
 /** Mega-role above admin — DB-only assignment and role-doc edits. */
@@ -145,10 +144,7 @@ export function canParticipateInForums(
 ) {
   if (isAnonymous) return false;
   const perms = resolvePermissionSet(roleOrPermissions);
-  if (
-    typeof roleOrPermissions === "string" &&
-    (roleOrPermissions === "guest" || !roleOrPermissions)
-  ) {
+  if (typeof roleOrPermissions === "string" && !roleOrPermissions.trim()) {
     return false;
   }
   return hasPermission(perms, "forums.participate");

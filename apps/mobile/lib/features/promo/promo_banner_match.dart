@@ -16,11 +16,9 @@ bool bannerAudienceMatches(
 }) {
   if (audiences.isEmpty) return false;
   if (audiences.contains('all')) return true;
-  if (isAnonymous || role == 'guest') {
-    return audiences.contains('guest');
-  }
+  if (isAnonymous) return false;
   final normalized = (role ?? '').trim();
-  if (normalized.isEmpty) return false;
+  if (normalized.isEmpty || normalized == 'guest') return false;
   return audiences.contains(normalized);
 }
 

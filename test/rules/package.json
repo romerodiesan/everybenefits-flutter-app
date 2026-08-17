@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test firestore.rules.test.js"
+    "test": "echo 'Requires Firebase emulators. From repo root: pnpm test:rules'",
+    "test:emulators": "node --test --test-concurrency=1 firestore.rules.test.js storage.rules.test.js database.rules.test.js"
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",

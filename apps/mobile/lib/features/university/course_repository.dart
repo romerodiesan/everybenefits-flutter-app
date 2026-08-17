@@ -143,8 +143,8 @@ class FirestoreCourseStore implements CourseStore {
   Future<CourseContent> fetchCourseContent(String courseId) async {
     final courseRef = _courses.doc(courseId);
     final results = await Future.wait([
-      courseRef.collection('modules').orderBy('order').get(),
-      courseRef.collection('lessons').orderBy('order').get(),
+      courseRef.collection('modules').orderBy('order').limit(200).get(),
+      courseRef.collection('lessons').orderBy('order').limit(500).get(),
     ]);
     return CourseContent(
       modules: results[0]
@@ -184,6 +184,7 @@ class FirestoreCourseStore implements CourseStore {
   Stream<List<Enrollment>> watchEnrollments(String uid) {
     return _enrollments(uid)
         .orderBy('updatedAt', descending: true)
+        .limit(100)
         .snapshots()
         .map(
           (snap) => snap.docs
@@ -291,6 +292,7 @@ class FirestoreCourseStore implements CourseStore {
     return _courses
         .where('createdBy', isEqualTo: uid)
         .orderBy('updatedAt', descending: true)
+        .limit(200)
         .snapshots()
         .map(
           (snap) => snap.docs
@@ -304,6 +306,7 @@ class FirestoreCourseStore implements CourseStore {
     return _courses
         .where('status', isEqualTo: status.wireValue)
         .orderBy('updatedAt', descending: true)
+        .limit(200)
         .snapshots()
         .map(
           (snap) => snap.docs
@@ -474,7 +477,7 @@ class CourseRepository {
     required UserProfile profile,
     required Course course,
   }) {
-    if (profile.isAnonymous || profile.roleId == 'guest' || profile.role == UserRole.guest) {
+    if (profile.isAnonymous) {
       throw StateError(kCourseErrSignInRequired);
     }
     if (!course.isPublished) {

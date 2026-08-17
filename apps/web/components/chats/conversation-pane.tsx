@@ -27,10 +27,12 @@ import {
   watchMessages,
   watchTyping,
 } from "@/lib/firebase/chats";
+import { ensureDefaultAgentGroup } from "@/lib/firebase/ensure-default-group";
 import {
   type ChatConversation,
   type ChatMessage,
   type ChatReplyTo,
+  AGENTS_DEFAULT_ID,
 } from "@/lib/types";
 import { Button, Input, Avatar } from "@/components/ui/primitives";
 import { ConversationSkeleton } from "@/components/ui/skeleton";
@@ -130,6 +132,7 @@ export function ConversationPane({
   const [error, setError] = useState<string | null>(null);
   const [sendError, setSendError] = useState<string | null>(null);
   const [timedOut, setTimedOut] = useState(false);
+  const [liveReady, setLiveReady] = useState(false);
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -140,6 +143,10 @@ export function ConversationPane({
   const typingOn = useRef(false);
   const uidRef = useRef(profile?.uid);
   uidRef.current = profile?.uid;
+  const uid = profile?.uid;
+  const canWatchTyping = Boolean(
+    liveReady && uid && chat?.memberIds.includes(uid),
+  );
 
   useEffect(() => {
     const seed = readChatSeed(chatId);
@@ -147,45 +154,59 @@ export function ConversationPane({
     startTransition(() => {
       setError(null);
       setTimedOut(false);
+      setLiveReady(false);
       setMessages([]);
       setReplyTo(null);
+      setTypingMap({});
       setChat((prev) => (prev?.id === chatId ? prev : seed));
     });
     if (!process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL) return;
+    if (!uid) return;
+    let cancelled = false;
+    let unsubChat = () => {};
+    let unsubMsg = () => {};
     const onErr = (err: Error) => {
       console.error(err);
       setError(t("errorGeneric"));
     };
-    const unsubChat = watchChat(
-      chatId,
-      (next) => {
-        if (next) {
-          setChat(next);
+    const start = () => {
+      if (cancelled) return;
+      unsubChat = watchChat(
+        chatId,
+        (next) => {
+          if (next) {
+            setChat(next);
+            setLiveReady(true);
+            setTimedOut(false);
+            setError(null);
+            return;
+          }
+          setChat((prev) => (prev?.id === chatId ? prev : null));
+        },
+        onErr,
+      );
+      unsubMsg = watchMessages(
+        chatId,
+        (msgs) => {
+          setMessages(msgs);
           setTimedOut(false);
-          setError(null);
-          return;
-        }
-        setChat((prev) => (prev?.id === chatId ? prev : null));
-      },
-      onErr,
-    );
-    const unsubMsg = watchMessages(
-      chatId,
-      (msgs) => {
-        setMessages(msgs);
-        setTimedOut(false);
-      },
-      40,
-      onErr,
-    );
-    const unsubTyping = watchTyping(chatId, setTypingMap, onErr);
+        },
+        40,
+        onErr,
+      );
+    };
+    if (chatId === AGENTS_DEFAULT_ID) {
+      void ensureDefaultAgentGroup().then(start);
+    } else {
+      start();
+    }
     const timer = window.setTimeout(() => {
       setTimedOut(true);
     }, 15_000);
     return () => {
+      cancelled = true;
       unsubChat();
       unsubMsg();
-      unsubTyping();
       window.clearTimeout(timer);
       if (typingTimer.current) window.clearTimeout(typingTimer.current);
       if (typingOn.current && uidRef.current) {
@@ -193,7 +214,16 @@ export function ConversationPane({
         void setTyping(chatId, uidRef.current, false);
       }
     };
-  }, [chatId, t]);
+  }, [chatId, t, uid]);
+
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL) return;
+    if (!canWatchTyping) {
+      setTypingMap({});
+      return;
+    }
+    return watchTyping(chatId, setTypingMap);
+  }, [chatId, canWatchTyping]);
 
   useEffect(() => {
     if (initialChat?.id === chatId) {

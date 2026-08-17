@@ -176,7 +176,7 @@ class FirestoreUserProfileStore implements UserProfileStore {
     final list = (raw is List ? raw : const [])
         .whereType<Map>()
         .map((data) => UserProfile.fromMap(Map<String, dynamic>.from(data)))
-        .where((p) => p.uid != excludeUid && p.role != UserRole.guest)
+        .where((p) => p.uid != excludeUid)
         .take(limit)
         .toList()
       ..sort(
@@ -275,6 +275,9 @@ class UserRepository {
       _avatarStorageOverride ?? AvatarStorage();
 
   Future<UserProfile> ensureProfile(User user) async {
+    if (user.isAnonymous) {
+      throw StateError('Anonymous sessions are not supported.');
+    }
     String? token;
     String? firestoreHost;
     var emulatorToken = false;
@@ -297,19 +300,18 @@ class UserRepository {
       }
 
       final now = DateTime.now().toUtc();
-      final isAnonymous = user.isAnonymous;
       final profile = UserProfile(
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
         photoUrl: user.photoURL,
-        role: isAnonymous ? UserRole.guest : UserRole.student,
-        isAnonymous: isAnonymous,
-        profileCompleted: isAnonymous,
+        role: UserRole.student,
+        isAnonymous: false,
+        profileCompleted: false,
         createdAt: now,
         updatedAt: now,
-        agency: isAnonymous ? null : kDefaultAgency,
-        approvalStatus: isAnonymous ? 'approved' : 'pending',
+        agency: kDefaultAgency,
+        approvalStatus: 'pending',
       );
       await _store.create(profile);
       return profile;

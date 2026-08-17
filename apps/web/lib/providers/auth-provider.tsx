@@ -23,6 +23,7 @@ import {
   readCachedProfile,
   writeCachedProfile,
 } from "@/lib/profile-cache";
+import { isFirebasePermissionDenied } from "@/lib/firebase/permission-error";
 import type { UserProfile } from "@/lib/types";
 import type { RoleOrPermissions } from "@pulse/shared";
 
@@ -39,12 +40,6 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
-
-function isPermissionDenied(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-  const code = "code" in error ? String((error as { code: unknown }).code) : "";
-  return code === "permission-denied" || /permission-denied/i.test(String(error));
-}
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -75,6 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setPermissions([]);
         setProfileLoading(false);
         clearCachedProfile();
+        return;
+      }
+
+      if (next.isAnonymous) {
+        void getFirebaseAuth().signOut();
         return;
       }
 
@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             },
             (error) => {
               // Race: listener attached just as session switched away from uid.
-              if (isPermissionDenied(error)) return;
+              if (isFirebasePermissionDenied(error)) return;
               console.error(error);
             },
           );
@@ -121,7 +121,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // Emulator/CSP offline noise — keep cache if we have it.
           if (
             !/client is offline/i.test(message) &&
-            !isPermissionDenied(error)
+            !isFirebasePermissionDenied(error)
           ) {
             console.error(error);
           }
@@ -147,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile.role,
       setPermissions,
       (error) => {
-        if (isPermissionDenied(error)) return;
+        if (isFirebasePermissionDenied(error)) return;
         console.error(error);
       },
     );

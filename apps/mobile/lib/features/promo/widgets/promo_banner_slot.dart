@@ -72,14 +72,13 @@ class _PromoBannerSlotState extends State<PromoBannerSlot> {
   }
 
   Future<void> _boot() async {
-    await _dismiss.warm();
-    if (!mounted) return;
     _sub = _repository.watchActiveBanners().listen(
       (banners) {
         _all = banners;
         _recompute();
       },
-      onError: (_) {
+      onError: (Object error, StackTrace stack) {
+        debugPrint('PromoBannerSlot: $error\n$stack');
         if (!mounted) return;
         setState(() {
           _all = const [];
@@ -88,13 +87,24 @@ class _PromoBannerSlotState extends State<PromoBannerSlot> {
         });
       },
     );
+    await _dismiss.warm();
+    if (mounted) _recompute();
+  }
+
+  @override
+  void didUpdateWidget(covariant PromoBannerSlot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.profile.uid != widget.profile.uid ||
+        oldWidget.profile.roleId != widget.profile.roleId ||
+        oldWidget.profile.isAnonymous != widget.profile.isAnonymous ||
+        oldWidget.surface != widget.surface) {
+      _recompute();
+    }
   }
 
   void _recompute() {
     if (!mounted) return;
-    final role = widget.profile.isAnonymous
-        ? 'guest'
-        : widget.profile.role.wireValue;
+    final role = widget.profile.roleId;
     final matched = pickBannersForSurface(
       _all,
       widget.surface,
@@ -169,6 +179,7 @@ class _PromoBannerSlotState extends State<PromoBannerSlot> {
     return Padding(
       padding: widget.padding,
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           _PromoBannerCard(

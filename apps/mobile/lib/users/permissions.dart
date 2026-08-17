@@ -1,4 +1,5 @@
 /// Permission keys + defaults mirroring `@pulse/shared` permissions.ts
+/// Keep in sync with packages/shared/src/permissions.ts (Dart is not generated).
 /// (subset used by mobile clients + full built-in default sets).
 library;
 
@@ -10,7 +11,6 @@ const kBuiltinRoleIds = {
   'agent',
   'student',
   'instructor',
-  'guest',
 };
 
 /// Permission keys referenced by mobile gates / shared defaults.
@@ -37,7 +37,7 @@ abstract final class Perm {
 
 String normalizeRoleId(String? roleId) {
   final trimmed = roleId?.trim() ?? '';
-  if (trimmed.isEmpty) return 'guest';
+  if (trimmed.isEmpty) return 'student';
   if (trimmed == 'teacher') return 'instructor';
   return trimmed;
 }
@@ -63,7 +63,7 @@ Object resolveAccess(
 ) {
   if (permissions != null && permissions.isNotEmpty) return permissions;
   final trimmed = roleId?.trim();
-  return (trimmed == null || trimmed.isEmpty) ? 'guest' : trimmed;
+  return (trimmed == null || trimmed.isEmpty) ? 'student' : trimmed;
 }
 
 /// Sync fallback permissions for a role slug (built-ins only; custom → []).
@@ -248,9 +248,6 @@ const Map<String, List<String>> defaultRolePermissions = {
     'chats.groups.default.join',
     'apps.web.access',
     'apps.studio.access',
-  ],
-  'guest': [
-    'apps.web.access',
   ],
 };
 

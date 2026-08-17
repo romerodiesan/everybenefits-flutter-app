@@ -133,7 +133,6 @@ void main() {
     expect(find.text('EVERY'), findsOneWidget);
     expect(find.text('INSURANCE'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
-    expect(find.text('Continue as guest'), findsOneWidget);
   });
 
   testWidgets('first-run onboarding shows story pages before auth',
@@ -256,24 +255,6 @@ void main() {
     expect(find.text('Home'), findsNothing);
   });
 
-  testWidgets('guest CTA signs in anonymously', (tester) async {
-    when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
-    when(() => auth.signInAnonymously()).thenAnswer((_) async {
-      return FakeUserCredential();
-    });
-
-    await tester.pumpWidget(
-      app(),
-    );
-    await tester.pump();
-    await tester.pump(const Duration(milliseconds: 950));
-
-    await tester.tap(find.text('Continue as guest'));
-    await tester.pump();
-
-    verify(() => auth.signInAnonymously()).called(1);
-  });
-
   testWidgets('shows home shell tabs when signed in', (tester) async {
     final user = MockUser();
     when(() => user.uid).thenReturn('uid-1');
@@ -299,7 +280,7 @@ void main() {
       (tester) async {
     final authService = MockAuthService();
     final usersRepo = MockUserRepository();
-    final profile = completedProfile(role: UserRole.guest, anonymous: true);
+    final profile = completedProfile();
 
     await tester.pumpWidget(
       MaterialApp(
@@ -320,20 +301,17 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 500));
 
-    expect(find.textContaining('Read-only'), findsOneWidget);
+    expect(find.byTooltip('Home'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Chats'));
     await tester.pumpAndSettle();
-    expect(find.textContaining('Sign up with an account'), findsOneWidget);
+    expect(find.textContaining('Sign up with an account'), findsNothing);
 
     await tester.tap(find.byTooltip('Profile'));
     await tester.pumpAndSettle();
 
-    // headlineName is a denormalized Firestore field kept as-is (not localized).
-    expect(find.text('Invitado'), findsOneWidget);
+    expect(find.text('Ada'), findsOneWidget);
     expect(find.byTooltip('Settings'), findsOneWidget);
-    expect(find.text('Tap to add a photo'), findsOneWidget);
-    expect(find.text('uid-1'), findsNothing);
   });
 
   testWidgets('theme and accent changes keep Settings on the stack',

@@ -12,6 +12,7 @@ import 'package:every_benefits/features/forums/forum_repository.dart';
 import 'package:every_benefits/features/forums/forums_screen.dart';
 import 'package:every_benefits/features/forums/saved_threads.dart';
 import 'package:every_benefits/features/promo/memory_promo_banner_store.dart';
+import 'package:every_benefits/features/promo/promo_banner_models.dart';
 import 'package:every_benefits/features/promo/promo_banner_repository.dart';
 import 'package:every_benefits/l10n/app_localizations.dart';
 import 'package:every_benefits/users/user_profile.dart';
@@ -239,6 +240,7 @@ ForumsScreen _screen({
   required UserProfile profile,
   required ForumRepository forumRepository,
   ChatRepository? chatRepository,
+  List<PromoBanner> banners = const [],
 }) {
   return ForumsScreen(
     profile: profile,
@@ -246,7 +248,7 @@ ForumsScreen _screen({
     chatRepository: chatRepository,
     savedThreads: SavedThreadsStore(),
     promoBannerRepository: PromoBannerRepository(
-      store: MemoryPromoBannerStore(),
+      store: MemoryPromoBannerStore(banners),
     ),
     audienceSizeFetcher: () async => 0,
   );
@@ -281,6 +283,33 @@ void main() {
     expect(find.text('Fresh'), findsOneWidget);
     expect(find.text('Pulse'), findsOneWidget);
     expect(find.text('Saved'), findsOneWidget);
+  });
+
+  testWidgets('renders an active home promo banner above the feed', (tester) async {
+    final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
+    final banner = withBannerCompatDefaults(
+      id: 'welcome-everybenefits',
+      surface: PromoBannerSurface.home,
+      active: true,
+      audiences: const ['all'],
+      eyebrow: (en: 'New', es: 'Nuevo'),
+      title: (en: 'Welcome to Pulse', es: 'Bienvenidos a Pulse'),
+      body: (en: 'Body', es: 'Cuerpo'),
+    );
+
+    await tester.pumpWidget(
+      _wrap(
+        _screen(
+          profile: _profile(role: UserRole.agent),
+          forumRepository: repo,
+          banners: [banner],
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump();
+
+    expect(find.text('Welcome to Pulse'), findsOneWidget);
   });
 
   testWidgets('guest is read-only without composer or FAB', (tester) async {

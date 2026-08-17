@@ -31,11 +31,12 @@ export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
     return;
   }
 
+  if (isAnonymousUser(user)) return;
+
   const ref = db.doc(`users/${user.uid}`);
   const existing = await ref.get();
   if (existing.exists) return;
 
-  const isAnonymous = isAnonymousUser(user);
   const email = user.email ?? null;
   const displayName = user.displayName ?? null;
   const { userSearchIndexFields } = await import("@pulse/shared");
@@ -44,9 +45,9 @@ export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
     email,
     ...userSearchIndexFields(displayName, email),
     photoUrl: user.photoURL ?? null,
-    role: isAnonymous ? "guest" : "student",
-    isAnonymous,
-    profileCompleted: isAnonymous,
+    role: "student",
+    isAnonymous: false,
+    profileCompleted: false,
     productTourVersion: 0,
     phoneCountryCode: null,
     phoneNumber: null,
@@ -58,8 +59,8 @@ export const bootstrapUserProfile = auth.user().onCreate(async (user) => {
     addressCity: null,
     addressState: null,
     addressZip: null,
-    agency: isAnonymous ? null : DEFAULT_AGENCY,
-    approvalStatus: isAnonymous ? "approved" : "pending",
+    agency: DEFAULT_AGENCY,
+    approvalStatus: "pending",
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   };

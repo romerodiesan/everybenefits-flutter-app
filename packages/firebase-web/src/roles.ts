@@ -5,7 +5,7 @@ import {
 } from "@pulse/shared";
 
 function normalizeRoleId(roleId: string): string {
-  return roleId === "teacher" ? "instructor" : roleId.trim() || "guest";
+  return roleId === "teacher" ? "instructor" : roleId.trim() || "student";
 }
 
 /** Live permissions for a role slug (defaults until / while Firestore loads). */

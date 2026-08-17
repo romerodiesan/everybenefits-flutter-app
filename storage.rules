@@ -43,13 +43,12 @@ service firebase.storage {
     }
 
     function isAdmin() {
-      return isAccountActive() && callerRole() == 'admin';
+      return isAccountActive() && callerRole() in ['admin', 'system'];
     }
 
     function isRegisteredMember() {
       return isAccountActive()
-        && userData().get('isAnonymous', true) == false
-        && callerRole() != 'guest';
+        && userData().get('isAnonymous', true) == false;
     }
 
     function ownsCourse(courseId) {
@@ -79,27 +78,20 @@ service firebase.storage {
     }
 
     match /avatars/{fileName} {
-      // Own-avatar writes only need Auth + path ownership. Avoid Firestore
-      // cross-service lookups here — a failed get() fails closed as 403 and
-      // blocks profile photo uploads for otherwise valid members.
-      // Reads: registered (non-guest) members, or the owner of the file.
+      // Own-avatar writes require a registered (non-anonymous) member.
+      // Reads: registered members, or the owner of the file.
       allow read: if isOwnerFile(fileName) || isRegisteredMember();
-      allow write: if isSignedIn()
+      allow write: if isRegisteredMember()
         && isOwnerFile(fileName)
         && request.resource.size < 5 * 1024 * 1024
         && isAllowedImageType();
     }
 
     // Agency / matrix logos: org-logos/{orgNodeId}.jpg
-    // Prefer Admin uploadOrgLogo callable (avoids firestore.get fail-closed).
-    // Direct client writes: platform roles only, single Firestore get.
+    // Writes go through uploadOrgLogo callable (Admin SDK).
     match /org-logos/{fileName} {
       allow read: if isRegisteredMember();
-      allow write: if isSignedIn()
-        && request.resource.size < 5 * 1024 * 1024
-        && isAllowedImageType()
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid))
-          .data.role in ['admin', 'system', 'manager'];
+      allow write: if false;
     }
 
     // Promo banner covers: /banners/{bannerId}/...

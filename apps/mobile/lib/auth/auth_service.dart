@@ -11,7 +11,7 @@ import 'google_sign_in_gateway.dart';
 
 /// Central Firebase Authentication API for Every Insurance.
 ///
-/// Supports email/password, passwordless email link, anonymous, phone, Google,
+/// Supports email/password, passwordless email link, phone, Google,
 /// backup password linking, and MFA (SMS + TOTP).
 class AuthService {
   AuthService({
@@ -93,10 +93,6 @@ class AuthService {
         emailLink: emailLink,
       ),
     );
-  }
-
-  Future<UserCredential> signInAnonymously() {
-    return _guard(_auth.signInAnonymously);
   }
 
   Future<void> verifyPhoneNumber({

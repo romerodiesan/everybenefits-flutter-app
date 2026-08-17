@@ -8,7 +8,7 @@ import {
   ID_TOKEN_MIN_LEN,
   MAX_SSO_PER_MINUTE,
 } from "./constants";
-import type { SsoErrorCode } from "./types";
+import { allAppOrigins } from "./urls";
 
 export class SsoHttpError extends Error {
   constructor(
@@ -38,6 +38,7 @@ export type SsoServerDeps = {
 export type SsoRequestContext = {
   appCheckToken?: string | null;
   clientIp?: string;
+  origin?: string | null;
   /** Cloud Functions use their own App Check enforcement. */
   skipAppCheck?: boolean;
 };
@@ -55,7 +56,22 @@ export function contextFromRequest(request: Request): SsoRequestContext {
   return {
     appCheckToken: request.headers.get("x-firebase-appcheck"),
     clientIp: clientIpFromRequest(request),
+    origin: request.headers.get("origin"),
   };
+}
+
+/** Same-origin fetch always sends Origin; missing Origin is allowed (non-browser). */
+export function assertAllowedSsoOrigin(origin: string | null | undefined): void {
+  if (!origin) return;
+  let parsed: URL;
+  try {
+    parsed = new URL(origin);
+  } catch {
+    throw new SsoHttpError(403, "origin-not-allowed", "Origin not allowed.");
+  }
+  if (!allAppOrigins().has(parsed.origin)) {
+    throw new SsoHttpError(403, "origin-not-allowed", "Origin not allowed.");
+  }
 }
 
 /** App Check for SSO is opt-in only (`PULSE_SSO_REQUIRE_APP_CHECK=true`). */
@@ -139,6 +155,7 @@ export function createSsoServer(deps: SsoServerDeps) {
     idToken: string,
   ): Promise<{ code: string; uid: string }> {
     await verifyAppCheck(ctx);
+    assertAllowedSsoOrigin(ctx.origin);
     await consumeRateLimit("create_ip", ctx.clientIp || "unknown");
 
     if (idToken.length < ID_TOKEN_MIN_LEN) {
@@ -210,6 +227,7 @@ export function createSsoServer(deps: SsoServerDeps) {
     code: string,
   ): Promise<{ customToken: string; uid: string }> {
     await verifyAppCheck(ctx);
+    assertAllowedSsoOrigin(ctx.origin);
     await consumeRateLimit("exchange_ip", ctx.clientIp || "unknown");
 
     const trimmed = code.trim();

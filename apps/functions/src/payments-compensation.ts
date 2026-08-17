@@ -11,7 +11,6 @@ import { HttpsError, onCall } from "firebase-functions/v2/https";
 import {
   agentRateGroupInputSchema,
   applyCompensationPlanInputSchema,
-  canAccessPayments,
   compensationPlanInputSchema,
   compensationTierInputSchema,
   DEFAULT_COMPENSATION_TIERS,
@@ -29,20 +28,8 @@ import {
   type PlanAssignment,
 } from "@pulse/shared";
 import { db, callableOpts } from "./init";
-import { requireCaller } from "./auth";
-import { loadPermissionsForUid } from "./permissions";
+import { requirePaymentsAdmin } from "./payments-shared";
 
-async function requirePaymentsAdmin(
-  request: { auth?: { uid: string } },
-  operation: string,
-) {
-  const uid = await requireCaller(request, operation);
-  const { permissions } = await loadPermissionsForUid(uid);
-  if (!canAccessPayments(permissions)) {
-    throw new HttpsError("permission-denied", "Payments access required.");
-  }
-  return uid;
-}
 
 function serializeTier(id: string, data: DocumentData): CompensationTier {
   const kindRaw = String(data.kind ?? "generic");
@@ -269,7 +256,7 @@ export const listCompensationTiers = onCall(callableOpts, async (request) => {
 });
 
 export const upsertCompensationTier = onCall(callableOpts, async (request) => {
-  await requirePaymentsAdmin(request, "upsertCompensationTier");
+  await requirePaymentsAdmin(request, "upsertCompensationTier", "commission.manageRules");
   const id =
     typeof request.data?.id === "string" && request.data.id.trim()
       ? request.data.id.trim()
@@ -294,7 +281,7 @@ export const upsertCompensationTier = onCall(callableOpts, async (request) => {
 });
 
 export const deleteCompensationTier = onCall(callableOpts, async (request) => {
-  await requirePaymentsAdmin(request, "deleteCompensationTier");
+  await requirePaymentsAdmin(request, "deleteCompensationTier", "commission.manageRules");
   const id = String(request.data?.id ?? "").trim();
   if (!id) throw new HttpsError("invalid-argument", "id required.");
   await db.doc(`compensationTiers/${id}`).delete();
@@ -304,7 +291,11 @@ export const deleteCompensationTier = onCall(callableOpts, async (request) => {
 export const seedDefaultCompensationTiers = onCall(
   callableOpts,
   async (request) => {
-    await requirePaymentsAdmin(request, "seedDefaultCompensationTiers");
+    await requirePaymentsAdmin(
+      request,
+      "seedDefaultCompensationTiers",
+      "commission.manageRules",
+    );
     const existing = await db.collection("compensationTiers").limit(1).get();
     if (!existing.empty) {
       const all = await db.collection("compensationTiers").get();
@@ -342,7 +333,7 @@ export const listAgentRateGroups = onCall(callableOpts, async (request) => {
 });
 
 export const upsertAgentRateGroup = onCall(callableOpts, async (request) => {
-  await requirePaymentsAdmin(request, "upsertAgentRateGroup");
+  await requirePaymentsAdmin(request, "upsertAgentRateGroup", "commission.manageRules");
   const id =
     typeof request.data?.id === "string" && request.data.id.trim()
       ? request.data.id.trim()
@@ -367,7 +358,7 @@ export const upsertAgentRateGroup = onCall(callableOpts, async (request) => {
 });
 
 export const deleteAgentRateGroup = onCall(callableOpts, async (request) => {
-  await requirePaymentsAdmin(request, "deleteAgentRateGroup");
+  await requirePaymentsAdmin(request, "deleteAgentRateGroup", "commission.manageRules");
   const id = String(request.data?.id ?? "").trim();
   if (!id) throw new HttpsError("invalid-argument", "id required.");
   await db.doc(`agentRateGroups/${id}`).delete();
@@ -383,7 +374,7 @@ export const listCompensationPlans = onCall(callableOpts, async (request) => {
 });
 
 export const upsertCompensationPlan = onCall(callableOpts, async (request) => {
-  await requirePaymentsAdmin(request, "upsertCompensationPlan");
+  await requirePaymentsAdmin(request, "upsertCompensationPlan", "commission.manageRules");
   const id =
     typeof request.data?.id === "string" && request.data.id.trim()
       ? request.data.id.trim()
@@ -408,7 +399,7 @@ export const upsertCompensationPlan = onCall(callableOpts, async (request) => {
 });
 
 export const deleteCompensationPlan = onCall(callableOpts, async (request) => {
-  await requirePaymentsAdmin(request, "deleteCompensationPlan");
+  await requirePaymentsAdmin(request, "deleteCompensationPlan", "commission.manageRules");
   const id = String(request.data?.id ?? "").trim();
   if (!id) throw new HttpsError("invalid-argument", "id required.");
   await db.doc(`compensationPlans/${id}`).delete();
@@ -563,7 +554,7 @@ export const previewCompensationPlan = onCall(callableOpts, async (request) => {
 });
 
 export const applyCompensationPlan = onCall(callableOpts, async (request) => {
-  await requirePaymentsAdmin(request, "applyCompensationPlan");
+  await requirePaymentsAdmin(request, "applyCompensationPlan", "commission.manageRules");
   const { plan, assignment, assignmentRef, expanded, carrierIds, relationships } =
     await resolveApplyPayload(request.data);
 

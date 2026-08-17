@@ -23,7 +23,7 @@ export function usePolls(surface: PollSurface) {
   const visible = useMemo(() => {
     void dismissTick;
     return pickPollsForSurface(polls, surface, {
-      role: profile?.role ?? (profile?.isAnonymous ? "guest" : null),
+      role: profile?.role ?? null,
       isAnonymous: profile?.isAnonymous === true,
     }).filter((poll) => {
       if (poll.dismissible === false) return true;

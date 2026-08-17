@@ -40,7 +40,6 @@ import {
 } from "@/lib/hooks/use-admin-queries";
 
 const ROLE_KEYS: Record<UserRole, string> = {
-  guest: "roleGuest",
   student: "roleStudent",
   agent: "roleAgent",
   agency_owner: "roleAgencyOwner",

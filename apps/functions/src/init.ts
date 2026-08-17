@@ -12,6 +12,7 @@ import {
 
 export {
   buildCallableCors,
+  isAllowedCallableOrigin,
   resolveEnforceAppCheck,
   PRODUCTION_ORIGINS,
   LOCAL_DEV_ORIGINS,

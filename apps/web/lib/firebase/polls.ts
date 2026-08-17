@@ -4,6 +4,7 @@ import {
   onSnapshot,
   query,
   where,
+  limit,
   type Unsubscribe,
 } from "firebase/firestore";
 import {
@@ -90,6 +91,7 @@ export function watchActivePolls(
   const q = query(
     collection(getFirebaseDb(), "polls"),
     where("active", "==", true),
+    limit(50),
   );
   return onSnapshot(
     q,

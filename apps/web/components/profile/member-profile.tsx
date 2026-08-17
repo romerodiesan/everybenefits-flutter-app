@@ -46,7 +46,6 @@ import {
 } from "@/components/forums/forum-ui";
 
 const ROLE_KEY: Record<UserRole, string> = {
-  guest: "roleGuest",
   student: "roleStudent",
   agent: "roleAgent",
   agency_owner: "roleAgencyOwner",
@@ -240,9 +239,7 @@ export function MemberProfile({ handle }: { handle: string }) {
   if (loading) {
     return (
       <div className="profile-page">
-        <div className="profile-masthead">
-          <div className="profile-portrait animate-pulse" />
-        </div>
+        <div className="profile-stage animate-pulse" />
         <p className="mt-8 px-5 text-sm text-muted">{t("loading")}</p>
       </div>
     );
@@ -288,132 +285,131 @@ export function MemberProfile({ handle }: { handle: string }) {
           : undefined
       }
     >
-      <article>
-        <div className="profile-masthead">
-          <div className="profile-portrait-wrap">
-          <div className="profile-portrait">
-            <span className="profile-portrait-mark" aria-hidden>
+      <div className="profile-stage">
+        {person.photoUrl ? (
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element -- emulator/LAN photo URLs */}
+            <img
+              src={person.photoUrl}
+              alt=""
+              decoding="async"
+              referrerPolicy="no-referrer"
+            />
+            <span className="profile-stage-wash" aria-hidden />
+          </>
+        ) : (
+          <>
+            <span className="profile-stage-mark" aria-hidden>
               {mark}
             </span>
-            {person.photoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- emulator/LAN photo URLs
-              <img
-                src={person.photoUrl}
-                alt=""
-                decoding="async"
-                referrerPolicy="no-referrer"
-              />
-            ) : null}
-            {person.profileBadge ? (
-              <div className="profile-portrait-stamp">
-                <RoleBadgeView compact badge={person.profileBadge} />
-              </div>
-            ) : null}
+            <span className="profile-stage-orb profile-stage-orb-a" aria-hidden />
+            <span className="profile-stage-orb profile-stage-orb-b" aria-hidden />
+          </>
+        )}
+        {person.profileBadge ? (
+          <div className="profile-stage-stamp">
+            <RoleBadgeView compact badge={person.profileBadge} />
           </div>
-            <div className="profile-portrait-tools" ref={menuRef}>
-              <button
-                type="button"
-                className="profile-tool"
-                aria-label={t("profileMore")}
-                aria-expanded={menuOpen}
-                onClick={() => setMenuOpen((open) => !open)}
+        ) : null}
+        <div className="profile-stage-tools" ref={menuRef}>
+          <button
+            type="button"
+            className="profile-tool"
+            aria-label={t("profileMore")}
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            ⋯
+          </button>
+          {menuOpen ? (
+            <div className="absolute right-0 top-11 z-20 min-w-[13rem] overflow-hidden rounded-xl border border-glass-border bg-sheet py-1 shadow-lg">
+              <MenuItem
+                onClick={() => {
+                  setMenuOpen(false);
+                  void copyLink();
+                }}
               >
-                ⋯
-              </button>
-              {menuOpen ? (
-                <div className="absolute right-0 top-11 z-20 min-w-[13rem] overflow-hidden rounded-xl border border-glass-border bg-sheet py-1 shadow-lg">
+                {copied ? t("profileLinkCopied") : t("profileCopyLink")}
+              </MenuItem>
+              {!isSelf && rel ? (
+                <>
+                  {rel.status === "contact" ? (
+                    <MenuItem
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void run(() => removeContact(uid));
+                      }}
+                    >
+                      {t("memberRemoveContact")}
+                    </MenuItem>
+                  ) : null}
+                  {!rel.blockedByMe ? (
+                    <MenuItem
+                      onClick={() => {
+                        setMenuOpen(false);
+                        void run(() => setMuted(uid, !rel.muted));
+                      }}
+                    >
+                      {rel.muted ? t("memberUnmute") : t("memberMute")}
+                    </MenuItem>
+                  ) : null}
                   <MenuItem
+                    danger
                     onClick={() => {
                       setMenuOpen(false);
-                      void copyLink();
+                      void run(() => setBlocked(uid, !rel.blockedByMe));
                     }}
                   >
-                    {copied ? t("profileLinkCopied") : t("profileCopyLink")}
+                    {rel.blockedByMe ? t("memberUnblock") : t("memberBlock")}
                   </MenuItem>
-                  {!isSelf && rel ? (
-                    <>
-                      {rel.status === "contact" ? (
-                        <MenuItem
-                          onClick={() => {
-                            setMenuOpen(false);
-                            void run(() => removeContact(uid));
-                          }}
-                        >
-                          {t("memberRemoveContact")}
-                        </MenuItem>
-                      ) : null}
-                      {!rel.blockedByMe ? (
-                        <MenuItem
-                          onClick={() => {
-                            setMenuOpen(false);
-                            void run(() => setMuted(uid, !rel.muted));
-                          }}
-                        >
-                          {rel.muted ? t("memberUnmute") : t("memberMute")}
-                        </MenuItem>
-                      ) : null}
-                      <MenuItem
-                        danger
-                        onClick={() => {
-                          setMenuOpen(false);
-                          void run(() => setBlocked(uid, !rel.blockedByMe));
-                        }}
-                      >
-                        {rel.blockedByMe ? t("memberUnblock") : t("memberBlock")}
-                      </MenuItem>
-                      <MenuItem
-                        danger
-                        onClick={() => {
-                          setMenuOpen(false);
-                          setReportOpen(true);
-                        }}
-                      >
-                        {t("profileReport")}
-                      </MenuItem>
-                    </>
-                  ) : null}
-                </div>
+                  <MenuItem
+                    danger
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setReportOpen(true);
+                    }}
+                  >
+                    {t("profileReport")}
+                  </MenuItem>
+                </>
               ) : null}
             </div>
-          </div>
-
-          <div className="profile-type">
-            <p className="profile-kicker">@{atHandle}</p>
-            <h1 className="profile-name">
-              <span>{firstName}</span>
-              {lastName ? <span>{lastName}</span> : null}
-            </h1>
-            {isSelf && !hasClaimedUsername(person.username) ? (
-              <Link
-                href="/account"
-                className="mt-2 inline-block text-xs font-bold text-brand"
-              >
-                {t("usernameChoose")}
-              </Link>
-            ) : null}
-            {metaLine ? <p className="profile-meta">{metaLine}</p> : null}
-            {quote ? (
-              <blockquote className="profile-quote">
-                <p className="line-clamp-3">{quote}</p>
-              </blockquote>
-            ) : null}
+          ) : null}
+        </div>
+        <div className="profile-stage-scrim">
+          <p className="profile-kicker">@{atHandle}</p>
+          <h1 className="profile-name">
+            <span>{firstName}</span>
+            {lastName ? <span>{lastName}</span> : null}
+          </h1>
+          {isSelf && !hasClaimedUsername(person.username) ? (
+            <Link href="/account" className="profile-username-cta">
+              {t("usernameChoose")}
+            </Link>
+          ) : null}
+          {metaLine ? <p className="profile-meta">{metaLine}</p> : null}
+          {quote ? (
+            <blockquote className="profile-quote">
+              <p className="line-clamp-2">{quote}</p>
+            </blockquote>
+          ) : null}
+          <div className="profile-stats">
+            <Stat
+              value={person.followerCount ?? 0}
+              label={t("profileStatFollowers")}
+              onClick={() => void openList("followers")}
+            />
+            <Stat
+              value={person.followingCount ?? 0}
+              label={t("profileStatFollowing")}
+              onClick={() => void openList("following")}
+            />
+            <Stat value={stats.posts} label={t("profileStatPosts")} />
           </div>
         </div>
+      </div>
 
-        <div className="profile-stats">
-          <Stat
-            value={person.followerCount ?? 0}
-            label={t("profileStatFollowers")}
-            onClick={() => void openList("followers")}
-          />
-          <Stat
-            value={person.followingCount ?? 0}
-            label={t("profileStatFollowing")}
-            onClick={() => void openList("following")}
-          />
-          <Stat value={stats.posts} label={t("profileStatPosts")} />
-        </div>
-
+      <div className="profile-sheet">
         <div className="profile-dock">
           {isSelf ? (
             <Link href="/account" className="profile-dock-primary">
@@ -475,89 +471,89 @@ export function MemberProfile({ handle }: { handle: string }) {
         {notice ? (
           <p className="mt-3 px-[1.15rem] text-sm text-brand md:px-6">{notice}</p>
         ) : null}
-      </article>
 
-      <div className="profile-tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          className="profile-tab"
-          aria-selected={tab === "posts"}
-          onClick={() => setTab("posts")}
-        >
-          {t("profilePosts")}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          className="profile-tab"
-          aria-selected={tab === "about"}
-          onClick={() => setTab("about")}
-        >
-          {t("profileAbout")}
-        </button>
+        <div className="profile-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            className="profile-tab"
+            aria-selected={tab === "posts"}
+            onClick={() => setTab("posts")}
+          >
+            {t("profilePosts")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            className="profile-tab"
+            aria-selected={tab === "about"}
+            onClick={() => setTab("about")}
+          >
+            {t("profileAbout")}
+          </button>
+        </div>
+
+        {tab === "posts" ? (
+          <section className="profile-mosaic">
+            {threads.length === 0 ? (
+              <div className="feed-card profile-empty">
+                <p className="font-display text-2xl font-extrabold tracking-tight">
+                  {t("profilePosts")}
+                </p>
+                <p className="mt-1 text-sm text-muted">{t("profilePostsEmpty")}</p>
+              </div>
+            ) : (
+              threads.map((thread) => {
+                const preview = excerpt(thread.body);
+                return (
+                  <Link
+                    key={thread.id}
+                    href={`/home/${thread.id}`}
+                    className="profile-post feed-card"
+                  >
+                    <p className="profile-post-title line-clamp-3">{thread.title}</p>
+                    {preview ? (
+                      <p className="profile-post-excerpt line-clamp-3">{preview}</p>
+                    ) : null}
+                    <div className="profile-post-meta">
+                      <span className="tabular-nums">
+                        {formatRelative(thread.createdAt, t("forumsJustNow"))}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <IconHeart width={13} height={13} />
+                        {Math.max(0, thread.score)}
+                      </span>
+                      <span className="inline-flex items-center gap-1">
+                        <IconComment width={13} height={13} />
+                        {thread.replyCount}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })
+            )}
+          </section>
+        ) : (
+          <section className="profile-about">
+            <AboutBlock
+              kicker={t("profileRole")}
+              value={t(ROLE_KEY[person.role])}
+            />
+            {person.agency ? (
+              <AboutBlock kicker={t("agency")} value={person.agency} />
+            ) : null}
+            {location ? (
+              <AboutBlock kicker={t("profileLocation")} value={location} />
+            ) : null}
+            {joined ? (
+              <AboutBlock value={t("profileJoined", { date: joined })} />
+            ) : null}
+            {quote ? (
+              <AboutBlock kicker={t("profileAbout")} value={quote} body />
+            ) : null}
+          </section>
+        )}
       </div>
-
-      {tab === "posts" ? (
-        <section className="profile-mosaic">
-          {threads.length === 0 ? (
-            <div className="feed-card profile-empty">
-              <p className="font-display text-2xl font-extrabold tracking-tight">
-                {t("profilePosts")}
-              </p>
-              <p className="mt-1 text-sm text-muted">{t("profilePostsEmpty")}</p>
-            </div>
-          ) : (
-            threads.map((thread) => {
-              const preview = excerpt(thread.body);
-              return (
-                <Link
-                  key={thread.id}
-                  href={`/home/${thread.id}`}
-                  className="profile-post feed-card"
-                >
-                  <p className="profile-post-title line-clamp-3">{thread.title}</p>
-                  {preview ? (
-                    <p className="profile-post-excerpt line-clamp-3">{preview}</p>
-                  ) : null}
-                  <div className="profile-post-meta">
-                    <span className="tabular-nums">
-                      {formatRelative(thread.createdAt, t("forumsJustNow"))}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <IconHeart width={13} height={13} />
-                      {Math.max(0, thread.score)}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <IconComment width={13} height={13} />
-                      {thread.replyCount}
-                    </span>
-                  </div>
-                </Link>
-              );
-            })
-          )}
-        </section>
-      ) : (
-        <section className="profile-about">
-          <AboutBlock
-            kicker={t("profileRole")}
-            value={t(ROLE_KEY[person.role])}
-          />
-          {person.agency ? (
-            <AboutBlock kicker={t("agency")} value={person.agency} />
-          ) : null}
-          {location ? (
-            <AboutBlock kicker={t("profileLocation")} value={location} />
-          ) : null}
-          {joined ? (
-            <AboutBlock value={t("profileJoined", { date: joined })} />
-          ) : null}
-          {quote ? (
-            <AboutBlock kicker={t("profileAbout")} value={quote} body />
-          ) : null}
-        </section>
-      )}
 
       {listKind ? (
         <MemberListSheet
@@ -608,9 +604,7 @@ function Stat({
       <span className="font-display text-[1.85rem] font-extrabold tabular-nums leading-none tracking-tight md:text-[2.15rem]">
         {value}
       </span>
-      <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-        {label}
-      </span>
+      <span className="profile-stat-label">{label}</span>
     </>
   );
   if (onClick) {

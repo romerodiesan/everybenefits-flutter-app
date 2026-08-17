@@ -5,13 +5,13 @@ import {
   parseRole,
 } from "@pulse/shared";
 import { db, callableOpts } from "./init";
-import { headlineName, requireCaller } from "./auth";
+import { headlineName } from "./auth";
+import { requireActor } from "./guards";
 import {
   addAgentToDefaultGroup,
   ensureAutoJoinMemberships,
 } from "./chats";
 import { assertAssignableRoleId } from "./role-management";
-import { requirePermission } from "./permissions";
 
 /**
  * Admin-only role assignment.
@@ -19,14 +19,14 @@ import { requirePermission } from "./permissions";
  * The `system` role cannot be assigned via this callable.
  */
 export const setUserRole = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "setUserRole");
+  await requireActor(request, "setUserRole", {
+    permission: "platform.manage",
+  });
   const targetUid = String(request.data?.uid ?? "");
   const roleRaw = String(request.data?.role ?? "").trim();
   if (!targetUid || !roleRaw) {
     throw new HttpsError("invalid-argument", "uid and valid role required");
   }
-
-  await requirePermission(actorUid, "platform.manage");
 
   const role = await assertAssignableRoleId(roleRaw);
 
@@ -41,10 +41,10 @@ export const setUserRole = onCall(callableOpts, async (request) => {
       "Cannot change a System user via Admin.",
     );
   }
-  if (currentRole === "agent" && (role === "student" || role === "guest")) {
+  if (currentRole === "agent" && role === "student") {
     throw new HttpsError(
       "failed-precondition",
-      "Cannot downgrade an agent to student or guest.",
+      "Cannot downgrade an agent to student.",
     );
   }
 
@@ -79,13 +79,14 @@ export const setUserRole = onCall(callableOpts, async (request) => {
  * Legacy users without approvalStatus are already treated as approved.
  */
 export const setUserApproval = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "setUserApproval");
+  const { uid: actorUid } = await requireActor(request, "setUserApproval", {
+    permission: "admin.approvals.decide",
+  });
   const targetUid = String(request.data?.uid ?? "");
   const status = String(request.data?.status ?? "");
   if (!targetUid || (status !== "approved" && status !== "rejected")) {
     throw new HttpsError("invalid-argument", "uid and status required");
   }
-  await requirePermission(actorUid, "admin.approvals.decide");
   const target = await db.doc(`users/${targetUid}`).get();
   if (!target.exists) {
     throw new HttpsError("not-found", "User not found.");
@@ -124,8 +125,11 @@ export const setUserApproval = onCall(callableOpts, async (request) => {
 
 /** Admin/manager directory of users awaiting approval. */
 export const listPendingApprovals = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "listPendingApprovals");
-  await requirePermission(actorUid, "admin.approvals.read");
+  const { uid: actorUid } = await requireActor(
+    request,
+    "listPendingApprovals",
+    { permission: "admin.approvals.read" },
+  );
   const snap = await db
     .collection("users")
     .where("approvalStatus", "==", "pending")
@@ -155,8 +159,11 @@ export const listPendingApprovals = onCall(callableOpts, async (request) => {
  * Uses Admin SDK so the client does not need a fragile users list rule.
  */
 export const listStudentsForPromotion = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "listStudentsForPromotion");
-  await requirePermission(actorUid, "admin.users.read");
+  await requireActor(
+    request,
+    "listStudentsForPromotion",
+    { permission: "admin.users.read" },
+  );
 
   const snap = await db
     .collection("users")

@@ -32,7 +32,7 @@ export function usePromoBanners(surface: PromoBannerSurface) {
   const visible = useMemo(() => {
     void dismissTick;
     return pickBannersForSurface(banners, surface, {
-      role: profile?.role ?? (profile?.isAnonymous ? "guest" : null),
+      role: profile?.role ?? null,
       isAnonymous: profile?.isAnonymous === true,
     }).filter((banner) => {
       if (banner.dismissible === false) return true;
@@ -90,10 +90,4 @@ export function usePromoBanners(surface: PromoBannerSurface) {
     next,
     prev,
   };
-}
-
-/** @deprecated Prefer {@link usePromoBanners}. */
-export function usePromoBanner(surface: PromoBannerSurface) {
-  const { banner, dismiss } = usePromoBanners(surface);
-  return { banner, dismiss };
 }

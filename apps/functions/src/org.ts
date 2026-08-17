@@ -4,8 +4,6 @@ import { randomUUID } from "node:crypto";
 import {
   DEFAULT_ORG_ROOT_NAME,
   ORG_OWNER_UIDS_CAP,
-  canAccessAdmin,
-  canManagePlatform,
   depthForType,
   isUserAssignableOrgType,
   isValidChildType,
@@ -15,9 +13,8 @@ import {
   validateOptionalEmail,
 } from "@pulse/shared";
 import { db, callableOpts, storageBucket } from "./init";
-import { requireCaller } from "./auth";
+import { requireActor, requireCaller } from "./guards";
 import { buildOrgNodePath, serializeOrgNode } from "./org-helpers";
-import { loadPermissionsForUid } from "./permissions";
 
 export { buildOrgNodePath, serializeOrgNode } from "./org-helpers";
 
@@ -27,7 +24,6 @@ const ORG_ROOT_ID = "root";
 const OWNER_PROMOTABLE = new Set([
   "student",
   "agent",
-  "guest",
   "agency_owner",
 ]);
 const PRIVILEGED_ROLES = new Set(["admin", "system", "manager"]);
@@ -35,14 +31,10 @@ const PRIVILEGED_ROLES = new Set(["admin", "system", "manager"]);
 async function requireOrgAdmin(
   request: { auth?: { uid: string } },
   operation: string,
-  platformOnly = false,
+  permission: string | string[] = "admin.orgs.read",
 ) {
-  const uid = await requireCaller(request, operation);
-  const { permissions } = await loadPermissionsForUid(uid);
-  if (platformOnly ? !canManagePlatform(permissions) : !canAccessAdmin(permissions)) {
-    throw new HttpsError("permission-denied", "Admin access required.");
-  }
-  return uid;
+  const actor = await requireActor(request, operation, { permission });
+  return actor.uid;
 }
 
 function emptyAgencyProfile() {
@@ -150,7 +142,7 @@ async function syncAgencyOwners(opts: {
     const snap = await ref.get();
     if (!snap.exists) continue;
     const data = snap.data() ?? {};
-    const role = String(data.role ?? "guest");
+    const role = String(data.role ?? "student");
     if (PRIVILEGED_ROLES.has(role)) continue;
     if (!OWNER_PROMOTABLE.has(role) && role !== "agency_owner") continue;
     const patch: Record<string, unknown> = {
@@ -193,7 +185,7 @@ async function syncAgencyOwners(opts: {
 }
 
 export const ensureOrgRoot = onCall(callableOpts, async (request) => {
-  await requireOrgAdmin(request, "ensureOrgRoot", true);
+  await requireOrgAdmin(request, "ensureOrgRoot", "admin.orgs.write");
   const preferredRef = db.doc(`orgNodes/${ORG_ROOT_ID}`);
   const preferredSnap = await preferredRef.get();
   if (preferredSnap.exists) {
@@ -236,7 +228,7 @@ export const ensureOrgRoot = onCall(callableOpts, async (request) => {
 });
 
 export const listOrgSubtree = onCall(callableOpts, async (request) => {
-  await requireOrgAdmin(request, "listOrgSubtree");
+  await requireOrgAdmin(request, "listOrgSubtree", "admin.orgs.read");
   const includeInactive = request.data?.includeInactive === true;
   const fullTree = request.data?.full === true;
   const parentId =
@@ -267,7 +259,7 @@ export const listOrgSubtree = onCall(callableOpts, async (request) => {
  * Paginated assignable agencies for Admin (matrix + agencies + legacy sub_agency).
  */
 export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
-  await requireOrgAdmin(request, "listAgenciesForAdmin");
+  await requireOrgAdmin(request, "listAgenciesForAdmin", "admin.orgs.read");
   const pageSize = Math.max(
     1,
     Math.min(100, Math.round(Number(request.data?.pageSize ?? 25))),
@@ -332,7 +324,7 @@ export const listAgenciesForAdmin = onCall(callableOpts, async (request) => {
 });
 
 export const createOrgNode = onCall(callableOpts, async (request) => {
-  await requireOrgAdmin(request, "createOrgNode", true);
+  await requireOrgAdmin(request, "createOrgNode", "admin.orgs.write");
   const name = String(request.data?.name ?? "").trim();
   const type = parseOrgNodeType(request.data?.type);
   const parentId = String(request.data?.parentId ?? "").trim();
@@ -424,7 +416,7 @@ export const createOrgNode = onCall(callableOpts, async (request) => {
 });
 
 export const updateOrgNode = onCall(callableOpts, async (request) => {
-  await requireOrgAdmin(request, "updateOrgNode", true);
+  await requireOrgAdmin(request, "updateOrgNode", "admin.orgs.write");
   const id = String(request.data?.id ?? "").trim();
   if (!id) throw new HttpsError("invalid-argument", "id required");
   const ref = db.doc(`orgNodes/${id}`);
@@ -483,7 +475,7 @@ export const updateOrgNode = onCall(callableOpts, async (request) => {
 });
 
 export const assignUserToOrgNode = onCall(callableOpts, async (request) => {
-  await requireOrgAdmin(request, "assignUserToOrgNode", true);
+  await requireOrgAdmin(request, "assignUserToOrgNode", "admin.orgs.write");
   const uid = String(request.data?.uid ?? "").trim();
   const orgNodeIdRaw = request.data?.orgNodeId;
   const orgNodeId =
@@ -526,7 +518,7 @@ export const assignUserToOrgNode = onCall(callableOpts, async (request) => {
 
 /** Flat list by org type (e.g. regions / agencies for parent pickers). */
 export const listOrgNodesByType = onCall(callableOpts, async (request) => {
-  await requireOrgAdmin(request, "listOrgNodesByType");
+  await requireOrgAdmin(request, "listOrgNodesByType", "admin.orgs.read");
   const type = parseOrgNodeType(request.data?.type);
   if (!type) {
     throw new HttpsError("invalid-argument", "Valid type required.");
@@ -600,7 +592,17 @@ export const listAgenciesForProfile = onCall(callableOpts, async (request) => {
 export const migrateSubAgenciesToAgencies = onCall(
   { ...callableOpts, timeoutSeconds: 300 },
   async (request) => {
-    await requireOrgAdmin(request, "migrateSubAgenciesToAgencies", true);
+    if (process.env.FUNCTIONS_ALLOW_ORG_MIGRATIONS !== "true") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Org migrations are disabled. Set FUNCTIONS_ALLOW_ORG_MIGRATIONS=true.",
+      );
+    }
+    await requireOrgAdmin(
+      request,
+      "migrateSubAgenciesToAgencies",
+      "platform.manage",
+    );
     const snap = await db
       .collection("orgNodes")
       .where("type", "==", "sub_agency")
@@ -653,7 +655,7 @@ const ORG_LOGO_TYPES = new Set([
 export const uploadOrgLogo = onCall(
   { ...callableOpts, memory: "512MiB", timeoutSeconds: 60 },
   async (request) => {
-    await requireOrgAdmin(request, "uploadOrgLogo", true);
+    await requireOrgAdmin(request, "uploadOrgLogo", "admin.orgs.write");
     const orgNodeId = String(request.data?.orgNodeId ?? "").trim();
     if (!orgNodeId || orgNodeId.length > 128) {
       throw new HttpsError("invalid-argument", "orgNodeId required.");

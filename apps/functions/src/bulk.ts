@@ -1,10 +1,10 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { parseRole } from "@pulse/shared";
+import { belongsInDefaultAgentGroup, parseRole } from "@pulse/shared";
 import { db, callableOpts } from "./init";
-import { headlineName, requireCaller } from "./auth";
+import { headlineName } from "./auth";
+import { requireActor } from "./guards";
 import { ensureAutoJoinMemberships } from "./chats";
-import { loadPermissionsForUid, requirePermission } from "./permissions";
 import {
   emptyBulkResult,
   finalizeBulkResult,
@@ -16,8 +16,9 @@ import {
  * Bulk approve / reject accounts (same effect as setUserApproval per uid).
  */
 export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "bulkSetUserApproval");
-  await requirePermission(actorUid, "admin.approvals.decide");
+  const { uid: actorUid } = await requireActor(request, "bulkSetUserApproval", {
+    permission: "admin.approvals.decide",
+  });
   const uids = parseBulkIds(request.data?.uids, "uids");
   const status = String(request.data?.status ?? "");
   if (
@@ -90,15 +91,15 @@ export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
  * Bulk role assignment (same rules as setUserRole per uid).
  */
 export const bulkSetUserRole = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "bulkSetUserRole");
-  await requirePermission(actorUid, "platform.manage");
+  await requireActor(request, "bulkSetUserRole", {
+    permission: "platform.manage",
+  });
   const uids = parseBulkIds(request.data?.uids, "uids");
   const roleRaw = String(request.data?.role ?? "").trim();
   if (!roleRaw) {
     throw new HttpsError("invalid-argument", "role required");
   }
   const { assertAssignableRoleId } = await import("./role-management");
-  const { belongsInDefaultAgentGroup } = await import("@pulse/shared");
   const { addAgentToDefaultGroup } = await import("./chats");
   const role = await assertAssignableRoleId(roleRaw);
 
@@ -127,11 +128,11 @@ export const bulkSetUserRole = onCall(callableOpts, async (request) => {
         });
         continue;
       }
-      if (currentRole === "agent" && (role === "student" || role === "guest")) {
+      if (currentRole === "agent" && role === "student") {
         result.failed.push({
           id: targetUid,
           code: "failed-precondition",
-          message: "Cannot downgrade an agent to student or guest.",
+          message: "Cannot downgrade an agent to student.",
         });
         continue;
       }
@@ -173,12 +174,11 @@ export const bulkSetUserRole = onCall(callableOpts, async (request) => {
  * Bulk agency / org assignment (same as assignUserToOrgNode per uid).
  */
 export const bulkAssignUsersToOrgNode = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "bulkAssignUsersToOrgNode");
-  const { permissions } = await loadPermissionsForUid(actorUid);
-  const { canManagePlatform } = await import("@pulse/shared");
-  if (!canManagePlatform(permissions)) {
-    throw new HttpsError("permission-denied", "Admin access required.");
-  }
+  await requireActor(
+    request,
+    "bulkAssignUsersToOrgNode",
+    { permission: "admin.orgs.write" },
+  );
 
   const uids = parseBulkIds(request.data?.uids, "uids");
   const orgNodeIdRaw = request.data?.orgNodeId;
@@ -238,12 +238,11 @@ export const bulkAssignUsersToOrgNode = onCall(callableOpts, async (request) => 
  * Bulk deactivate / reactivate accounts (platform.manage).
  */
 export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "bulkSetUserAccountStatus");
-  const { permissions } = await loadPermissionsForUid(actorUid);
-  const { canManagePlatform } = await import("@pulse/shared");
-  if (!canManagePlatform(permissions)) {
-    throw new HttpsError("permission-denied", "Admin access required.");
-  }
+  const { uid: actorUid } = await requireActor(
+    request,
+    "bulkSetUserAccountStatus",
+    { permission: "admin.users.deactivate" },
+  );
 
   const uids = parseBulkIds(request.data?.uids, "uids");
   const status = String(request.data?.status ?? "");
@@ -354,12 +353,9 @@ export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => 
  * Bulk soft-activate / deactivate org nodes (platform.manage).
  */
 export const bulkSetOrgNodesActive = onCall(callableOpts, async (request) => {
-  const actorUid = await requireCaller(request, "bulkSetOrgNodesActive");
-  const { permissions } = await loadPermissionsForUid(actorUid);
-  const { canManagePlatform } = await import("@pulse/shared");
-  if (!canManagePlatform(permissions)) {
-    throw new HttpsError("permission-denied", "Admin access required.");
-  }
+  await requireActor(request, "bulkSetOrgNodesActive", {
+      permission: "admin.orgs.write",
+    });
 
   const ids = parseBulkIds(request.data?.ids, "ids");
   if (typeof request.data?.active !== "boolean") {

@@ -27,22 +27,19 @@ export const LOCAL_DEV_ORIGINS = [
 /**
  * CORS for Gen2 callables.
  * - Emulator: open (preflight quirks).
- * - Production: everybenefits.us + App Hosting default domains only.
- * - Extra origins via FUNCTIONS_ALLOWED_ORIGINS (comma-separated) for staging.
+ * - Production: everybenefits.us + App Hosting default domains.
+ * - Preview App Hosting: `*-every-benefits-us.us-central1.hosted.app`
+ *   (also set FUNCTIONS_ALLOWED_ORIGINS for any other staging hosts).
  * Localhost is never included in production unless FUNCTIONS_ALLOW_LOCALHOST=true
  * (emergency / preview only).
  */
-export function buildCallableCors(
+export function allowedCallableOrigins(
   opts: {
     emulator?: boolean;
     allowLocalhost?: boolean;
     extraOrigins?: string;
   } = {},
-): true | string[] {
-  const emulator =
-    opts.emulator ?? process.env.FUNCTIONS_EMULATOR === "true";
-  if (emulator) return true;
-
+): string[] {
   const allowLocalhost =
     opts.allowLocalhost ?? process.env.FUNCTIONS_ALLOW_LOCALHOST === "true";
   const extra = (opts.extraOrigins ?? process.env.FUNCTIONS_ALLOWED_ORIGINS ?? "")
@@ -54,6 +51,40 @@ export function buildCallableCors(
     ...PRODUCTION_ORIGINS,
     ...(allowLocalhost ? LOCAL_DEV_ORIGINS : []),
     ...extra,
+  ];
+}
+
+const APP_HOSTING_PREVIEW_SUFFIX =
+  "-every-benefits-us.us-central1.hosted.app";
+
+export function isAllowedCallableOrigin(
+  origin: string,
+  opts?: Parameters<typeof allowedCallableOrigins>[0],
+): boolean {
+  const trimmed = origin.trim();
+  if (!trimmed) return false;
+  if (allowedCallableOrigins(opts).includes(trimmed)) return true;
+  try {
+    const host = new URL(trimmed).hostname;
+    return host.endsWith(APP_HOSTING_PREVIEW_SUFFIX);
+  } catch {
+    return false;
+  }
+}
+
+export function buildCallableCors(
+  opts: {
+    emulator?: boolean;
+    allowLocalhost?: boolean;
+    extraOrigins?: string;
+  } = {},
+): true | Array<string | RegExp> {
+  const emulator =
+    opts.emulator ?? process.env.FUNCTIONS_EMULATOR === "true";
+  if (emulator) return true;
+  return [
+    ...allowedCallableOrigins(opts),
+    /^https:\/\/[a-z0-9-]+-every-benefits-us\.us-central1\.hosted\.app$/i,
   ];
 }
 

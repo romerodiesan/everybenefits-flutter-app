@@ -264,6 +264,11 @@ class _AuthHome extends StatelessWidget {
       return WelcomeScreen(authService: authService);
     }
 
+    if (user!.isAnonymous) {
+      Future.microtask(authService.signOut);
+      return WelcomeScreen(authService: authService);
+    }
+
     return ProfileBootstrap(
       key: ValueKey(user!.uid),
       user: user!,

@@ -28,7 +28,7 @@ const EnrollmentsContext = createContext<EnrollmentsContextValue | null>(null);
 export function EnrollmentsProvider({ children }: { children: ReactNode }) {
   const { profile } = useAuth();
   const uid =
-    profile && !profile.isAnonymous && profile.role !== "guest"
+    profile && !profile.isAnonymous
       ? profile.uid
       : null;
 

@@ -9,7 +9,7 @@ void main() {
 
   group('UserRole', () {
     test('parses known values including agency_owner', () {
-      expect(UserRole.parse('guest'), UserRole.guest);
+      expect(UserRole.parse('guest'), UserRole.student);
       expect(UserRole.parse('student'), UserRole.student);
       expect(UserRole.parse('agent'), UserRole.agent);
       expect(UserRole.parse('agency_owner'), UserRole.agencyOwner);
@@ -20,10 +20,10 @@ void main() {
       expect(UserRole.parse('teacher'), UserRole.instructor);
     });
 
-    test('parse maps unknown to guest; tryParseBuiltin returns null', () {
-      expect(UserRole.parse('custom_ops'), UserRole.guest);
+    test('parse maps unknown to student; tryParseBuiltin returns null', () {
+      expect(UserRole.parse('custom_ops'), UserRole.student);
       expect(UserRole.tryParseBuiltin('custom_ops'), isNull);
-      expect(UserRole.parse(null), UserRole.guest);
+      expect(UserRole.parse(null), UserRole.student);
     });
 
     test('serializes to wire values', () {

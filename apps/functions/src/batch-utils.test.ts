@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { chunkArray, FIRESTORE_BATCH_LIMIT } from "./batch-utils";
+import { chunkArray, FIRESTORE_BATCH_LIMIT, mapPool } from "./batch-utils";
 
 describe("chunkArray", () => {
   it("returns empty for empty input", () => {
@@ -17,5 +17,18 @@ describe("chunkArray", () => {
     expect(chunks).toHaveLength(2);
     expect(chunks[0]).toHaveLength(FIRESTORE_BATCH_LIMIT);
     expect(chunks[1]).toHaveLength(3);
+  });
+});
+
+describe("mapPool", () => {
+  it("preserves order with bounded concurrency", async () => {
+    const seen: number[] = [];
+    const out = await mapPool([3, 1, 2], 2, async (n) => {
+      seen.push(n);
+      await Promise.resolve();
+      return n * 10;
+    });
+    expect(out).toEqual([30, 10, 20]);
+    expect(seen.sort()).toEqual([1, 2, 3]);
   });
 });

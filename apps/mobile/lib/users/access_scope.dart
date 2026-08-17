@@ -33,7 +33,7 @@ class AccessScope extends InheritedWidget {
     if (scope != null) return scope.access;
     return fallbackRoleId?.trim().isNotEmpty == true
         ? fallbackRoleId!.trim()
-        : 'guest';
+        : 'student';
   }
 
   @override
