@@ -92,10 +92,9 @@ export function mapPoll(id: string, data: DocumentData): Poll {
 async function requirePollAdmin(
   request: { auth?: { uid: string } },
   operation: string,
+  permission: "admin.polls.read" | "admin.polls.write",
 ): Promise<string> {
-  const actor = await requireActor(request, operation, {
-    permission: "platform.manage",
-  });
+  const actor = await requireActor(request, operation, { permission });
   return actor.uid;
 }
 
@@ -106,7 +105,7 @@ function slugId(input?: string): string {
 }
 
 export const listPolls = onCall(callableOpts, async (request) => {
-  await requirePollAdmin(request, "listPolls");
+  await requirePollAdmin(request, "listPolls", "admin.polls.read");
   const snap = await db
     .collection(COLLECTION)
     .orderBy("updatedAt", "desc")
@@ -116,7 +115,7 @@ export const listPolls = onCall(callableOpts, async (request) => {
 });
 
 export const upsertPoll = onCall(callableOpts, async (request) => {
-  const uid = await requirePollAdmin(request, "upsertPoll");
+  const uid = await requirePollAdmin(request, "upsertPoll", "admin.polls.write");
   const parsed = pollUpsertSchema.safeParse(request.data ?? {});
   if (!parsed.success) {
     const detail = parsed.error.issues
@@ -180,7 +179,7 @@ export const upsertPoll = onCall(callableOpts, async (request) => {
 });
 
 export const deletePoll = onCall(callableOpts, async (request) => {
-  await requirePollAdmin(request, "deletePoll");
+  await requirePollAdmin(request, "deletePoll", "admin.polls.write");
   const id = String(request.data?.id ?? "").trim();
   if (!id) throw new HttpsError("invalid-argument", "id required.");
   const hard = request.data?.hard === true;

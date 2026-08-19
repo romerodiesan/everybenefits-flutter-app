@@ -3,9 +3,9 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { onValueCreated, onValueWritten } from "firebase-functions/v2/database";
 import { HttpsError } from "firebase-functions/v2/https";
 import type { DocumentData } from "firebase-admin/firestore";
+import { randomUUID } from "node:crypto";
 import {
   GROUP_SEED_ROLES,
-  belongsInDefaultAgentGroup,
   canConfigureGroupAutoJoin,
   canCreateChatGroups,
   parseRole,
@@ -13,7 +13,7 @@ import {
   parseMentions,
   type UserRole,
 } from "@pulse/shared";
-import { db, rtdb, callableOpts } from "./init";
+import { db, rtdb, callableOpts, storageBucket } from "./init";
 import {
   DEFAULT_AGENT_GROUP_ID,
   MAX_GROUP_MEMBERS,
@@ -23,7 +23,13 @@ import {
   headlineName,
   isUserApprovedForJoin,
 } from "./auth";
+import {
+  canOpenDirectMessage,
+  canResumeDirectMessage,
+} from "./chat-access";
 import { actorHasPermission, requireActor, requireCaller } from "./guards";
+import { canClearChatThread } from "./chat-moderation";
+import { loadPermissionsForRole } from "./permissions";
 import { notifyUser } from "./notifications";
 import {
   areMutualContacts,
@@ -50,6 +56,63 @@ function compactStrings(
   entries: Array<[string, string]>,
 ): Record<string, string> {
   return Object.fromEntries(entries.filter(([, value]) => value));
+}
+
+async function canProfileUseChats(
+  data: DocumentData | undefined,
+  permissionsByRole = new Map<string, string[]>(),
+): Promise<boolean> {
+  if (!isUserApprovedForJoin(data)) return false;
+  const role = String(data?.role ?? "student");
+  let permissions = permissionsByRole.get(role);
+  if (!permissions) {
+    permissions = await loadPermissionsForRole(role);
+    permissionsByRole.set(role, permissions);
+  }
+  return actorHasPermission(permissions, "chats.participate");
+}
+
+function chatIdFrom(request: { data?: unknown }): string {
+  const raw =
+    request.data && typeof request.data === "object"
+      ? (request.data as Record<string, unknown>).chatId
+      : undefined;
+  const chatId = String(raw ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(chatId)) {
+    throw new HttpsError("invalid-argument", "Valid chat required.");
+  }
+  return chatId;
+}
+
+const GROUP_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+
+async function refreshChatSummary(chatId: string): Promise<void> {
+  const latest = await rtdb
+    .ref(`messages/${chatId}`)
+    .orderByChild("createdAt")
+    .limitToLast(1)
+    .get();
+  const values = (latest.val() ?? {}) as Record<string, Record<string, unknown>>;
+  const message = Object.values(values)[0];
+  const chatRef = rtdb.ref(`chats/${chatId}`);
+  const chatSnap = await chatRef.get();
+  if (!chatSnap.exists()) return;
+  if (!message) {
+    const chat = (chatSnap.val() ?? {}) as Record<string, unknown>;
+    const members = Object.keys((chat.members ?? {}) as Record<string, unknown>);
+    await chatRef.update({
+      lastMessage: "",
+      lastMessageAt: Number(chat.createdAt ?? Date.now()),
+      lastMessageSenderId: null,
+      unreadCounts: Object.fromEntries(members.map((uid) => [uid, 0])),
+    });
+    return;
+  }
+  await chatRef.update({
+    lastMessage: String(message.body ?? "").slice(0, 4000),
+    lastMessageAt: Number(message.createdAt ?? Date.now()),
+    lastMessageSenderId: String(message.senderId ?? "") || null,
+  });
 }
 
 function applyMemberIdentity(
@@ -123,6 +186,7 @@ export function chatInboxRow(
     createdBy: String(chat.createdBy ?? ""),
     isDefaultAgentGroup: chat.isDefaultAgentGroup === true,
     autoJoinRoles,
+    photoUrl: typeof chat.photoUrl === "string" ? chat.photoUrl : null,
     dmMessagingEnabled:
       chat.isGroup === true || chat.dmMessagingEnabled === true,
   };
@@ -134,6 +198,7 @@ export async function addMemberToChat(
   displayName: string,
 ) {
   const userSnap = await db.doc(`users/${uid}`).get();
+  if (!(await canProfileUseChats(userSnap.data()))) return;
   const photoUrl = photoOf(userSnap.data());
   const username = claimedUsernameOf(userSnap.data());
   const chatRef = rtdb.ref(`chats/${chatId}`);
@@ -192,6 +257,11 @@ export async function ensureAutoJoinMemberships(
 ) {
   if (isAnonymous) return;
   if (approvalStatus !== "approved") return;
+  const permissions = await loadPermissionsForRole(role);
+  if (!actorHasPermission(permissions, "chats.participate")) return;
+  if (actorHasPermission(permissions, "chats.groups.default.join")) {
+    await addAgentToDefaultGroup(uid, displayName);
+  }
   const indexSnap = await rtdb.ref(`autoJoinGroups/${role}`).get();
   const chatIds = Object.keys(
     (indexSnap.val() ?? {}) as Record<string, unknown>,
@@ -210,6 +280,8 @@ export async function collectUsersByRoles(
   // Query per role (avoids composite index); filter approval in memory.
   await Promise.all(
     roles.map(async (role) => {
+      const permissions = await loadPermissionsForRole(role);
+      if (!actorHasPermission(permissions, "chats.participate")) return;
       const snap = await db
         .collection("users")
         .where("role", "==", role)
@@ -234,7 +306,7 @@ export async function addAgentToDefaultGroup(uid: string, displayName: string) {
   const chatRef = rtdb.ref(`chats/${DEFAULT_AGENT_GROUP_ID}`);
   const now = Date.now();
 
-  await chatRef.transaction((current) => {
+  const transaction = await chatRef.transaction((current) => {
     if (current === null) {
       return {
         members: { [uid]: true },
@@ -293,9 +365,13 @@ export async function addAgentToDefaultGroup(uid: string, displayName: string) {
     };
   });
 
-  await rtdb.ref(`userChats/${uid}/${DEFAULT_AGENT_GROUP_ID}`).set({
-    lastMessageAt: now,
-  });
+  const chat = transaction.snapshot.val() as Record<string, unknown> | null;
+  const members = asObj(chat?.members);
+  if (chat && members[uid] === true) {
+    await rtdb
+      .ref(`userChats/${uid}/${DEFAULT_AGENT_GROUP_ID}`)
+      .set(chatInboxRow(DEFAULT_AGENT_GROUP_ID, chat, uid));
+  }
 }
 
 /** Join auto-join groups when role or approvalStatus changes. */
@@ -485,7 +561,10 @@ export const syncChatMetadataOnMessage = onValueCreated(
  * Create (or return) a 1:1 DM. Enforces privacy.allowDirectMessages server-side.
  */
 export const createDm = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "createDm");
+  const actor = await requireActor(request, "createDm", {
+    permission: "chats.participate",
+  });
+  const uid = actor.uid;
   const otherUid = String(request.data?.otherUid ?? "").trim();
   if (!otherUid || otherUid === uid) {
     throw new HttpsError("invalid-argument", "Valid recipient required.");
@@ -507,13 +586,32 @@ export const createDm = onCall(callableOpts, async (request) => {
   if (!isUserApprovedForJoin(meData) || !isUserApprovedForJoin(otherData)) {
     throw new HttpsError("permission-denied", "Both users must be approved.");
   }
+  if (!(await canProfileUseChats(otherData))) {
+    throw new HttpsError(
+      "permission-denied",
+      "Recipient cannot participate in chats.",
+    );
+  }
 
+  const canAccessAllContacts = actorHasPermission(
+    actor.permissions,
+    "chats.contacts.all",
+  );
+  const canOverrideRecipientOptOut = actorHasPermission(
+    actor.permissions,
+    "chats.dm.override_optout",
+  );
   const allowDirect =
     publicSnap.exists
       ? publicSnap.data()?.allowDirectMessages !== false
       : (otherData.privacy as { allowDirectMessages?: boolean } | undefined)
           ?.allowDirectMessages !== false;
-  if (!allowDirect) {
+  if (
+    !canOpenDirectMessage({
+      canOverrideRecipientOptOut,
+      recipientAllowsDirectMessages: allowDirect,
+    })
+  ) {
     throw new HttpsError(
       "failed-precondition",
       "direct-messages-disabled",
@@ -528,6 +626,14 @@ export const createDm = onCall(callableOpts, async (request) => {
   const existing = await rtdb.ref(`chats/${dmKey}`).get();
   if (existing.exists()) {
     const chat = existing.val() as Record<string, unknown>;
+    const canResumeExistingDm = canResumeDirectMessage({
+      canAccessAllContacts,
+      mutualContacts:
+        !canAccessAllContacts && (await areMutualContacts(uid, otherUid)),
+    });
+    if (canResumeExistingDm && chat.dmMessagingEnabled !== true) {
+      await existing.ref.child("dmMessagingEnabled").set(true);
+    }
     return {
       chatId: dmKey,
       createdAt: Number(chat.createdAt ?? Date.now()),
@@ -537,7 +643,7 @@ export const createDm = onCall(callableOpts, async (request) => {
     };
   }
 
-  if (!(await areMutualContacts(uid, otherUid))) {
+  if (!canAccessAllContacts && !(await areMutualContacts(uid, otherUid))) {
     throw new HttpsError("failed-precondition", "not-contacts");
   }
 
@@ -613,6 +719,201 @@ export const rebuildChatInbox = onCall(callableOpts, async (request) => {
   );
   if (Object.keys(updates).length) await rtdb.ref().update(updates);
   return { ok: true };
+});
+
+export const deleteChatMessage = onCall(callableOpts, async (request) => {
+  const actor = await requireActor(request, "deleteChatMessage");
+  const chatId = chatIdFrom(request);
+  const messageId = String(request.data?.messageId ?? "").trim();
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(messageId)) {
+    throw new HttpsError("invalid-argument", "Valid message required.");
+  }
+  const [chatSnap, messageSnap] = await Promise.all([
+    rtdb.ref(`chats/${chatId}`).get(),
+    rtdb.ref(`messages/${chatId}/${messageId}`).get(),
+  ]);
+  if (!chatSnap.exists()) throw new HttpsError("not-found", "Chat not found.");
+  if (!messageSnap.exists()) return { ok: true, deleted: false };
+  const chat = (chatSnap.val() ?? {}) as Record<string, unknown>;
+  const members = (chat.members ?? {}) as Record<string, unknown>;
+  const canModerate = actorHasPermission(
+    actor.permissions,
+    "chats.messages.moderate",
+  );
+  if (members[actor.uid] !== true && !canModerate) {
+    throw new HttpsError("permission-denied", "Chat membership required.");
+  }
+  const message = (messageSnap.val() ?? {}) as Record<string, unknown>;
+  if (String(message.senderId ?? "") !== actor.uid && !canModerate) {
+    throw new HttpsError("permission-denied", "Cannot delete this message.");
+  }
+  await messageSnap.ref.remove();
+  await refreshChatSummary(chatId);
+  return { ok: true, deleted: true };
+});
+
+export const clearChatMessages = onCall(callableOpts, async (request) => {
+  const actor = await requireActor(request, "clearChatMessages", {
+    permission: "chats.messages.moderate",
+  });
+  const chatId = chatIdFrom(request);
+  const chatSnap = await rtdb.ref(`chats/${chatId}`).get();
+  if (!chatSnap.exists()) throw new HttpsError("not-found", "Chat not found.");
+  const chat = (chatSnap.val() ?? {}) as Record<string, unknown>;
+  const members = asObj(chat.members);
+  if (
+    !canClearChatThread({
+      uid: actor.uid,
+      permissions: actor.permissions,
+      members,
+      isGroup: chat.isGroup === true,
+    })
+  ) {
+    throw new HttpsError("permission-denied", "Chat membership required.");
+  }
+  await rtdb.ref().update({
+    [`messages/${chatId}`]: null,
+    [`typing/${chatId}`]: null,
+  });
+  await refreshChatSummary(chatId);
+  return { ok: true };
+});
+
+export const listManagedGroupChats = onCall(callableOpts, async (request) => {
+  const actor = await requireActor(request, "listManagedGroupChats", {
+    permission: "chats.groups.manage",
+    skipQuota: true,
+  });
+  const requestedLimit = Math.round(Number(request.data?.limit ?? 100));
+  const limit = Math.max(1, Math.min(200, requestedLimit));
+  const snap = await rtdb
+    .ref("chats")
+    .orderByChild("isGroup")
+    .equalTo(true)
+    .limitToFirst(limit)
+    .get();
+  const raw = (snap.val() ?? {}) as Record<string, Record<string, unknown>>;
+  const groups = Object.entries(raw)
+    .filter(([, chat]) => chat.isGroup === true)
+    .map(([chatId, chat]) => ({
+      ...chatInboxRow(chatId, chat, actor.uid),
+      id: chatId,
+    }))
+    .sort((a, b) => Number(b.lastMessageAt) - Number(a.lastMessageAt))
+    .slice(0, limit);
+  return { groups };
+});
+
+export const updateGroupChat = onCall(callableOpts, async (request) => {
+  await requireActor(request, "updateGroupChat", {
+    permission: "chats.groups.manage",
+  });
+  const chatId = chatIdFrom(request);
+  const title = String(request.data?.title ?? "").trim();
+  const requestedMemberIds: unknown[] = Array.isArray(request.data?.memberIds)
+    ? request.data.memberIds
+    : [];
+  const memberIds: string[] = [
+    ...new Set(
+      requestedMemberIds
+        .map((value) => String(value).trim())
+        .filter((uid) => uid.length > 0),
+    ),
+  ];
+  if (!title || title.length > 120) {
+    throw new HttpsError("invalid-argument", "Valid group title required.");
+  }
+  if (memberIds.length < 1 || memberIds.length > MAX_ROLE_SEED_MEMBERS) {
+    throw new HttpsError("invalid-argument", "Valid group members required.");
+  }
+  const chatRef = rtdb.ref(`chats/${chatId}`);
+  const chatSnap = await chatRef.get();
+  if (!chatSnap.exists()) throw new HttpsError("not-found", "Chat not found.");
+  const current = (chatSnap.val() ?? {}) as Record<string, unknown>;
+  if (current.isGroup !== true) {
+    throw new HttpsError("failed-precondition", "Only groups can be edited.");
+  }
+  const profileSnaps = await db.getAll(
+    ...memberIds.map((uid) => db.doc(`users/${uid}`)),
+  );
+  const eligibilityCache = new Map<string, string[]>();
+  const eligibility = await Promise.all(
+    profileSnaps.map(
+      async (profile) =>
+        profile.exists &&
+        (await canProfileUseChats(profile.data(), eligibilityCache)),
+    ),
+  );
+  if (eligibility.some((allowed) => !allowed)) {
+    throw new HttpsError("failed-precondition", "Unknown group member.");
+  }
+  const profiles = new Map(
+    profileSnaps.map((profile) => [profile.id, profile.data() ?? {}]),
+  );
+  const oldUnread = asObj(current.unreadCounts);
+  const oldPinned = asObj(current.pinnedBy);
+  const patch: Record<string, unknown> = {
+    title,
+    members: Object.fromEntries(memberIds.map((uid) => [uid, true])),
+    memberCount: memberIds.length,
+    memberNames: Object.fromEntries(
+      memberIds.map((uid) => [uid, headlineName(profiles.get(uid))]),
+    ),
+    memberPhotos: compactStrings(
+      memberIds.map((uid): [string, string] => [uid, photoOf(profiles.get(uid))]),
+    ),
+    memberUsernames: compactStrings(
+      memberIds.map((uid): [string, string] => [
+        uid,
+        claimedUsernameOf(profiles.get(uid)),
+      ]),
+    ),
+    unreadCounts: Object.fromEntries(
+      memberIds.map((uid) => [uid, Number(oldUnread[uid] ?? 0)]),
+    ),
+    pinnedBy: Object.fromEntries(
+      memberIds
+        .filter((uid) => oldPinned[uid] === true)
+        .map((uid) => [uid, true]),
+    ),
+  };
+  const incomingPhoto = request.data?.photoUrl;
+  if (typeof incomingPhoto === "string") {
+    const trimmed = incomingPhoto.trim();
+    patch.photoUrl =
+      trimmed.length > 0 && trimmed.length <= 4096 ? trimmed : null;
+  }
+  await chatRef.update(patch);
+  return { ok: true, chatId, memberCount: memberIds.length };
+});
+
+export const deleteGroupChat = onCall(callableOpts, async (request) => {
+  await requireActor(request, "deleteGroupChat", {
+    permission: "chats.groups.manage",
+  });
+  const chatId = chatIdFrom(request);
+  const chatSnap = await rtdb.ref(`chats/${chatId}`).get();
+  if (!chatSnap.exists()) return { ok: true, deleted: false };
+  const chat = (chatSnap.val() ?? {}) as Record<string, unknown>;
+  if (chat.isGroup !== true) {
+    throw new HttpsError("failed-precondition", "Only groups can be deleted.");
+  }
+  if (chatId === DEFAULT_AGENT_GROUP_ID || chat.isDefaultAgentGroup === true) {
+    throw new HttpsError("failed-precondition", "The Team group cannot be deleted.");
+  }
+  const updates: Record<string, unknown> = {
+    [`chats/${chatId}`]: null,
+    [`messages/${chatId}`]: null,
+    [`typing/${chatId}`]: null,
+  };
+  for (const uid of Object.keys(asObj(chat.members))) {
+    updates[`userChats/${uid}/${chatId}`] = null;
+  }
+  for (const role of Object.keys(asObj(chat.autoJoinRoles))) {
+    updates[`autoJoinGroups/${role}/${chatId}`] = null;
+  }
+  await rtdb.ref().update(updates);
+  return { ok: true, deleted: true };
 });
 
 export const createGroupChat = onCall(callableOpts, async (request) => {
@@ -701,6 +1002,18 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
   for (const profile of fetched) {
     roleUsers.set(profile.id, profile.data() ?? {});
   }
+  const eligibilityCache = new Map<string, string[]>();
+  const eligibleMembers = await Promise.all(
+    memberIds.map((id) =>
+      canProfileUseChats(roleUsers.get(id), eligibilityCache),
+    ),
+  );
+  if (eligibleMembers.some((allowed) => !allowed)) {
+    throw new HttpsError(
+      "failed-precondition",
+      "All group members must have active chat access.",
+    );
+  }
 
   const memberNames = Object.fromEntries(
     memberIds.map((id) => [id, headlineName(roleUsers.get(id))]),
@@ -766,10 +1079,12 @@ export const createGroupChat = onCall(callableOpts, async (request) => {
 });
 
 /**
- * Ensures the caller (staff) is a member of the default community RTDB chat.
+ * Ensures the caller is a member of the default Team community RTDB chat.
  */
 export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
-  const actor = await requireActor(request, "ensureDefaultAgentGroup");
+  const actor = await requireActor(request, "ensureDefaultAgentGroup", {
+    permission: "chats.groups.default.join",
+  });
   const callerUid = actor.uid;
   const targetUid = String(request.data?.uid ?? callerUid);
 
@@ -785,7 +1100,11 @@ export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
     throw new HttpsError("not-found", "User not found.");
   }
   const targetRole = String(target.data()?.role ?? "");
-  if (!belongsInDefaultAgentGroup(targetRole)) {
+  const targetPermissions = await loadPermissionsForRole(targetRole);
+  if (
+    !actorHasPermission(targetPermissions, "chats.groups.default.join") ||
+    !(await canProfileUseChats(target.data()))
+  ) {
     throw new HttpsError(
       "failed-precondition",
       "Role lacks default agent group permission.",
@@ -795,3 +1114,60 @@ export const ensureDefaultAgentGroup = onCall(callableOpts, async (request) => {
   await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
   return { ok: true, uid: targetUid, chatId: DEFAULT_AGENT_GROUP_ID };
 });
+
+/** Upload group cover via Admin SDK (client Storage writes are denied). */
+export const uploadGroupChatPhoto = onCall(
+  { ...callableOpts, memory: "512MiB", timeoutSeconds: 60 },
+  async (request) => {
+    const actor = await requireActor(request, "uploadGroupChatPhoto", {
+      permission: "chats.groups.manage",
+    });
+    const chatId = chatIdFrom(request);
+    const chatSnap = await rtdb.ref(`chats/${chatId}`).get();
+    if (!chatSnap.exists()) throw new HttpsError("not-found", "Chat not found.");
+    const chat = (chatSnap.val() ?? {}) as Record<string, unknown>;
+    if (chat.isGroup !== true) {
+      throw new HttpsError("failed-precondition", "Only groups have photos.");
+    }
+
+    const contentType = String(request.data?.contentType ?? "image/jpeg").trim();
+    if (!GROUP_PHOTO_TYPES.has(contentType)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Photo must be JPEG, PNG, or WebP.",
+      );
+    }
+
+    const base64 = String(request.data?.bytesBase64 ?? "");
+    if (!base64 || base64.length > 7_000_000) {
+      throw new HttpsError("invalid-argument", "Photo payload missing or too large.");
+    }
+    const buffer = Buffer.from(base64, "base64");
+    if (!buffer.length || buffer.length >= 5 * 1024 * 1024) {
+      throw new HttpsError("invalid-argument", "Photo must be under 5MB.");
+    }
+
+    const path = `chat-photos/${chatId}.jpg`;
+    const token = randomUUID();
+    const file = storageBucket().file(path);
+    await file.save(buffer, {
+      resumable: false,
+      contentType,
+      metadata: {
+        contentType,
+        metadata: { firebaseStorageDownloadTokens: token },
+      },
+    });
+
+    const bucket = file.bucket.name;
+    const emulatorHost = process.env.FIREBASE_STORAGE_EMULATOR_HOST?.trim();
+    const encoded = encodeURIComponent(path);
+    const downloadUrl = emulatorHost
+      ? `http://${emulatorHost}/v0/b/${bucket}/o/${encoded}?alt=media&token=${token}`
+      : `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encoded}?alt=media&token=${token}`;
+
+    await rtdb.ref(`chats/${chatId}`).update({ photoUrl: downloadUrl });
+    return { downloadUrl, path, chatId, updatedBy: actor.uid };
+  },
+);
+

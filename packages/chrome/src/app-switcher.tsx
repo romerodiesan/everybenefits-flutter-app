@@ -60,6 +60,7 @@ export function AppSwitcher({
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [busyTarget, setBusyTarget] = useState<PulseAppId | null>(null);
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [coords, setCoords] = useState<{ top: number; left: number } | null>(
     null,
@@ -141,12 +142,14 @@ export function AppSwitcher({
     const meta = getAppEntry(target);
     if (!meta) return;
     setBusy(true);
+    setBusyTarget(target);
     setSwitchError(null);
     try {
       window.location.assign(await resolveSwitchUrl(target, meta.homePath));
     } catch {
       setSwitchError(t("appSwitchHandoffFailed"));
       setBusy(false);
+      setBusyTarget(null);
     }
   };
 
@@ -228,6 +231,7 @@ export function AppSwitcher({
             <ul className="max-h-[min(16rem,50vh)] space-y-0.5 overflow-y-auto p-1.5">
               {apps.map((app) => {
                 const active = app.id === current;
+                const opening = busyTarget === app.id;
                 return (
                   <li key={app.id}>
                     <button
@@ -254,7 +258,12 @@ export function AppSwitcher({
                           {t(app.blurbKey)}
                         </span>
                       </span>
-                      {active ? (
+                      {opening ? (
+                        <span
+                          className="h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand/25 border-t-brand"
+                          aria-hidden
+                        />
+                      ) : active ? (
                         <IconCheck
                           width={14}
                           height={14}

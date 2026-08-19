@@ -439,7 +439,9 @@ export const getSocialRelationship = onCall(callableOpts, async (request) => {
 
 export const listContacts = onCall(callableOpts, async (request) => {
   const uid = await requireCaller(request, "listContacts");
-  const snap = await db.collection(`social/${uid}/contacts`).limit(200).get();
+  const requestedLimit = Math.round(Number(request.data?.limit ?? 24));
+  const limit = Math.max(1, Math.min(50, requestedLimit));
+  const snap = await db.collection(`social/${uid}/contacts`).limit(limit).get();
   const profiles = await cardsForUids(snap.docs.map((doc) => doc.id));
   profiles.sort((a, b) =>
     (a.displayName ?? "").localeCompare(b.displayName ?? ""),

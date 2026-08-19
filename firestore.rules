@@ -21,21 +21,20 @@ service cloud.firestore {
     // Prefer exists()+get() with Map.get defaults so missing fields never
     // throw evaluation errors during list queries.
 
-    /// Absent or "active" = normal. Deactivated / pendingDeletion are blocked
-    /// from community + academy (they can still read their own user doc).
+    /// Eligible account: active and approved. Legacy missing approval is approved.
+    /// Ineligible users can still read their own user document for status UI.
     function isAccountActive() {
       return isSignedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && !(userDoc(request.auth.uid).data.get('accountStatus', 'active')
-          in ['deactivated', 'pendingDeletion']);
+          in ['deactivated', 'pendingDeletion'])
+        && userDoc(request.auth.uid).data.get('approvalStatus', 'approved')
+          == 'approved';
     }
 
     function isAdmin() {
-      return isAccountActive()
-        && (
-          callerRole() in ['admin', 'system']
-          || hasPermission('platform.manage')
-        );
+      return hasPermission('platform.manage')
+        || (isAccountActive() && callerRole() in ['admin', 'system']);
     }
 
     /// Registered members: signed-in, account active, not anonymous Auth.
@@ -43,15 +42,16 @@ service cloud.firestore {
     /// docs are orphan data (ops may delete) and are not a live guest mode.
     function isRegisteredMember() {
       return isAccountActive()
-        && userDoc(request.auth.uid).data.get('isAnonymous', true) == false;
+        && userDoc(request.auth.uid).data.get('isAnonymous', true) == false
+        && callerRole() != 'guest';
     }
 
     function isForumParticipant() {
       return isRegisteredMember()
         && (
-          callerRole() in
+          hasPermission('forums.participate')
+          || callerRole() in
             ['student', 'agent', 'agency_owner', 'instructor', 'teacher', 'manager', 'admin', 'system']
-          || hasPermission('forums.participate')
         );
     }
 
@@ -61,8 +61,8 @@ service cloud.firestore {
     function isCourseAuthor() {
       return isAccountActive()
         && (
-          callerRole() in ['instructor', 'teacher', 'manager', 'admin', 'system']
-          || hasPermission('courses.author')
+          hasPermission('courses.author')
+          || callerRole() in ['instructor', 'teacher', 'manager', 'admin', 'system']
         );
     }
 
@@ -149,8 +149,8 @@ service cloud.firestore {
     }
 
     /// Permission check against Firestore `roles/{roleId}` when seeded.
-    /// Seed built-in roles (`seedSystemRoles`) in every environment; missing
-    /// docs make this fail closed (empty list) except the hardcoded role lists.
+    /// Built-in roles auto-seed on Functions init (`ensureBuiltinRolesSeeded`);
+    /// missing docs make this fail closed (empty list) except the hardcoded role lists.
     function hasPermission(key) {
       return isAccountActive()
         && (
@@ -756,7 +756,7 @@ service cloud.firestore {
 
     // Payments / Override Management — admin read; all writes via Functions.
     function canAccessPaymentsData() {
-      return isAdmin() || hasPermission('apps.payments.access');
+      return hasPermission('apps.payments.access') || isAdmin();
     }
 
     match /paymentsParticipants/{id} {

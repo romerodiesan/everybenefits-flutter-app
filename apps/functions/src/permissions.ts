@@ -3,6 +3,7 @@ import {
   ALL_PERMISSION_KEYS,
   filterValidPermissions,
   getDefaultPermissionsForRole,
+  getRequiredBuiltinChatPermissions,
   hasPermission,
   isBuiltinRoleId,
   parseRole,
@@ -14,7 +15,7 @@ import { db } from "./init";
  * Resolve permissions from a `roles/{id}` snapshot.
  * Seeded docs win. Missing docs: builtins → DEFAULT_ROLE_PERMISSIONS;
  * custom slugs → [] (fail closed). Matches Firestore `hasPermission` once
- * roles are seeded (required in every environment).
+ * roles are seeded (Functions auto-seed built-ins on init).
  */
 export function resolveRolePermissions(
   roleId: string,
@@ -29,7 +30,10 @@ export function resolveRolePermissions(
     const raw = Array.isArray(roleDoc.permissions)
       ? roleDoc.permissions.map(String)
       : [];
-    return filterValidPermissions(raw);
+    return filterValidPermissions([
+      ...raw,
+      ...getRequiredBuiltinChatPermissions(normalized),
+    ]);
   }
   if (isBuiltinRoleId(normalized)) {
     return [...getDefaultPermissionsForRole(normalized)];

@@ -1,15 +1,8 @@
 "use strict";
-/**
- * Shared Content-Security-Policy allowlist for Pulse web + Studio.
- *
- * RTDB long-poll JSONP (BrowserPollConnection) injects <script src="{host}/.lp?…">
- * and uses an iframe for disconnect — those hosts MUST be in script-src / frame-src,
- * not only connect-src. Emulator: http://localhost:9000 (and 127.0.0.1).
- * Production: https://*.firebaseio.com.
- */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildContentSecurityPolicy = buildContentSecurityPolicy;
 exports.shouldIncludeEmulatorCsp = shouldIncludeEmulatorCsp;
+const origins_1 = require("./origins");
 function join(...parts) {
     return parts.filter(Boolean).join(" ");
 }
@@ -110,13 +103,14 @@ function buildContentSecurityPolicy(options = {}) {
     "https://*.firebaseio.com", emulatorRtdbScriptFrame, emulatorAuthFrame);
     const childSrc = join("child-src", "'self'", "blob:", frameExtras);
     const frameSrc = join("frame-src", "'self'", frameExtras);
-    const connectSrc = join("connect-src", "'self'", "https://*.googleapis.com", "https://*.firebaseio.com", "wss://*.firebaseio.com", "https://*.cloudfunctions.net", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://firebaseinstallations.googleapis.com", "https://content-firebaseappcheck.googleapis.com", "https://www.google.com", "https://accounts.google.com", "https://apis.google.com", "https://www.recaptcha.net", analyticsConnect, lottieConnect, mapsConnect, emulatorConnect);
+    const siblingOrigins = (0, origins_1.productionAppOriginsCsp)();
+    const connectSrc = join("connect-src", "'self'", siblingOrigins, "https://*.googleapis.com", "https://*.firebaseio.com", "wss://*.firebaseio.com", "https://*.cloudfunctions.net", "https://identitytoolkit.googleapis.com", "https://securetoken.googleapis.com", "https://firebaseinstallations.googleapis.com", "https://content-firebaseappcheck.googleapis.com", "https://www.google.com", "https://accounts.google.com", "https://apis.google.com", "https://www.recaptcha.net", analyticsConnect, lottieConnect, mapsConnect, emulatorConnect);
     return [
         "default-src 'self'",
         "base-uri 'self'",
         "object-src 'none'",
         "frame-ancestors 'none'",
-        "form-action 'self' https://accounts.google.com",
+        "form-action 'self' https://accounts.google.com " + siblingOrigins,
         scriptSrc,
         styleSrc,
         imgSrc,

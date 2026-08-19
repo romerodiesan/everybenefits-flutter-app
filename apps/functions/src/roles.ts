@@ -1,25 +1,23 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import {
-  belongsInDefaultAgentGroup,
-  parseRole,
-} from "@pulse/shared";
+import { parseRole } from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import { headlineName } from "./auth";
 import { requireActor } from "./guards";
+import { ensureAutoJoinMemberships } from "./chats";
 import {
-  addAgentToDefaultGroup,
-  ensureAutoJoinMemberships,
-} from "./chats";
-import { assertAssignableRoleId } from "./role-management";
+  actorCanManageRole,
+  assertActorCanManageCurrentRole,
+  assertAssignableRoleForActor,
+} from "./role-management";
 
 /**
  * Admin-only role assignment.
- * Staff roles with default-group permission join the default group.
+ * Eligible roles join the default Team group through the shared auto-join path.
  * The `system` role cannot be assigned via this callable.
  */
 export const setUserRole = onCall(callableOpts, async (request) => {
-  await requireActor(request, "setUserRole", {
+  const actor = await requireActor(request, "setUserRole", {
     permission: "platform.manage",
   });
   const targetUid = String(request.data?.uid ?? "");
@@ -28,19 +26,17 @@ export const setUserRole = onCall(callableOpts, async (request) => {
     throw new HttpsError("invalid-argument", "uid and valid role required");
   }
 
-  const role = await assertAssignableRoleId(roleRaw);
+  if (targetUid === actor.uid) {
+    throw new HttpsError("permission-denied", "Cannot change your own role.");
+  }
 
   const target = await db.doc(`users/${targetUid}`).get();
   if (!target.exists) {
     throw new HttpsError("not-found", "User not found.");
   }
   const currentRole = String(target.data()?.role ?? "");
-  if (currentRole === "system") {
-    throw new HttpsError(
-      "permission-denied",
-      "Cannot change a System user via Admin.",
-    );
-  }
+  await assertActorCanManageCurrentRole(actor, currentRole || "student");
+  const role = await assertAssignableRoleForActor(actor, roleRaw);
   if (currentRole === "agent" && role === "student") {
     throw new HttpsError(
       "failed-precondition",
@@ -57,10 +53,6 @@ export const setUserRole = onCall(callableOpts, async (request) => {
     "./platform-stats"
   );
   await bumpUserRoleChange(parseStoredRole(currentRole), parseRole(role));
-
-  if (belongsInDefaultAgentGroup(role)) {
-    await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
-  }
 
   const approvalStatus = String(target.data()?.approvalStatus ?? "approved");
   await ensureAutoJoinMemberships(
@@ -79,7 +71,7 @@ export const setUserRole = onCall(callableOpts, async (request) => {
  * Legacy users without approvalStatus are already treated as approved.
  */
 export const setUserApproval = onCall(callableOpts, async (request) => {
-  const { uid: actorUid } = await requireActor(request, "setUserApproval", {
+  const actor = await requireActor(request, "setUserApproval", {
     permission: "admin.approvals.decide",
   });
   const targetUid = String(request.data?.uid ?? "");
@@ -87,14 +79,21 @@ export const setUserApproval = onCall(callableOpts, async (request) => {
   if (!targetUid || (status !== "approved" && status !== "rejected")) {
     throw new HttpsError("invalid-argument", "uid and status required");
   }
+  if (targetUid === actor.uid) {
+    throw new HttpsError("permission-denied", "Cannot approve your own account.");
+  }
   const target = await db.doc(`users/${targetUid}`).get();
   if (!target.exists) {
     throw new HttpsError("not-found", "User not found.");
   }
+  await assertActorCanManageCurrentRole(
+    actor,
+    String(target.data()?.role ?? "student"),
+  );
   const prevApproval = target.data()?.approvalStatus;
   await db.doc(`users/${targetUid}`).update({
     approvalStatus: status,
-    approvedBy: actorUid,
+    approvedBy: actor.uid,
     approvedAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
   });
@@ -125,7 +124,7 @@ export const setUserApproval = onCall(callableOpts, async (request) => {
 
 /** Admin/manager directory of users awaiting approval. */
 export const listPendingApprovals = onCall(callableOpts, async (request) => {
-  const { uid: actorUid } = await requireActor(
+  const actor = await requireActor(
     request,
     "listPendingApprovals",
     { permission: "admin.approvals.read" },
@@ -135,9 +134,30 @@ export const listPendingApprovals = onCall(callableOpts, async (request) => {
     .where("approvalStatus", "==", "pending")
     .limit(100)
     .get();
-  const users = snap.docs
-    .filter((doc) => doc.id !== actorUid && doc.data()?.isAnonymous !== true)
-    .map((doc) => {
+  const manageableByRole = new Map<string, Promise<boolean>>();
+  const canManage = (role: string) => {
+    let pending = manageableByRole.get(role);
+    if (!pending) {
+      pending = actorCanManageRole(actor, role);
+      manageableByRole.set(role, pending);
+    }
+    return pending;
+  };
+  const manageable = await Promise.all(
+    snap.docs.map(async (doc) => {
+      const role = String(doc.data()?.role ?? "student");
+      return {
+        doc,
+        allowed:
+          doc.id !== actor.uid &&
+          doc.data()?.isAnonymous !== true &&
+          (await canManage(role)),
+      };
+    }),
+  );
+  const users = manageable
+    .filter(({ allowed }) => allowed)
+    .map(({ doc }) => {
       const data = doc.data();
       return {
         uid: doc.id,

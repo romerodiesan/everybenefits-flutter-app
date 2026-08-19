@@ -1,4 +1,5 @@
 import type { PulseAppId } from "@pulse/shared";
+import { PRODUCTION_APP_ORIGINS } from "@pulse/shared";
 import { isSafeInternalPath, safeInternalPath } from "./paths";
 
 export function pulseWebUrl() {
@@ -89,6 +90,7 @@ export function allAppOrigins(): Set<string> {
     new URL(studioWebUrl()).origin,
     new URL(adminWebUrl()).origin,
     new URL(paymentsWebUrl()).origin,
+    ...PRODUCTION_APP_ORIGINS,
   ]);
 }
 

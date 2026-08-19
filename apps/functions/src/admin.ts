@@ -15,8 +15,11 @@ import {
   type UserRole,
 } from "@pulse/shared";
 import { admin, db, callableOpts } from "./init";
-import { requireActor } from "./guards";
-import { assertAssignableRoleId } from "./role-management";
+import { actorHasPermission, requireActor, type Actor } from "./guards";
+import {
+  assertActorCanManageCurrentRole,
+  assertAssignableRoleForActor,
+} from "./role-management";
 import { syncUserEmail } from "./account";
 
 const DEFAULT_AGENCY = "Every Benefits";
@@ -80,13 +83,9 @@ async function requireAdminCaller(
   request: { auth?: { uid: string } },
   operation: string,
   permission: string | string[] = "admin.access",
-): Promise<{ uid: string; role: UserRole; permissions: string[] }> {
+): Promise<Actor> {
   const actor = await requireActor(request, operation, { permission });
-  return {
-    uid: actor.uid,
-    role: parseRole(actor.role),
-    permissions: actor.permissions,
-  };
+  return actor;
 }
 
 function prefixRange(query: string): { start: string; end: string } {
@@ -267,26 +266,30 @@ export const listUsersForAdmin = onCall(callableOpts, async (request) => {
 });
 
 export const adminDeactivateUser = onCall(callableOpts, async (request) => {
-  const { uid: actorUid } = await requireAdminCaller(
+  const actor = await requireAdminCaller(
     request,
     "adminDeactivateUser",
     "admin.users.deactivate",
   );
   const targetUid = String(request.data?.uid ?? "").trim();
   if (!targetUid) throw new HttpsError("invalid-argument", "uid required");
-  if (targetUid === actorUid) {
+  if (targetUid === actor.uid) {
     throw new HttpsError("failed-precondition", "Cannot deactivate yourself.");
   }
   const userRef = db.doc(`users/${targetUid}`);
   const snap = await userRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "User not found.");
+  await assertActorCanManageCurrentRole(
+    actor,
+    String(snap.data()?.role ?? "student"),
+  );
   if (snap.data()?.accountStatus === "pendingDeletion") {
     throw new HttpsError("failed-precondition", "Deletion already requested.");
   }
   await userRef.update({
     accountStatus: "deactivated",
     deactivatedAt: FieldValue.serverTimestamp(),
-    deactivatedBy: actorUid,
+    deactivatedBy: actor.uid,
     updatedAt: FieldValue.serverTimestamp(),
   });
   const { bumpAccountStatusChange } = await import("./platform-stats");
@@ -310,16 +313,23 @@ export const adminDeactivateUser = onCall(callableOpts, async (request) => {
 });
 
 export const adminReactivateUser = onCall(callableOpts, async (request) => {
-  const { uid: actorUid } = await requireAdminCaller(
+  const actor = await requireAdminCaller(
     request,
     "adminReactivateUser",
     "admin.users.deactivate",
   );
   const targetUid = String(request.data?.uid ?? "").trim();
   if (!targetUid) throw new HttpsError("invalid-argument", "uid required");
+  if (targetUid === actor.uid) {
+    throw new HttpsError("failed-precondition", "Cannot reactivate yourself.");
+  }
   const userRef = db.doc(`users/${targetUid}`);
   const snap = await userRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "User not found.");
+  await assertActorCanManageCurrentRole(
+    actor,
+    String(snap.data()?.role ?? "student"),
+  );
   if (snap.data()?.accountStatus !== "deactivated") {
     throw new HttpsError("failed-precondition", "Account is not deactivated.");
   }
@@ -327,7 +337,7 @@ export const adminReactivateUser = onCall(callableOpts, async (request) => {
     accountStatus: "active",
     deactivatedAt: FieldValue.delete(),
     deactivatedBy: FieldValue.delete(),
-    reactivatedBy: actorUid,
+    reactivatedBy: actor.uid,
     updatedAt: FieldValue.serverTimestamp(),
   });
   const { bumpAccountStatusChange } = await import("./platform-stats");
@@ -343,12 +353,16 @@ export const adminReactivateUser = onCall(callableOpts, async (request) => {
 });
 
 export const adminCreateUser = onCall(callableOpts, async (request) => {
-  await requireAdminCaller(request, "adminCreateUser", "admin.users.create");
+  const actor = await requireAdminCaller(
+    request,
+    "adminCreateUser",
+    "admin.users.create",
+  );
   const email = String(request.data?.email ?? "").trim().toLowerCase();
   const displayName = String(request.data?.displayName ?? "").trim();
   const password = String(request.data?.password ?? "");
   const roleRaw = String(request.data?.role ?? "student").trim();
-  const role = await assertAssignableRoleId(roleRaw);
+  const role = await assertAssignableRoleForActor(actor, roleRaw);
   const orgNodeIdRaw = request.data?.orgNodeId;
   const orgNodeId =
     orgNodeIdRaw === null || orgNodeIdRaw === undefined || orgNodeIdRaw === ""
@@ -441,19 +455,25 @@ export const adminCreateUser = onCall(callableOpts, async (request) => {
 });
 
 export const adminUpdateUser = onCall(callableOpts, async (request) => {
-  await requireAdminCaller(request, "adminUpdateUser", "admin.users.update");
+  const actor = await requireAdminCaller(
+    request,
+    "adminUpdateUser",
+    "admin.users.update",
+  );
   const targetUid = String(request.data?.uid ?? "").trim();
   if (!targetUid) throw new HttpsError("invalid-argument", "uid required");
+  if (targetUid === actor.uid) {
+    throw new HttpsError(
+      "permission-denied",
+      "Use your profile settings to update your own account.",
+    );
+  }
 
   const userRef = db.doc(`users/${targetUid}`);
   const snap = await userRef.get();
   if (!snap.exists) throw new HttpsError("not-found", "User not found.");
-  if (String(snap.data()?.role ?? "") === "system") {
-    throw new HttpsError(
-      "permission-denied",
-      "Cannot change a System user via Admin.",
-    );
-  }
+  const currentRole = String(snap.data()?.role ?? "student");
+  await assertActorCanManageCurrentRole(actor, currentRole);
 
   const updates: Record<string, unknown> = {
     updatedAt: FieldValue.serverTimestamp(),
@@ -476,11 +496,25 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
     authUpdates.displayName = displayName || undefined;
   }
   if (typeof request.data?.role === "string") {
-    const role = await assertAssignableRoleId(request.data.role);
-    updates.role = role;
+    const requestedRole = String(request.data.role).trim();
+    if (requestedRole !== currentRole) {
+      if (!actorHasPermission(actor.permissions, "platform.manage")) {
+        throw new HttpsError(
+          "permission-denied",
+          "Changing roles requires platform.manage.",
+        );
+      }
+      updates.role = await assertAssignableRoleForActor(actor, requestedRole);
+    }
   }
   const prevRole = parseRole(snap.data()?.role);
   const prevApproval = snap.data()?.approvalStatus;
+  const currentApproval =
+    prevApproval === "pending" ||
+    prevApproval === "approved" ||
+    prevApproval === "rejected"
+      ? prevApproval
+      : "approved";
   if (typeof request.data?.npn === "string") {
     updates.npn = request.data.npn.trim() || null;
   }
@@ -489,7 +523,17 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
     request.data?.approvalStatus === "approved" ||
     request.data?.approvalStatus === "rejected"
   ) {
-    updates.approvalStatus = request.data.approvalStatus;
+    if (request.data.approvalStatus !== currentApproval) {
+      if (
+        !actorHasPermission(actor.permissions, "admin.approvals.decide")
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "Changing approval requires admin.approvals.decide.",
+        );
+      }
+      updates.approvalStatus = request.data.approvalStatus;
+    }
   }
   if ("orgNodeId" in (request.data ?? {})) {
     const orgNodeIdRaw = request.data?.orgNodeId;
@@ -497,6 +541,19 @@ export const adminUpdateUser = onCall(callableOpts, async (request) => {
       orgNodeIdRaw === null || orgNodeIdRaw === undefined || orgNodeIdRaw === ""
         ? null
         : String(orgNodeIdRaw).trim();
+    const currentOrgNodeId =
+      typeof snap.data()?.orgNodeId === "string"
+        ? String(snap.data()?.orgNodeId)
+        : null;
+    if (
+      orgNodeId !== currentOrgNodeId &&
+      !actorHasPermission(actor.permissions, "admin.orgs.write")
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "Changing organization requires admin.orgs.write.",
+      );
+    }
     if (orgNodeId) {
       const node = await db.doc(`orgNodes/${orgNodeId}`).get();
       if (!node.exists) throw new HttpsError("not-found", "Org node not found.");

@@ -105,6 +105,7 @@ after(async () => {
 
 beforeEach(async () => {
   await clearDb();
+  await seed("chatAccess", { alice: true, bob: true, eve: true });
 });
 
 describe("chats and messages", () => {
@@ -127,6 +128,30 @@ describe("chats and messages", () => {
     });
     expectDenied(
       await rtdbRequest("chats/c1", { auth: userAuth("eve") }),
+    );
+  });
+
+  it("blocks a member whose live chat permission was revoked", async () => {
+    await seed("chats/c1", {
+      members: { alice: true, bob: true },
+      isGroup: false,
+      dmMessagingEnabled: true,
+    });
+    await seed("chatAccess/alice", false);
+    expectDenied(
+      await rtdbRequest("chats/c1", { auth: userAuth("alice") }),
+    );
+    expectDenied(
+      await rtdbRequest("messages/c1/m1", {
+        method: "PUT",
+        auth: userAuth("alice"),
+        body: {
+          senderId: "alice",
+          body: "blocked",
+          senderName: "Alice",
+          createdAt: Date.now(),
+        },
+      }),
     );
   });
 
@@ -176,6 +201,46 @@ describe("chats and messages", () => {
         method: "PUT",
         auth: userAuth("alice"),
         body: { members: { alice: true }, isGroup: true },
+      }),
+    );
+  });
+
+  it("lets a member hide a message only for themselves", async () => {
+    await seed("chats/c1", {
+      members: { alice: true, bob: true },
+      isGroup: true,
+    });
+    expectOk(
+      await rtdbRequest("hiddenMessages/alice/c1/m1", {
+        method: "PUT",
+        auth: userAuth("alice"),
+        body: true,
+      }),
+    );
+    expectDenied(
+      await rtdbRequest("hiddenMessages/bob/c1/m1", {
+        method: "PUT",
+        auth: userAuth("alice"),
+        body: true,
+      }),
+    );
+  });
+
+  it("keeps message deletion server-only", async () => {
+    await seed("chats/c1", {
+      members: { alice: true, bob: true },
+      isGroup: true,
+    });
+    await seed("messages/c1/m1", {
+      senderId: "alice",
+      body: "hello",
+      senderName: "Alice",
+      createdAt: Date.now(),
+    });
+    expectDenied(
+      await rtdbRequest("messages/c1/m1", {
+        method: "DELETE",
+        auth: userAuth("alice"),
       }),
     );
   });

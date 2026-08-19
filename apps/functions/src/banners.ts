@@ -78,10 +78,9 @@ export function mapPromoBanner(id: string, data: DocumentData): PromoBanner {
 async function requireBannerAdmin(
   request: { auth?: { uid: string } },
   operation: string,
+  permission: "admin.banners.read" | "admin.banners.write",
 ): Promise<string> {
-  const actor = await requireActor(request, operation, {
-    permission: "platform.manage",
-  });
+  const actor = await requireActor(request, operation, { permission });
   return actor.uid;
 }
 
@@ -93,7 +92,7 @@ function slugId(input?: string): string {
 
 /** Admin list — all banners, including inactive. */
 export const listPromoBanners = onCall(callableOpts, async (request) => {
-  await requireBannerAdmin(request, "listPromoBanners");
+  await requireBannerAdmin(request, "listPromoBanners", "admin.banners.read");
   const snap = await db
     .collection(COLLECTION)
     .orderBy("updatedAt", "desc")
@@ -105,7 +104,7 @@ export const listPromoBanners = onCall(callableOpts, async (request) => {
 
 /** Create or update a promo banner. */
 export const upsertPromoBanner = onCall(callableOpts, async (request) => {
-  const uid = await requireBannerAdmin(request, "upsertPromoBanner");
+  const uid = await requireBannerAdmin(request, "upsertPromoBanner", "admin.banners.write");
   const parsed = promoBannerUpsertSchema.safeParse(request.data ?? {});
   if (!parsed.success) {
     const detail = parsed.error.issues
@@ -203,7 +202,7 @@ export const upsertPromoBanner = onCall(callableOpts, async (request) => {
 
 /** Soft-deactivate or hard-delete a banner. */
 export const deletePromoBanner = onCall(callableOpts, async (request) => {
-  await requireBannerAdmin(request, "deletePromoBanner");
+  await requireBannerAdmin(request, "deletePromoBanner", "admin.banners.write");
   const id = String(request.data?.id ?? "").trim();
   if (!id) throw new HttpsError("invalid-argument", "id required.");
   const hard = request.data?.hard === true;
@@ -228,7 +227,7 @@ export const deletePromoBanner = onCall(callableOpts, async (request) => {
 export const uploadPromoBannerImage = onCall(
   { ...callableOpts, memory: "512MiB", timeoutSeconds: 60 },
   async (request) => {
-    await requireBannerAdmin(request, "uploadPromoBannerImage");
+    await requireBannerAdmin(request, "uploadPromoBannerImage", "admin.banners.write");
     const bannerId = String(request.data?.bannerId ?? "")
       .trim()
       .toLowerCase();

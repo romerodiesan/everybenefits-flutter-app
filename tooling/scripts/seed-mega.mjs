@@ -9,6 +9,7 @@
  * Usage:
  *   pnpm seed:quick           # smoke (~200 users) — prefer this first
  *   pnpm seed / seed:mega     # full (~10k users, ~2k agencies)
+ *   pnpm seed:roles           # built-in roles + permissions only
  *   pnpm seed -- --quick
  *   SEED_USERS=500 pnpm seed  # override counts (see mega-seed/config.mjs)
  *
@@ -24,6 +25,7 @@ if (argv.includes("--quick") || argv.includes("-q")) {
 
 const { config } = await import("./mega-seed/config.mjs");
 const { initAdmin, log } = await import("./mega-seed/admin.mjs");
+const { seedRoles } = await import("./mega-seed/roles.mjs");
 const { seedOrgs } = await import("./mega-seed/orgs.mjs");
 const { seedUsers } = await import("./mega-seed/users.mjs");
 const { seedAcademy } = await import("./mega-seed/academy.mjs");
@@ -44,6 +46,7 @@ async function main() {
     `emulators firestore=${config.firestoreHost} auth=${config.authHost} rtdb=${config.databaseHost}`,
   );
 
+  await seedRoles();
   const org = await seedOrgs();
   const userCtx = await seedUsers(org);
   const academy = await seedAcademy(userCtx);

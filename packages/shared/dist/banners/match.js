@@ -22,11 +22,10 @@ function bannerAudienceMatches(audiences, role, isAnonymous) {
         return false;
     if (audiences.includes("all"))
         return true;
-    if (isAnonymous || role === "guest") {
-        return audiences.includes("guest");
-    }
+    if (isAnonymous)
+        return false;
     const normalized = (role ?? "").trim();
-    if (!normalized)
+    if (!normalized || normalized === "guest")
         return false;
     return audiences.includes(normalized);
 }

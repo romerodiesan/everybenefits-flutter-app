@@ -65,7 +65,7 @@ describe("unauthenticated", () => {
   });
 });
 
-describe("org-logos and banners (Admin SDK writes only)", () => {
+describe("org-logos, banners, and chat-photos (Admin SDK writes only)", () => {
   it("denies client writes to org-logos even when signed in", async () => {
     const storage = authedStorage("admin1");
     await assertFails(
@@ -79,6 +79,15 @@ describe("org-logos and banners (Admin SDK writes only)", () => {
     const storage = authedStorage("admin1");
     await assertFails(
       uploadBytes(ref(storage, "banners/b1/cover.jpg"), JPEG, {
+        contentType: "image/jpeg",
+      }),
+    );
+  });
+
+  it("denies client writes to chat-photos", async () => {
+    const storage = authedStorage("admin1");
+    await assertFails(
+      uploadBytes(ref(storage, "chat-photos/group1.jpg"), JPEG, {
         contentType: "image/jpeg",
       }),
     );

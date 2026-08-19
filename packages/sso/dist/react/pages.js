@@ -91,6 +91,7 @@ function consumeSsoOnce(opts) {
 function SsoConsumePage({ homePath = "/", rootRedirectPath, LoadingUI, signInWithCustomToken, getAuth, initFirebase, getAppCheckToken, }) {
     const t = (0, next_intl_1.useTranslations)();
     const locale = (0, next_intl_1.useLocale)();
+    const router = (0, navigation_1.useRouter)();
     const params = (0, navigation_1.useSearchParams)();
     const [error, setError] = (0, react_1.useState)(null);
     const [step, setStep] = (0, react_1.useState)("token");
@@ -117,7 +118,7 @@ function SsoConsumePage({ homePath = "/", rootRedirectPath, LoadingUI, signInWit
                 const root = rootRedirectPath ?? homePath;
                 const destPath = next === "/" ? root : next;
                 const suffix = destPath === "/" ? "" : destPath;
-                window.location.replace(`/${locale}${suffix}`);
+                router.replace(`/${locale}${suffix}`);
             }
             catch (err) {
                 if (!alive)
@@ -138,6 +139,7 @@ function SsoConsumePage({ homePath = "/", rootRedirectPath, LoadingUI, signInWit
         initFirebase,
         locale,
         params,
+        router,
         rootRedirectPath,
         signInWithCustomToken,
         t,

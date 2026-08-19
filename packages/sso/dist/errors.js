@@ -22,6 +22,7 @@ const KNOWN_CODES = new Set([
     "code-required",
     "invalid-code",
     "account-disabled",
+    "origin-not-allowed",
     "network",
     "missing-token",
     "unknown",

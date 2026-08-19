@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type ComponentType } from "react";
 import { useLocale, useTranslations } from "next-intl";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { onAuthStateChanged, type Auth, type User } from "firebase/auth";
 import {
   asSsoClientError,
@@ -132,6 +132,7 @@ export function SsoConsumePage({
 }: SsoConsumePageProps) {
   const t = useTranslations();
   const locale = useLocale();
+  const router = useRouter();
   const params = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<Step>("token");
@@ -157,7 +158,7 @@ export function SsoConsumePage({
         const root = rootRedirectPath ?? homePath;
         const destPath = next === "/" ? root : next;
         const suffix = destPath === "/" ? "" : destPath;
-        window.location.replace(`/${locale}${suffix}`);
+        router.replace(`/${locale}${suffix}`);
       } catch (err) {
         if (!alive) return;
         const clientErr = asSsoClientError(err);
@@ -176,6 +177,7 @@ export function SsoConsumePage({
     initFirebase,
     locale,
     params,
+    router,
     rootRedirectPath,
     signInWithCustomToken,
     t,

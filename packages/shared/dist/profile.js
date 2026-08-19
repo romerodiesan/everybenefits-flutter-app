@@ -296,7 +296,7 @@ function headlineName(profile) {
         return profile.displayName.trim();
     if (profile.email)
         return profile.email;
-    return profile.isAnonymous ? "Guest" : "User";
+    return "User";
 }
 /** Compose a US mailing address string from structured fields. */
 function composeUsAddress(parts) {

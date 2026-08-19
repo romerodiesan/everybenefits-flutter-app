@@ -1,10 +1,10 @@
-export type UserRole = "guest" | "student" | "agent" | "agency_owner" | "instructor" | "manager" | "admin" | "system";
+export type UserRole = "student" | "agent" | "agency_owner" | "instructor" | "manager" | "admin" | "system";
 /** Built-in role slugs used across clients and Firestore rules. */
 export declare const ALL_ROLES: readonly UserRole[];
 /** Product system roles (editable only by `system` in Admin). */
 export declare const SYSTEM_ROLE_IDS: readonly ["system", "admin", "manager", "agency_owner", "agent", "student"];
 /** Legacy built-ins kept for compatibility. */
-export declare const LEGACY_ROLE_IDS: readonly ["guest", "instructor"];
+export declare const LEGACY_ROLE_IDS: readonly ["instructor"];
 /**
  * Role IDs that may be targeted for group seed / auto-join pickers.
  * This is a data filter (which roles can be selected), not an authz check.

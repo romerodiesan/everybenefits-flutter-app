@@ -9,18 +9,25 @@ describe("resolveRolePermissions", () => {
   });
 
   it("uses seeded role docs when active", () => {
-    expect(
-      resolveRolePermissions("agent", {
-        exists: true,
-        active: true,
-        permissions: ["forums.participate", "not.a.key"],
-      }),
-    ).toEqual(["forums.participate"]);
+    const permissions = resolveRolePermissions("agent", {
+      exists: true,
+      active: true,
+      permissions: ["forums.participate", "not.a.key"],
+    });
+    expect(permissions).toEqual(
+      expect.arrayContaining([
+        "forums.participate",
+        "chats.participate",
+        "chats.groups.default.join",
+      ]),
+    );
+    expect(permissions).not.toContain("not.a.key");
   });
 
   it("falls back to builtin defaults when the role doc is missing", () => {
     const perms = resolveRolePermissions("student", null);
     expect(perms).toContain("forums.participate");
+    expect(perms).toContain("chats.groups.default.join");
     expect(perms).not.toContain("admin.access");
   });
 

@@ -2,13 +2,11 @@ import {
   FieldValue,
   type DocumentData,
 } from "firebase-admin/firestore";
-import { HttpsError, onCall } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import {
   appearanceAccentFrom,
-  canParticipateInChats,
   normalizeSearchQueryToken,
-  parseRole,
   sanitizeProfileBadgeInput,
   toPublicProfileBadge,
   userSearchIndexFields,
@@ -17,7 +15,8 @@ import {
 import { blockedWithCaller } from "./social";
 import { sanitizeBio } from "./social-helpers";
 import { db, callableOpts } from "./init";
-import { isUserApprovedForJoin, requireCaller } from "./auth";
+import { isUserApprovedForJoin } from "./auth";
+import { actorHasPermission, requireActor } from "./guards";
 
 type PrivacyPrefs = {
   discoverableInDirectory: boolean;
@@ -164,7 +163,10 @@ export const syncPublicProfile = onDocumentWritten(
 );
 
 export const listPublicProfiles = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "listPublicProfiles");
+  const actor = await requireActor(request, "listPublicProfiles", {
+    permission: "chats.participate",
+  });
+  const uid = actor.uid;
   const requestedLimit = Math.round(Number(request.data?.limit ?? 80));
   const max = Math.max(1, Math.min(100, requestedLimit));
   // Oversample so privacy filters still fill the page.
@@ -175,6 +177,7 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
     .get();
   const visible = snap.docs.filter((profile) => {
     if (profile.id === uid) return false;
+    if (!isUserApprovedForJoin(profile.data())) return false;
     const privacy = readPrivacy(profile.data().privacy);
     return privacy.discoverableInDirectory;
   });
@@ -211,24 +214,22 @@ export const listPublicProfiles = onCall(callableOpts, async (request) => {
 });
 
 /**
- * Directory search for chats (name, email, NPN). Returns PII for org members
- * who can participate in chats — respecting each target's privacy prefs.
+ * Directory search for chats (name, username, and separately-permitted email/NPN).
+ * Sensitive fields are matched only by explicitly authorized callers and are
+ * returned only when the target opted into display.
  *
  * Uses indexed prefix queries (`displayNameLower` / `emailLower`) and
  * `nameTokens` array-contains so results are not limited to a loaded page.
  */
 export const searchDirectory = onCall(callableOpts, async (request) => {
-  const uid = await requireCaller(request, "searchDirectory");
-  const caller = await db.doc(`users/${uid}`).get();
-  const callerData = caller.data();
-  if (
-    !canParticipateInChats(
-      parseRole(callerData?.role),
-      callerData?.isAnonymous === true,
-    )
-  ) {
-    throw new HttpsError("permission-denied", "Chats not available.");
-  }
+  const actor = await requireActor(request, "searchDirectory", {
+    permission: "chats.participate",
+  });
+  const uid = actor.uid;
+  const canSearchSensitive = actorHasPermission(
+    actor.permissions,
+    "chats.directory.sensitive.read",
+  );
 
   const rawQuery = String(request.data?.query ?? "").trim();
   if (rawQuery.length < 2) {
@@ -261,22 +262,23 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
     if (matched.size >= limit) return;
     const data = doc.data();
     if (data.isAnonymous === true) return;
-    if (!isUserApprovedForJoin(data) && String(data.approvalStatus ?? "") === "rejected") {
-      return;
-    }
     if (!isUserApprovedForJoin(data)) return;
     const privacy = readPrivacy(data.privacy);
     if (!privacy.discoverableInDirectory) return;
-    if (matchKind === "email" && !privacy.searchableByEmail) return;
-    if (matchKind === "npn" && !privacy.searchableByNpn) return;
+    if (matchKind === "email") {
+      if (!canSearchSensitive || !privacy.searchableByEmail) return;
+    }
+    if (matchKind === "npn") {
+      if (!canSearchSensitive || !privacy.searchableByNpn) return;
+    }
     matched.set(doc.id, data);
   };
 
   const snaps = await Promise.all([
-    looksEmail
+    canSearchSensitive && looksEmail
       ? db.collection("users").where("email", "==", q).limit(limit).get()
       : Promise.resolve(null),
-    looksEmail && rangeKey
+    canSearchSensitive && looksEmail && rangeKey
       ? db
           .collection("users")
           .where("emailLower", ">=", rangeKey)
@@ -285,7 +287,7 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
           .limit(limit)
           .get()
       : Promise.resolve(null),
-    looksNpn
+    canSearchSensitive && looksNpn
       ? db.collection("users").where("npn", "==", npnDigits).limit(limit).get()
       : Promise.resolve(null),
     rangeKey
@@ -297,7 +299,7 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
           .limit(limit)
           .get()
       : Promise.resolve(null),
-    !looksEmail && rangeKey
+    canSearchSensitive && !looksEmail && rangeKey
       ? db
           .collection("users")
           .where("emailLower", ">=", rangeKey)
@@ -352,11 +354,15 @@ export const searchDirectory = onCall(callableOpts, async (request) => {
       bio: sanitizeBio(data.bio),
       profileBadge: publicBadgeFor(data, roleBadges.get(roleId)),
       email:
-        privacy.showEmailInSearch && typeof data.email === "string"
+        canSearchSensitive &&
+        privacy.showEmailInSearch &&
+        typeof data.email === "string"
           ? data.email
           : null,
       npn:
-        privacy.showNpnInSearch && typeof data.npn === "string"
+        canSearchSensitive &&
+        privacy.showNpnInSearch &&
+        typeof data.npn === "string"
           ? data.npn
           : null,
       isAnonymous: false,

@@ -17,9 +17,9 @@ export type PromoBannerVariant = (typeof PROMO_BANNER_VARIANTS)[number];
 export declare const FORMATS_BY_SURFACE: Record<PromoBannerSurface, readonly PromoBannerFormat[]>;
 /**
  * Audience roles for light targeting.
- * `all` matches every signed-in viewer (including guests browsing Pulse).
+ * `all` matches every signed-in registered viewer.
  */
-export declare const PROMO_BANNER_AUDIENCES: readonly ["all", "guest", "student", "agent", "agency_owner", "instructor", "manager", "admin"];
+export declare const PROMO_BANNER_AUDIENCES: readonly ["all", "student", "agent", "agency_owner", "instructor", "manager", "admin"];
 export type PromoBannerAudience = (typeof PROMO_BANNER_AUDIENCES)[number];
 /** Locale keys stored on each banner (CMS-managed, not app message catalogs). */
 export declare const PROMO_BANNER_LOCALES: readonly ["en", "es"];
@@ -114,9 +114,9 @@ export type PromoBanner = {
 };
 /**
  * Coexistence priority (higher wins for chrome overlays).
- * Feed/academy promos sit in content and do not block consent / guest / tour.
+ * Feed/academy promos sit in content and do not block consent / tour.
  */
-export declare const PROMO_BANNER_CHROME_PRIORITY: readonly ["consent", "guest", "tour", "promo"];
+export declare const PROMO_BANNER_CHROME_PRIORITY: readonly ["consent", "tour", "promo"];
 /** Apply defaults for documents written before type/format/toggles existed. */
 export declare function withBannerCompatDefaults(partial: Partial<PromoBanner> & Pick<PromoBanner, "id" | "surface" | "title" | "body" | "eyebrow">): PromoBanner;
 //# sourceMappingURL=types.d.ts.map

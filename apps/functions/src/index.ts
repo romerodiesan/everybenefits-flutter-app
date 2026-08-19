@@ -3,6 +3,7 @@
  * Domain implementations live in sibling modules.
  */
 import "./init";
+import "./role-seed";
 
 export {
   syncPublicProfile,
@@ -38,8 +39,21 @@ export {
   createDm,
   rebuildChatInbox,
   createGroupChat,
+  listManagedGroupChats,
+  updateGroupChat,
+  deleteGroupChat,
+  deleteChatMessage,
+  clearChatMessages,
   ensureDefaultAgentGroup,
+  uploadGroupChatPhoto,
 } from "./chats";
+
+export {
+  syncUserChatAccess,
+  syncRoleChatAccess,
+  backfillChatAccess,
+  refreshMyChatAccess,
+} from "./chat-access-sync";
 
 export {
   enrollInCourse,

@@ -15,6 +15,8 @@ Treat **`.firebaserc` → `every-benefits-us`** as the active CLI default unless
 
 ## Domains (production)
 
+Canonical origin list: [`packages/shared/src/origins.ts`](../../packages/shared/src/origins.ts) (callables CORS, SSO allowlist, CSP extras).
+
 - `pulse.everybenefits.us` — webapp
 - `studio.everybenefits.us` — studio
 - `admin.everybenefits.us` — admin

@@ -24,7 +24,10 @@ delete pkg.scripts;
 delete pkg.devDependencies;
 fs.writeFileSync(path.join(dest, "package.json"), JSON.stringify(pkg, null, 2) + "\n");
 
-fs.cpSync(path.join(src, "dist"), path.join(dest, "dist"), { recursive: true });
+fs.cpSync(path.join(src, "dist"), path.join(dest, "dist"), {
+  recursive: true,
+  filter: (srcPath) => !/\.test\.(js|d\.ts)(\.map)?$/.test(srcPath),
+});
 
 // Refresh pnpm's materialized copy of file:./vendor/pulse-shared when present.
 const pnpmShared = path.join(

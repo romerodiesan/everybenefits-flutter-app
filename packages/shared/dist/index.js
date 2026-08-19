@@ -19,6 +19,7 @@ __exportStar(require("./permissions"), exports);
 __exportStar(require("./apps"), exports);
 __exportStar(require("./academy"), exports);
 __exportStar(require("./csp"), exports);
+__exportStar(require("./origins"), exports);
 __exportStar(require("./profile"), exports);
 __exportStar(require("./username"), exports);
 __exportStar(require("./phone-countries"), exports);

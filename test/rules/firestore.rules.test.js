@@ -74,15 +74,15 @@ describe('users create', () => {
     );
   });
 
-  it('allows anonymous guest bootstrap', async () => {
+  it('blocks anonymous profile bootstrap', async () => {
     const db = anonDb('anon2');
-    await assertSucceeds(
+    await assertFails(
       db.doc('users/anon2').set({
         uid: 'anon2',
-        role: 'guest',
+        role: 'student',
         isAnonymous: true,
-        profileCompleted: true,
-        approvalStatus: 'approved',
+        profileCompleted: false,
+        approvalStatus: 'pending',
       }),
     );
   });
@@ -381,6 +381,21 @@ describe('academy catalog', () => {
       accountStatus: 'deactivated',
     });
     await assertFails(authedDb('ex1').doc('courses/pubD').get());
+  });
+
+  it('blocks pending and rejected members from published courses', async () => {
+    await seedCourse('pubApproval', {
+      status: 'published',
+      createdBy: 'manager1',
+    });
+    await seedUser('pendingMember', { approvalStatus: 'pending' });
+    await seedUser('rejectedMember', { approvalStatus: 'rejected' });
+    await assertFails(
+      authedDb('pendingMember').doc('courses/pubApproval').get(),
+    );
+    await assertFails(
+      authedDb('rejectedMember').doc('courses/pubApproval').get(),
+    );
   });
 
   it('only lets instructors, managers, and admins create courses', async () => {
@@ -812,6 +827,17 @@ describe('private and public profiles', () => {
       }),
     );
   });
+
+  it('blocks pending and rejected viewers from the public directory', async () => {
+    await seedUser('pendingViewer', { approvalStatus: 'pending' });
+    await seedUser('rejectedViewer', { approvalStatus: 'rejected' });
+    await assertFails(
+      authedDb('pendingViewer').doc('publicProfiles/agent1').get(),
+    );
+    await assertFails(
+      authedDb('rejectedViewer').doc('publicProfiles/agent1').get(),
+    );
+  });
 });
 
 describe('chats moved to Realtime Database', () => {
@@ -1110,6 +1136,7 @@ describe('registered-member catalog reads', () => {
     await assertFails(db.doc('polls/p1/votes/agent1').get());
     await assertFails(db.doc('polls/p1').set({ active: false }));
     await assertFails(db.doc('polls/p1/votes/member1').set({ optionId: 'x' }));
+    await assertFails(db.doc('polls/p1').delete());
     await assertSucceeds(db.doc('platformStats/global').get());
   });
 

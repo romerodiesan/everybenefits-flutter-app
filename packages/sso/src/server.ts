@@ -9,6 +9,7 @@ import {
   MAX_SSO_PER_MINUTE,
 } from "./constants";
 import { allAppOrigins } from "./urls";
+import type { SsoErrorCode } from "./types";
 
 export class SsoHttpError extends Error {
   constructor(

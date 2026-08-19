@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DEFAULT_ROLE_META = exports.DEFAULT_ROLE_PERMISSIONS = exports.BUILTIN_ROLE_IDS = exports.SYSTEM_EDITABLE_ROLE_IDS = exports.SYSTEM_MEGA_ROLE_ID = exports.ROLE_CATEGORIES = exports.ALL_PERMISSION_KEYS = exports.PERMISSION_CATALOG = exports.PERMISSION_CATEGORIES = void 0;
+exports.ROLE_SEED_CONFIG_PATH = exports.DEFAULT_ROLE_META = exports.DEFAULT_ROLE_PERMISSIONS = exports.BUILTIN_ROLE_IDS = exports.SYSTEM_EDITABLE_ROLE_IDS = exports.SYSTEM_MEGA_ROLE_ID = exports.ROLE_CATEGORIES = exports.ALL_PERMISSION_KEYS = exports.PERMISSION_CATALOG = exports.PERMISSION_CATEGORIES = void 0;
 exports.permissionNameMessageKey = permissionNameMessageKey;
+exports.permissionDescriptionMessageKey = permissionDescriptionMessageKey;
 exports.isPermissionKey = isPermissionKey;
 exports.permissionsByCategory = permissionsByCategory;
 exports.hasPermission = hasPermission;
@@ -13,7 +14,14 @@ exports.resolvePermissionsFromRoleDoc = resolvePermissionsFromRoleDoc;
 exports.can = can;
 exports.isRoleCategory = isRoleCategory;
 exports.isBuiltinRoleId = isBuiltinRoleId;
+exports.getRequiredBuiltinChatPermissions = getRequiredBuiltinChatPermissions;
 exports.isSystemEditableRoleId = isSystemEditableRoleId;
+exports.roleAuthorityRank = roleAuthorityRank;
+exports.canAssignRoleByAuthority = canAssignRoleByAuthority;
+exports.builtinRoleSeedDoc = builtinRoleSeedDoc;
+exports.builtinRoleSeedDocs = builtinRoleSeedDocs;
+exports.mergeBuiltinRolePermissions = mergeBuiltinRolePermissions;
+exports.builtinRoleSeedVersion = builtinRoleSeedVersion;
 exports.PERMISSION_CATEGORIES = [
     "platform",
     "admin",
@@ -131,6 +139,30 @@ exports.PERMISSION_CATALOG = [
         category: "admin",
         name: "Decide approvals",
         description: "Approve or reject accounts",
+    },
+    {
+        key: "admin.polls.read",
+        category: "admin",
+        name: "View polls",
+        description: "List polls and view live vote results in Admin",
+    },
+    {
+        key: "admin.polls.write",
+        category: "admin",
+        name: "Edit polls",
+        description: "Create, update, and deactivate polls",
+    },
+    {
+        key: "admin.banners.read",
+        category: "admin",
+        name: "View banners",
+        description: "List promo banners in Admin",
+    },
+    {
+        key: "admin.banners.write",
+        category: "admin",
+        name: "Edit banners",
+        description: "Create, update, and deactivate promo banners",
     },
     // org
     {
@@ -305,6 +337,36 @@ exports.PERMISSION_CATALOG = [
         description: "Configure auto-join-by-role on groups",
     },
     {
+        key: "chats.groups.manage",
+        category: "comms",
+        name: "Manage all chat groups",
+        description: "Rename, edit membership, and delete chat groups",
+    },
+    {
+        key: "chats.messages.moderate",
+        category: "comms",
+        name: "Moderate chat messages",
+        description: "Delete messages and clear chat histories",
+    },
+    {
+        key: "chats.contacts.all",
+        category: "comms",
+        name: "Access all chat contacts",
+        description: "Find and message discoverable members without a contact relationship",
+    },
+    {
+        key: "chats.directory.sensitive.read",
+        category: "comms",
+        name: "Search sensitive directory fields",
+        description: "Find members by private email or NPN fields; does not reveal those values",
+    },
+    {
+        key: "chats.dm.override_optout",
+        category: "comms",
+        name: "Override direct-message opt-out",
+        description: "Start a direct message when the recipient disabled new direct messages",
+    },
+    {
         key: "notifications.manage",
         category: "comms",
         name: "Manage notifications",
@@ -400,6 +462,10 @@ exports.PERMISSION_CATALOG = [
 function permissionNameMessageKey(key) {
     return `permName_${key.replace(/\./g, "_")}`;
 }
+/** i18n message key for a permission description. */
+function permissionDescriptionMessageKey(key) {
+    return `permDescription_${key.replace(/\./g, "_")}`;
+}
 const PERMISSION_KEY_SET = new Set(exports.PERMISSION_CATALOG.map((p) => p.key));
 function isPermissionKey(value) {
     return typeof value === "string" && PERMISSION_KEY_SET.has(value);
@@ -420,7 +486,7 @@ function resolveAccess(permissions, role) {
     if (permissions && permissions.length > 0)
         return permissions;
     const trimmed = role?.trim();
-    return trimmed || "guest";
+    return trimmed || "student";
 }
 function filterValidPermissions(keys) {
     return keys.filter((k) => isPermissionKey(k));
@@ -432,7 +498,7 @@ function filterValidPermissions(keys) {
  */
 function getDefaultPermissionsForRole(roleId) {
     if (!roleId)
-        return exports.DEFAULT_ROLE_PERMISSIONS.guest;
+        return exports.DEFAULT_ROLE_PERMISSIONS.student;
     const normalized = roleId === "teacher" ? "instructor" : roleId;
     if (normalized === exports.SYSTEM_MEGA_ROLE_ID)
         return exports.ALL_PERMISSION_KEYS;
@@ -457,7 +523,7 @@ function resolvePermissionSet(roleOrPermissions) {
  * Falls back to built-in defaults when the doc is missing or inactive.
  */
 function resolvePermissionsFromRoleDoc(roleId, data) {
-    const normalized = roleId === "teacher" ? "instructor" : roleId.trim() || "guest";
+    const normalized = roleId === "teacher" ? "instructor" : roleId.trim() || "student";
     if (normalized === exports.SYSTEM_MEGA_ROLE_ID) {
         return [...getDefaultPermissionsForRole(normalized)];
     }
@@ -505,10 +571,34 @@ exports.BUILTIN_ROLE_IDS = [
     "agent",
     "student",
     "instructor",
-    "guest",
 ];
 function isBuiltinRoleId(id) {
     return exports.BUILTIN_ROLE_IDS.includes(id);
+}
+/** Capabilities that are product invariants for already-seeded built-in roles. */
+function getRequiredBuiltinChatPermissions(roleId) {
+    if (!isBuiltinRoleId(roleId))
+        return [];
+    const base = [
+        "chats.participate",
+        "chats.groups.default.join",
+    ];
+    switch (roleId) {
+        case "admin":
+            return [
+                ...base,
+                "chats.groups.manage",
+                "chats.messages.moderate",
+                "chats.contacts.all",
+                "chats.directory.sensitive.read",
+                "chats.dm.override_optout",
+            ];
+        case "manager":
+        case "instructor":
+            return [...base, "chats.contacts.all"];
+        default:
+            return base;
+    }
 }
 function isSystemEditableRoleId(id) {
     return (id === exports.SYSTEM_MEGA_ROLE_ID ||
@@ -534,6 +624,10 @@ exports.DEFAULT_ROLE_PERMISSIONS = {
         "admin.orgs.write",
         "admin.approvals.read",
         "admin.approvals.decide",
+        "admin.polls.read",
+        "admin.polls.write",
+        "admin.banners.read",
+        "admin.banners.write",
         "org.tree.read",
         "org.agency.create",
         "org.agency.update",
@@ -562,6 +656,11 @@ exports.DEFAULT_ROLE_PERMISSIONS = {
         "chats.groups.create",
         "chats.groups.default.join",
         "chats.groups.autojoin.configure",
+        "chats.groups.manage",
+        "chats.messages.moderate",
+        "chats.contacts.all",
+        "chats.directory.sensitive.read",
+        "chats.dm.override_optout",
         "notifications.manage",
         "apps.web.access",
         "apps.studio.access",
@@ -587,6 +686,10 @@ exports.DEFAULT_ROLE_PERMISSIONS = {
         "admin.orgs.write",
         "admin.approvals.read",
         "admin.approvals.decide",
+        "admin.polls.read",
+        "admin.polls.write",
+        "admin.banners.read",
+        "admin.banners.write",
         "org.tree.read",
         "org.agency.create",
         "org.agency.update",
@@ -605,6 +708,7 @@ exports.DEFAULT_ROLE_PERMISSIONS = {
         "chats.groups.create",
         "chats.groups.default.join",
         "chats.groups.autojoin.configure",
+        "chats.contacts.all",
         "apps.web.access",
         "apps.studio.access",
         "apps.admin.access",
@@ -642,6 +746,7 @@ exports.DEFAULT_ROLE_PERMISSIONS = {
         "academy.progress.read",
         "forums.participate",
         "chats.participate",
+        "chats.groups.default.join",
         "apps.web.access",
     ],
     instructor: [
@@ -657,11 +762,55 @@ exports.DEFAULT_ROLE_PERMISSIONS = {
         "chats.participate",
         "chats.groups.create",
         "chats.groups.default.join",
+        "chats.contacts.all",
         "apps.web.access",
         "apps.studio.access",
     ],
-    guest: ["apps.web.access"],
 };
+const BUILTIN_ROLE_AUTHORITY = {
+    student: 10,
+    agent: 20,
+    agency_owner: 30,
+    instructor: 40,
+    manager: 50,
+    admin: 60,
+    system: 70,
+};
+const MANAGEMENT_PERMISSION_KEYS = new Set([
+    "admin.users.create",
+    "admin.users.update",
+    "admin.users.deactivate",
+    "admin.roles.create",
+    "admin.roles.update",
+    "admin.roles.delete",
+    "admin.approvals.decide",
+]);
+/**
+ * Authority level used only for role assignment ceilings.
+ * Custom roles inherit a ceiling from their strongest management permission.
+ */
+function roleAuthorityRank(roleId, permissions = []) {
+    const normalized = roleId === "teacher" ? "instructor" : roleId;
+    if (isBuiltinRoleId(normalized)) {
+        return BUILTIN_ROLE_AUTHORITY[normalized];
+    }
+    if (permissions.includes("platform.roles.system.edit"))
+        return 70;
+    if (permissions.includes("platform.manage"))
+        return 60;
+    if (permissions.some((key) => MANAGEMENT_PERMISSION_KEYS.has(key)))
+        return 50;
+    return 0;
+}
+/** Strictly-lower role assignment with a permission-subset ceiling. */
+function canAssignRoleByAuthority(options) {
+    const actorRank = roleAuthorityRank(options.actorRole, options.actorPermissions);
+    const targetRank = roleAuthorityRank(options.targetRole, options.targetPermissions);
+    if (targetRank >= actorRank)
+        return false;
+    const actorSet = new Set(options.actorPermissions);
+    return options.targetPermissions.every((permission) => actorSet.has(permission));
+}
 exports.DEFAULT_ROLE_META = {
     system: {
         name: "System",
@@ -719,12 +868,69 @@ exports.DEFAULT_ROLE_META = {
         locked: false,
         editableBySystemOnly: true,
     },
-    guest: {
-        name: "Guest",
-        description: "Anonymous or unregistered visitor (legacy built-in).",
-        category: "member",
-        sortOrder: 60,
-        locked: false,
-        editableBySystemOnly: true,
-    },
 };
+/** Firestore path for the built-in role seed fingerprint. */
+exports.ROLE_SEED_CONFIG_PATH = "platformConfig/roleSeed";
+function builtinRoleSeedDoc(id) {
+    const meta = exports.DEFAULT_ROLE_META[id];
+    return {
+        id,
+        name: meta.name,
+        description: meta.description,
+        category: meta.category,
+        permissions: [...exports.DEFAULT_ROLE_PERMISSIONS[id]],
+        builtIn: true,
+        editableBySystemOnly: meta.editableBySystemOnly,
+        locked: meta.locked,
+        active: true,
+        sortOrder: meta.sortOrder,
+    };
+}
+function builtinRoleSeedDocs() {
+    return exports.BUILTIN_ROLE_IDS.map(builtinRoleSeedDoc);
+}
+/**
+ * Merge product defaults into a stored permission list.
+ * `system` always tracks the full catalog. Other built-ins keep extras and
+ * gain any newly shipped keys without removing Admin customizations.
+ */
+function mergeBuiltinRolePermissions(roleId, current) {
+    const defaults = [...exports.DEFAULT_ROLE_PERMISSIONS[roleId]];
+    if (roleId === exports.SYSTEM_MEGA_ROLE_ID)
+        return defaults;
+    if (!current || current.length === 0)
+        return defaults;
+    const seen = new Set(current);
+    const next = [...current];
+    for (const key of defaults) {
+        if (!seen.has(key)) {
+            seen.add(key);
+            next.push(key);
+        }
+    }
+    return next;
+}
+function fnv1aHex(input) {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < input.length; i += 1) {
+        hash ^= input.charCodeAt(i);
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+}
+/**
+ * Fingerprint of shipped built-in role docs. Changes when the catalog or
+ * default matrices change so new app versions re-seed automatically.
+ */
+function builtinRoleSeedVersion() {
+    return fnv1aHex(JSON.stringify(builtinRoleSeedDocs().map((doc) => [
+        doc.id,
+        doc.permissions,
+        doc.name,
+        doc.description,
+        doc.category,
+        doc.sortOrder,
+        doc.locked,
+        doc.editableBySystemOnly,
+    ])));
+}

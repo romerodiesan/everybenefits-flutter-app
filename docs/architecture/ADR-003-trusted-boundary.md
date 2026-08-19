@@ -26,5 +26,5 @@ Clients talk directly to Firestore and RTDB under security rules, and call Cloud
 ## Consequences
 
 - Admin UI must never write org/users privileged fields with the client SDK alone.
-- Role permission documents (`roles/{id}`) must be seeded in every environment (`seedSystemRoles`); Functions fall back to built-in defaults when a doc is missing, while Firestore `hasPermission` fails closed.
+- Role permission documents (`roles/{id}`) auto-seed on Functions instance init from `@pulse/shared` defaults (`ensureBuiltinRolesSeeded`); new catalog versions merge missing keys without clobbering Admin customizations. `seedSystemRoles` / `pnpm seed:roles` remain manual overrides. Functions fall back to built-in defaults when a doc is missing, while Firestore `hasPermission` fails closed.
 - One-shot `sub_agency` → `agency` rewrite: `node tooling/scripts/migrate-sub-agencies.mjs` (callable is gated by `FUNCTIONS_ALLOW_ORG_MIGRATIONS=true`).

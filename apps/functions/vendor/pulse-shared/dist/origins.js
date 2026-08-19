@@ -1,0 +1,44 @@
+"use strict";
+/**
+ * Canonical browser origins for Pulse-family apps.
+ * Callables CORS, SSO allowlists, and CSP form/connect extras share this list.
+ */
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.APP_HOSTING_PREVIEW_ORIGIN_RE = exports.APP_HOSTING_PREVIEW_SUFFIX = exports.LOCAL_DEV_APP_ORIGINS = exports.PRODUCTION_APP_ORIGINS = void 0;
+exports.isAppHostingPreviewOrigin = isAppHostingPreviewOrigin;
+exports.productionAppOriginsCsp = productionAppOriginsCsp;
+exports.PRODUCTION_APP_ORIGINS = [
+    "https://every-insurance.web.app",
+    "https://every-insurance.firebaseapp.com",
+    "https://pulse.everybenefits.us",
+    "https://studio.everybenefits.us",
+    "https://admin.everybenefits.us",
+    "https://payments.everybenefits.us",
+    "https://pulse-web-app--every-benefits-us.us-central1.hosted.app",
+    "https://studio-web-app--every-benefits-us.us-central1.hosted.app",
+    "https://admin-web-app--every-benefits-us.us-central1.hosted.app",
+    "https://payments-web-app--every-benefits-us.us-central1.hosted.app",
+];
+exports.LOCAL_DEV_APP_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+    "http://localhost:3002",
+    "http://127.0.0.1:3002",
+    "http://localhost:3004",
+    "http://127.0.0.1:3004",
+];
+exports.APP_HOSTING_PREVIEW_SUFFIX = "-every-benefits-us.us-central1.hosted.app";
+exports.APP_HOSTING_PREVIEW_ORIGIN_RE = /^https:\/\/[a-z0-9-]+-every-benefits-us\.us-central1\.hosted\.app$/i;
+function isAppHostingPreviewOrigin(origin) {
+    const trimmed = origin.trim();
+    if (!trimmed.startsWith("https://"))
+        return false;
+    const host = trimmed.slice("https://".length).split("/")[0] ?? "";
+    return host.endsWith(exports.APP_HOSTING_PREVIEW_SUFFIX);
+}
+/** Space-separated production origins for CSP directives. */
+function productionAppOriginsCsp() {
+    return exports.PRODUCTION_APP_ORIGINS.join(" ");
+}

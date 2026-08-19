@@ -22,6 +22,7 @@
     "seed": "node ./tooling/scripts/seed-mega.mjs",
     "seed:quick": "SEED_PROFILE=quick node ./tooling/scripts/seed-mega.mjs",
     "seed:mega": "node ./tooling/scripts/seed-mega.mjs",
+    "seed:roles": "node ./tooling/scripts/seed-roles.mjs",
     "purge:ai-support": "node ./tooling/scripts/purge-ai-and-support.mjs",
     "sync:functions-shared": "pnpm --filter @pulse/functions run sync:shared",
     "check:functions-shared": "pnpm --filter @pulse/functions run check:shared",

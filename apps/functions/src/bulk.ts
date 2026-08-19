@@ -1,6 +1,6 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
-import { belongsInDefaultAgentGroup, parseRole } from "@pulse/shared";
+import { parseRole } from "@pulse/shared";
 import { db, callableOpts } from "./init";
 import { headlineName } from "./auth";
 import { requireActor } from "./guards";
@@ -16,7 +16,7 @@ import {
  * Bulk approve / reject accounts (same effect as setUserApproval per uid).
  */
 export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
-  const { uid: actorUid } = await requireActor(request, "bulkSetUserApproval", {
+  const actor = await requireActor(request, "bulkSetUserApproval", {
     permission: "admin.approvals.decide",
   });
   const uids = parseBulkIds(request.data?.uids, "uids");
@@ -34,9 +34,18 @@ export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
 
   const result = emptyBulkResult();
   const { bumpApprovalChange } = await import("./platform-stats");
+  const { assertActorCanManageCurrentRole } = await import("./role-management");
 
   for (const targetUid of uids) {
     try {
+      if (targetUid === actor.uid) {
+        result.failed.push({
+          id: targetUid,
+          code: "permission-denied",
+          message: "Cannot approve your own account.",
+        });
+        continue;
+      }
       const target = await db.doc(`users/${targetUid}`).get();
       if (!target.exists) {
         result.failed.push({
@@ -46,10 +55,14 @@ export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
         });
         continue;
       }
+      await assertActorCanManageCurrentRole(
+        actor,
+        String(target.data()?.role ?? "student"),
+      );
       const prevApproval = target.data()?.approvalStatus;
       await db.doc(`users/${targetUid}`).update({
         approvalStatus: status,
-        approvedBy: actorUid,
+        approvedBy: actor.uid,
         approvedAt: FieldValue.serverTimestamp(),
         updatedAt: FieldValue.serverTimestamp(),
       });
@@ -91,7 +104,7 @@ export const bulkSetUserApproval = onCall(callableOpts, async (request) => {
  * Bulk role assignment (same rules as setUserRole per uid).
  */
 export const bulkSetUserRole = onCall(callableOpts, async (request) => {
-  await requireActor(request, "bulkSetUserRole", {
+  const actor = await requireActor(request, "bulkSetUserRole", {
     permission: "platform.manage",
   });
   const uids = parseBulkIds(request.data?.uids, "uids");
@@ -99,9 +112,11 @@ export const bulkSetUserRole = onCall(callableOpts, async (request) => {
   if (!roleRaw) {
     throw new HttpsError("invalid-argument", "role required");
   }
-  const { assertAssignableRoleId } = await import("./role-management");
-  const { addAgentToDefaultGroup } = await import("./chats");
-  const role = await assertAssignableRoleId(roleRaw);
+  const {
+    assertActorCanManageCurrentRole,
+    assertAssignableRoleForActor,
+  } = await import("./role-management");
+  const role = await assertAssignableRoleForActor(actor, roleRaw);
 
   const result = emptyBulkResult();
   const { bumpUserRoleChange, parseStoredRole } = await import(
@@ -110,6 +125,14 @@ export const bulkSetUserRole = onCall(callableOpts, async (request) => {
 
   for (const targetUid of uids) {
     try {
+      if (targetUid === actor.uid) {
+        result.failed.push({
+          id: targetUid,
+          code: "permission-denied",
+          message: "Cannot change your own role.",
+        });
+        continue;
+      }
       const target = await db.doc(`users/${targetUid}`).get();
       if (!target.exists) {
         result.failed.push({
@@ -120,14 +143,10 @@ export const bulkSetUserRole = onCall(callableOpts, async (request) => {
         continue;
       }
       const currentRole = String(target.data()?.role ?? "");
-      if (currentRole === "system") {
-        result.failed.push({
-          id: targetUid,
-          code: "permission-denied",
-          message: "Cannot change a System user via Admin.",
-        });
-        continue;
-      }
+      await assertActorCanManageCurrentRole(
+        actor,
+        currentRole || "student",
+      );
       if (currentRole === "agent" && role === "student") {
         result.failed.push({
           id: targetUid,
@@ -142,10 +161,6 @@ export const bulkSetUserRole = onCall(callableOpts, async (request) => {
         updatedAt: FieldValue.serverTimestamp(),
       });
       await bumpUserRoleChange(parseStoredRole(currentRole), parseRole(role));
-
-      if (belongsInDefaultAgentGroup(role)) {
-        await addAgentToDefaultGroup(targetUid, headlineName(target.data()));
-      }
 
       const approvalStatus = String(
         target.data()?.approvalStatus ?? "approved",
@@ -174,7 +189,7 @@ export const bulkSetUserRole = onCall(callableOpts, async (request) => {
  * Bulk agency / org assignment (same as assignUserToOrgNode per uid).
  */
 export const bulkAssignUsersToOrgNode = onCall(callableOpts, async (request) => {
-  await requireActor(
+  const actor = await requireActor(
     request,
     "bulkAssignUsersToOrgNode",
     { permission: "admin.orgs.write" },
@@ -202,9 +217,18 @@ export const bulkAssignUsersToOrgNode = onCall(callableOpts, async (request) => 
   }
 
   const result = emptyBulkResult();
+  const { assertActorCanManageCurrentRole } = await import("./role-management");
 
   for (const targetUid of uids) {
     try {
+      if (targetUid === actor.uid) {
+        result.failed.push({
+          id: targetUid,
+          code: "permission-denied",
+          message: "Cannot change your own organization assignment.",
+        });
+        continue;
+      }
       const userRef = db.doc(`users/${targetUid}`);
       const userSnap = await userRef.get();
       if (!userSnap.exists) {
@@ -215,6 +239,10 @@ export const bulkAssignUsersToOrgNode = onCall(callableOpts, async (request) => 
         });
         continue;
       }
+      await assertActorCanManageCurrentRole(
+        actor,
+        String(userSnap.data()?.role ?? "student"),
+      );
       const updates: Record<string, unknown> = {
         orgNodeId,
         agency: agencyName,
@@ -238,7 +266,7 @@ export const bulkAssignUsersToOrgNode = onCall(callableOpts, async (request) => 
  * Bulk deactivate / reactivate accounts (platform.manage).
  */
 export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => {
-  const { uid: actorUid } = await requireActor(
+  const actor = await requireActor(
     request,
     "bulkSetUserAccountStatus",
     { permission: "admin.users.deactivate" },
@@ -252,14 +280,15 @@ export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => 
 
   const result = emptyBulkResult();
   const { bumpAccountStatusChange } = await import("./platform-stats");
+  const { assertActorCanManageCurrentRole } = await import("./role-management");
 
   for (const targetUid of uids) {
     try {
-      if (targetUid === actorUid && status === "deactivated") {
+      if (targetUid === actor.uid) {
         result.failed.push({
           id: targetUid,
           code: "failed-precondition",
-          message: "Cannot deactivate yourself.",
+          message: "Cannot change your own account status.",
         });
         continue;
       }
@@ -273,6 +302,10 @@ export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => 
         });
         continue;
       }
+      await assertActorCanManageCurrentRole(
+        actor,
+        String(snap.data()?.role ?? "student"),
+      );
       const current =
         snap.data()?.accountStatus === "deactivated" ||
         snap.data()?.accountStatus === "pendingDeletion"
@@ -295,7 +328,7 @@ export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => 
         await userRef.update({
           accountStatus: "deactivated",
           deactivatedAt: FieldValue.serverTimestamp(),
-          deactivatedBy: actorUid,
+          deactivatedBy: actor.uid,
           updatedAt: FieldValue.serverTimestamp(),
         });
         await bumpAccountStatusChange(current, "deactivated");
@@ -324,7 +357,7 @@ export const bulkSetUserAccountStatus = onCall(callableOpts, async (request) => 
           accountStatus: "active",
           deactivatedAt: FieldValue.delete(),
           deactivatedBy: FieldValue.delete(),
-          reactivatedBy: actorUid,
+          reactivatedBy: actor.uid,
           updatedAt: FieldValue.serverTimestamp(),
         });
         await bumpAccountStatusChange("deactivated", "active");

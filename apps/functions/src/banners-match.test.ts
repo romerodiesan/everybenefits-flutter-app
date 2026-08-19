@@ -47,11 +47,14 @@ describe("promo banner matching", () => {
     ).toBe(false);
   });
 
-  it("matches guest audience for anonymous viewers", () => {
-    const promo = banner({ id: "g", audiences: ["guest"] });
+  it("does not match orphan guest audiences", () => {
+    const promo = banner({
+      id: "g",
+      audiences: ["guest" as unknown as PromoBanner["audiences"][number]],
+    });
     expect(
       isBannerVisibleToViewer(promo, { role: "guest", isAnonymous: true }),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       isBannerVisibleToViewer(promo, { role: "agent", isAnonymous: false }),
     ).toBe(false);

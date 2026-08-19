@@ -1,12 +1,11 @@
 import { z } from "zod";
 export declare const userRoleSchema: z.ZodEnum<{
     admin: "admin";
-    guest: "guest";
+    student: "student";
     system: "system";
     manager: "manager";
     agency_owner: "agency_owner";
     agent: "agent";
-    student: "student";
     instructor: "instructor";
 }>;
 export declare const accountStatusSchema: z.ZodEnum<{
@@ -28,12 +27,11 @@ export declare const userProfileFixtureSchema: z.ZodObject<{
     photoUrl: z.ZodNullable<z.ZodString>;
     role: z.ZodEnum<{
         admin: "admin";
-        guest: "guest";
+        student: "student";
         system: "system";
         manager: "manager";
         agency_owner: "agency_owner";
         agent: "agent";
-        student: "student";
         instructor: "instructor";
     }>;
     isAnonymous: z.ZodBoolean;

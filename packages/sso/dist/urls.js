@@ -18,6 +18,7 @@ exports.handoffUrlWithCode = handoffUrlWithCode;
 exports.logoutCascadeUrl = logoutCascadeUrl;
 exports.isAllowedSsoReturnUrl = isAllowedSsoReturnUrl;
 exports.isAllowedLogoutNext = isAllowedLogoutNext;
+const shared_1 = require("@pulse/shared");
 const paths_1 = require("./paths");
 function pulseWebUrl() {
     return (process.env.NEXT_PUBLIC_PULSE_WEB_URL?.replace(/\/$/, "") ||
@@ -86,6 +87,7 @@ function allAppOrigins() {
         new URL(studioWebUrl()).origin,
         new URL(adminWebUrl()).origin,
         new URL(paymentsWebUrl()).origin,
+        ...shared_1.PRODUCTION_APP_ORIGINS,
     ]);
 }
 /** Absolute SSO consume URL on `app`, with optional post-login path. */

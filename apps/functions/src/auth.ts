@@ -26,6 +26,11 @@ export async function requireActiveAccount(uid: string): Promise<void> {
 
 export function isUserApprovedForJoin(data: DocumentData | undefined) {
   if (!data || data.isAnonymous === true) return false;
-  const status = String(data.approvalStatus ?? "approved");
-  return status === "approved";
+  const approval = String(data.approvalStatus ?? "approved");
+  const account = String(data.accountStatus ?? "active");
+  return (
+    approval === "approved" &&
+    account !== "deactivated" &&
+    account !== "pendingDeletion"
+  );
 }

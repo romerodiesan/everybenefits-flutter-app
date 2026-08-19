@@ -3,6 +3,7 @@ export * from "./permissions";
 export * from "./apps";
 export * from "./academy";
 export * from "./csp";
+export * from "./origins";
 export * from "./profile";
 export * from "./username";
 export * from "./phone-countries";

@@ -1,3 +1,5 @@
+import { productionAppOriginsCsp } from "./origins";
+
 /**
  * Shared Content-Security-Policy allowlist for Pulse web + Studio.
  *
@@ -240,9 +242,12 @@ export function buildContentSecurityPolicy(
   const childSrc = join("child-src", "'self'", "blob:", frameExtras);
   const frameSrc = join("frame-src", "'self'", frameExtras);
 
+  const siblingOrigins = productionAppOriginsCsp();
+
   const connectSrc = join(
     "connect-src",
     "'self'",
+    siblingOrigins,
     "https://*.googleapis.com",
     "https://*.firebaseio.com",
     "wss://*.firebaseio.com",
@@ -266,7 +271,7 @@ export function buildContentSecurityPolicy(
     "base-uri 'self'",
     "object-src 'none'",
     "frame-ancestors 'none'",
-    "form-action 'self' https://accounts.google.com",
+    "form-action 'self' https://accounts.google.com " + siblingOrigins,
     scriptSrc,
     styleSrc,
     imgSrc,

@@ -1,24 +1,30 @@
 import { FieldValue, type DocumentData } from "firebase-admin/firestore";
 import { HttpsError, onCall } from "firebase-functions/v2/https";
 import {
+  ALL_PERMISSION_KEYS,
   ALL_ROLES,
   BUILTIN_ROLE_IDS,
-  DEFAULT_ROLE_META,
-  DEFAULT_ROLE_PERMISSIONS,
+  ROLE_SEED_CONFIG_PATH,
   SYSTEM_MEGA_ROLE_ID,
+  builtinRoleSeedDoc,
+  builtinRoleSeedVersion,
+  canAssignRoleByAuthority,
   filterValidPermissions,
+  getRequiredBuiltinChatPermissions,
   isBuiltinRoleId,
   isProfileBadgeIcon,
   isRoleCategory,
   isSystemEditableRoleId,
   isSystemRole,
+  mergeBuiltinRolePermissions,
   parseBadgeColorToken,
   type BuiltinRoleId,
   type RoleCategory,
   type RoleDoc,
 } from "@pulse/shared";
 import { db, callableOpts } from "./init";
-import { requireActor } from "./guards";
+import { requireActor, type Actor } from "./guards";
+import { loadPermissionsForRole } from "./permissions";
 
 const SLUG_RE = /^[a-z][a-z0-9-]{1,62}$/;
 
@@ -38,9 +44,12 @@ export function mapRoleDoc(id: string, data: DocumentData): RoleDoc {
     description:
       typeof data.description === "string" ? data.description : undefined,
     category,
-    permissions: Array.isArray(data.permissions)
-      ? data.permissions.map(String).filter(Boolean)
-      : [],
+    permissions: filterValidPermissions([
+      ...(Array.isArray(data.permissions)
+        ? data.permissions.map(String).filter(Boolean)
+        : []),
+      ...getRequiredBuiltinChatPermissions(id),
+    ]),
     builtIn: data.builtIn === true,
     editableBySystemOnly: data.editableBySystemOnly === true,
     locked: data.locked === true,
@@ -61,9 +70,8 @@ async function requireRolesReader(
   request: { auth?: { uid: string } },
   operation: string,
   permission: string | string[] = "admin.roles.read",
-): Promise<{ uid: string; role: string; permissions: string[] }> {
-  const actor = await requireActor(request, operation, { permission });
-  return { uid: actor.uid, role: actor.role, permissions: actor.permissions };
+): Promise<Actor> {
+  return requireActor(request, operation, { permission });
 }
 
 /**
@@ -105,56 +113,136 @@ export async function assertAssignableRoleId(roleId: string): Promise<string> {
   throw new HttpsError("invalid-argument", "Invalid or unknown role.");
 }
 
+async function assertRoleBelowActor(
+  actor: Actor,
+  targetRole: string,
+): Promise<void> {
+  const targetPermissions = await loadPermissionsForRole(targetRole);
+  if (
+    !canAssignRoleByAuthority({
+      actorRole: actor.role,
+      actorPermissions: actor.permissions,
+      targetRole,
+      targetPermissions,
+    })
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "Cannot manage a role at or above your authority.",
+    );
+  }
+}
+
+/** Returns whether a role is strictly below the caller and within its permissions. */
+export async function actorCanManageRole(
+  actor: Actor,
+  targetRole: string,
+): Promise<boolean> {
+  const targetPermissions = await loadPermissionsForRole(targetRole);
+  return canAssignRoleByAuthority({
+    actorRole: actor.role,
+    actorPermissions: actor.permissions,
+    targetRole,
+    targetPermissions,
+  });
+}
+
+/** Validates an assignable role and enforces the caller's strict ceiling. */
+export async function assertAssignableRoleForActor(
+  actor: Actor,
+  roleId: string,
+): Promise<string> {
+  const role = await assertAssignableRoleId(roleId);
+  await assertRoleBelowActor(actor, role);
+  return role;
+}
+
+/** Prevents modifying users whose current authority is not below the caller. */
+export async function assertActorCanManageCurrentRole(
+  actor: Actor,
+  currentRole: string,
+): Promise<void> {
+  await assertRoleBelowActor(actor, currentRole);
+}
+
 function seedPayload(
   id: BuiltinRoleId,
   actorUid: string | null,
 ): Record<string, unknown> {
-  const meta = DEFAULT_ROLE_META[id];
   return {
-    id,
-    name: meta.name,
-    description: meta.description,
-    category: meta.category,
-    permissions: [...DEFAULT_ROLE_PERMISSIONS[id]],
-    builtIn: true,
-    editableBySystemOnly: meta.editableBySystemOnly,
-    locked: meta.locked,
-    active: true,
-    sortOrder: meta.sortOrder,
+    ...builtinRoleSeedDoc(id),
     updatedAt: FieldValue.serverTimestamp(),
     updatedBy: actorUid,
     createdAt: FieldValue.serverTimestamp(),
   };
 }
 
+function roleSeedMetaPayload(
+  actorUid: string | null,
+  version: string,
+): Record<string, unknown> {
+  return {
+    version,
+    roleCount: BUILTIN_ROLE_IDS.length,
+    permissionCount: ALL_PERMISSION_KEYS.length,
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: actorUid,
+  };
+}
+
 /** Upserts built-in roles. Safe to call repeatedly. */
 export async function upsertBuiltinRoles(actorUid: string | null) {
+  const refs = BUILTIN_ROLE_IDS.map((id) => db.doc(`roles/${id}`));
+  const existingSnaps = await Promise.all(refs.map((ref) => ref.get()));
   const batch = db.batch();
-  for (const id of BUILTIN_ROLE_IDS) {
-    const ref = db.doc(`roles/${id}`);
-    const existing = await ref.get();
+  for (let i = 0; i < BUILTIN_ROLE_IDS.length; i += 1) {
+    const id = BUILTIN_ROLE_IDS[i]!;
+    const ref = refs[i]!;
+    const existing = existingSnaps[i]!;
     const payload = seedPayload(id, actorUid);
     if (!existing.exists) {
       batch.set(ref, payload);
       continue;
     }
-    // Never clobber createdAt; refresh metadata. Always reset system permissions.
     const { createdAt: _createdAt, ...update } = payload;
-    if (id === SYSTEM_MEGA_ROLE_ID) {
-      batch.set(ref, update, { merge: true });
-      continue;
-    }
-    const hasPermissions =
-      Array.isArray(existing.data()?.permissions) &&
-      existing.data()!.permissions.length > 0;
-    if (hasPermissions) {
-      const { permissions: _p, ...metaOnly } = update;
-      batch.set(ref, metaOnly, { merge: true });
-    } else {
-      batch.set(ref, update, { merge: true });
-    }
+    const current = Array.isArray(existing.data()?.permissions)
+      ? existing.data()!.permissions.map(String)
+      : [];
+    const nextPermissions = mergeBuiltinRolePermissions(id, current);
+    batch.set(ref, { ...update, permissions: nextPermissions }, { merge: true });
   }
   await batch.commit();
+}
+
+/**
+ * Writes shipped built-in roles when the catalog fingerprint changes.
+ * Force recreates missing docs even if this version already ran.
+ */
+export async function ensureBuiltinRolesSeeded(
+  actorUid: string | null,
+  options?: { force?: boolean },
+): Promise<{ seeded: boolean; version: string }> {
+  const version = builtinRoleSeedVersion();
+  const metaRef = db.doc(ROLE_SEED_CONFIG_PATH);
+  if (!options?.force) {
+    const metaSnap = await metaRef.get();
+    if (metaSnap.data()?.version === version) {
+      return { seeded: false, version };
+    }
+  }
+  await upsertBuiltinRoles(actorUid);
+  await metaRef.set(roleSeedMetaPayload(actorUid, version), { merge: true });
+  return { seeded: true, version };
+}
+
+async function loadRoleCollection() {
+  let snap = await db.collection("roles").limit(200).get();
+  const have = new Set(snap.docs.map((doc) => doc.id));
+  if (BUILTIN_ROLE_IDS.some((id) => !have.has(id))) {
+    await ensureBuiltinRolesSeeded(null, { force: true });
+    snap = await db.collection("roles").limit(200).get();
+  }
+  return snap;
 }
 
 export const seedSystemRoles = onCall(callableOpts, async (request) => {
@@ -163,12 +251,12 @@ export const seedSystemRoles = onCall(callableOpts, async (request) => {
     "seedSystemRoles",
     "platform.manage",
   );
-  await upsertBuiltinRoles(uid);
+  const { version } = await ensureBuiltinRolesSeeded(uid, { force: true });
   const snap = await db.collection("roles").limit(200).get();
   const roles = snap.docs
     .map((doc) => mapRoleDoc(doc.id, doc.data()))
     .sort((a, b) => a.sortOrder - b.sortOrder || a.name.localeCompare(b.name));
-  return { ok: true, roles };
+  return { ok: true, version, roles };
 });
 
 export const listRoles = onCall(callableOpts, async (request) => {
@@ -178,7 +266,7 @@ export const listRoles = onCall(callableOpts, async (request) => {
   const includeInactive = request.data?.includeInactive === true;
   const includeSystem = request.data?.includeSystem === true;
 
-  const snap = await db.collection("roles").limit(200).get();
+  const snap = await loadRoleCollection();
 
   let roles = snap.docs.map((doc) => mapRoleDoc(doc.id, doc.data()));
   if (!includeInactive) {
@@ -195,7 +283,7 @@ export const listRoles = onCall(callableOpts, async (request) => {
 });
 
 export const createRole = onCall(callableOpts, async (request) => {
-  const { uid } = await requireRolesReader(
+  const actor = await requireRolesReader(
     request,
     "createRole",
     "admin.roles.create",
@@ -238,6 +326,19 @@ export const createRole = onCall(callableOpts, async (request) => {
   if (!name) {
     throw new HttpsError("invalid-argument", "Name required.");
   }
+  if (
+    !canAssignRoleByAuthority({
+      actorRole: actor.role,
+      actorPermissions: actor.permissions,
+      targetRole: id,
+      targetPermissions: permissions,
+    })
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "A role cannot contain permissions at or above your authority.",
+    );
+  }
 
   const ref = db.doc(`roles/${id}`);
   const existing = await ref.get();
@@ -266,7 +367,7 @@ export const createRole = onCall(callableOpts, async (request) => {
     badgeColor: parseBadgeColorToken(request.data?.badgeColor),
     createdAt: FieldValue.serverTimestamp(),
     updatedAt: FieldValue.serverTimestamp(),
-    updatedBy: uid,
+    updatedBy: actor.uid,
   };
   await ref.set(payload);
   const after = await ref.get();
@@ -274,7 +375,7 @@ export const createRole = onCall(callableOpts, async (request) => {
 });
 
 export const updateRole = onCall(callableOpts, async (request) => {
-  const { uid, role: actorRole } = await requireRolesReader(
+  const actor = await requireRolesReader(
     request,
     "updateRole",
     "admin.roles.update",
@@ -299,7 +400,7 @@ export const updateRole = onCall(callableOpts, async (request) => {
   }
 
   if (current.editableBySystemOnly || isSystemEditableRoleId(id)) {
-    if (!isSystemRole(actorRole)) {
+    if (!isSystemRole(actor.role)) {
       throw new HttpsError(
         "permission-denied",
         "Only the System role can edit this role.",
@@ -307,9 +408,36 @@ export const updateRole = onCall(callableOpts, async (request) => {
     }
   }
 
+  if (!(await actorCanManageRole(actor, id))) {
+    throw new HttpsError(
+      "permission-denied",
+      "Cannot edit a role at or above your authority.",
+    );
+  }
+
+  const nextPermissions = Array.isArray(request.data?.permissions)
+    ? filterValidPermissions([
+        ...request.data.permissions.map(String),
+        ...getRequiredBuiltinChatPermissions(id),
+      ])
+    : current.permissions;
+  if (
+    !canAssignRoleByAuthority({
+      actorRole: actor.role,
+      actorPermissions: actor.permissions,
+      targetRole: id,
+      targetPermissions: nextPermissions,
+    })
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "A role cannot contain permissions at or above your authority.",
+    );
+  }
+
   const updates: Record<string, unknown> = {
     updatedAt: FieldValue.serverTimestamp(),
-    updatedBy: uid,
+    updatedBy: actor.uid,
   };
 
   if (typeof request.data?.name === "string") {
@@ -324,9 +452,7 @@ export const updateRole = onCall(callableOpts, async (request) => {
     updates.category = request.data.category;
   }
   if (Array.isArray(request.data?.permissions)) {
-    updates.permissions = filterValidPermissions(
-      request.data.permissions.map(String),
-    );
+    updates.permissions = nextPermissions;
   }
   if (typeof request.data?.active === "boolean") {
     if (current.builtIn && request.data.active === false) {
@@ -363,7 +489,7 @@ export const updateRole = onCall(callableOpts, async (request) => {
 });
 
 export const deleteRole = onCall(callableOpts, async (request) => {
-  const { uid } = await requireRolesReader(
+  const actor = await requireRolesReader(
     request,
     "deleteRole",
     "admin.roles.delete",
@@ -382,6 +508,12 @@ export const deleteRole = onCall(callableOpts, async (request) => {
   const ref = db.doc(`roles/${id}`);
   const snap = await ref.get();
   if (!snap.exists) throw new HttpsError("not-found", "Role not found.");
+  if (!(await actorCanManageRole(actor, id))) {
+    throw new HttpsError(
+      "permission-denied",
+      "Cannot delete a role at or above your authority.",
+    );
+  }
 
   const usersWithRole = await db
     .collection("users")
@@ -403,7 +535,7 @@ export const deleteRole = onCall(callableOpts, async (request) => {
   await ref.update({
     active: false,
     updatedAt: FieldValue.serverTimestamp(),
-    updatedBy: uid,
+    updatedBy: actor.uid,
   });
   return { ok: true, deleted: false, active: false };
 });

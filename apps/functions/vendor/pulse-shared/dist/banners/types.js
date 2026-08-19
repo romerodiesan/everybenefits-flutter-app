@@ -35,11 +35,10 @@ exports.FORMATS_BY_SURFACE = {
 };
 /**
  * Audience roles for light targeting.
- * `all` matches every signed-in viewer (including guests browsing Pulse).
+ * `all` matches every signed-in registered viewer.
  */
 exports.PROMO_BANNER_AUDIENCES = [
     "all",
-    "guest",
     "student",
     "agent",
     "agency_owner",
@@ -186,11 +185,10 @@ function resolveBannerFormat(banner) {
 }
 /**
  * Coexistence priority (higher wins for chrome overlays).
- * Feed/academy promos sit in content and do not block consent / guest / tour.
+ * Feed/academy promos sit in content and do not block consent / tour.
  */
 exports.PROMO_BANNER_CHROME_PRIORITY = [
     "consent",
-    "guest",
     "tour",
     "promo",
 ];

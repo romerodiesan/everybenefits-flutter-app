@@ -14,6 +14,7 @@ function AppSwitcher({ current, permissions, role, resolveSwitchUrl, renderTrigg
     const panelId = (0, react_1.useId)();
     const [open, setOpen] = (0, react_1.useState)(false);
     const [busy, setBusy] = (0, react_1.useState)(false);
+    const [busyTarget, setBusyTarget] = (0, react_1.useState)(null);
     const [switchError, setSwitchError] = (0, react_1.useState)(null);
     const [coords, setCoords] = (0, react_1.useState)(null);
     const [mounted, setMounted] = (0, react_1.useState)(false);
@@ -91,6 +92,7 @@ function AppSwitcher({ current, permissions, role, resolveSwitchUrl, renderTrigg
         if (!meta)
             return;
         setBusy(true);
+        setBusyTarget(target);
         setSwitchError(null);
         try {
             window.location.assign(await resolveSwitchUrl(target, meta.homePath));
@@ -98,6 +100,7 @@ function AppSwitcher({ current, permissions, role, resolveSwitchUrl, renderTrigg
         catch {
             setSwitchError(t("appSwitchHandoffFailed"));
             setBusy(false);
+            setBusyTarget(null);
         }
     };
     const canSwitch = apps.length > 1;
@@ -112,9 +115,10 @@ function AppSwitcher({ current, permissions, role, resolveSwitchUrl, renderTrigg
                 width: PANEL_WIDTH_PX,
             }, className: "z-[200] overflow-hidden rounded-xl border border-glass-border bg-sheet shadow-[0_12px_28px_-12px_rgba(0,0,0,0.45)]", children: [(0, jsx_runtime_1.jsxs)("div", { className: "flex items-center justify-between gap-2 border-b border-glass-border px-2.5 py-1.5", children: [(0, jsx_runtime_1.jsx)("p", { className: "text-[9px] font-bold uppercase tracking-[0.14em] text-muted", children: t("appSwitchTitle") }), (0, jsx_runtime_1.jsx)("p", { className: "truncate text-[10px] text-muted", children: t(currentMeta.labelKey) })] }), switchError ? ((0, jsx_runtime_1.jsx)("p", { className: "mx-1.5 mt-1.5 rounded-lg bg-red-500/10 px-2 py-1.5 text-[10px] leading-snug text-red-500", children: switchError })) : null, (0, jsx_runtime_1.jsx)("ul", { className: "max-h-[min(16rem,50vh)] space-y-0.5 overflow-y-auto p-1.5", children: apps.map((app) => {
                         const active = app.id === current;
+                        const opening = busyTarget === app.id;
                         return ((0, jsx_runtime_1.jsx)("li", { children: (0, jsx_runtime_1.jsxs)("button", { type: "button", disabled: busy, "aria-current": active ? "page" : undefined, onClick: () => void switchTo(app.id), className: `flex w-full cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1.5 text-left outline-none transition focus-visible:ring-2 focus-visible:ring-brand/30 disabled:cursor-not-allowed disabled:opacity-60 ${active
                                     ? "bg-brand/10 ring-1 ring-brand/20"
-                                    : "hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"}`, children: [(0, jsx_runtime_1.jsx)("span", { className: `flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${app.tileClass}`, children: (0, jsx_runtime_1.jsx)(icons_1.AppIcon, { id: app.id, width: 14, height: 14 }) }), (0, jsx_runtime_1.jsxs)("span", { className: "min-w-0 flex-1", children: [(0, jsx_runtime_1.jsx)("span", { className: "block truncate text-[12px] font-semibold leading-tight text-ink", children: t(app.labelKey) }), (0, jsx_runtime_1.jsx)("span", { className: "mt-0.5 block truncate text-[10px] leading-snug text-muted", children: t(app.blurbKey) })] }), active ? ((0, jsx_runtime_1.jsx)(icons_1.IconCheck, { width: 14, height: 14, className: "shrink-0 text-brand" })) : ((0, jsx_runtime_1.jsx)("span", { className: "w-3.5 shrink-0", "aria-hidden": true }))] }) }, app.id));
+                                    : "hover:bg-ink/[0.04] dark:hover:bg-white/[0.05]"}`, children: [(0, jsx_runtime_1.jsx)("span", { className: `flex h-7 w-7 shrink-0 items-center justify-center rounded-md ${app.tileClass}`, children: (0, jsx_runtime_1.jsx)(icons_1.AppIcon, { id: app.id, width: 14, height: 14 }) }), (0, jsx_runtime_1.jsxs)("span", { className: "min-w-0 flex-1", children: [(0, jsx_runtime_1.jsx)("span", { className: "block truncate text-[12px] font-semibold leading-tight text-ink", children: t(app.labelKey) }), (0, jsx_runtime_1.jsx)("span", { className: "mt-0.5 block truncate text-[10px] leading-snug text-muted", children: t(app.blurbKey) })] }), opening ? ((0, jsx_runtime_1.jsx)("span", { className: "h-3.5 w-3.5 shrink-0 animate-spin rounded-full border-2 border-brand/25 border-t-brand", "aria-hidden": true })) : active ? ((0, jsx_runtime_1.jsx)(icons_1.IconCheck, { width: 14, height: 14, className: "shrink-0 text-brand" })) : ((0, jsx_runtime_1.jsx)("span", { className: "w-3.5 shrink-0", "aria-hidden": true }))] }) }, app.id));
                     }) })] }), document.body)
         : null;
     return ((0, jsx_runtime_1.jsxs)("div", { ref: rootRef, className: "relative", children: [canSwitch ? ((0, jsx_runtime_1.jsx)("button", { ref: triggerRef, type: "button", "aria-haspopup": "dialog", "aria-expanded": open, "aria-controls": open ? panelId : undefined, "aria-label": t("appSwitchTitle"), "aria-busy": busy, disabled: busy, onClick: () => {

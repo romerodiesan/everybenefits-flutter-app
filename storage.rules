@@ -35,15 +35,37 @@ service firebase.storage {
     function isAccountActive() {
       return hasProfile()
         && !(userData().get('accountStatus', 'active')
-          in ['deactivated', 'pendingDeletion']);
+          in ['deactivated', 'pendingDeletion'])
+        && userData().get('approvalStatus', 'approved') == 'approved';
     }
 
     function callerRole() {
       return userData().get('role', '');
     }
 
+    function normalizedCallerRole() {
+      let role = callerRole();
+      return role == 'teacher' ? 'instructor' : role;
+    }
+
+    function rolePermissions() {
+      return firestore.exists(/databases/(default)/documents/roles/$(normalizedCallerRole()))
+        ? firestore.get(/databases/(default)/documents/roles/$(normalizedCallerRole()))
+          .data.get('permissions', [])
+        : [];
+    }
+
+    function hasPermission(key) {
+      return isAccountActive()
+        && (
+          normalizedCallerRole() == 'system'
+          || key in rolePermissions()
+        );
+    }
+
     function isAdmin() {
-      return isAccountActive() && callerRole() in ['admin', 'system'];
+      return hasPermission('platform.manage')
+        || (isAccountActive() && callerRole() in ['admin', 'system']);
     }
 
     function isRegisteredMember() {
@@ -59,6 +81,11 @@ service firebase.storage {
 
     function canWriteCourseFiles(courseId) {
       return isAdmin()
+        || (
+          isAccountActive()
+          && hasPermission('courses.author')
+          && ownsCourse(courseId)
+        )
         || (
           isAccountActive()
           && callerRole() in ['instructor', 'teacher', 'manager']
@@ -85,6 +112,13 @@ service firebase.storage {
         && isOwnerFile(fileName)
         && request.resource.size < 5 * 1024 * 1024
         && isAllowedImageType();
+    }
+
+    // Group chat covers: chat-photos/{chatId}.jpg
+    // Writes go through uploadGroupChatPhoto callable (Admin SDK).
+    match /chat-photos/{chatId} {
+      allow read: if isRegisteredMember();
+      allow write: if false;
     }
 
     // Agency / matrix logos: org-logos/{orgNodeId}.jpg

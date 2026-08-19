@@ -17,10 +17,13 @@ export type SsoServerDeps = {
 export type SsoRequestContext = {
     appCheckToken?: string | null;
     clientIp?: string;
+    origin?: string | null;
     /** Cloud Functions use their own App Check enforcement. */
     skipAppCheck?: boolean;
 };
 export declare function contextFromRequest(request: Request): SsoRequestContext;
+/** Same-origin fetch always sends Origin; missing Origin is allowed (non-browser). */
+export declare function assertAllowedSsoOrigin(origin: string | null | undefined): void;
 /** App Check for SSO is opt-in only (`PULSE_SSO_REQUIRE_APP_CHECK=true`). */
 export declare function requireAppCheckEnabled(usingEmulators: boolean): boolean;
 export declare function rateLimitDocId(bucket: string, identity: string): string;

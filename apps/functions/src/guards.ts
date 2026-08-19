@@ -65,6 +65,13 @@ function assertAccountActive(data: DocumentData | undefined) {
       "Account is deactivated or pending deletion.",
     );
   }
+  const approval = String(data?.approvalStatus ?? "approved");
+  if (approval !== "approved") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Account is pending approval or rejected.",
+    );
+  }
 }
 
 export async function requireActor(

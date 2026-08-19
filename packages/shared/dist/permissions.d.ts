@@ -15,6 +15,8 @@ export type PermissionDef = {
 export declare const PERMISSION_CATALOG: readonly PermissionDef[];
 /** i18n message key for a permission display name: permName_admin_users_read */
 export declare function permissionNameMessageKey(key: string): string;
+/** i18n message key for a permission description. */
+export declare function permissionDescriptionMessageKey(key: string): string;
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]["key"];
 export declare function isPermissionKey(value: unknown): value is PermissionKey;
 export declare function permissionsByCategory(category: PermissionCategory): readonly PermissionDef[];
@@ -85,12 +87,26 @@ export declare const SYSTEM_MEGA_ROLE_ID: "system";
 /** Product system roles editable only by `system`. */
 export declare const SYSTEM_EDITABLE_ROLE_IDS: readonly ["admin", "manager", "agency_owner", "agent", "student"];
 /** All built-in role document ids (seeded, non-deletable). */
-export declare const BUILTIN_ROLE_IDS: readonly ["system", "admin", "manager", "agency_owner", "agent", "student", "instructor", "guest"];
+export declare const BUILTIN_ROLE_IDS: readonly ["system", "admin", "manager", "agency_owner", "agent", "student", "instructor"];
 export type BuiltinRoleId = (typeof BUILTIN_ROLE_IDS)[number];
 export declare function isBuiltinRoleId(id: string): id is BuiltinRoleId;
+/** Capabilities that are product invariants for already-seeded built-in roles. */
+export declare function getRequiredBuiltinChatPermissions(roleId: string): PermissionKey[];
 export declare function isSystemEditableRoleId(id: string): boolean;
 /** Default permission sets matching legacy `can*` behavior. */
 export declare const DEFAULT_ROLE_PERMISSIONS: Record<BuiltinRoleId, readonly PermissionKey[]>;
+/**
+ * Authority level used only for role assignment ceilings.
+ * Custom roles inherit a ceiling from their strongest management permission.
+ */
+export declare function roleAuthorityRank(roleId: string, permissions?: readonly string[]): number;
+/** Strictly-lower role assignment with a permission-subset ceiling. */
+export declare function canAssignRoleByAuthority(options: {
+    actorRole: string;
+    actorPermissions: readonly string[];
+    targetRole: string;
+    targetPermissions: readonly string[];
+}): boolean;
 export declare const DEFAULT_ROLE_META: Record<BuiltinRoleId, {
     name: string;
     description: string;
@@ -99,4 +115,32 @@ export declare const DEFAULT_ROLE_META: Record<BuiltinRoleId, {
     locked: boolean;
     editableBySystemOnly: boolean;
 }>;
+/** Firestore path for the built-in role seed fingerprint. */
+export declare const ROLE_SEED_CONFIG_PATH = "platformConfig/roleSeed";
+/** JSON-serializable built-in role document (timestamps added at write time). */
+export type BuiltinRoleSeedDoc = {
+    id: BuiltinRoleId;
+    name: string;
+    description: string;
+    category: RoleCategory;
+    permissions: PermissionKey[];
+    builtIn: true;
+    editableBySystemOnly: boolean;
+    locked: boolean;
+    active: true;
+    sortOrder: number;
+};
+export declare function builtinRoleSeedDoc(id: BuiltinRoleId): BuiltinRoleSeedDoc;
+export declare function builtinRoleSeedDocs(): BuiltinRoleSeedDoc[];
+/**
+ * Merge product defaults into a stored permission list.
+ * `system` always tracks the full catalog. Other built-ins keep extras and
+ * gain any newly shipped keys without removing Admin customizations.
+ */
+export declare function mergeBuiltinRolePermissions(roleId: BuiltinRoleId, current: readonly string[] | null | undefined): string[];
+/**
+ * Fingerprint of shipped built-in role docs. Changes when the catalog or
+ * default matrices change so new app versions re-seed automatically.
+ */
+export declare function builtinRoleSeedVersion(): string;
 //# sourceMappingURL=permissions.d.ts.map

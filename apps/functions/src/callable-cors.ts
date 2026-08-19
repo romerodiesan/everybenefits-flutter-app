@@ -1,28 +1,14 @@
 /** CORS + App Check flag helpers (no Admin SDK side effects). */
 
-export const PRODUCTION_ORIGINS = [
-  "https://every-insurance.web.app",
-  "https://every-insurance.firebaseapp.com",
-  "https://pulse.everybenefits.us",
-  "https://studio.everybenefits.us",
-  "https://admin.everybenefits.us",
-  "https://payments.everybenefits.us",
-  "https://pulse-web-app--every-benefits-us.us-central1.hosted.app",
-  "https://studio-web-app--every-benefits-us.us-central1.hosted.app",
-  "https://admin-web-app--every-benefits-us.us-central1.hosted.app",
-  "https://payments-web-app--every-benefits-us.us-central1.hosted.app",
-] as const;
+import {
+  APP_HOSTING_PREVIEW_ORIGIN_RE,
+  LOCAL_DEV_APP_ORIGINS,
+  PRODUCTION_APP_ORIGINS,
+  isAppHostingPreviewOrigin,
+} from "@pulse/shared";
 
-export const LOCAL_DEV_ORIGINS = [
-  "http://localhost:3000",
-  "http://127.0.0.1:3000",
-  "http://localhost:3001",
-  "http://127.0.0.1:3001",
-  "http://localhost:3002",
-  "http://127.0.0.1:3002",
-  "http://localhost:3004",
-  "http://127.0.0.1:3004",
-] as const;
+export const PRODUCTION_ORIGINS = PRODUCTION_APP_ORIGINS;
+export const LOCAL_DEV_ORIGINS = LOCAL_DEV_APP_ORIGINS;
 
 /**
  * CORS for Gen2 callables.
@@ -54,9 +40,6 @@ export function allowedCallableOrigins(
   ];
 }
 
-const APP_HOSTING_PREVIEW_SUFFIX =
-  "-every-benefits-us.us-central1.hosted.app";
-
 export function isAllowedCallableOrigin(
   origin: string,
   opts?: Parameters<typeof allowedCallableOrigins>[0],
@@ -64,12 +47,7 @@ export function isAllowedCallableOrigin(
   const trimmed = origin.trim();
   if (!trimmed) return false;
   if (allowedCallableOrigins(opts).includes(trimmed)) return true;
-  try {
-    const host = new URL(trimmed).hostname;
-    return host.endsWith(APP_HOSTING_PREVIEW_SUFFIX);
-  } catch {
-    return false;
-  }
+  return isAppHostingPreviewOrigin(trimmed);
 }
 
 export function buildCallableCors(
@@ -82,10 +60,7 @@ export function buildCallableCors(
   const emulator =
     opts.emulator ?? process.env.FUNCTIONS_EMULATOR === "true";
   if (emulator) return true;
-  return [
-    ...allowedCallableOrigins(opts),
-    /^https:\/\/[a-z0-9-]+-every-benefits-us\.us-central1\.hosted\.app$/i,
-  ];
+  return [...allowedCallableOrigins(opts), APP_HOSTING_PREVIEW_ORIGIN_RE];
 }
 
 /** Opt-in: set FUNCTIONS_ENFORCE_APP_CHECK=true when App Check is ready. */

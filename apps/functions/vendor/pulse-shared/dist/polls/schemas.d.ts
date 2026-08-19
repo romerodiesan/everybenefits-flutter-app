@@ -18,11 +18,10 @@ export declare const pollUpsertSchema: z.ZodObject<{
     audiences: z.ZodArray<z.ZodEnum<{
         all: "all";
         admin: "admin";
-        guest: "guest";
+        student: "student";
         manager: "manager";
         agency_owner: "agency_owner";
         agent: "agent";
-        student: "student";
         instructor: "instructor";
     }>>;
     question: z.ZodObject<{

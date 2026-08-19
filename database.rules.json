@@ -4,11 +4,14 @@
     ".write": false,
 
     "chats": {
+      ".indexOn": ["isGroup", "lastMessageAt"],
       "$chatId": {
         // Allow missing nodes so clients can probe before create (null).
         // Existing chats still require membership.
         // Chat documents are created via Admin SDK callables only.
-        ".read": "auth != null && (
+        ".read": "auth != null
+          && root.child('chatAccess').child(auth.uid).val() === true
+          && (
           !data.exists()
           || data.child('members').child(auth.uid).val() === true
         )",
@@ -18,6 +21,7 @@
         "unreadCounts": {
           "$uid": {
             ".write": "auth != null
+              && root.child('chatAccess').child(auth.uid).val() === true
               && auth.uid === $uid
               && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
           }
@@ -25,6 +29,7 @@
         "pinnedBy": {
           "$uid": {
             ".write": "auth != null
+              && root.child('chatAccess').child(auth.uid).val() === true
               && auth.uid === $uid
               && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true"
           }
@@ -33,6 +38,7 @@
           "$uid": {
             // Members may only set/clear their own display name entry.
             ".write": "auth != null
+              && root.child('chatAccess').child(auth.uid).val() === true
               && auth.uid === $uid
               && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
               && (!newData.exists() || newData.isString())"
@@ -41,6 +47,7 @@
         "memberPhotos": {
           "$uid": {
             ".write": "auth != null
+              && root.child('chatAccess').child(auth.uid).val() === true
               && auth.uid === $uid
               && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
               && (!newData.exists() || (newData.isString() && newData.val().length <= 4096))"
@@ -49,6 +56,7 @@
         "memberUsernames": {
           "$uid": {
             ".write": "auth != null
+              && root.child('chatAccess').child(auth.uid).val() === true
               && auth.uid === $uid
               && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
               && (!newData.exists() || (newData.isString() && newData.val().length <= 20))"
@@ -63,11 +71,14 @@
 
     "messages": {
       "$chatId": {
-        ".read": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
+        ".read": "auth != null
+          && root.child('chatAccess').child(auth.uid).val() === true
+          && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
         ".indexOn": ["createdAt"],
         "$messageId": {
           // Members may only post as themselves.
           ".write": "auth != null
+            && root.child('chatAccess').child(auth.uid).val() === true
             && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
             && (
               root.child('chats').child($chatId).child('isGroup').val() === true
@@ -87,6 +98,7 @@
           "reactions": {
             "$uid": {
               ".write": "auth != null
+                && root.child('chatAccess').child(auth.uid).val() === true
                 && auth.uid === $uid
                 && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true
                 && (!newData.exists() || newData.isString())"
@@ -108,11 +120,29 @@
       }
     },
 
+    "hiddenMessages": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid
+          && root.child('chatAccess').child(auth.uid).val() === true",
+        "$chatId": {
+          "$messageId": {
+            ".write": "auth != null && auth.uid === $uid
+              && root.child('chatAccess').child(auth.uid).val() === true
+              && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
+            ".validate": "!newData.exists() || newData.val() === true"
+          }
+        }
+      }
+    },
+
     "typing": {
       "$chatId": {
-        ".read": "auth != null && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
+        ".read": "auth != null
+          && root.child('chatAccess').child(auth.uid).val() === true
+          && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
         "$uid": {
           ".write": "auth != null
+            && root.child('chatAccess').child(auth.uid).val() === true
             && auth.uid === $uid
             && root.child('chats').child($chatId).child('members').child(auth.uid).val() === true",
           ".validate": "!newData.exists() || (
@@ -125,11 +155,14 @@
 
     "userChats": {
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid",
+        ".read": "auth != null && auth.uid === $uid
+          && root.child('chatAccess').child(auth.uid).val() === true",
         ".indexOn": ["lastMessageAt"],
         "$chatId": {
           // Membership required to create/update; delete allowed after leaving.
-          ".write": "auth != null && auth.uid === $uid && (!newData.exists() || root.child('chats').child($chatId).child('members').child(auth.uid).val() === true)"
+          ".write": "auth != null && auth.uid === $uid
+            && root.child('chatAccess').child(auth.uid).val() === true
+            && (!newData.exists() || root.child('chats').child($chatId).child('members').child(auth.uid).val() === true)"
         }
       }
     },
@@ -137,7 +170,9 @@
     "dmIndex": {
       "$dmKey": {
         // Only the two participants can resolve a DM key (uidA_uidB).
-        ".read": "auth != null && ($dmKey.beginsWith(auth.uid + '_') || $dmKey.endsWith('_' + auth.uid))",
+        ".read": "auth != null
+          && root.child('chatAccess').child(auth.uid).val() === true
+          && ($dmKey.beginsWith(auth.uid + '_') || $dmKey.endsWith('_' + auth.uid))",
         ".write": false
       }
     },
@@ -146,9 +181,11 @@
       // Per-uid only — no list/enumerate of other users' presence trees.
       // Headcount uses the shallow online/ index instead.
       "$uid": {
-        ".read": "auth != null && auth.uid === $uid && auth.provider != 'anonymous'",
+        ".read": "auth != null && auth.uid === $uid && auth.provider != 'anonymous'
+          && root.child('chatAccess').child(auth.uid).val() === true",
         "$clientId": {
-          ".write": "auth != null && auth.uid === $uid",
+          ".write": "auth != null && auth.uid === $uid
+            && root.child('chatAccess').child(auth.uid).val() === true",
           ".validate": "newData.hasChildren(['at']) && (newData.child('at').isNumber() || newData.child('at').val() === now)"
         }
       }
@@ -156,9 +193,11 @@
 
     // Shallow online index for cheap headcount (one boolean per uid; no PII).
     "online": {
-      ".read": "auth != null && auth.provider != 'anonymous'",
+      ".read": "auth != null && auth.provider != 'anonymous'
+        && root.child('chatAccess').child(auth.uid).val() === true",
       "$uid": {
-        ".write": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid
+          && root.child('chatAccess').child(auth.uid).val() === true",
         ".validate": "!newData.exists() || newData.val() === true"
       }
     },
@@ -167,6 +206,13 @@
     "autoJoinGroups": {
       ".read": false,
       ".write": false
+    },
+
+    "chatAccess": {
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": false
+      }
     }
   }
 }

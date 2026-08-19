@@ -5,16 +5,22 @@ exports.loadPermissionsForRoles = loadPermissionsForRoles;
 const firestore_1 = require("firebase/firestore");
 const shared_1 = require("@pulse/shared");
 function normalizeRoleId(roleId) {
-    return roleId === "teacher" ? "instructor" : roleId.trim() || "guest";
+    return roleId === "teacher" ? "instructor" : roleId.trim() || "student";
+}
+function optimisticPermissions(roleId) {
+    // Custom roles stay fail-closed until the Firestore doc lands.
+    if (!(0, shared_1.isBuiltinRoleId)(roleId))
+        return [];
+    return [...(0, shared_1.getDefaultPermissionsForRole)(roleId)];
 }
 /** Live permissions for a role slug (defaults until / while Firestore loads). */
 function watchRolePermissions(db, roleId, onChange, onError) {
     const normalized = normalizeRoleId(roleId);
-    onChange([...(0, shared_1.getDefaultPermissionsForRole)(normalized)]);
+    onChange(optimisticPermissions(normalized));
     return (0, firestore_1.onSnapshot)((0, firestore_1.doc)(db, "roles", normalized), (snap) => {
         onChange((0, shared_1.resolvePermissionsFromRoleDoc)(normalized, snap.data()));
     }, (error) => {
-        onChange([...(0, shared_1.getDefaultPermissionsForRole)(normalized)]);
+        onChange(optimisticPermissions(normalized));
         onError?.(error);
     });
 }

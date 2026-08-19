@@ -68,7 +68,8 @@ Canonical paths used by Pulse. Field-level contracts for TS live in `@pulse/shar
 | `functionUsage/{id}` | Callable rate / usage counters |
 | `ssoHandoffs/{code}` | Cross-app SSO codes (60s TTL; configure Firestore TTL on `expiresAt`) |
 | `ssoRateLimit/{id}` | SSO abuse counters (configure Firestore TTL on `expiresAt`) |
-| `platformConfig/{id}` | Platform settings |
+| `platformConfig/{id}` | Platform settings (`roleSeed` = built-in role catalog fingerprint) |
+| `roles/{id}` | Role docs + permission matrices. Built-ins (`system`, `admin`, `manager`, `agency_owner`, `agent`, `student`, `instructor`) auto-seed on Functions init; custom roles are Admin-managed. Writes via Functions only. |
 | `promoBanners/{id}` | In-app promotional banners (`type`, `format`, `surface`, dismissible/CTA/image toggles, localized copy; Admin-managed). Multiple active banners on the same surface rotate in a Pulse carousel. |
 | `polls/{id}` | In-app polls (question, options, surface, audience, schedule; Admin-managed). Votes live in `polls/{id}/votes/{uid}` and tallies on the poll doc. |
 

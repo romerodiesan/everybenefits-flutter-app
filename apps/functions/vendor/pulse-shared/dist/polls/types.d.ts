@@ -1,7 +1,7 @@
 import { type PromoBannerAudience, type PromoBannerLocalizedString, type PromoBannerSurface } from "../banners/types";
 export declare const POLL_SURFACES: readonly ["home", "rail", "academy"];
 export type PollSurface = PromoBannerSurface;
-export declare const POLL_AUDIENCES: readonly ["all", "guest", "student", "agent", "agency_owner", "instructor", "manager", "admin"];
+export declare const POLL_AUDIENCES: readonly ["all", "student", "agent", "agency_owner", "instructor", "manager", "admin"];
 export type PollAudience = PromoBannerAudience;
 export type PollLocalizedString = PromoBannerLocalizedString;
 export declare const POLL_LIMITS: {
