@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
+import 'package:share_plus/share_plus.dart';
 
 import '../../app/app_spacing.dart';
 import '../../app/pulse_haptics.dart';
@@ -11,6 +12,8 @@ import '../../app/widgets/pulse_chrome.dart';
 import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/user_profile.dart';
+import '../../users/access_scope.dart';
+import '../../users/user_role.dart';
 import '../forums/forum_repository.dart';
 import '../forums/thread_detail_screen.dart';
 import '../profile/public_profile_screen.dart';
@@ -52,14 +55,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
   final _threadSearch = TextEditingController();
-  late final ChatRepository _repo =
-      widget.chatRepository ?? ChatRepository();
-  late final Stream<ChatConversation?> _chatStream =
-      _repo.watchChat(widget.chat.id);
-  late final Stream<List<ChatMessage>> _messagesStream =
-      _repo.watchMessages(widget.chat.id);
-  late final Stream<Map<String, int>> _typingStream =
-      _repo.watchTyping(widget.chat.id);
+  late final ChatRepository _repo = widget.chatRepository ?? ChatRepository();
+  late Stream<ChatConversation?> _chatStream;
+  late Stream<List<ChatMessage>> _messagesStream;
+  late Stream<Map<String, int>> _typingStream;
+  final _sharedSubs = <StreamSubscription<void>>[];
+  final _sharedControllers = <StreamController<dynamic>>[];
   var _sending = false;
   var _sharedBootstrapped = false;
   var _emojiOpen = false;
@@ -70,6 +71,38 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   var _typingSent = false;
   final _unreadKey = GlobalKey();
   final _messageKeys = <String, GlobalKey>{};
+
+  Stream<List<ChatMessage>> _watchVisibleMessages() {
+    return Stream<List<ChatMessage>>.multi((controller) {
+      List<ChatMessage>? messages;
+      Set<String> hidden = const {};
+      void emit() {
+        final current = messages;
+        if (current == null) return;
+        controller.add(
+          current.where((message) => !hidden.contains(message.id)).toList(),
+        );
+      }
+
+      final messagesSub = _repo.watchMessages(widget.chat.id).listen((value) {
+        messages = value;
+        emit();
+      }, onError: controller.addError);
+      final hiddenSub = _repo
+          .watchHiddenMessageIds(
+            chatId: widget.chat.id,
+            uid: widget.profile.uid,
+          )
+          .listen((value) {
+            hidden = value;
+            emit();
+          }, onError: controller.addError);
+      controller.onCancel = () async {
+        await messagesSub.cancel();
+        await hiddenSub.cancel();
+      };
+    }, isBroadcast: true);
+  }
 
   GlobalKey _keyForMessage(String id) {
     return _messageKeys.putIfAbsent(id, GlobalKey.new);
@@ -89,11 +122,54 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
   @override
   void initState() {
     super.initState();
+    _resetStreams();
     _unreadSnapshot = widget.chat.unreadFor(widget.profile.uid);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _repo.markRead(chatId: widget.chat.id, uid: widget.profile.uid);
       _bootstrapSharedPost();
     });
+  }
+
+  /// Keeps a single source subscription alive for the screen lifetime.
+  ///
+  /// `watchChat` / `watchTyping` are single-subscription (`async*`). AppBar,
+  /// thread, and composer all listen, and [LayoutBuilder] can remount those
+  /// [StreamBuilder]s — `asBroadcastStream()` then throws "already listened to".
+  Stream<T> _share<T>(Stream<T> source) {
+    final controller = StreamController<T>.broadcast();
+    _sharedControllers.add(controller);
+    _sharedSubs.add(
+      source.listen(
+        controller.add,
+        onError: controller.addError,
+        onDone: () {
+          if (!controller.isClosed) controller.close();
+        },
+      ),
+    );
+    return controller.stream;
+  }
+
+  void _releaseSharedStreams() {
+    for (final sub in _sharedSubs) {
+      unawaited(sub.cancel());
+    }
+    _sharedSubs.clear();
+    for (final controller in _sharedControllers) {
+      if (!controller.isClosed) unawaited(controller.close());
+    }
+    _sharedControllers.clear();
+  }
+
+  void _resetStreams() {
+    _releaseSharedStreams();
+    _chatStream = _share(_repo.watchChat(widget.chat.id));
+    _messagesStream = _share(_watchVisibleMessages());
+    _typingStream = _share(_repo.watchTyping(widget.chat.id));
+  }
+
+  void _retryStreams() {
+    setState(_resetStreams);
   }
 
   Future<void> _bootstrapSharedPost() async {
@@ -117,6 +193,7 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   @override
   void dispose() {
+    _releaseSharedStreams();
     _typingIdle?.cancel();
     if (_typingSent) {
       unawaited(
@@ -216,9 +293,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
       });
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyChatError(error, l10n))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(friendlyChatError(error, l10n))));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -243,10 +320,14 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
 
   Future<void> _showMessageMenu(ChatMessage msg, Rect anchor) async {
     final mine = msg.isMine(widget.profile.uid);
+    final canModerate = canModerateChatMessages(
+      AccessScope.accessOf(context, fallbackRoleId: widget.profile.roleId),
+    );
     final result = await showChatMessageMenu(
       context: context,
       anchor: anchor,
       mine: mine,
+      canDelete: mine || canModerate,
       selected: msg.reactions[widget.profile.uid],
     );
     if (result == null || !mounted) return;
@@ -259,12 +340,121 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
             : msg.body;
         await Clipboard.setData(ClipboardData(text: text));
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(context.l10n.chatCopied)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(context.l10n.chatCopied)));
       case ChatMessageMenuAction.reply:
         setState(() => _replyTo = msg);
         _focusNode.requestFocus();
+      case ChatMessageMenuAction.share:
+        final text = msg.sharedPost?.title.trim().isNotEmpty == true
+            ? msg.sharedPost!.title
+            : msg.body;
+        await SharePlus.instance.share(ShareParams(text: text));
+      case ChatMessageMenuAction.delete:
+        await _chooseMessageDeletion(
+          msg,
+          canDeleteForEveryone: mine || canModerate,
+        );
+    }
+  }
+
+  Future<void> _chooseMessageDeletion(
+    ChatMessage msg, {
+    required bool canDeleteForEveryone,
+  }) async {
+    final l10n = context.l10n;
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                l10n.chatDeleteMessageTitle,
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.visibility_off_outlined),
+                title: Text(l10n.chatDeleteForMe),
+                subtitle: Text(l10n.chatDeleteForMeHint),
+                onTap: () => Navigator.pop(sheetContext, 'me'),
+              ),
+              if (canDeleteForEveryone)
+                ListTile(
+                  leading: Icon(
+                    Icons.delete_forever_outlined,
+                    color: Theme.of(sheetContext).colorScheme.error,
+                  ),
+                  title: Text(l10n.chatDeleteForEveryone),
+                  subtitle: Text(l10n.chatDeleteForEveryoneHint),
+                  onTap: () => Navigator.pop(sheetContext, 'everyone'),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (choice == null || !mounted) return;
+    try {
+      if (choice == 'me') {
+        await _repo.hideMessageForMe(
+          chatId: widget.chat.id,
+          messageId: msg.id,
+          uid: widget.profile.uid,
+        );
+      } else {
+        await _repo.deleteMessageForEveryone(
+          chatId: widget.chat.id,
+          messageId: msg.id,
+        );
+      }
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(friendlyChatError(error, l10n))));
+    }
+  }
+
+  Future<void> _confirmClearHistory() async {
+    final l10n = context.l10n;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(l10n.chatClearHistoryTitle),
+        content: Text(l10n.chatClearHistoryBody),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(MaterialLocalizations.of(context).cancelButtonLabel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(l10n.chatDeleteConfirmAction),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _repo.clearMessages(widget.chat.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.chatHistoryCleared)));
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(friendlyChatError(error, l10n))));
     }
   }
 
@@ -314,9 +504,9 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
     return LayoutBuilder(
       builder: (context, constraints) {
         return MediaQuery(
-          data: MediaQuery.of(context).copyWith(
-            size: Size(constraints.maxWidth, constraints.maxHeight),
-          ),
+          data: MediaQuery.of(
+            context,
+          ).copyWith(size: Size(constraints.maxWidth, constraints.maxHeight)),
           child: _conversationScaffold(context),
         );
       },
@@ -392,23 +582,26 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                           StreamBuilder<Map<String, int>>(
                             stream: _typingStream,
                             builder: (context, typingSnap) {
-                              final typers =
-                                  _activeTypers(typingSnap.data ?? const {});
+                              final typers = _activeTypers(
+                                typingSnap.data ?? const {},
+                              );
                               final subtitle = typers.isEmpty
                                   ? (chat.isDefaultAgentGroup
-                                      ? l10n.chatsDefaultGroupBadge
-                                      : (chat.isGroup
-                                          ? l10n.chatTypeGroup
-                                          : l10n.chatTypePrivate))
+                                        ? l10n.chatsDefaultGroupBadge
+                                        : (chat.isGroup
+                                              ? l10n.chatTypeGroup
+                                              : l10n.chatTypePrivate))
                                   : (typers.length == 1
-                                      ? l10n.chatTypingOne(typers.first)
-                                      : l10n.chatTypingMany);
+                                        ? l10n.chatTypingOne(typers.first)
+                                        : l10n.chatTypingMany);
                               return Text(
                                 subtitle,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelSmall?.copyWith(
-                                  color: typers.isEmpty ? colors.muted : AppColors.brandOf(context),
+                                  color: typers.isEmpty
+                                      ? colors.muted
+                                      : AppColors.brandOf(context),
                                   fontWeight: FontWeight.w600,
                                   fontSize: 11,
                                 ),
@@ -425,6 +618,17 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
           },
         ),
         actions: [
+          if (canModerateChatMessages(
+            AccessScope.accessOf(
+              context,
+              fallbackRoleId: widget.profile.roleId,
+            ),
+          ))
+            IconButton(
+              tooltip: l10n.chatClearHistory,
+              onPressed: _confirmClearHistory,
+              icon: const Icon(Icons.delete_sweep_outlined),
+            ),
           IconButton(
             tooltip: l10n.chatSearchThread,
             onPressed: () {
@@ -461,10 +665,25 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
-                    child: Text(
-                      friendlyChatError(snapshot.error!, l10n),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colors.muted,
+                    child: Padding(
+                      padding: const EdgeInsets.all(AppSpacing.xl),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            friendlyChatError(snapshot.error!, l10n),
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.muted,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          FilledButton.tonalIcon(
+                            onPressed: _retryStreams,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: Text(l10n.actionRetry),
+                          ),
+                        ],
                       ),
                     ),
                   );
@@ -489,12 +708,12 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                 final visible = query.isEmpty
                     ? messages
                     : messages
-                        .where(
-                          (m) =>
-                              m.body.toLowerCase().contains(query) ||
-                              m.senderName.toLowerCase().contains(query),
-                        )
-                        .toList();
+                          .where(
+                            (m) =>
+                                m.body.toLowerCase().contains(query) ||
+                                m.senderName.toLowerCase().contains(query),
+                          )
+                          .toList();
                 if (visible.isEmpty) {
                   return Center(
                     child: Text(
@@ -529,75 +748,76 @@ class _ChatConversationScreenState extends State<ChatConversationScreen> {
                               center: Alignment.topCenter,
                               radius: 1.2,
                               colors: [
-                                AppColors.brandOf(context)
-                                    .withValues(alpha: 0.05),
+                                AppColors.brandOf(
+                                  context,
+                                ).withValues(alpha: 0.05),
                                 colors.canvas,
                               ],
                             ),
                           ),
                           child: SlidableAutoCloseBehavior(
                             child: ListView.builder(
-                            controller: _scrollController,
-                            reverse: true,
-                            padding: const EdgeInsets.fromLTRB(
-                              AppSpacing.md,
-                              AppSpacing.md,
-                              AppSpacing.md,
-                              AppSpacing.sm,
+                              controller: _scrollController,
+                              reverse: true,
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.md,
+                                AppSpacing.md,
+                                AppSpacing.md,
+                                AppSpacing.sm,
+                              ),
+                              itemCount: items.length,
+                              itemBuilder: (context, index) {
+                                final item = items[index];
+                                switch (item.kind) {
+                                  case ChatTimelineKind.day:
+                                    return ChatDayPill(at: item.day!);
+                                  case ChatTimelineKind.unread:
+                                    return ChatUnreadDivider(key: _unreadKey);
+                                  case ChatTimelineKind.message:
+                                    final msg = item.message!;
+                                    final shared = msg.sharedPost;
+                                    return ChatBubbleCluster(
+                                      key: _keyForMessage(msg.id),
+                                      msg: msg,
+                                      mine: msg.isMine(uid),
+                                      time: formatChatTime(msg.createdAt, l10n),
+                                      showName: item.showSenderName,
+                                      showTime: item.showTime,
+                                      groupedWithOlder: item.groupedWithOlder,
+                                      viewerUid: uid,
+                                      senderPhotoUrl:
+                                          msg.senderPhotoUrl ??
+                                          chat.photoOf(msg.senderId),
+                                      onTapSender: msg.isMine(uid)
+                                          ? null
+                                          : () => _openMember(msg.senderId),
+                                      onOpenMention: (handle) => _openMember(
+                                        chat.uidForUsername(handle) ?? handle,
+                                      ),
+                                      onOpenShared: shared == null
+                                          ? null
+                                          : () => _openSharedPost(shared),
+                                      onLongPress: (anchor) =>
+                                          _showMessageMenu(msg, anchor),
+                                      onTapReaction: (emoji) =>
+                                          _react(msg, emoji),
+                                      onSwipeReply: () {
+                                        setState(() => _replyTo = msg);
+                                        _focusNode.requestFocus();
+                                      },
+                                      onTapReply: msg.replyTo == null
+                                          ? null
+                                          : () {
+                                              _scrollToKey(
+                                                _keyForMessage(
+                                                  msg.replyTo!.messageId,
+                                                ),
+                                              );
+                                            },
+                                    );
+                                }
+                              },
                             ),
-                            itemCount: items.length,
-                            itemBuilder: (context, index) {
-                              final item = items[index];
-                              switch (item.kind) {
-                                case ChatTimelineKind.day:
-                                  return ChatDayPill(at: item.day!);
-                                case ChatTimelineKind.unread:
-                                  return ChatUnreadDivider(key: _unreadKey);
-                                case ChatTimelineKind.message:
-                                  final msg = item.message!;
-                                  final shared = msg.sharedPost;
-                                  return ChatBubbleCluster(
-                                    key: _keyForMessage(msg.id),
-                                    msg: msg,
-                                    mine: msg.isMine(uid),
-                                    time: formatChatTime(msg.createdAt, l10n),
-                                    showName: item.showSenderName,
-                                    showTime: item.showTime,
-                                    groupedWithOlder: item.groupedWithOlder,
-                                    viewerUid: uid,
-                                    senderPhotoUrl:
-                                        msg.senderPhotoUrl ??
-                                            chat.photoOf(msg.senderId),
-                                    onTapSender: msg.isMine(uid)
-                                        ? null
-                                        : () => _openMember(msg.senderId),
-                                    onOpenMention: (handle) => _openMember(
-                                      chat.uidForUsername(handle) ?? handle,
-                                    ),
-                                    onOpenShared: shared == null
-                                        ? null
-                                        : () => _openSharedPost(shared),
-                                    onLongPress: (anchor) =>
-                                        _showMessageMenu(msg, anchor),
-                                    onTapReaction: (emoji) =>
-                                        _react(msg, emoji),
-                                    onSwipeReply: () {
-                                      setState(() => _replyTo = msg);
-                                      _focusNode.requestFocus();
-                                    },
-                                    onTapReply: msg.replyTo == null
-                                        ? null
-                                        : () {
-                                            _scrollToKey(
-                                              _keyForMessage(
-                                                msg.replyTo!.messageId,
-                                              ),
-                                            );
-                                          },
-                                  );
-                              }
-                            },
-                          ),
                           ),
                         ),
                         if (unreadIndex > 4)

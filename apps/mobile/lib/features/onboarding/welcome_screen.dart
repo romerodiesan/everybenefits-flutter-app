@@ -9,7 +9,6 @@ import 'login_screen.dart';
 import 'onboarding_prefs.dart';
 import 'phone_auth_screen.dart';
 import 'register_screen.dart';
-import 'widgets/auth_form_widgets.dart';
 import 'widgets/onboarding_illustrations.dart';
 
 class WelcomeScreen extends StatefulWidget {
@@ -98,10 +97,8 @@ class _WelcomeScreenState extends State<WelcomeScreen>
   Future<void> _open(Widget page) {
     return Navigator.of(context).push(
       PageRouteBuilder<void>(
-        pageBuilder: (_, animation, _) => FadeTransition(
-          opacity: animation,
-          child: page,
-        ),
+        pageBuilder: (_, animation, _) =>
+            FadeTransition(opacity: animation, child: page),
         transitionsBuilder: (_, animation, _, child) =>
             FadeTransition(opacity: animation, child: child),
       ),
@@ -286,9 +283,9 @@ class _TopBar extends StatelessWidget {
                     child: Text(
                       skipLabel,
                       style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: colors.muted,
-                            fontWeight: FontWeight.w600,
-                          ),
+                        color: colors.muted,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   )
                 : null,
@@ -324,10 +321,7 @@ class _TopBar extends StatelessWidget {
 }
 
 class _BottomNav extends StatelessWidget {
-  const _BottomNav({
-    required this.nextLabel,
-    required this.onNext,
-  });
+  const _BottomNav({required this.nextLabel, required this.onNext});
 
   final String nextLabel;
   final VoidCallback? onNext;
@@ -382,8 +376,10 @@ class _StoryPage extends StatelessWidget {
         final progress = active ? reveal.value : 1.0;
         return LayoutBuilder(
           builder: (context, constraints) {
-            final illustrationHeight =
-                (constraints.maxHeight * 0.42).clamp(160.0, 260.0);
+            final illustrationHeight = (constraints.maxHeight * 0.42).clamp(
+              160.0,
+              260.0,
+            );
             return SingleChildScrollView(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: ConstrainedBox(
@@ -465,8 +461,10 @@ class _AuthPage extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final illustrationHeight =
-            (constraints.maxHeight * 0.32).clamp(120.0, 220.0);
+        final illustrationHeight = (constraints.maxHeight * 0.32).clamp(
+          120.0,
+          220.0,
+        );
         return SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(28, 8, 28, 24),
           child: ConstrainedBox(

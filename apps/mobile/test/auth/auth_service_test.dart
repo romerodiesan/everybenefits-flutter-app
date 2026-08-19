@@ -46,6 +46,13 @@ void main() {
     user = MockUser();
     when(() => credential.user).thenReturn(user);
     when(() => user.uid).thenReturn('uid-1');
+    when(
+      () => auth.setSettings(
+        appVerificationDisabledForTesting: any(
+          named: 'appVerificationDisabledForTesting',
+        ),
+      ),
+    ).thenAnswer((_) async {});
     sut = AuthService(auth: auth, googleSignIn: google);
   });
 
@@ -116,7 +123,10 @@ void main() {
         ),
       ).thenAnswer((_) async {});
 
-      await sut.sendSignInLinkToEmail(email: 'a@b.com', actionCodeSettings: settings);
+      await sut.sendSignInLinkToEmail(
+        email: 'a@b.com',
+        actionCodeSettings: settings,
+      );
 
       verify(
         () => auth.sendSignInLinkToEmail(
@@ -146,16 +156,6 @@ void main() {
       when(() => auth.isSignInWithEmailLink(any())).thenReturn(true);
 
       expect(sut.isSignInWithEmailLink('https://link'), isTrue);
-    });
-  });
-
-  group('anonymous', () {
-    test('signInAnonymously returns credential', () async {
-      when(() => auth.signInAnonymously()).thenAnswer((_) async => credential);
-
-      final result = await sut.signInAnonymously();
-
-      expect(result.user?.uid, 'uid-1');
     });
   });
 
@@ -213,9 +213,9 @@ void main() {
 
   group('google', () {
     test('signInWithGoogle signs in with id token credential', () async {
-      when(() => google.authenticate()).thenAnswer(
-        (_) async => const GoogleIdToken(idToken: 'id-token'),
-      );
+      when(
+        () => google.authenticate(),
+      ).thenAnswer((_) async => const GoogleIdToken(idToken: 'id-token'));
       when(
         () => auth.signInWithCredential(any()),
       ).thenAnswer((_) async => credential);

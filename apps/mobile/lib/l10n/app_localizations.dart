@@ -200,11 +200,11 @@ abstract class AppLocalizations {
   /// **'Your NPN is locked after setup.'**
   String get editProfileNpnFrozen;
 
-  /// No description provided for @roleGuest.
+  /// No description provided for @editProfileAgencyFrozen.
   ///
   /// In en, this message translates to:
-  /// **'Guest'**
-  String get roleGuest;
+  /// **'Your agency is assigned by your organization and cannot be changed here.'**
+  String get editProfileAgencyFrozen;
 
   /// No description provided for @roleStudent.
   ///
@@ -259,12 +259,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Sign in'**
   String get welcomeEnter;
-
-  /// No description provided for @welcomeGuest.
-  ///
-  /// In en, this message translates to:
-  /// **'Continue as guest'**
-  String get welcomeGuest;
 
   /// No description provided for @welcomeCreateAccount.
   ///
@@ -2306,6 +2300,96 @@ abstract class AppLocalizations {
   /// **'CONTACTS'**
   String get newChatContactsHeader;
 
+  /// No description provided for @newChatSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name, email, @username, or NPN'**
+  String get newChatSearchHint;
+
+  /// No description provided for @newChatSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'SEARCH RESULTS'**
+  String get newChatSearchResults;
+
+  /// No description provided for @newChatSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No members match this search.'**
+  String get newChatSearchEmpty;
+
+  /// No description provided for @peopleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'People'**
+  String get peopleTitle;
+
+  /// No description provided for @peopleHeroEyebrow.
+  ///
+  /// In en, this message translates to:
+  /// **'Your network'**
+  String get peopleHeroEyebrow;
+
+  /// No description provided for @peopleHeroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Find the right person'**
+  String get peopleHeroTitle;
+
+  /// No description provided for @peopleHeroBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a profile or start a private conversation without loading the entire directory.'**
+  String get peopleHeroBody;
+
+  /// No description provided for @peopleRecentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent conversations'**
+  String get peopleRecentTitle;
+
+  /// No description provided for @peopleContactsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your contacts'**
+  String get peopleContactsTitle;
+
+  /// No description provided for @peopleDirectoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Directory'**
+  String get peopleDirectoryTitle;
+
+  /// No description provided for @peopleSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'Search results'**
+  String get peopleSearchResults;
+
+  /// No description provided for @peopleMessageAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Message'**
+  String get peopleMessageAction;
+
+  /// No description provided for @peopleNoRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Your recent private conversations will appear here.'**
+  String get peopleNoRecent;
+
+  /// No description provided for @peopleNoContacts.
+  ///
+  /// In en, this message translates to:
+  /// **'No contacts to show yet. Use search to find someone directly.'**
+  String get peopleNoContacts;
+
+  /// No description provided for @peopleSearchEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No people match this search.'**
+  String get peopleSearchEmpty;
+
   /// No description provided for @chatEmptyThread.
   ///
   /// In en, this message translates to:
@@ -2347,6 +2431,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Copy'**
   String get chatCopy;
+
+  /// No description provided for @chatShareMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get chatShareMessage;
+
+  /// No description provided for @chatDeleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get chatDeleteMessage;
+
+  /// No description provided for @chatDeleteMessageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete message'**
+  String get chatDeleteMessageTitle;
+
+  /// No description provided for @chatDeleteForMe.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete for me'**
+  String get chatDeleteForMe;
+
+  /// No description provided for @chatDeleteForMeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only you will stop seeing this message.'**
+  String get chatDeleteForMeHint;
+
+  /// No description provided for @chatDeleteForEveryone.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete for everyone'**
+  String get chatDeleteForEveryone;
+
+  /// No description provided for @chatDeleteForEveryoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This message will disappear completely.'**
+  String get chatDeleteForEveryoneHint;
 
   /// No description provided for @chatCopied.
   ///
@@ -2419,6 +2545,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Info'**
   String get chatInfoTitle;
+
+  /// No description provided for @chatManageGroupsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage groups'**
+  String get chatManageGroupsTitle;
+
+  /// No description provided for @chatManageGroupsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'There are no groups to manage.'**
+  String get chatManageGroupsEmpty;
+
+  /// No description provided for @chatMemberCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} members'**
+  String chatMemberCount(int count);
+
+  /// No description provided for @chatEditGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit group'**
+  String get chatEditGroupTitle;
+
+  /// No description provided for @chatSaveGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get chatSaveGroup;
+
+  /// No description provided for @chatCurrentMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Current members'**
+  String get chatCurrentMembers;
+
+  /// No description provided for @chatAddMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Add member'**
+  String get chatAddMember;
+
+  /// No description provided for @chatLoadMoreMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Load more'**
+  String get chatLoadMoreMembers;
+
+  /// No description provided for @chatChangeGroupPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Change group photo'**
+  String get chatChangeGroupPhoto;
+
+  /// No description provided for @chatRemoveMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove member'**
+  String get chatRemoveMember;
+
+  /// No description provided for @chatClearHistory.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all messages'**
+  String get chatClearHistory;
+
+  /// No description provided for @chatClearHistoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear chat history?'**
+  String get chatClearHistoryTitle;
+
+  /// No description provided for @chatClearHistoryBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Every message in this chat will be permanently deleted for everyone.'**
+  String get chatClearHistoryBody;
+
+  /// No description provided for @chatHistoryCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat history cleared'**
+  String get chatHistoryCleared;
+
+  /// No description provided for @chatDeleteGroup.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete group'**
+  String get chatDeleteGroup;
+
+  /// No description provided for @chatDeleteGroupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this group?'**
+  String get chatDeleteGroupTitle;
+
+  /// No description provided for @chatDeleteGroupBody.
+  ///
+  /// In en, this message translates to:
+  /// **'The group and all of its messages will be permanently deleted.'**
+  String get chatDeleteGroupBody;
 
   /// No description provided for @chatPin.
   ///
@@ -3733,6 +3961,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add contact'**
   String get memberAddContact;
+
+  /// No description provided for @memberRequestSent.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact request sent.'**
+  String get memberRequestSent;
 
   /// No description provided for @memberCancelRequest.
   ///

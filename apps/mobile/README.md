@@ -63,9 +63,10 @@ firebase apps:sdkconfig IOS <appId> --project every-benefits-us \
 
 ## Roles / permissions
 
-Mobile hydrates `roles/{roleId}.permissions` (same as web). Built-in defaults
-cover `agency_owner`. Gates (forums/chats/academy/admin/license) use
-`AccessScope`, not hard-coded enum checks.
+Mobile hydrates `roles/{roleId}.permissions` (same as web). Built-in roles
+auto-seed on Functions init from shared defaults (including `agency_owner`).
+Gates (forums/chats/academy/admin/license) use `AccessScope`, not hard-coded
+enum checks.
 
 Smoke: student + agent + agency_owner can post/chat; guest cannot; manager sees
 Admin promote when `admin.access` is present.

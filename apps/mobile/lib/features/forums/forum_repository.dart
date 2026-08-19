@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../../firebase/https_callable.dart';
 import '../../users/avatar_storage.dart';
 import '../../users/profile_badge.dart';
 import '../../users/user_profile.dart';
@@ -127,12 +128,12 @@ class FirestoreForumStore implements ForumStore {
   FirestoreForumStore({
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
+    HttpsCallableClient? callables,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ??
-            FirebaseFunctions.instanceFor(region: 'us-central1');
+        _callables = callables ?? HttpsCallableClient(functions: functions);
 
   final FirebaseFirestore _firestore;
-  final FirebaseFunctions _functions;
+  final HttpsCallableClient _callables;
 
   CollectionReference<Map<String, dynamic>> get _threads =>
       _firestore.collection('threads');
@@ -491,10 +492,11 @@ class FirestoreForumStore implements ForumStore {
     required UserProfile author,
   }) async {
     final now = DateTime.now().toUtc();
-    final result = await _functions.httpsCallable('addForumReply').call(
+    final result = await _callables.call(
+      'addForumReply',
       <String, dynamic>{'threadId': threadId, 'body': body.trim()},
     );
-    final data = result.data is Map ? result.data as Map : const {};
+    final data = result is Map ? result : const {};
     final replyId = '${data['replyId'] ?? ''}';
     final reply = ForumReply(
       id: replyId,
@@ -529,7 +531,7 @@ class FirestoreForumStore implements ForumStore {
   Future<void> deleteThread(String threadId) async {
     // Cascade (replies/votes/participants) requires Admin SDK — client rules
     // deny reply/vote deletes.
-    await _functions.httpsCallable('deleteForumThread').call(<String, dynamic>{
+    await _callables.call('deleteForumThread', <String, dynamic>{
       'threadId': threadId,
     });
   }
@@ -539,7 +541,7 @@ class FirestoreForumStore implements ForumStore {
     required String threadId,
     required String replyId,
   }) async {
-    await _functions.httpsCallable('deleteForumReply').call(<String, dynamic>{
+    await _callables.call('deleteForumReply', <String, dynamic>{
       'threadId': threadId,
       'replyId': replyId,
     });

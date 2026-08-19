@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import '../../../app/app_spacing.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/role_badge.dart';
+import '../../../app/widgets/pulse_skeleton.dart';
 import '../../../l10n/l10n.dart';
 import '../../../users/avatar_storage.dart';
 import '../../../users/user_profile.dart';
@@ -436,24 +437,39 @@ class ProfileDock extends StatelessWidget {
     final colors = AppColors.of(context);
     final l10n = context.l10n;
     if (actions == null && onShare == null) return const SizedBox.shrink();
-    return Row(
-      children: [
-        if (actions != null) Expanded(child: actions!),
-        if (onShare != null) ...[
-          if (actions != null) const SizedBox(width: 8),
-          IconButton.filledTonal(
-            tooltip: l10n.profileShare,
-            onPressed: onShare,
-            style: IconButton.styleFrom(
-              backgroundColor: colors.sheet,
-              foregroundColor: colors.ink,
-              side: BorderSide(color: colors.border),
-              minimumSize: const Size(44, 44),
-            ),
-            icon: const Icon(Icons.ios_share_rounded),
+    return Container(
+      padding: const EdgeInsets.all(6),
+      decoration: BoxDecoration(
+        color: colors.canvas.withValues(alpha: 0.96),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.12),
+            blurRadius: 22,
+            offset: const Offset(0, 9),
           ),
         ],
-      ],
+      ),
+      child: Row(
+        children: [
+          if (actions != null) Expanded(child: actions!),
+          if (onShare != null) ...[
+            if (actions != null) const SizedBox(width: 6),
+            IconButton.filledTonal(
+              tooltip: l10n.profileShare,
+              onPressed: onShare,
+              style: IconButton.styleFrom(
+                backgroundColor: colors.sheet,
+                foregroundColor: colors.ink,
+                side: BorderSide(color: colors.border),
+                minimumSize: const Size(44, 44),
+              ),
+              icon: const Icon(Icons.ios_share_rounded),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -532,10 +548,7 @@ class ProfilePostsSection extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (loading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 32),
-            child: Center(child: CircularProgressIndicator()),
-          )
+          const PulseFeedSkeleton(itemCount: 3)
         else if (threads.isEmpty)
           Padding(
             padding: const EdgeInsets.fromLTRB(

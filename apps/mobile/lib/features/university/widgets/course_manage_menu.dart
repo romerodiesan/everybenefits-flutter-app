@@ -8,7 +8,6 @@ import '../../../app/pulse_haptics.dart';
 import '../../../app/theme.dart';
 import '../../../app/widgets/pulse_chrome.dart';
 import '../../../l10n/l10n.dart';
-import '../../../users/user_profile.dart';
 import '../course_models.dart';
 import '../course_repository.dart';
 
@@ -63,15 +62,17 @@ class CourseManageMenu extends StatelessWidget {
   final VoidCallback? onChanged;
 
   bool _isAdmin(BuildContext context) => canManageCourses(
-        AccessScope.accessOf(context, fallbackRoleId: profile.roleId),
-      );
+    AccessScope.accessOf(context, fallbackRoleId: profile.roleId),
+  );
 
   bool _canEdit(BuildContext context) => canEditCourse(
-        course: course,
-        uid: profile.uid,
-        roleOrPermissions:
-            AccessScope.accessOf(context, fallbackRoleId: profile.roleId),
-      );
+    course: course,
+    uid: profile.uid,
+    roleOrPermissions: AccessScope.accessOf(
+      context,
+      fallbackRoleId: profile.roleId,
+    ),
+  );
 
   List<_ManageAction> _actions(BuildContext context) {
     final actions = <_ManageAction>[];
@@ -123,13 +124,13 @@ class CourseManageMenu extends StatelessWidget {
   }
 
   IconData _iconFor(_ManageAction action) => switch (action) {
-        _ManageAction.edit => Icons.edit_outlined,
-        _ManageAction.submitReview => Icons.send_outlined,
-        _ManageAction.publish => Icons.verified_outlined,
-        _ManageAction.unpublish => Icons.visibility_off_outlined,
-        _ManageAction.rejectToDraft => Icons.undo_rounded,
-        _ManageAction.delete => Icons.delete_outline_rounded,
-      };
+    _ManageAction.edit => Icons.edit_outlined,
+    _ManageAction.submitReview => Icons.send_outlined,
+    _ManageAction.publish => Icons.verified_outlined,
+    _ManageAction.unpublish => Icons.visibility_off_outlined,
+    _ManageAction.rejectToDraft => Icons.undo_rounded,
+    _ManageAction.delete => Icons.delete_outline_rounded,
+  };
 
   String _labelFor(_ManageAction action, AppLocalizations l10n) =>
       switch (action) {
@@ -265,8 +266,9 @@ class _CourseEditSheet extends StatefulWidget {
 
 class _CourseEditSheetState extends State<_CourseEditSheet> {
   late final _title = TextEditingController(text: widget.course.title);
-  late final _description =
-      TextEditingController(text: widget.course.description);
+  late final _description = TextEditingController(
+    text: widget.course.description,
+  );
   late final _teacher = TextEditingController(text: widget.course.teacherName);
   late CourseLevel _level = widget.course.level;
   bool _saving = false;
@@ -331,16 +333,14 @@ class _CourseEditSheetState extends State<_CourseEditSheet> {
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    l10n.courseEditTitle,
-                    style: theme.textTheme.titleLarge,
-                  ),
+                  Text(l10n.courseEditTitle, style: theme.textTheme.titleLarge),
                   const SizedBox(height: AppSpacing.md),
                   TextField(
                     controller: _title,
                     textCapitalization: TextCapitalization.sentences,
-                    decoration:
-                        InputDecoration(labelText: l10n.courseFieldTitle),
+                    decoration: InputDecoration(
+                      labelText: l10n.courseFieldTitle,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   TextField(
@@ -357,8 +357,9 @@ class _CourseEditSheetState extends State<_CourseEditSheet> {
                   TextField(
                     controller: _teacher,
                     textCapitalization: TextCapitalization.words,
-                    decoration:
-                        InputDecoration(labelText: l10n.courseFieldTeacher),
+                    decoration: InputDecoration(
+                      labelText: l10n.courseFieldTeacher,
+                    ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   Text(

@@ -44,7 +44,10 @@ class ChatInboxSearchBar extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           borderSide: BorderSide(color: AppColors.brandOf(context), width: 1.4),
         ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 10,
+        ),
         isDense: true,
       ),
     );
@@ -92,10 +95,10 @@ class ChatInboxFilterChips extends StatelessWidget {
         color: selected ? brand.withValues(alpha: 0.4) : colors.border,
       ),
       labelStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-            color: selected ? brand : colors.ink,
-          ),
+        fontWeight: FontWeight.w700,
+        fontSize: 12,
+        color: selected ? brand : colors.ink,
+      ),
     );
   }
 }
@@ -335,10 +338,9 @@ class ChatInboxRow extends StatelessWidget {
     var preview = chat.isDefaultAgentGroup && chat.lastMessage.isEmpty
         ? l10n.chatsDefaultGroupBadge
         : (chat.lastMessage.isEmpty
-            ? l10n.chatsNoMessagesYet
-            : chat.lastMessage);
-    if (chat.lastMessage.isNotEmpty &&
-        chat.lastMessageSenderId == viewerUid) {
+              ? l10n.chatsNoMessagesYet
+              : chat.lastMessage);
+    if (chat.lastMessage.isNotEmpty && chat.lastMessageSenderId == viewerUid) {
       preview = l10n.chatYouPrefix(preview);
     }
 
@@ -391,8 +393,9 @@ class ChatInboxRow extends StatelessWidget {
                           style: theme.textTheme.labelLarge?.copyWith(
                             color: hasUnread ? brand : colors.muted,
                             fontSize: 11.5,
-                            fontWeight:
-                                hasUnread ? FontWeight.w800 : FontWeight.w600,
+                            fontWeight: hasUnread
+                                ? FontWeight.w800
+                                : FontWeight.w600,
                           ),
                         ),
                       ],
@@ -409,8 +412,9 @@ class ChatInboxRow extends StatelessWidget {
                               color: hasUnread
                                   ? colors.ink.withValues(alpha: 0.78)
                                   : colors.muted,
-                              fontWeight:
-                                  hasUnread ? FontWeight.w600 : FontWeight.w500,
+                              fontWeight: hasUnread
+                                  ? FontWeight.w600
+                                  : FontWeight.w500,
                               fontSize: 13.5,
                             ),
                           ),
@@ -435,58 +439,84 @@ class ChatInboxRow extends StatelessWidget {
     return Slidable(
       key: ValueKey('slide-${chat.id}'),
       startActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.28,
+        motion: const StretchMotion(),
+        extentRatio: 0.25,
         children: [
           CustomSlidableAction(
             onPressed: (_) => onPin(),
-            backgroundColor: brand,
+            backgroundColor: Colors.transparent,
             foregroundColor: AppColors.onBrandOf(context),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-                  size: 22,
+            padding: const EdgeInsets.fromLTRB(0, 5, 7, 5),
+            child: Container(
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: brand,
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      pinned
+                          ? Icons.push_pin_outlined
+                          : Icons.push_pin_rounded,
+                      size: 20,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      pinned ? l10n.chatUnpin : l10n.chatPin,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  pinned ? l10n.chatUnpin : l10n.chatPin,
-                  textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                    height: 1.15,
-                  ),
-                ),
-              ],
+              ),
             ),
           ),
         ],
       ),
       endActionPane: ActionPane(
-        motion: const DrawerMotion(),
-        extentRatio: 0.28,
+        motion: const StretchMotion(),
+        extentRatio: 0.25,
         children: [
           CustomSlidableAction(
             onPressed: (_) => onDelete(),
-            backgroundColor: const Color(0xFFB42318),
+            backgroundColor: Colors.transparent,
             foregroundColor: Colors.white,
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(Icons.delete_outline_rounded, size: 22),
-                const SizedBox(height: 4),
-                Text(
-                  l10n.chatDelete,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
+            padding: const EdgeInsets.fromLTRB(7, 5, 0, 5),
+            child: Container(
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: const Color(0xFFB42318),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.delete_outline_rounded, size: 20),
+                    const SizedBox(height: 2),
+                    Text(
+                      l10n.chatDelete,
+                      maxLines: 1,
+                      softWrap: false,
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ],

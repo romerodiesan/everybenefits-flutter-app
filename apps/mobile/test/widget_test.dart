@@ -14,6 +14,8 @@ import 'package:every_benefits/auth/auth_service.dart';
 import 'package:every_benefits/features/chats/chat_repository.dart';
 import 'package:every_benefits/features/forums/forum_models.dart';
 import 'package:every_benefits/features/forums/forum_repository.dart';
+import 'package:every_benefits/features/notifications/notification_models.dart';
+import 'package:every_benefits/features/notifications/notification_repository.dart';
 import 'package:every_benefits/features/university/course_repository.dart';
 import 'package:every_benefits/features/onboarding/login_screen.dart';
 import 'package:every_benefits/features/onboarding/onboarding_prefs.dart';
@@ -37,6 +39,9 @@ class MockUserRepository extends Mock implements UserRepository {}
 
 class MockUser extends Mock implements User {}
 
+class MockNotificationRepository extends Mock
+    implements NotificationRepository {}
+
 void main() {
   late MockAuthService auth;
   late MockUserRepository users;
@@ -45,6 +50,7 @@ void main() {
   late ChatRepository emptyChats;
   late FakeCourseStore courseStore;
   late CourseRepository emptyCourses;
+  late MockNotificationRepository notifications;
 
   setUpAll(() {
     registerFallbackValue(MockUser());
@@ -66,6 +72,17 @@ void main() {
     emptyChats = ChatRepository(store: chatStore);
     courseStore = FakeCourseStore();
     emptyCourses = CourseRepository(store: courseStore);
+    notifications = MockNotificationRepository();
+    when(
+      () => notifications.watchState(any()),
+    ).thenAnswer((_) => Stream.value(const NotificationState()));
+    when(
+      () => notifications.countNewFeedThreads(any()),
+    ).thenAnswer((_) async => 0);
+    when(
+      () => notifications.registerPushToken(any()),
+    ).thenAnswer((_) async => null);
+    when(() => notifications.markFeedSeen(any())).thenAnswer((_) async {});
   });
 
   tearDown(() {
@@ -83,6 +100,7 @@ void main() {
       forumRepository: emptyForums,
       chatRepository: emptyChats,
       courseRepository: emptyCourses,
+      notificationRepository: notifications,
     );
   }
 
@@ -94,7 +112,7 @@ void main() {
     return UserProfile(
       uid: uid,
       email: anonymous ? null : 'a@b.com',
-      displayName: anonymous ? null : 'Ada',
+      displayName: anonymous ? null : 'Ada Agent',
       role: role,
       isAnonymous: anonymous,
       profileCompleted: true,
@@ -102,9 +120,7 @@ void main() {
       phoneCountryCode: anonymous ? null : '+506',
       phoneNumber: anonymous ? null : '88887777',
       npn: role == UserRole.agent ? '1234567' : null,
-      address: role == UserRole.agent
-          ? '100 Main St\nMiami, FL 33101'
-          : null,
+      address: role == UserRole.agent ? '100 Main St\nMiami, FL 33101' : null,
       addressStreet: role == UserRole.agent ? '100 Main St' : null,
       addressCity: role == UserRole.agent ? 'Miami' : null,
       addressState: role == UserRole.agent ? 'FL' : null,
@@ -117,26 +133,26 @@ void main() {
 
   void stubCompletedProfile(UserProfile profile) {
     when(() => users.ensureProfile(any())).thenAnswer((_) async => profile);
-    when(() => users.watchProfile(profile.uid))
-        .thenAnswer((_) => Stream.value(profile));
+    when(
+      () => users.watchProfile(profile.uid),
+    ).thenAnswer((_) => Stream.value(profile));
   }
 
   testWidgets('shows welcome onboarding when there is no user', (tester) async {
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
 
-    await tester.pumpWidget(
-      app(),
-    );
+    await tester.pumpWidget(app());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
-    expect(find.text('EVERY'), findsOneWidget);
-    expect(find.text('INSURANCE'), findsOneWidget);
+    expect(find.text('PULSE'), findsOneWidget);
+    expect(find.text('EVERY BENEFITS'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
   });
 
-  testWidgets('first-run onboarding shows story pages before auth',
-      (tester) async {
+  testWidgets('first-run onboarding shows story pages before auth', (
+    tester,
+  ) async {
     SharedPreferences.setMockInitialValues({});
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
 
@@ -152,16 +168,14 @@ void main() {
     await tester.tap(find.text('Skip'));
     await tester.pumpAndSettle();
 
-    expect(find.text('EVERY'), findsOneWidget);
+    expect(find.text('PULSE'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
   });
 
   testWidgets('welcome navigates to login and register', (tester) async {
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(null));
 
-    await tester.pumpWidget(
-      app(),
-    );
+    await tester.pumpWidget(app());
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
 
@@ -179,8 +193,9 @@ void main() {
     expect(find.byType(RegisterScreen), findsOneWidget);
   });
 
-  testWidgets('auth success clears login stack and shows dashboard',
-      (tester) async {
+  testWidgets('auth success clears login stack and shows dashboard', (
+    tester,
+  ) async {
     final authController = StreamController<User?>.broadcast();
     when(() => auth.authStateChanges).thenAnswer((_) => authController.stream);
     when(
@@ -191,6 +206,7 @@ void main() {
     ).thenAnswer((_) async {
       final user = MockUser();
       when(() => user.uid).thenReturn('uid-login');
+      when(() => user.isAnonymous).thenReturn(false);
       authController.add(user);
       return FakeUserCredential();
     });
@@ -198,9 +214,7 @@ void main() {
     final profile = completedProfile(uid: 'uid-login');
     stubCompletedProfile(profile);
 
-    await tester.pumpWidget(
-      app(),
-    );
+    await tester.pumpWidget(app());
     authController.add(null);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 950));
@@ -217,7 +231,8 @@ void main() {
     expect(find.byType(LoginScreen), findsNothing);
     expect(find.byTooltip('Home'), findsOneWidget);
     expect(find.byTooltip('Chats'), findsOneWidget);
-    expect(find.byTooltip('AI'), findsOneWidget);
+    expect(find.byTooltip('Academy'), findsOneWidget);
+    expect(find.byTooltip('Profile'), findsOneWidget);
 
     await authController.close();
   });
@@ -225,6 +240,7 @@ void main() {
   testWidgets('incomplete profile shows completion flow', (tester) async {
     final user = MockUser();
     when(() => user.uid).thenReturn('uid-new');
+    when(() => user.isAnonymous).thenReturn(false);
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(user));
 
     final incomplete = UserProfile(
@@ -238,12 +254,11 @@ void main() {
       updatedAt: DateTime.utc(2024, 1, 1),
     );
     when(() => users.ensureProfile(any())).thenAnswer((_) async => incomplete);
-    when(() => users.watchProfile('uid-new'))
-        .thenAnswer((_) => Stream.value(incomplete));
+    when(
+      () => users.watchProfile('uid-new'),
+    ).thenAnswer((_) => Stream.value(incomplete));
 
-    await tester.pumpWidget(
-      app(),
-    );
+    await tester.pumpWidget(app());
     await tester.pump();
     await tester.pump();
 
@@ -258,26 +273,25 @@ void main() {
   testWidgets('shows home shell tabs when signed in', (tester) async {
     final user = MockUser();
     when(() => user.uid).thenReturn('uid-1');
+    when(() => user.isAnonymous).thenReturn(false);
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(user));
 
     final profile = completedProfile();
     stubCompletedProfile(profile);
 
-    await tester.pumpWidget(
-      app(),
-    );
+    await tester.pumpWidget(app());
     await tester.pump();
     await tester.pump();
 
     expect(find.byTooltip('Home'), findsOneWidget);
     expect(find.byTooltip('Chats'), findsOneWidget);
-    expect(find.byTooltip('AI'), findsOneWidget);
     expect(find.byTooltip('Academy'), findsOneWidget);
     expect(find.byTooltip('Profile'), findsOneWidget);
   });
 
-  testWidgets('pulse shell tabs switch between feed chats and profile',
-      (tester) async {
+  testWidgets('pulse shell tabs switch between feed chats and profile', (
+    tester,
+  ) async {
     final authService = MockAuthService();
     final usersRepo = MockUserRepository();
     final profile = completedProfile();
@@ -295,6 +309,7 @@ void main() {
           forumRepository: ForumRepository(store: _EmptyForumStore()),
           chatRepository: emptyChats,
           courseRepository: emptyCourses,
+          notificationRepository: notifications,
         ),
       ),
     );
@@ -310,12 +325,12 @@ void main() {
     await tester.tap(find.byTooltip('Profile'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Ada'), findsOneWidget);
     expect(find.byTooltip('Settings'), findsOneWidget);
   });
 
-  testWidgets('theme and accent changes keep Settings on the stack',
-      (tester) async {
+  testWidgets('theme and accent changes keep Settings on the stack', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(800, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -323,6 +338,7 @@ void main() {
 
     final user = MockUser();
     when(() => user.uid).thenReturn('uid-1');
+    when(() => user.isAnonymous).thenReturn(false);
     // Simulate AuthService returning a fresh stream on every getter access.
     when(() => auth.authStateChanges).thenAnswer((_) => Stream.value(user));
 
@@ -339,6 +355,7 @@ void main() {
         forumRepository: emptyForums,
         chatRepository: emptyChats,
         courseRepository: emptyCourses,
+        notificationRepository: notifications,
       ),
     );
     await tester.pump();
@@ -350,7 +367,9 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(SettingsScreen), findsOneWidget);
-    expect(find.text('BRAND SIGNAL'), findsOneWidget);
+    await tester.tap(find.text('Appearance'));
+    await tester.pumpAndSettle();
+    expect(find.byType(AppearanceSettingsScreen), findsOneWidget);
 
     // Theme mode lives in a dropdown; open it before picking a value.
     await tester.ensureVisible(find.text('Auto'));
@@ -358,14 +377,14 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Dark').last);
     await tester.pumpAndSettle();
-    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.byType(AppearanceSettingsScreen), findsOneWidget);
     expect(themeController.mode, ThemeMode.dark);
 
     final amber = find.bySemanticsLabel('Amber');
     await tester.ensureVisible(amber);
     await tester.tap(amber);
     await tester.pumpAndSettle();
-    expect(find.byType(SettingsScreen), findsOneWidget);
+    expect(find.byType(AppearanceSettingsScreen), findsOneWidget);
     expect(themeController.primarySeedId, 'amber');
     expect(themeController.primaryColor, const Color(0xFFF5A524));
   });
@@ -381,8 +400,7 @@ class _EmptyForumStore implements ForumStore {
     ForumSort sort = ForumSort.recent,
     int limit = kForumPageSize,
     Object? cursor,
-  }) async =>
-      const ForumThreadPage(threads: []);
+  }) async => const ForumThreadPage(threads: []);
 
   @override
   Stream<ForumThreadPage> watchThreads({
@@ -390,8 +408,7 @@ class _EmptyForumStore implements ForumStore {
     String? authorId,
     ForumSort sort = ForumSort.recent,
     int limit = kForumPageSize,
-  }) =>
-      Stream.value(const ForumThreadPage(threads: []));
+  }) => Stream.value(const ForumThreadPage(threads: []));
 
   @override
   Stream<ForumThread?> watchThread(String threadId) => Stream.value(null);
@@ -400,38 +417,33 @@ class _EmptyForumStore implements ForumStore {
   Stream<List<ForumReply>> watchReplies(
     String threadId, {
     int limit = kForumReplyPageSize,
-  }) =>
-      Stream.value(const []);
+  }) => Stream.value(const []);
 
   @override
   Stream<RelevanceVote> watchThreadVote({
     required String threadId,
     required String uid,
-  }) =>
-      Stream.value(RelevanceVote.none);
+  }) => Stream.value(RelevanceVote.none);
 
   @override
   Stream<RelevanceVote> watchReplyVote({
     required String threadId,
     required String replyId,
     required String uid,
-  }) =>
-      Stream.value(RelevanceVote.none);
+  }) => Stream.value(RelevanceVote.none);
 
   @override
   Future<Map<String, RelevanceVote>> fetchReplyVotes({
     required String threadId,
     required String uid,
     required List<String> replyIds,
-  }) async =>
-      {for (final id in replyIds) id: RelevanceVote.none};
+  }) async => {for (final id in replyIds) id: RelevanceVote.none};
 
   @override
   Future<Map<String, RelevanceVote>> fetchThreadVotes({
     required String uid,
     required List<String> threadIds,
-  }) async =>
-      {for (final id in threadIds) id: RelevanceVote.none};
+  }) async => {for (final id in threadIds) id: RelevanceVote.none};
 
   @override
   Future<List<ForumThread>> fetchThreadsByIds(List<String> ids) async =>

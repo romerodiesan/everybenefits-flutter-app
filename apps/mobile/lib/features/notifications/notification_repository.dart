@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 
+import '../../firebase/https_callable.dart';
 import 'notification_models.dart';
 
 class NotificationRepository {
@@ -13,13 +14,13 @@ class NotificationRepository {
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
     FirebaseMessaging? messaging,
+    HttpsCallableClient? callables,
   })  : _db = firestore ?? FirebaseFirestore.instance,
-        _functions =
-            functions ?? FirebaseFunctions.instanceFor(region: 'us-central1'),
+        _callables = callables ?? HttpsCallableClient(functions: functions),
         _messaging = messaging ?? FirebaseMessaging.instance;
 
   final FirebaseFirestore _db;
-  final FirebaseFunctions _functions;
+  final HttpsCallableClient _callables;
   final FirebaseMessaging _messaging;
 
   DocumentReference<Map<String, dynamic>> _stateRef(String uid) =>
@@ -47,7 +48,7 @@ class NotificationRepository {
   Future<void> markRead(String uid, AppNotification notification) async {
     if (notification.read) return;
     try {
-      await _functions.httpsCallable('markNotificationRead').call({
+      await _callables.call('markNotificationRead', {
         'notificationId': notification.id,
       });
       return;
@@ -72,7 +73,7 @@ class NotificationRepository {
 
   Future<void> markAllRead(String uid) async {
     try {
-      await _functions.httpsCallable('markAllNotificationsRead').call({});
+      await _callables.call('markAllNotificationsRead', {});
       return;
     } catch (_) {
       // Fall through.

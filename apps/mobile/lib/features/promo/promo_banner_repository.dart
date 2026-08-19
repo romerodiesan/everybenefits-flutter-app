@@ -9,18 +9,11 @@ import 'promo_banner_models.dart';
 abstract class PromoBannerStore {
   Stream<List<PromoBanner>> watchActiveBanners();
 
-  Future<String?> resolveImageUrl({
-    String? imageUrl,
-    String? imagePath,
-  });
+  Future<String?> resolveImageUrl({String? imageUrl, String? imagePath});
 }
 
 class FirestorePromoBannerStore implements PromoBannerStore {
-  FirestorePromoBannerStore({
-    FirebaseFirestore? firestore,
-    FirebaseStorage? storage,
-  })  : _firestore = firestore,
-        _storage = storage;
+  FirestorePromoBannerStore({this._firestore, this._storage});
 
   final FirebaseFirestore? _firestore;
   final FirebaseStorage? _storage;
@@ -34,16 +27,16 @@ class FirestorePromoBannerStore implements PromoBannerStore {
           .where('active', isEqualTo: true)
           .snapshots()
           .map((snap) {
-        final banners = <PromoBanner>[];
-        for (final doc in snap.docs) {
-          try {
-            banners.add(promoBannerFromMap(doc.id, doc.data()));
-          } catch (error, stack) {
-            debugPrint('promoBanner parse ${doc.id}: $error\n$stack');
-          }
-        }
-        return banners;
-      });
+            final banners = <PromoBanner>[];
+            for (final doc in snap.docs) {
+              try {
+                banners.add(promoBannerFromMap(doc.id, doc.data()));
+              } catch (error, stack) {
+                debugPrint('promoBanner parse ${doc.id}: $error\n$stack');
+              }
+            }
+            return banners;
+          });
     } catch (_) {
       // Firebase not initialized (widget tests) — treat as no promos.
       return Stream.value(const []);
@@ -51,13 +44,11 @@ class FirestorePromoBannerStore implements PromoBannerStore {
   }
 
   @override
-  Future<String?> resolveImageUrl({
-    String? imageUrl,
-    String? imagePath,
-  }) async {
+  Future<String?> resolveImageUrl({String? imageUrl, String? imagePath}) async {
     final path = imagePath?.trim();
     final rawUrl = imageUrl?.trim();
-    final preferPath = path != null &&
+    final preferPath =
+        path != null &&
         path.isNotEmpty &&
         (useFirebaseEmulators ||
             rawUrl == null ||
@@ -88,8 +79,8 @@ class FirestorePromoBannerStore implements PromoBannerStore {
       return rewriteEmulatorStorageUrl(candidate);
     }
 
-    if (preferPath) {
-      final resolved = await fromStoragePath(path!);
+    if (path != null && preferPath) {
+      final resolved = await fromStoragePath(path);
       if (resolved != null && resolved.isNotEmpty) return resolved;
       if (rawUrl != null && rawUrl.isNotEmpty) return fromUrl(rawUrl);
       return null;
@@ -100,17 +91,15 @@ class FirestorePromoBannerStore implements PromoBannerStore {
     return null;
   }
 }
+
 class PromoBannerRepository {
   PromoBannerRepository({PromoBannerStore? store})
-      : _store = store ?? FirestorePromoBannerStore();
+    : _store = store ?? FirestorePromoBannerStore();
 
   final PromoBannerStore _store;
 
   Stream<List<PromoBanner>> watchActiveBanners() => _store.watchActiveBanners();
 
-  Future<String?> resolveImageUrl({
-    String? imageUrl,
-    String? imagePath,
-  }) =>
+  Future<String?> resolveImageUrl({String? imageUrl, String? imagePath}) =>
       _store.resolveImageUrl(imageUrl: imageUrl, imagePath: imagePath);
 }

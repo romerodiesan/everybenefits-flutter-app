@@ -33,7 +33,8 @@ class SharedPostPreview {
       title: data['title'] as String? ?? '',
       excerpt: data['excerpt'] as String? ?? '',
       authorName: data['authorName'] as String?,
-      tags: (data['tags'] as List<dynamic>?)
+      tags:
+          (data['tags'] as List<dynamic>?)
               ?.map((e) => '$e')
               .where((e) => e.isNotEmpty)
               .toList() ??
@@ -66,6 +67,7 @@ class ChatConversation {
     required this.createdAt,
     required this.createdBy,
     this.title,
+    this.photoUrl,
     this.dmKey,
     this.lastMessageSenderId,
     this.unreadCounts = const {},
@@ -84,6 +86,7 @@ class ChatConversation {
   final Map<String, String> memberUsernames;
   final bool isGroup;
   final String? title;
+  final String? photoUrl;
   final String? dmKey;
   final String lastMessage;
   final DateTime lastMessageAt;
@@ -103,7 +106,10 @@ class ChatConversation {
 
   String titleFor(String viewerUid, {AppLocalizations? l10n}) {
     if (isDefaultAgentGroup) {
-      return l10n?.chatsDefaultGroupTitle ?? title?.trim() ?? 'Team';
+      final custom = title?.trim();
+      return custom?.isNotEmpty == true
+          ? custom!
+          : (l10n?.chatsDefaultGroupTitle ?? 'Team');
     }
     if (isGroup && title != null && title!.trim().isNotEmpty) {
       return title!.trim();
@@ -132,7 +138,10 @@ class ChatConversation {
   }
 
   String? inboxPhotoUrl(String viewerUid) {
-    if (isGroup) return null;
+    if (isGroup) {
+      final url = photoUrl?.trim();
+      return (url != null && url.isNotEmpty) ? url : null;
+    }
     final other = peerId(viewerUid);
     return other == null ? null : photoOf(other);
   }
@@ -175,17 +184,20 @@ class ChatConversation {
     Map<String, String>? memberPhotos,
     Map<String, String>? memberUsernames,
     String? title,
+    String? photoUrl,
+    List<String>? memberIds,
     bool? isDefaultAgentGroup,
     bool? dmMessagingEnabled,
   }) {
     return ChatConversation(
       id: id,
-      memberIds: memberIds,
+      memberIds: memberIds ?? this.memberIds,
       memberNames: memberNames ?? this.memberNames,
       memberPhotos: memberPhotos ?? this.memberPhotos,
       memberUsernames: memberUsernames ?? this.memberUsernames,
       isGroup: isGroup,
       title: title ?? this.title,
+      photoUrl: photoUrl ?? this.photoUrl,
       dmKey: dmKey,
       lastMessage: lastMessage ?? this.lastMessage,
       lastMessageAt: lastMessageAt ?? this.lastMessageAt,
@@ -209,6 +221,7 @@ class ChatConversation {
       'memberUsernames': memberUsernames,
       'isGroup': isGroup,
       'title': title,
+      'photoUrl': photoUrl,
       'dmKey': dmKey,
       'lastMessage': lastMessage,
       'lastMessageAt': lastMessageAt.toUtc().millisecondsSinceEpoch,
@@ -233,6 +246,7 @@ class ChatConversation {
       'memberUsernames': memberUsernames,
       'isGroup': isGroup,
       'title': title,
+      'photoUrl': photoUrl,
       'dmKey': dmKey,
       'lastMessage': lastMessage,
       'lastMessageAt': lastMessageAt.toUtc().millisecondsSinceEpoch,
@@ -279,9 +293,8 @@ class ChatConversation {
     if (membersRaw is Map) {
       memberIds = membersRaw.keys.map((e) => '$e').toList()..sort();
     } else {
-      memberIds = (data['memberIds'] as List<dynamic>?)
-              ?.map((e) => '$e')
-              .toList() ??
+      memberIds =
+          (data['memberIds'] as List<dynamic>?)?.map((e) => '$e').toList() ??
           const [];
     }
 
@@ -293,6 +306,11 @@ class ChatConversation {
       memberUsernames: _chatStringMap(data['memberUsernames']),
       isGroup: data['isGroup'] as bool? ?? false,
       title: data['title'] as String?,
+      photoUrl: () {
+        final raw = data['photoUrl'] as String?;
+        final trimmed = raw?.trim();
+        return (trimmed != null && trimmed.isNotEmpty) ? trimmed : null;
+      }(),
       dmKey: data['dmKey'] as String?,
       lastMessage: data['lastMessage'] as String? ?? '',
       lastMessageAt: _readDate(data['lastMessageAt']) ?? DateTime.now().toUtc(),
@@ -301,10 +319,11 @@ class ChatConversation {
       pinnedBy: pinned,
       createdAt: _readDate(data['createdAt']) ?? DateTime.now().toUtc(),
       createdBy: data['createdBy'] as String? ?? '',
-      isDefaultAgentGroup: data['isDefaultAgentGroup'] as bool? ??
+      isDefaultAgentGroup:
+          data['isDefaultAgentGroup'] as bool? ??
           id == ChatConversation.defaultAgentGroupId,
-      dmMessagingEnabled: data['isGroup'] == true ||
-          data['dmMessagingEnabled'] == true,
+      dmMessagingEnabled:
+          data['isGroup'] == true || data['dmMessagingEnabled'] == true,
     );
   }
 }
@@ -360,8 +379,9 @@ class ChatReplyTo {
 
   static String previewOf(ChatMessage message) {
     final title = message.sharedPost?.title.trim();
-    final source =
-        (title != null && title.isNotEmpty) ? title : message.body.trim();
+    final source = (title != null && title.isNotEmpty)
+        ? title
+        : message.body.trim();
     if (source.length <= maxPreviewLength) return source;
     return '${source.substring(0, maxPreviewLength)}…';
   }
@@ -454,8 +474,7 @@ class ChatMessage {
     return trimmed == 'Pregunta: $title' || trimmed == 'Question: $title';
   }
 
-  bool get showsTextBubble =>
-      body.trim().isNotEmpty && !isSyntheticShareBody;
+  bool get showsTextBubble => body.trim().isNotEmpty && !isSyntheticShareBody;
 
   /// Aggregated emoji → count for chips.
   Map<String, int> reactionCounts() {
@@ -503,21 +522,18 @@ class ChatMessage {
       sharedPost: sharedRaw is Map<String, dynamic>
           ? SharedPostPreview.fromMap(sharedRaw)
           : sharedRaw is Map
-              ? SharedPostPreview.fromMap(Map<String, dynamic>.from(sharedRaw))
-              : null,
+          ? SharedPostPreview.fromMap(Map<String, dynamic>.from(sharedRaw))
+          : null,
       reactions: reactions,
       replyTo: replyRaw is Map<String, dynamic>
           ? ChatReplyTo.fromMap(replyRaw)
           : replyRaw is Map
-              ? ChatReplyTo.fromMap(Map<String, dynamic>.from(replyRaw))
-              : null,
+          ? ChatReplyTo.fromMap(Map<String, dynamic>.from(replyRaw))
+          : null,
     );
   }
 
-  ChatMessage copyWith({
-    Map<String, String>? reactions,
-    ChatReplyTo? replyTo,
-  }) {
+  ChatMessage copyWith({Map<String, String>? reactions, ChatReplyTo? replyTo}) {
     return ChatMessage(
       id: id,
       chatId: chatId,
@@ -557,11 +573,7 @@ String chatInitials(String name) {
   return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
 }
 
-String formatChatTime(
-  DateTime at,
-  AppLocalizations l10n, {
-  DateTime? now,
-}) {
+String formatChatTime(DateTime at, AppLocalizations l10n, {DateTime? now}) {
   final local = at.toLocal();
   final n = (now ?? DateTime.now()).toLocal();
   final today = DateTime(n.year, n.month, n.day);
@@ -586,11 +598,7 @@ String formatChatTime(
   return '${local.day}/${local.month}';
 }
 
-String formatChatDayLabel(
-  DateTime at,
-  AppLocalizations l10n, {
-  DateTime? now,
-}) {
+String formatChatDayLabel(DateTime at, AppLocalizations l10n, {DateTime? now}) {
   final local = at.toLocal();
   final n = (now ?? DateTime.now()).toLocal();
   final today = DateTime(n.year, n.month, n.day);
@@ -628,6 +636,9 @@ String friendlyChatError(Object error, AppLocalizations l10n) {
   final raw = '$error';
   if (raw.contains('permission') || raw.contains('PERMISSION')) {
     return l10n.errNoPermission;
+  }
+  if (raw.contains('unauthenticated') || raw.contains('Sign in required')) {
+    return l10n.errChatRegister;
   }
 
   final cleaned = raw

@@ -26,14 +26,11 @@ ChatConversation _chat({
 
 void main() {
   test('partitionChatInbox puts default, then pins and recent', () {
-    final sections = partitionChatInbox(
-      [
-        _chat(id: 'recent'),
-        _chat(id: 'pinned', pinned: true),
-        _chat(id: 'agents-default', isDefault: true, pinned: true),
-      ],
-      'me',
-    );
+    final sections = partitionChatInbox([
+      _chat(id: 'recent'),
+      _chat(id: 'pinned', pinned: true),
+      _chat(id: 'agents-default', isDefault: true, pinned: true),
+    ], 'me');
 
     expect(sections.community.map((c) => c.id), ['agents-default']);
     expect(sections.pinned.map((c) => c.id), ['pinned']);
@@ -41,10 +38,7 @@ void main() {
   });
 
   test('userChatIndexMemberIds returns all members', () {
-    expect(
-      userChatIndexMemberIds(['me', 'other']),
-      ['me', 'other'],
-    );
+    expect(userChatIndexMemberIds(['me', 'other']), ['me', 'other']);
   });
 
   test('canCreateChatGroups allows admin instructor manager only', () {
@@ -55,13 +49,29 @@ void main() {
     expect(canCreateChatGroups(UserRole.student), isFalse);
   });
 
-  test('belongsInDefaultAgentGroup includes staff roles, not students', () {
+  test('belongsInDefaultAgentGroup includes every built-in member role', () {
     expect(belongsInDefaultAgentGroup(UserRole.agent), isTrue);
     expect(belongsInDefaultAgentGroup(UserRole.instructor), isTrue);
     expect(belongsInDefaultAgentGroup(UserRole.manager), isTrue);
     expect(belongsInDefaultAgentGroup(UserRole.admin), isTrue);
-    expect(belongsInDefaultAgentGroup(UserRole.student), isFalse);
-    expect(belongsInDefaultAgentGroup(UserRole.guest), isFalse);
+    expect(belongsInDefaultAgentGroup(UserRole.student), isTrue);
+  });
+
+  test('chat administration remains admin/system only', () {
+    expect(canManageChatGroups(UserRole.system), isTrue);
+    expect(canManageChatGroups(UserRole.admin), isTrue);
+    expect(canModerateChatMessages(UserRole.admin), isTrue);
+    expect(canManageChatGroups(UserRole.manager), isFalse);
+    expect(canModerateChatMessages(UserRole.instructor), isFalse);
+  });
+
+  test('staff contact access includes managers and instructors', () {
+    expect(canAccessAllChatContacts(UserRole.system), isTrue);
+    expect(canAccessAllChatContacts(UserRole.admin), isTrue);
+    expect(canAccessAllChatContacts(UserRole.manager), isTrue);
+    expect(canAccessAllChatContacts(UserRole.instructor), isTrue);
+    expect(canAccessAllChatContacts(UserRole.agent), isFalse);
+    expect(canAccessAllChatContacts(UserRole.student), isFalse);
   });
 
   test('inbox filter and query match unread groups and titles', () {

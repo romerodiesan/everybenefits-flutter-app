@@ -93,9 +93,11 @@ void main() {
     test('resolvePermissionsFromRoleDoc uses doc then defaults', () {
       final fromDoc = resolvePermissionsFromRoleDoc('student', {
         'active': true,
-        'permissions': ['forums.participate', 'chats.participate'],
+        'permissions': ['forums.participate'],
       });
-      expect(fromDoc, ['forums.participate', 'chats.participate']);
+      expect(fromDoc, contains(Perm.forumsParticipate));
+      expect(fromDoc, contains(Perm.chatsParticipate));
+      expect(fromDoc, contains(Perm.chatsGroupsDefaultJoin));
 
       final fallback = resolvePermissionsFromRoleDoc('agent', null);
       expect(fallback, contains(Perm.forumsParticipate));

@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 
-import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../firebase/https_callable.dart';
 import 'telemetry.dart';
 
 /// Schema version mirrored from `@pulse/shared` ACADEMY_ANALYTICS_SCHEMA_VERSION.
@@ -82,9 +82,9 @@ Future<void> _flushQueue() async {
   final batch = _queue.take(20).toList(growable: false);
   _queue.removeRange(0, batch.length);
   try {
-    await FirebaseFunctions.instance
-        .httpsCallable('recordAcademyAnalytics')
-        .call(<String, dynamic>{'events': batch});
+    await HttpsCallableClient().call('recordAcademyAnalytics', <String, dynamic>{
+      'events': batch,
+    });
   } catch (e) {
     debugPrint('[AcademyAnalytics] flush failed: $e');
     _queue.insertAll(0, batch.take(10));
@@ -119,15 +119,15 @@ Future<void> trackAcademyEvent({
     'platform': _platform(),
     'source': source,
     'clientEventId': _randomId(),
-    if (lessonId != null) 'lessonId': lessonId,
-    if (positionSeconds != null) 'positionSeconds': positionSeconds,
-    if (durationSeconds != null) 'durationSeconds': durationSeconds,
-    if (watchDeltaSeconds != null) 'watchDeltaSeconds': watchDeltaSeconds,
-    if (retentionBucket != null) 'retentionBucket': retentionBucket,
-    if (quizPassed != null) 'quizPassed': quizPassed,
-    if (quizScore != null) 'quizScore': quizScore,
-    if (locale != null) 'locale': locale,
-    if (trafficSource != null) 'trafficSource': trafficSource,
+    'lessonId': ?lessonId,
+    'positionSeconds': ?positionSeconds,
+    'durationSeconds': ?durationSeconds,
+    'watchDeltaSeconds': ?watchDeltaSeconds,
+    'retentionBucket': ?retentionBucket,
+    'quizPassed': ?quizPassed,
+    'quizScore': ?quizScore,
+    'locale': ?locale,
+    'trafficSource': ?trafficSource,
   };
   await _logGa(name, {
     'course_id': courseId,

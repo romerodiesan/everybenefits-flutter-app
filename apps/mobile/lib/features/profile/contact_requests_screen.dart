@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../app/app_spacing.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
+import '../../app/widgets/pulse_skeleton.dart';
 import '../../l10n/l10n.dart';
 import '../../users/social_repository.dart';
 import '../../users/user_profile.dart';
@@ -49,7 +50,7 @@ class _ContactRequestsScreenState extends State<ContactRequestsScreen> {
         future: _future,
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(child: CircularProgressIndicator());
+            return const PulseContactListSkeleton();
           }
           final people = snapshot.data!;
           if (people.isEmpty) {
@@ -76,10 +77,7 @@ class _ContactRequestsScreenState extends State<ContactRequestsScreen> {
                 },
                 child: Row(
                   children: [
-                    ProfileAvatar(
-                      profile: person,
-                      size: 44,
-                    ),
+                    ProfileAvatar(profile: person, size: 44),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(

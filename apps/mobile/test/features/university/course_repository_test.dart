@@ -93,25 +93,33 @@ void main() {
       expect(courses.map((c) => c.id), ['published']);
     });
 
-    test('authors see their own drafts and admins see the review queue',
-        () async {
-      store.seedCourse(
-        _course(id: 'mine', status: CourseStatus.draft, createdBy: 'manager-1'),
-      );
-      store.seedCourse(
-        _course(
-          id: 'theirs',
-          status: CourseStatus.pending,
-          createdBy: 'manager-2',
-        ),
-      );
+    test(
+      'authors see their own drafts and admins see the review queue',
+      () async {
+        store.seedCourse(
+          _course(
+            id: 'mine',
+            status: CourseStatus.draft,
+            createdBy: 'manager-1',
+          ),
+        );
+        store.seedCourse(
+          _course(
+            id: 'theirs',
+            status: CourseStatus.pending,
+            createdBy: 'manager-2',
+          ),
+        );
 
-      final authored = await repository.watchAuthoredCourses('manager-1').first;
-      final pending = await repository.watchPendingCourses().first;
+        final authored = await repository
+            .watchAuthoredCourses('manager-1')
+            .first;
+        final pending = await repository.watchPendingCourses().first;
 
-      expect(authored.map((c) => c.id), ['mine']);
-      expect(pending.map((c) => c.id), ['theirs']);
-    });
+        expect(authored.map((c) => c.id), ['mine']);
+        expect(pending.map((c) => c.id), ['theirs']);
+      },
+    );
   });
 
   group('enrollment', () {
@@ -129,13 +137,17 @@ void main() {
       expect(store.courses[course.id]!.studentCount, 1);
     });
 
-    test('guests cannot enroll', () async {
+    test('anonymous sessions cannot enroll', () async {
       final course = _course();
       store.seedCourse(course);
 
       expect(
         () => repository.enroll(
-          profile: _profile('guest', role: UserRole.guest, isAnonymous: true),
+          profile: _profile(
+            'anonymous',
+            role: UserRole.student,
+            isAnonymous: true,
+          ),
           course: course,
         ),
         throwsA(
@@ -199,33 +211,37 @@ void main() {
 
       expect(enrollment.progressFor(course.lessonCount), 1);
       expect(enrollment.isCompleted, isTrue);
-      expect(store.enrollments['student-1']![course.id]!.completedLessonIds,
-          ['l1', 'l2']);
+      expect(store.enrollments['student-1']![course.id]!.completedLessonIds, [
+        'l1',
+        'l2',
+      ]);
     });
 
-    test('saving position keeps the lesson incomplete and never goes negative',
-        () async {
-      final course = _course();
-      final content = _content();
-      store.seedCourse(course, withContent: content);
-      final enrollment = await repository.enroll(
-        profile: _profile('student-1'),
-        course: course,
-      );
+    test(
+      'saving position keeps the lesson incomplete and never goes negative',
+      () async {
+        final course = _course();
+        final content = _content();
+        store.seedCourse(course, withContent: content);
+        final enrollment = await repository.enroll(
+          profile: _profile('student-1'),
+          course: course,
+        );
 
-      final saved = await repository.saveLessonProgress(
-        uid: 'student-1',
-        course: course,
-        enrollment: enrollment,
-        lesson: content.lessons[0],
-        positionSeconds: -5,
-        completed: false,
-      );
+        final saved = await repository.saveLessonProgress(
+          uid: 'student-1',
+          course: course,
+          enrollment: enrollment,
+          lesson: content.lessons[0],
+          positionSeconds: -5,
+          completed: false,
+        );
 
-      expect(saved.lastPositionSeconds, 0);
-      expect(saved.completedLessonIds, isEmpty);
-      expect(saved.progressFor(course.lessonCount), 0);
-    });
+        expect(saved.lastPositionSeconds, 0);
+        expect(saved.completedLessonIds, isEmpty);
+        expect(saved.progressFor(course.lessonCount), 0);
+      },
+    );
 
     test('the same lesson is never counted twice', () async {
       final course = _course();
@@ -341,7 +357,10 @@ void main() {
 
   group('publication workflow', () {
     test('a manager can only move their draft to pending', () async {
-      final course = _course(status: CourseStatus.draft, createdBy: 'manager-1');
+      final course = _course(
+        status: CourseStatus.draft,
+        createdBy: 'manager-1',
+      );
       store.seedCourse(course);
       final manager = _profile('manager-1', role: UserRole.manager);
 
@@ -440,7 +459,6 @@ void main() {
 
   group('permission helpers', () {
     test('canAuthorCourses covers instructors, managers, and admins', () {
-      expect(canAuthorCourses(UserRole.guest), isFalse);
       expect(canAuthorCourses(UserRole.agent), isFalse);
       expect(canAuthorCourses(UserRole.instructor), isTrue);
       expect(canAuthorCourses(UserRole.manager), isTrue);

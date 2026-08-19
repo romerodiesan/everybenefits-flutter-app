@@ -11,6 +11,9 @@ import '../../app/widgets/pulse_skeleton.dart';
 import '../../auth/auth.dart';
 import '../../firebase/firebase_emulators.dart';
 import '../../l10n/l10n.dart';
+import '../../users/users.dart';
+import 'phone_profile_verify.dart';
+import 'widgets/profile_form_widgets.dart';
 
 /// Password + MFA enrollment for signed-in members.
 class SecuritySettingsScreen extends StatefulWidget {
@@ -39,6 +42,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
   String? _totpQrUrl;
   String? _phoneVerificationId;
   bool _smsSent = false;
+  PhoneCountry _smsCountry = resolvePhoneCountry(dialCode: '+1');
 
   @override
   void initState() {
@@ -205,17 +209,22 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
       );
       return;
     }
-    final phone = _phone.text.trim();
-    if (phone.isEmpty) return;
+    final phone = e164Phone(_smsCountry.dialCode, _phone.text);
+    if (phone.length < 8) return;
     if (!await _ensureRecentLogin()) return;
     setState(() => _busy = true);
     try {
-      final session =
-          await widget.authService.currentUser!.multiFactor.getSession();
+      final user = widget.authService.currentUser;
+      if (user == null) {
+        throw const AuthException(code: 'unauthenticated');
+      }
+      final session = await user.multiFactor.getSession();
       await widget.authService.verifyPhoneNumber(
         phoneNumber: phone,
         multiFactorSession: session,
-        onVerificationCompleted: (_) {},
+        onVerificationCompleted: (credential) async {
+          await _completePhoneCredential(credential);
+        },
         onVerificationFailed: (error) {
           if (!mounted) return;
           showAuthError(context, AuthException.fromFirebase(error));
@@ -239,6 +248,26 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
     }
   }
 
+  Future<void> _completePhoneCredential(PhoneAuthCredential credential) async {
+    try {
+      await widget.authService.enrollPhoneFactor(credential: credential);
+      if (!mounted) return;
+      _smsCode.clear();
+      _phone.clear();
+      setState(() {
+        _smsSent = false;
+        _phoneVerificationId = null;
+        _busy = false;
+      });
+      showAppSuccess(context, context.l10n.securityFactorAdded);
+      await _reloadFactors();
+    } catch (error, stack) {
+      if (!mounted) return;
+      showAuthError(context, error, stackTrace: stack);
+      setState(() => _busy = false);
+    }
+  }
+
   Future<void> _finishPhone() async {
     final vid = _phoneVerificationId;
     if (vid == null) return;
@@ -248,21 +277,12 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
         verificationId: vid,
         smsCode: _smsCode.text.trim(),
       );
-      await widget.authService.enrollPhoneFactor(credential: cred);
-      if (!mounted) return;
-      _smsCode.clear();
-      _phone.clear();
-      setState(() {
-        _smsSent = false;
-        _phoneVerificationId = null;
-      });
-      showAppSuccess(context, context.l10n.securityFactorAdded);
-      await _reloadFactors();
+      await _completePhoneCredential(cred);
     } catch (error, stack) {
       if (!mounted) return;
       showAuthError(context, error, stackTrace: stack);
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted && _busy) setState(() => _busy = false);
     }
   }
 
@@ -330,8 +350,9 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             TextField(
               controller: _currentPassword,
               obscureText: true,
-              decoration:
-                  InputDecoration(labelText: l10n.securityCurrentPassword),
+              decoration: InputDecoration(
+                labelText: l10n.securityCurrentPassword,
+              ),
             ),
           if (hasPassword) const SizedBox(height: AppSpacing.sm),
           TextField(
@@ -383,7 +404,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
           ],
           const SizedBox(height: AppSpacing.md),
           if (_loading)
-            const PulseListSkeleton(itemCount: 3)
+            const PulseListSkeleton(itemCount: 3, shrinkWrap: true)
           else if (_factors.isEmpty)
             Text(
               l10n.securityNoFactors,
@@ -449,9 +470,7 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             ),
             TextButton(
               onPressed: () {
-                Clipboard.setData(
-                  ClipboardData(text: _pendingTotp!.secretKey),
-                );
+                Clipboard.setData(ClipboardData(text: _pendingTotp!.secretKey));
               },
               child: Text(l10n.securityTotpSecret),
             ),
@@ -467,10 +486,25 @@ class _SecuritySettingsScreenState extends State<SecuritySettingsScreen> {
             ),
           ],
           const SizedBox(height: AppSpacing.md),
-          TextField(
-            controller: _phone,
-            keyboardType: TextInputType.phone,
-            decoration: InputDecoration(labelText: l10n.securityPhoneHint),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              PhoneCountryField(
+                country: _smsCountry,
+                enabled: !_smsSent && !_busy,
+                onChanged: (country) => setState(() => _smsCountry = country),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: TextField(
+                  controller: _phone,
+                  enabled: !_smsSent,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(labelText: l10n.fieldPhone),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: AppSpacing.sm),
           if (!_smsSent)

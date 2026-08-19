@@ -1,17 +1,19 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
-/// Ensures the signed-in staff member is in the default community group.
-class DefaultAgentGroupCallable {
-  DefaultAgentGroupCallable({FirebaseFunctions? functions})
-      : _functions = functions ??
-            FirebaseFunctions.instanceFor(region: 'us-central1');
+import '../../firebase/https_callable.dart';
 
-  final FirebaseFunctions _functions;
+/// Ensures the signed-in member is in the default Team community group.
+class DefaultAgentGroupCallable {
+  DefaultAgentGroupCallable({
+    FirebaseFunctions? functions,
+    HttpsCallableClient? callables,
+  }) : _callables = callables ?? HttpsCallableClient(functions: functions);
+
+  final HttpsCallableClient _callables;
 
   Future<void> ensureMembership({String? uid}) async {
-    final callable = _functions.httpsCallable('ensureDefaultAgentGroup');
     final data = <String, dynamic>{};
     if (uid != null) data['uid'] = uid;
-    await callable.call(data);
+    await _callables.call('ensureDefaultAgentGroup', data);
   }
 }

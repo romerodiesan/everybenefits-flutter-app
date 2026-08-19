@@ -77,8 +77,9 @@ class _ChatBubbleClusterState extends State<ChatBubbleCluster> {
 
     final column = Column(
       key: _bubbleKey,
-      crossAxisAlignment:
-          mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      crossAxisAlignment: mine
+          ? CrossAxisAlignment.end
+          : CrossAxisAlignment.start,
       children: [
         if (widget.showName)
           Padding(
@@ -106,9 +107,7 @@ class _ChatBubbleClusterState extends State<ChatBubbleCluster> {
                 decoration: BoxDecoration(
                   color: colors.glassFill,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border(
-                    left: BorderSide(color: brand, width: 3),
-                  ),
+                  border: Border(left: BorderSide(color: brand, width: 3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -193,72 +192,80 @@ class _ChatBubbleClusterState extends State<ChatBubbleCluster> {
     );
 
     final replyPane = ActionPane(
-      motion: const DrawerMotion(),
-      extentRatio: 0.22,
+      motion: const StretchMotion(),
+      extentRatio: 0.18,
       children: [
         CustomSlidableAction(
           onPressed: (_) {
             PulseHaptics.selection();
             widget.onSwipeReply();
           },
-          backgroundColor: brand,
+          backgroundColor: Colors.transparent,
           foregroundColor: AppColors.onBrandOf(context),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.reply_rounded, size: 22),
-              const SizedBox(height: 4),
-              Text(
-                l10n.chatReply,
-                style: const TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Semantics(
+            label: l10n.chatReply,
+            button: true,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: brand,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: brand.withValues(alpha: 0.28),
+                    blurRadius: 12,
+                    offset: const Offset(0, 5),
+                  ),
+                ],
               ),
-            ],
+              child: const Icon(Icons.reply_rounded, size: 22),
+            ),
           ),
         ),
       ],
     );
 
+    final avatar = widget.groupedWithOlder
+        ? const SizedBox(width: 28)
+        : GestureDetector(
+            onTap: widget.onTapSender,
+            child: ChatAvatar(
+              key: ValueKey('chat-avatar-${msg.senderId}'),
+              initials: chatInitials(msg.senderName),
+              name: msg.senderName,
+              photoUrl: widget.senderPhotoUrl ?? msg.senderPhotoUrl,
+              size: 28,
+            ),
+          );
+
     return Padding(
       padding: EdgeInsets.only(bottom: widget.groupedWithOlder ? 3 : 10),
-      child: Align(
-        alignment: mine ? Alignment.centerRight : Alignment.centerLeft,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxWidth: MediaQuery.sizeOf(context).width * 0.82,
-          ),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (!mine) ...[
-                if (widget.groupedWithOlder)
-                  const SizedBox(width: 28)
-                else
-                  GestureDetector(
-                    onTap: widget.onTapSender,
-                    child: ChatAvatar(
-                      initials: chatInitials(msg.senderName),
-                      name: msg.senderName,
-                      photoUrl: widget.senderPhotoUrl ?? msg.senderPhotoUrl,
-                      size: 28,
-                    ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!mine) ...[avatar, const SizedBox(width: 6)],
+          Expanded(
+            child: Slidable(
+              key: ValueKey('reply-${msg.id}'),
+              startActionPane: mine ? null : replyPane,
+              endActionPane: mine ? replyPane : null,
+              child: Align(
+                alignment: mine
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: MediaQuery.sizeOf(context).width * 0.72,
                   ),
-                const SizedBox(width: 6),
-              ],
-              Flexible(
-                child: Slidable(
-                  key: ValueKey('reply-${msg.id}'),
-                  startActionPane: mine ? null : replyPane,
-                  endActionPane: mine ? replyPane : null,
                   child: column,
                 ),
               ),
-            ],
+            ),
           ),
-        ),
+          if (mine) ...[const SizedBox(width: 6), avatar],
+        ],
       ),
     );
   }
@@ -286,9 +293,9 @@ class ChatDayPill extends StatelessWidget {
           child: Text(
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: colors.muted,
-                ),
+              fontWeight: FontWeight.w700,
+              color: colors.muted,
+            ),
           ),
         ),
       ),
@@ -312,9 +319,9 @@ class ChatUnreadDivider extends StatelessWidget {
             child: Text(
               context.l10n.chatNewMessages,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: brand,
-                    fontWeight: FontWeight.w800,
-                  ),
+                color: brand,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ),
           Expanded(child: Divider(color: brand.withValues(alpha: 0.35))),
@@ -358,8 +365,9 @@ class _MessageBubble extends StatelessWidget {
         ),
       ),
       child: Column(
-        crossAxisAlignment:
-            mine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        crossAxisAlignment: mine
+            ? CrossAxisAlignment.end
+            : CrossAxisAlignment.start,
         children: [
           _LinkifiedText(
             text: text,
@@ -439,7 +447,8 @@ class _LinkifiedText extends StatelessWidget {
               ),
               recognizer: onMentionTap == null
                   ? null
-                  : (TapGestureRecognizer()..onTap = () => onMentionTap!(handle)),
+                  : (TapGestureRecognizer()
+                      ..onTap = () => onMentionTap!(handle)),
             ),
           );
       }

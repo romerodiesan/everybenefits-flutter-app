@@ -148,6 +148,7 @@ class ForumsScreenState extends State<ForumsScreen> {
   Future<void> _reload() async {
     await _liveSub?.cancel();
     _liveSub = null;
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _loadingMore = false;
@@ -646,6 +647,12 @@ class ForumsScreenState extends State<ForumsScreen> {
           Expanded(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 220),
+              // Default layout keeps the outgoing child in a Stack. Reloading
+              // the feed reuses key `feed` before that fade finishes, which
+              // throws "Duplicate keys found".
+              layoutBuilder: (currentChild, _) {
+                return currentChild ?? const SizedBox.shrink();
+              },
               child: KeyedSubtree(
                 key: ValueKey<String>(
                   _loading

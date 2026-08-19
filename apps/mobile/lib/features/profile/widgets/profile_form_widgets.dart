@@ -33,19 +33,33 @@ class PhoneCountryField extends StatelessWidget {
     super.key,
     required this.country,
     required this.onChanged,
+    this.enabled = true,
   });
 
   final PhoneCountry country;
   final ValueChanged<PhoneCountry> onChanged;
+  final bool enabled;
 
   Future<void> _pick(BuildContext context) async {
     final selected = await showPulseSheet<PhoneCountry>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: AppColors.of(context).meshDeep,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (context) => _PhoneCountryPickerSheet(selected: country),
+      builder: (context) {
+        final media = MediaQuery.of(context);
+        final height = ((media.size.height - media.viewInsets.bottom) * 0.88)
+            .clamp(320.0, 720.0);
+        return Padding(
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: SizedBox(
+            height: height,
+            child: _PhoneCountryPickerSheet(selected: country),
+          ),
+        );
+      },
     );
     if (selected != null) onChanged(selected);
   }
@@ -53,7 +67,7 @@ class PhoneCountryField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return OutlinedButton(
-      onPressed: () => _pick(context),
+      onPressed: enabled ? () => _pick(context) : null,
       style: OutlinedButton.styleFrom(
         minimumSize: const Size(112, 56),
         padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -102,7 +116,9 @@ class _PhoneCountryPickerSheetState extends State<_PhoneCountryPickerSheet> {
                 ),
                 const SizedBox(height: 12),
                 TextField(
-                  autofocus: true,
+                  autofocus: false,
+                  keyboardType: TextInputType.text,
+                  textInputAction: TextInputAction.search,
                   onChanged: (value) => setState(() => _query = value),
                   decoration: InputDecoration(
                     hintText: l10n.phoneCountrySearch,
@@ -116,19 +132,30 @@ class _PhoneCountryPickerSheetState extends State<_PhoneCountryPickerSheet> {
             child: filtered.isEmpty
                 ? Center(child: Text(l10n.phoneCountryEmpty))
                 : ListView.builder(
+                    keyboardDismissBehavior:
+                        ScrollViewKeyboardDismissBehavior.onDrag,
                     itemCount: filtered.length,
                     itemBuilder: (context, index) {
                       final item = filtered[index];
                       return ListTile(
                         selected: item.iso2 == widget.selected.iso2,
-                        leading: Text(
-                          item.flag,
-                          style: const TextStyle(fontSize: 22),
+                        leading: SizedBox(
+                          width: 36,
+                          child: Text(
+                            item.flag,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              fontSize: 24,
+                              height: 1.2,
+                            ),
+                          ),
                         ),
                         title: Text(item.name),
+                        subtitle: Text(item.iso2),
                         trailing: Text(
                           item.dialCode,
-                          style: Theme.of(context).textTheme.bodyMedium,
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         onTap: () => Navigator.pop(context, item),
                       );
@@ -164,6 +191,7 @@ class ProfileDetailsForm extends StatefulWidget {
     this.busy = false,
     this.lockName = false,
     this.lockNpn = false,
+    this.lockAgency = false,
     this.showEmail = false,
     this.showUsername = false,
   });
@@ -188,6 +216,7 @@ class ProfileDetailsForm extends StatefulWidget {
   final bool busy;
   final bool lockName;
   final bool lockNpn;
+  final bool lockAgency;
   final bool showEmail;
   final bool showUsername;
 
@@ -289,7 +318,11 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
       addressCity: _isAgent ? _city.text.trim() : null,
       addressState: _isAgent ? _state.text.trim().toUpperCase() : null,
       addressZip: _isAgent ? _zip.text.trim() : null,
-      agency: _isAgent ? _agency.text.trim() : null,
+      agency: _isAgent
+          ? (widget.lockAgency
+              ? widget.initialAgency?.trim()
+              : _agency.text.trim())
+          : null,
     ));
   }
 
@@ -575,21 +608,30 @@ class _ProfileDetailsFormState extends State<ProfileDetailsForm> {
               ],
             ),
             const SizedBox(height: AppSpacing.md),
-            TextFormField(
-              controller: _agency,
-              textCapitalization: TextCapitalization.words,
-              textInputAction: TextInputAction.done,
-              decoration: InputDecoration(
-                labelText: l10n.fieldAgency,
-                helperText: l10n.fieldAgencyHelper,
+            if (widget.lockAgency)
+              _LockedFieldStrip(
+                label: l10n.fieldAgency,
+                value: widget.initialAgency?.trim().isNotEmpty == true
+                    ? widget.initialAgency!.trim()
+                    : '—',
+                hint: l10n.editProfileAgencyFrozen,
+              )
+            else
+              TextFormField(
+                controller: _agency,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                decoration: InputDecoration(
+                  labelText: l10n.fieldAgency,
+                  helperText: l10n.fieldAgencyHelper,
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return l10n.validationAgency;
+                  }
+                  return null;
+                },
               ),
-              validator: (value) {
-                if (value == null || value.trim().isEmpty) {
-                  return l10n.validationAgency;
-                }
-                return null;
-              },
-            ),
           ],
           const SizedBox(height: AppSpacing.xl),
           FilledButton(

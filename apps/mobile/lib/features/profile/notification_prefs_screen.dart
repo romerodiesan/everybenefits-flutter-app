@@ -137,7 +137,7 @@ class _NotificationPrefsScreenState extends State<NotificationPrefsScreen> {
             ),
           const SizedBox(height: AppSpacing.lg),
           if (!_loaded)
-            const PulseListSkeleton(itemCount: 4)
+            const PulseListSkeleton(itemCount: 4, shrinkWrap: true)
           else ...[
             _PrefTile(
               label: l10n.notificationsPrefChats,

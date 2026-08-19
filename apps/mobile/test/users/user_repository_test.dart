@@ -69,11 +69,24 @@ class FakeUserStore implements UserProfileStore {
     int limit = 80,
   }) async {
     return profiles.values
+        .where((p) => !p.isAnonymous && p.uid != excludeUid)
+        .take(limit)
+        .toList();
+  }
+
+  @override
+  Future<List<UserProfile>> searchDirectory(
+    String query, {
+    int limit = 24,
+  }) async {
+    final normalized = query.toLowerCase();
+    return profiles.values
         .where(
-          (p) =>
-              !p.isAnonymous &&
-              p.role != UserRole.guest &&
-              p.uid != excludeUid,
+          (profile) =>
+              profile.headlineName.toLowerCase().contains(normalized) ||
+              profile.handle.toLowerCase().contains(normalized) ||
+              (profile.email?.toLowerCase().contains(normalized) ?? false) ||
+              (profile.npn?.contains(normalized) ?? false),
         )
         .take(limit)
         .toList();
@@ -105,11 +118,7 @@ void main() {
     store = FakeUserStore();
     repository = UserRepository(
       store: store,
-      syncAuthProfile: ({
-        required uid,
-        displayName,
-        photoUrl,
-      }) async {},
+      syncAuthProfile: ({required uid, displayName, photoUrl}) async {},
     );
     user = MockUser();
   });
@@ -117,19 +126,17 @@ void main() {
   tearDown(() => store.dispose());
 
   group('ensureProfile', () {
-    test('creates completed guest profile for anonymous users', () async {
+    test('rejects anonymous users', () async {
       when(() => user.uid).thenReturn('anon-1');
       when(() => user.isAnonymous).thenReturn(true);
       when(() => user.email).thenReturn(null);
       when(() => user.displayName).thenReturn(null);
 
-      final profile = await repository.ensureProfile(user);
-
-      expect(profile.uid, 'anon-1');
-      expect(profile.role, UserRole.guest);
-      expect(profile.isAnonymous, isTrue);
-      expect(profile.profileCompleted, isTrue);
-      expect(store.profiles['anon-1']?.role, UserRole.guest);
+      await expectLater(
+        repository.ensureProfile(user),
+        throwsA(isA<StateError>()),
+      );
+      expect(store.profiles, isEmpty);
     });
 
     test('creates incomplete student profile for registered users', () async {
@@ -146,16 +153,6 @@ void main() {
       expect(profile.profileCompleted, isFalse);
       expect(profile.agency, kDefaultAgency);
       expect(profile.approvalStatus, 'pending');
-    });
-
-    test('creates guest with approved approvalStatus', () async {
-      when(() => user.uid).thenReturn('anon-2');
-      when(() => user.isAnonymous).thenReturn(true);
-      when(() => user.email).thenReturn(null);
-      when(() => user.displayName).thenReturn(null);
-
-      final profile = await repository.ensureProfile(user);
-      expect(profile.approvalStatus, 'approved');
     });
 
     test('returns existing profile without overwriting role', () async {
@@ -279,11 +276,7 @@ void main() {
       String? syncedPhoto;
       final repo = UserRepository(
         store: store,
-        syncAuthProfile: ({
-          required uid,
-          displayName,
-          photoUrl,
-        }) async {
+        syncAuthProfile: ({required uid, displayName, photoUrl}) async {
           syncedUid = uid;
           syncedName = displayName;
           syncedPhoto = photoUrl;
@@ -320,11 +313,7 @@ void main() {
       String? syncedPhotoUrl;
       final repo = UserRepository(
         store: store,
-        syncAuthProfile: ({
-          required uid,
-          displayName,
-          photoUrl,
-        }) async {},
+        syncAuthProfile: ({required uid, displayName, photoUrl}) async {},
         avatarStorage: AvatarStorage.test(
           ({required uid, required bytes}) async =>
               'https://cdn.example/avatars/$uid.jpg?alt=media&token=abc&v=99',
@@ -363,11 +352,7 @@ void main() {
 
       final repo = UserRepository(
         store: store,
-        syncAuthProfile: ({
-          required uid,
-          displayName,
-          photoUrl,
-        }) async {},
+        syncAuthProfile: ({required uid, displayName, photoUrl}) async {},
         avatarStorage: AvatarStorage.test(
           ({required uid, required bytes}) async =>
               'https://cdn.example/avatars/$uid.jpg?alt=media&token=abc',

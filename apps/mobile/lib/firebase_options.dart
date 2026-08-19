@@ -8,14 +8,8 @@
 // Native GOOGLE_APP_ID / appId MUST use platform segments `:ios:` / `:android:`.
 // A `:web:` id crashes FIRApp on device ("invalid GOOGLE_APP_ID").
 //
-// Current mobile appIds are format-valid placeholders for local/emulator runs.
-// Register real apps and replace plists + this file:
-//   firebase login --reauth
-//   firebase apps:create IOS --bundle-id com.everybenefits.everyinsurance \
-//     --project every-benefits-us
-//   firebase apps:sdkconfig IOS <appId> --project every-benefits-us -o \
-//     apps/mobile/ios/Runner/GoogleService-Info.plist
-//   (same for ANDROID / google-services.json)
+// Keep these options and each native Firebase config aligned with the same
+// bundle/package IDs. Phone Auth redirects depend on that exact identity.
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
@@ -52,7 +46,7 @@ class DefaultFirebaseOptions {
     measurementId: 'G-BM8TQCEQQN',
   );
 
-  /// Placeholder `:android:` appId — replace after firebase apps:create ANDROID.
+  /// Registered Android app for com.everybenefits.everyinsurance.
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk',
     appId: '1:1001601265155:android:0261ba55ef35c1a0',
@@ -62,7 +56,7 @@ class DefaultFirebaseOptions {
     databaseURL: 'https://every-benefits-us-default-rtdb.firebaseio.com',
   );
 
-  /// Placeholder `:ios:` appId — replace after firebase apps:create IOS.
+  /// Registered Apple app for com.everybenefits.everyinsurance.
   static const FirebaseOptions ios = FirebaseOptions(
     apiKey: 'AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk',
     appId: '1:1001601265155:ios:cb529635090fda32',

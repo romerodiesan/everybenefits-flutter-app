@@ -37,6 +37,11 @@ void main() {
   });
 
   testWidgets('student path collects name and phone only', (tester) async {
+    tester.view.physicalSize = const Size(800, 1200);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
     final incomplete = UserProfile(
       uid: 'uid-1',
       email: 's@b.com',
@@ -44,6 +49,8 @@ void main() {
       isAnonymous: false,
       profileCompleted: false,
       agency: kDefaultAgency,
+      phoneCountryCode: '+506',
+      phoneNumber: '88887777',
       createdAt: DateTime.utc(2024, 1, 1),
       updatedAt: DateTime.utc(2024, 1, 1),
     );
@@ -77,12 +84,14 @@ void main() {
 
     await tester.enterText(find.byType(TextFormField).at(0), 'Sam');
     await tester.enterText(find.byType(TextFormField).at(1), 'Student');
-    await tester.enterText(find.byType(TextFormField).at(2), '88887777');
+    await tester.enterText(find.byType(TextFormField).at(3), '88887777');
+    await tester.ensureVisible(find.text('Finish'));
     await tester.tap(find.text('Finish'));
     await tester.pump();
 
-    final captured = verify(() => users.updateProfile(captureAny())).captured.single
-        as UserProfile;
+    final captured =
+        verify(() => users.updateProfile(captureAny())).captured.single
+            as UserProfile;
     expect(captured.role, UserRole.student);
     expect(captured.displayName, 'Sam Student');
     expect(captured.phoneCountryCode, '+506');
@@ -91,8 +100,9 @@ void main() {
     expect(captured.npn, isNull);
   });
 
-  testWidgets('agent path requires NPN US address and agency default',
-      (tester) async {
+  testWidgets('agent path requires NPN US address and agency default', (
+    tester,
+  ) async {
     tester.view.physicalSize = const Size(800, 1800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -105,6 +115,8 @@ void main() {
       isAnonymous: false,
       profileCompleted: false,
       agency: kDefaultAgency,
+      phoneCountryCode: '+506',
+      phoneNumber: '70001111',
       createdAt: DateTime.utc(2024, 1, 1),
       updatedAt: DateTime.utc(2024, 1, 1),
     );
@@ -138,21 +150,22 @@ void main() {
 
     await tester.enterText(find.byType(TextFormField).at(0), 'Alex');
     await tester.enterText(find.byType(TextFormField).at(1), 'Agent');
-    await tester.enterText(find.byType(TextFormField).at(2), '70001111');
-    await tester.enterText(find.byType(TextFormField).at(3), '998877');
-    await tester.enterText(find.byType(TextFormField).at(4), '100 Main St');
-    // apt optional at index 5
-    await tester.enterText(find.byType(TextFormField).at(6), 'Miami');
-    await tester.enterText(find.byType(TextFormField).at(7), 'FL');
-    await tester.enterText(find.byType(TextFormField).at(8), '33101');
+    await tester.enterText(find.byType(TextFormField).at(3), '70001111');
+    await tester.enterText(find.byType(TextFormField).at(4), '9988776');
+    await tester.enterText(find.byType(TextFormField).at(5), '100 Main St');
+    // Bio and apartment remain optional at indices 2 and 6.
+    await tester.enterText(find.byType(TextFormField).at(7), 'Miami');
+    await tester.enterText(find.byType(TextFormField).at(8), 'FL');
+    await tester.enterText(find.byType(TextFormField).at(9), '33101');
     await tester.ensureVisible(find.text('Finish'));
     await tester.tap(find.text('Finish'));
     await tester.pump();
 
-    final captured = verify(() => users.updateProfile(captureAny())).captured.single
-        as UserProfile;
+    final captured =
+        verify(() => users.updateProfile(captureAny())).captured.single
+            as UserProfile;
     expect(captured.role, UserRole.agent);
-    expect(captured.npn, '998877');
+    expect(captured.npn, '9988776');
     expect(captured.addressStreet, '100 Main St');
     expect(captured.addressCity, 'Miami');
     expect(captured.addressState, 'FL');

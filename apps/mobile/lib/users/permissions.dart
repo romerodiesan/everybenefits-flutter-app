@@ -20,6 +20,11 @@ abstract final class Perm {
   static const chatsParticipate = 'chats.participate';
   static const chatsGroupsCreate = 'chats.groups.create';
   static const chatsGroupsDefaultJoin = 'chats.groups.default.join';
+  static const chatsGroupsManage = 'chats.groups.manage';
+  static const chatsMessagesModerate = 'chats.messages.moderate';
+  static const chatsContactsAll = 'chats.contacts.all';
+  static const chatsDirectorySensitiveRead = 'chats.directory.sensitive.read';
+  static const chatsDmOverrideOptout = 'chats.dm.override_optout';
   static const coursesAuthor = 'courses.author';
   static const coursesManage = 'courses.manage';
   static const coursesPublish = 'courses.publish';
@@ -45,10 +50,7 @@ String normalizeRoleId(String? roleId) {
 bool isBuiltinRoleId(String roleId) =>
     kBuiltinRoleIds.contains(normalizeRoleId(roleId));
 
-bool hasPermission(
-  Iterable<String>? rolePermissions,
-  String key,
-) {
+bool hasPermission(Iterable<String>? rolePermissions, String key) {
   if (rolePermissions == null) return false;
   for (final p in rolePermissions) {
     if (p == key) return true;
@@ -57,10 +59,7 @@ bool hasPermission(
 }
 
 /// Prefer live permission keys; fall back to the role slug for [can] helpers.
-Object resolveAccess(
-  List<String>? permissions,
-  String? roleId,
-) {
+Object resolveAccess(List<String>? permissions, String? roleId) {
   if (permissions != null && permissions.isNotEmpty) return permissions;
   final trimmed = roleId?.trim();
   return (trimmed == null || trimmed.isEmpty) ? 'student' : trimmed;
@@ -103,10 +102,30 @@ List<String> resolvePermissionsFromRoleDoc(
   if (data != null && data['active'] != false) {
     final raw = data['permissions'];
     if (raw is List) {
-      return raw.map((e) => '$e').where((k) => k.isNotEmpty).toList();
+      return {
+        ...raw.map((e) => '$e').where((k) => k.isNotEmpty),
+        ..._requiredBuiltinChatPermissions(normalized),
+      }.toList();
     }
   }
   return getDefaultPermissionsForRole(normalized);
+}
+
+List<String> _requiredBuiltinChatPermissions(String roleId) {
+  if (!isBuiltinRoleId(roleId)) return const [];
+  const base = [Perm.chatsParticipate, Perm.chatsGroupsDefaultJoin];
+  return switch (roleId) {
+    'admin' => const [
+      ...base,
+      Perm.chatsGroupsManage,
+      Perm.chatsMessagesModerate,
+      Perm.chatsContactsAll,
+      Perm.chatsDirectorySensitiveRead,
+      Perm.chatsDmOverrideOptout,
+    ],
+    'manager' || 'instructor' => const [...base, Perm.chatsContactsAll],
+    _ => const [...base],
+  };
 }
 
 bool can(Object? roleOrPermissions, String key) {
@@ -132,6 +151,10 @@ const Map<String, List<String>> defaultRolePermissions = {
     'admin.orgs.write',
     'admin.approvals.read',
     'admin.approvals.decide',
+    'admin.polls.read',
+    'admin.polls.write',
+    'admin.banners.read',
+    'admin.banners.write',
     'org.tree.read',
     'org.agency.create',
     'org.agency.update',
@@ -160,6 +183,11 @@ const Map<String, List<String>> defaultRolePermissions = {
     'chats.groups.create',
     'chats.groups.default.join',
     'chats.groups.autojoin.configure',
+    'chats.groups.manage',
+    'chats.messages.moderate',
+    'chats.contacts.all',
+    'chats.directory.sensitive.read',
+    'chats.dm.override_optout',
     'notifications.manage',
     'apps.web.access',
     'apps.studio.access',
@@ -176,6 +204,10 @@ const Map<String, List<String>> defaultRolePermissions = {
     'admin.orgs.write',
     'admin.approvals.read',
     'admin.approvals.decide',
+    'admin.polls.read',
+    'admin.polls.write',
+    'admin.banners.read',
+    'admin.banners.write',
     'org.tree.read',
     'org.agency.create',
     'org.agency.update',
@@ -194,6 +226,7 @@ const Map<String, List<String>> defaultRolePermissions = {
     'chats.groups.create',
     'chats.groups.default.join',
     'chats.groups.autojoin.configure',
+    'chats.contacts.all',
     'apps.web.access',
     'apps.studio.access',
     'apps.admin.access',
@@ -231,6 +264,7 @@ const Map<String, List<String>> defaultRolePermissions = {
     'academy.progress.read',
     'forums.participate',
     'chats.participate',
+    'chats.groups.default.join',
     'apps.web.access',
   ],
   'instructor': [
@@ -246,6 +280,7 @@ const Map<String, List<String>> defaultRolePermissions = {
     'chats.participate',
     'chats.groups.create',
     'chats.groups.default.join',
+    'chats.contacts.all',
     'apps.web.access',
     'apps.studio.access',
   ],
@@ -270,6 +305,11 @@ const _systemPermissions = [
   'chats.participate',
   'chats.groups.create',
   'chats.groups.default.join',
+  'chats.groups.manage',
+  'chats.messages.moderate',
+  'chats.contacts.all',
+  'chats.directory.sensitive.read',
+  'chats.dm.override_optout',
   'tools.access',
   'apps.studio.access',
   'apps.web.access',

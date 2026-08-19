@@ -48,4 +48,18 @@ class AvatarStorage {
     // the Storage emulator (empty body → NetworkImage exceptions).
     return sanitizeAvatarDownloadUrl(await ref.getDownloadURL());
   }
+
+  Future<String> uploadGroupPhoto({
+    required String chatId,
+    required Uint8List bytes,
+  }) async {
+    final testUpload = _testUpload;
+    if (testUpload != null) {
+      return testUpload(uid: chatId, bytes: bytes);
+    }
+    final storage = _storage ?? FirebaseStorage.instance;
+    final ref = storage.ref().child('chat-photos').child('$chatId.jpg');
+    await ref.putData(bytes, SettableMetadata(contentType: 'image/jpeg'));
+    return sanitizeAvatarDownloadUrl(await ref.getDownloadURL());
+  }
 }

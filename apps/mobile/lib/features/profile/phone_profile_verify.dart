@@ -17,19 +17,26 @@ bool phoneChangedFromProfile({
   required String nextCode,
   required String nextNumber,
 }) {
-  final prev =
-      '${previousCode?.trim() ?? ''}${previousNumber?.trim() ?? ''}';
-  final next = '${nextCode.trim()}${nextNumber.trim()}';
+  final prev = canonicalPhone(previousCode ?? '', previousNumber ?? '');
+  final next = canonicalPhone(nextCode, nextNumber);
   if (next.isEmpty) return prev.isNotEmpty;
   return prev != next;
 }
 
-String e164Phone(String countryCode, String nationalNumber) {
-  final code = countryCode.trim();
-  final digits = nationalNumber.trim().replaceAll(RegExp(r'[^\d]'), '');
-  final dial = code.startsWith('+') ? code : '+$code';
-  return '$dial$digits';
+String canonicalPhone(String countryCode, String nationalNumber) {
+  final dialDigits = countryCode.replaceAll(RegExp(r'[^\d]'), '');
+  final numberDigits = nationalNumber.replaceAll(RegExp(r'[^\d]'), '');
+  if (numberDigits.isEmpty) return '';
+  if (dialDigits.isEmpty) return '+$numberDigits';
+  if (numberDigits.startsWith(dialDigits) &&
+      numberDigits.length >= dialDigits.length + 7) {
+    return '+$numberDigits';
+  }
+  return '+$dialDigits$numberDigits';
 }
+
+String e164Phone(String countryCode, String nationalNumber) =>
+    canonicalPhone(countryCode, nationalNumber);
 
 /// Sends SMS (not MFA enroll), confirms code, links phone on Auth user.
 /// Returns true when verified; false if cancelled.
@@ -45,19 +52,13 @@ Future<bool> verifyProfilePhone({
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
-    builder: (ctx) => _PhoneVerifySheet(
-      authService: authService,
-      e164: e164,
-    ),
+    builder: (ctx) => _PhoneVerifySheet(authService: authService, e164: e164),
   );
   return result == true;
 }
 
 class _PhoneVerifySheet extends StatefulWidget {
-  const _PhoneVerifySheet({
-    required this.authService,
-    required this.e164,
-  });
+  const _PhoneVerifySheet({required this.authService, required this.e164});
 
   final AuthService authService;
   final String e164;
@@ -206,7 +207,9 @@ class _PhoneVerifySheetState extends State<_PhoneVerifySheet> {
                 FilteringTextInputFormatter.digitsOnly,
                 LengthLimitingTextInputFormatter(6),
               ],
-              decoration: InputDecoration(labelText: l10n.fieldVerificationCode),
+              decoration: InputDecoration(
+                labelText: l10n.fieldVerificationCode,
+              ),
               enabled: !_busy,
             ),
             const SizedBox(height: AppSpacing.md),
@@ -224,9 +227,7 @@ class _PhoneVerifySheetState extends State<_PhoneVerifySheet> {
               child: Center(child: CircularProgressIndicator()),
             ),
           TextButton(
-            onPressed: _busy
-                ? null
-                : () => Navigator.of(context).pop(false),
+            onPressed: _busy ? null : () => Navigator.of(context).pop(false),
             child: Text(l10n.actionCancel),
           ),
         ],

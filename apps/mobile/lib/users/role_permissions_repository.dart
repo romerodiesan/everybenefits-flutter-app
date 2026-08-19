@@ -8,8 +8,7 @@ abstract class RolePermissionsStore {
 }
 
 class FirestoreRolePermissionsStore implements RolePermissionsStore {
-  FirestoreRolePermissionsStore({FirebaseFirestore? firestore})
-    : _firestore = firestore;
+  FirestoreRolePermissionsStore({this._firestore});
 
   final FirebaseFirestore? _firestore;
 
@@ -17,10 +16,6 @@ class FirestoreRolePermissionsStore implements RolePermissionsStore {
   Stream<List<String>> watch(String roleId) {
     final normalized = normalizeRoleId(roleId);
     final defaults = getDefaultPermissionsForRole(normalized);
-    // Guests are not `isRegisteredMember` in rules — don't probe /roles.
-    if (normalized == 'guest') {
-      return Stream<List<String>>.value(defaults);
-    }
     try {
       final db = _firestore ?? FirebaseFirestore.instance;
       return Stream<List<String>>.multi((controller) {

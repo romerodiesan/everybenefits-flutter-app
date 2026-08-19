@@ -2,18 +2,18 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../firebase/firebase_emulators.dart';
+import '../../firebase/https_callable.dart';
 import 'forum_models.dart';
 
 /// Calls [castForumVote]. Votes are server-only (Firestore rules deny client
 /// writes to `votes` / `score`), so this never soft-fails into a client path.
 class ForumVoteCallable {
-  ForumVoteCallable({FirebaseFunctions? functions}) : _functionsOverride = functions;
+  ForumVoteCallable({
+    FirebaseFunctions? functions,
+    HttpsCallableClient? callables,
+  }) : _callables = callables ?? HttpsCallableClient(functions: functions);
 
-  final FirebaseFunctions? _functionsOverride;
-
-  FirebaseFunctions get _functions =>
-      _functionsOverride ??
-      FirebaseFunctions.instanceFor(region: 'us-central1');
+  final HttpsCallableClient _callables;
 
   /// Returns `true` on success.
   ///
@@ -26,8 +26,7 @@ class ForumVoteCallable {
     required RelevanceVote vote,
   }) async {
     try {
-      final callable = _functions.httpsCallable('castForumVote');
-      await callable.call(<String, dynamic>{
+      await _callables.call('castForumVote', <String, dynamic>{
         'threadId': threadId,
         'replyId': ?replyId,
         'vote': vote.value,

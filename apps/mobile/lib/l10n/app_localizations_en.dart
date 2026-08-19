@@ -62,7 +62,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get editProfileNpnFrozen => 'Your NPN is locked after setup.';
 
   @override
-  String get roleGuest => 'Guest';
+  String get editProfileAgencyFrozen =>
+      'Your agency is assigned by your organization and cannot be changed here.';
 
   @override
   String get roleStudent => 'Student';
@@ -90,9 +91,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get welcomeEnter => 'Sign in';
-
-  @override
-  String get welcomeGuest => 'Continue as guest';
 
   @override
   String get welcomeCreateAccount => 'Create account';
@@ -1189,6 +1187,54 @@ class AppLocalizationsEn extends AppLocalizations {
   String get newChatContactsHeader => 'CONTACTS';
 
   @override
+  String get newChatSearchHint => 'Search by name, email, @username, or NPN';
+
+  @override
+  String get newChatSearchResults => 'SEARCH RESULTS';
+
+  @override
+  String get newChatSearchEmpty => 'No members match this search.';
+
+  @override
+  String get peopleTitle => 'People';
+
+  @override
+  String get peopleHeroEyebrow => 'Your network';
+
+  @override
+  String get peopleHeroTitle => 'Find the right person';
+
+  @override
+  String get peopleHeroBody =>
+      'Open a profile or start a private conversation without loading the entire directory.';
+
+  @override
+  String get peopleRecentTitle => 'Recent conversations';
+
+  @override
+  String get peopleContactsTitle => 'Your contacts';
+
+  @override
+  String get peopleDirectoryTitle => 'Directory';
+
+  @override
+  String get peopleSearchResults => 'Search results';
+
+  @override
+  String get peopleMessageAction => 'Message';
+
+  @override
+  String get peopleNoRecent =>
+      'Your recent private conversations will appear here.';
+
+  @override
+  String get peopleNoContacts =>
+      'No contacts to show yet. Use search to find someone directly.';
+
+  @override
+  String get peopleSearchEmpty => 'No people match this search.';
+
+  @override
   String get chatEmptyThread => 'Say hello. Messages sync live.';
 
   @override
@@ -1208,6 +1254,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatCopy => 'Copy';
+
+  @override
+  String get chatShareMessage => 'Share';
+
+  @override
+  String get chatDeleteMessage => 'Delete';
+
+  @override
+  String get chatDeleteMessageTitle => 'Delete message';
+
+  @override
+  String get chatDeleteForMe => 'Delete for me';
+
+  @override
+  String get chatDeleteForMeHint => 'Only you will stop seeing this message.';
+
+  @override
+  String get chatDeleteForEveryone => 'Delete for everyone';
+
+  @override
+  String get chatDeleteForEveryoneHint =>
+      'This message will disappear completely.';
 
   @override
   String get chatCopied => 'Copied';
@@ -1248,6 +1316,61 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get chatInfoTitle => 'Info';
+
+  @override
+  String get chatManageGroupsTitle => 'Manage groups';
+
+  @override
+  String get chatManageGroupsEmpty => 'There are no groups to manage.';
+
+  @override
+  String chatMemberCount(int count) {
+    return '$count members';
+  }
+
+  @override
+  String get chatEditGroupTitle => 'Edit group';
+
+  @override
+  String get chatSaveGroup => 'Save';
+
+  @override
+  String get chatCurrentMembers => 'Current members';
+
+  @override
+  String get chatAddMember => 'Add member';
+
+  @override
+  String get chatLoadMoreMembers => 'Load more';
+
+  @override
+  String get chatChangeGroupPhoto => 'Change group photo';
+
+  @override
+  String get chatRemoveMember => 'Remove member';
+
+  @override
+  String get chatClearHistory => 'Clear all messages';
+
+  @override
+  String get chatClearHistoryTitle => 'Clear chat history?';
+
+  @override
+  String get chatClearHistoryBody =>
+      'Every message in this chat will be permanently deleted for everyone.';
+
+  @override
+  String get chatHistoryCleared => 'Chat history cleared';
+
+  @override
+  String get chatDeleteGroup => 'Delete group';
+
+  @override
+  String get chatDeleteGroupTitle => 'Delete this group?';
+
+  @override
+  String get chatDeleteGroupBody =>
+      'The group and all of its messages will be permanently deleted.';
 
   @override
   String get chatPin => 'Pin chat';
@@ -1984,6 +2107,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get memberAddContact => 'Add contact';
+
+  @override
+  String get memberRequestSent => 'Contact request sent.';
 
   @override
   String get memberCancelRequest => 'Cancel request';

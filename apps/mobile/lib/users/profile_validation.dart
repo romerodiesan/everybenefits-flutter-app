@@ -1,7 +1,6 @@
 /// Shared profile validation helpers (mirrors @pulse/shared profile.ts).
 library;
 
-import 'permissions.dart';
 import 'user_role.dart';
 
 final _emailLike = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
@@ -11,13 +10,11 @@ final _usZip = RegExp(r'^\d{5}(-\d{4})?$');
 final _nameLetters = RegExp(r'[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ]');
 
 /// True when license fields are required for this role (permission-aware).
-bool requiresLicenseProfile(String role) =>
-    requiresLicenseProfileAccess(role);
+bool requiresLicenseProfile(String role) => requiresLicenseProfileAccess(role);
 
 bool looksLikeEmailName(String value) => _emailLike.hasMatch(value.trim());
 
-int _letterCount(String part) =>
-    part.replaceAll(_nameLetters, '').length;
+int _letterCount(String part) => part.replaceAll(_nameLetters, '').length;
 
 String normalizePersonName(String raw) {
   final trimmed = raw.trim().replaceAll(RegExp(r'\s+'), ' ');
@@ -52,9 +49,10 @@ String normalizePersonName(String raw) {
 
 String composeDisplayName(String givenName, String familyName) {
   return normalizePersonName(
-    [givenName.trim(), familyName.trim()]
-        .where((part) => part.isNotEmpty)
-        .join(' '),
+    [
+      givenName.trim(),
+      familyName.trim(),
+    ].where((part) => part.isNotEmpty).join(' '),
   );
 }
 
@@ -286,8 +284,7 @@ Map<String, Object?> userSearchIndexFields(
   String? username,
 ]) {
   final normalized = displayName?.trim();
-  final name =
-      normalized == null || normalized.isEmpty ? null : normalized;
+  final name = normalized == null || normalized.isEmpty ? null : normalized;
   final emailTrim = email?.trim();
   final foldedName = name
       ?.toLowerCase()

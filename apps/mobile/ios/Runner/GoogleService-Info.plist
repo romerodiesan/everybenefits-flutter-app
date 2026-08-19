@@ -2,20 +2,14 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CLIENT_ID</key>
-	<string>1001601265155-9g2khfbo51k1ccsj31ilc1ciarq7rl7e.apps.googleusercontent.com</string>
-	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.1001601265155-9g2khfbo51k1ccsj31ilc1ciarq7rl7e</string>
-	<key>ANDROID_CLIENT_ID</key>
-	<string>1001601265155-jiv5dtk9v55uoa3qpo6vm57s6lsg2t8q.apps.googleusercontent.com</string>
 	<key>API_KEY</key>
-	<string>AIzaSyD5m-1RB6HQuBXwUfSKFBCDkdzNjSCiPLo</string>
+	<string>AIzaSyD7SRc2CY4ggUITwIqXNp1i1SPmcsTc-xk</string>
 	<key>GCM_SENDER_ID</key>
 	<string>1001601265155</string>
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>us.everybenefits.Every-Insurance</string>
+	<string>com.everybenefits.everyinsurance</string>
 	<key>PROJECT_ID</key>
 	<string>every-benefits-us</string>
 	<key>STORAGE_BUCKET</key>
@@ -31,7 +25,7 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:1001601265155:ios:b198277d563832e2d8e836</string>
+	<string>1:1001601265155:ios:cb529635090fda32</string>
 	<key>DATABASE_URL</key>
 	<string>https://every-benefits-us-default-rtdb.firebaseio.com</string>
 </dict>

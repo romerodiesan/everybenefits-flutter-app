@@ -32,6 +32,7 @@ class PulseShell extends StatefulWidget {
     this.forumRepository,
     this.chatRepository,
     this.courseRepository,
+    this.notificationRepository,
   });
 
   final AuthService authService;
@@ -40,6 +41,7 @@ class PulseShell extends StatefulWidget {
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
   final CourseRepository? courseRepository;
+  final NotificationRepository? notificationRepository;
 
   @override
   State<PulseShell> createState() => PulseShellState();
@@ -54,8 +56,8 @@ class PulseShellState extends State<PulseShell> {
   final _forumsKey = GlobalKey<ForumsScreenState>();
   final _chatsKey = GlobalKey<ChatsScreenState>();
   final _profileKey = GlobalKey<ProfileScreenState>();
-  final _notifications = NotificationRepository();
-  final _chatRepoFallback = ChatRepository();
+  late final NotificationRepository _notifications;
+  late final ChatRepository _chatRepoFallback;
   final _subs = <StreamSubscription<dynamic>>[];
 
   int _chatUnread = 0;
@@ -79,6 +81,8 @@ class PulseShellState extends State<PulseShell> {
   @override
   void initState() {
     super.initState();
+    _notifications = widget.notificationRepository ?? NotificationRepository();
+    _chatRepoFallback = widget.chatRepository ?? ChatRepository();
     _active = this;
     _bindBadgeStreams();
   }
@@ -86,7 +90,7 @@ class PulseShellState extends State<PulseShell> {
   void _bindBadgeStreams() {
     final profile = widget.profile;
     if (!profile.isRegisteredMember) return;
-    final chatRepo = widget.chatRepository ?? _chatRepoFallback;
+    final chatRepo = _chatRepoFallback;
     _subs.add(
       chatRepo.watchChats(profile.uid).listen((chats) {
         if (!mounted) return;
@@ -169,7 +173,7 @@ class PulseShellState extends State<PulseShell> {
           uid: widget.profile.uid,
           profile: widget.profile,
           forumRepository: widget.forumRepository,
-          chatRepository: widget.chatRepository ?? _chatRepoFallback,
+          chatRepository: _chatRepoFallback,
           courseRepository: widget.courseRepository,
         ),
       ),
@@ -269,7 +273,7 @@ class PulseShellState extends State<PulseShell> {
         openNewChat(
           context,
           profile: widget.profile,
-          chatRepository: widget.chatRepository,
+          chatRepository: _chatRepoFallback,
           userRepository: widget.userRepository,
         );
       case 2:
@@ -296,7 +300,7 @@ class PulseShellState extends State<PulseShell> {
         key: _forumsKey,
         profile: profile,
         forumRepository: widget.forumRepository,
-        chatRepository: widget.chatRepository,
+        chatRepository: _chatRepoFallback,
         embeddedInShell: true,
         notificationUnread: _notifUnread,
         onOpenNotifications: _openNotifications,
@@ -304,7 +308,7 @@ class PulseShellState extends State<PulseShell> {
       ChatsScreen(
         key: _chatsKey,
         profile: profile,
-        chatRepository: widget.chatRepository,
+        chatRepository: _chatRepoFallback,
         userRepository: widget.userRepository,
         showFab: false,
         notificationUnread: _notifUnread,

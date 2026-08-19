@@ -22,7 +22,6 @@ import 'edit_profile_screen.dart';
 import 'public_profile_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/profile_public_extras.dart';
-import 'widgets/profile_social_header.dart';
 
 /// Identity tab — social cover, stats, and the member's posts.
 class ProfileScreen extends StatefulWidget {
@@ -32,6 +31,7 @@ class ProfileScreen extends StatefulWidget {
     required this.userRepository,
     required this.profile,
     this.forumRepository,
+    this.socialRepository,
     this.notificationUnread = 0,
     this.onOpenNotifications,
   });
@@ -40,6 +40,7 @@ class ProfileScreen extends StatefulWidget {
   final UserRepository userRepository;
   final UserProfile profile;
   final ForumRepository? forumRepository;
+  final SocialRepository? socialRepository;
   final int notificationUnread;
   final VoidCallback? onOpenNotifications;
 
@@ -51,7 +52,8 @@ class ProfileScreenState extends State<ProfileScreen> {
   bool _uploading = false;
   late final ForumRepository _forums =
       widget.forumRepository ?? ForumRepository();
-  final _social = SocialRepository();
+  late final SocialRepository _social =
+      widget.socialRepository ?? SocialRepository();
   StreamSubscription<ForumThreadPage>? _postsSub;
   List<ForumThread> _threads = const [];
   var _postsLoading = true;
@@ -406,79 +408,118 @@ class ProfileScreenState extends State<ProfileScreen> {
         maxWidth: PulseContentWidth.feed,
         padding: EdgeInsets.zero,
         child: ListView(
-          clipBehavior: Clip.none,
-          physics: const BouncingScrollPhysics(),
-          padding: EdgeInsets.zero,
+          key: const Key('profile-scroll'),
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          padding: EdgeInsets.fromLTRB(
+            0,
+            MediaQuery.paddingOf(context).top + 10,
+            0,
+            MediaQuery.paddingOf(context).bottom,
+          ),
           children: [
-            ProfileSocialHeader(
-              person: profile,
-              posts: posts,
-              roleLabel: roleLabelForId(profile.roleId, l10n),
-              showLocation: profile.showLocationOnProfile,
-              followerCount: profile.followerCount,
-              followingCount: profile.followingCount,
-              onFollowersTap: () => _openFollowList(true),
-              onFollowingTap: () => _openFollowList(false),
-              avatarBusy: _uploading,
-              showEditBadge: true,
-              onAvatarTap: _uploading ? null : _pickAvatar,
-              onChooseUsername: openEdit,
-              topBar: Row(
-                children: [
-                  const Spacer(),
-                  if (widget.onOpenNotifications != null)
-                    NotificationBellButton(
-                      unreadCount: widget.notificationUnread,
-                      onPressed: widget.onOpenNotifications!,
-                      style: IconButton.styleFrom(
-                        backgroundColor: const Color(0x6B0C0D10),
-                        foregroundColor: const Color(0xFFF4F3F0),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              child: ModernProfileIdentityHero(
+                person: profile,
+                roleLabel: roleLabelForId(profile.roleId, l10n),
+                showLocation: profile.showLocationOnProfile,
+                avatarBusy: _uploading,
+                showEditBadge: true,
+                onAvatarTap: _uploading ? null : _pickAvatar,
+                menu: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (widget.onOpenNotifications != null) ...[
+                      NotificationBellButton(
+                        unreadCount: widget.notificationUnread,
+                        onPressed: widget.onOpenNotifications!,
+                        style: IconButton.styleFrom(
+                          backgroundColor: Colors.white.withValues(alpha: 0.14),
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(46, 46),
+                        ),
                       ),
+                      const SizedBox(width: 8),
+                    ],
+                    IconButton(
+                      key: const Key('profile-settings-button'),
+                      tooltip: l10n.profileSettingsTooltip,
+                      onPressed: _openSettings,
+                      style: IconButton.styleFrom(
+                        backgroundColor: Colors.white.withValues(alpha: 0.14),
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(46, 46),
+                      ),
+                      icon: const Icon(Icons.settings_outlined),
                     ),
-                  IconButton(
-                    tooltip: l10n.profileSettingsTooltip,
-                    onPressed: _openSettings,
-                    style: IconButton.styleFrom(
-                      backgroundColor: const Color(0x6B0C0D10),
-                      foregroundColor: const Color(0xFFF4F3F0),
-                    ),
-                    icon: const Icon(Icons.settings_outlined),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-            ProfileOverlapSheet(
-              dock: ProfileDock(
-                actions: OutlinedButton(
-                  onPressed: openEdit,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size.fromHeight(44),
-                  ),
-                  child: Text(l10n.fabEditProfile),
-                ),
-                onShare: () => sharePublicProfile(context, profile),
-              ),
+            Transform.translate(
+              offset: const Offset(0, -14),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ProfileTabBar(
-                    index: _tab,
-                    onChanged: (value) => setState(() => _tab = value),
-                  ),
-                  if (_tab == 0)
-                    ProfilePostsSection(
-                      threads: _threads,
-                      loading: _postsLoading,
-                      onOpenThread: _openThread,
-                      bottomPad: bottomPad,
-                    )
-                  else
-                    ProfileAboutSection(
-                      person: profile,
-                      showLocation: profile.showLocationOnProfile,
-                      bottomPad: bottomPad,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: ModernProfileActionPanel(
+                      shareTooltip: l10n.profileShare,
+                      onShare: () => sharePublicProfile(context, profile),
+                      actions: OutlinedButton.icon(
+                        key: const Key('profile-edit-button'),
+                        onPressed: openEdit,
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(44),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(15),
+                          ),
+                        ),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: Text(l10n.fabEditProfile),
+                      ),
                     ),
+                  ),
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: ModernProfileSignals(
+                      posts: posts,
+                      followers: profile.followerCount,
+                      following: profile.followingCount,
+                      onFollowersTap: () => _openFollowList(true),
+                      onFollowingTap: () => _openFollowList(false),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
+                    child: ModernProfileSectionSwitch(
+                      index: _tab,
+                      onChanged: (value) => setState(() => _tab = value),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 260),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeInCubic,
+                    child: _tab == 0
+                        ? ModernProfilePostsSection(
+                            key: const ValueKey('own-profile-posts'),
+                            threads: _threads,
+                            loading: _postsLoading,
+                            onOpenThread: _openThread,
+                          )
+                        : ModernProfileAboutSection(
+                            key: const ValueKey('own-profile-about'),
+                            person: profile,
+                            roleLabel: roleLabelForId(profile.roleId, l10n),
+                            showLocation: profile.showLocationOnProfile,
+                          ),
+                  ),
+                  SizedBox(height: bottomPad),
                 ],
               ),
             ),

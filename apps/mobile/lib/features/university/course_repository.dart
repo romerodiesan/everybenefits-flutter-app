@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../firebase/https_callable.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_role.dart';
 import 'course_models.dart';
@@ -83,7 +84,9 @@ class FirestoreCourseStore implements CourseStore {
     FirebaseFirestore? firestore,
     this.storage,
     this.functions,
-  }) : _firestore = firestore ?? FirebaseFirestore.instance;
+    HttpsCallableClient? callables,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _callables = callables ?? HttpsCallableClient(functions: functions);
 
   final FirebaseFirestore _firestore;
 
@@ -92,12 +95,10 @@ class FirestoreCourseStore implements CourseStore {
 
   /// Injected in tests; quizzes are graded by the `submitQuizAttempt` callable.
   final FirebaseFunctions? functions;
+  final HttpsCallableClient _callables;
   final Map<String, Future<String>> _storageUrlCache = {};
 
   FirebaseStorage get _bucket => storage ?? FirebaseStorage.instance;
-
-  FirebaseFunctions get _functions =>
-      functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
 
   CollectionReference<Map<String, dynamic>> get _courses =>
       _firestore.collection('courses');
@@ -218,7 +219,7 @@ class FirestoreCourseStore implements CourseStore {
       updatedAt: now,
     );
 
-    await _functions.httpsCallable('enrollInCourse').call(<String, dynamic>{
+    await _callables.call('enrollInCourse', <String, dynamic>{
       'courseId': courseId,
     });
     return enrollment;
@@ -231,7 +232,7 @@ class FirestoreCourseStore implements CourseStore {
   }) async {
     final lessonId = enrollment.lastLessonId;
     if (lessonId == null || lessonId.isEmpty) return;
-    await _functions.httpsCallable('saveCourseProgress').call(<String, dynamic>{
+    await _callables.call('saveCourseProgress', <String, dynamic>{
       'courseId': enrollment.courseId,
       'lessonId': lessonId,
       'positionSeconds': enrollment.lastPositionSeconds,
@@ -274,13 +275,11 @@ class FirestoreCourseStore implements CourseStore {
     required String lessonId,
     required Map<String, List<int>> answers,
   }) async {
-    final callable = _functions.httpsCallable('submitQuizAttempt');
-    final response = await callable.call<Object?>(<String, dynamic>{
+    final data = await _callables.call('submitQuizAttempt', <String, dynamic>{
       'courseId': courseId,
       'lessonId': lessonId,
       'answers': answers,
     });
-    final data = response.data;
     if (data is Map) {
       return QuizAttemptResult.fromMap(Map<String, dynamic>.from(data));
     }

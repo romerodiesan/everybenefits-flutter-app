@@ -45,8 +45,8 @@ void main() {
   });
 
   group('getOrCreateDm', () {
-    test('rejects guests and anonymous', () async {
-      final guest = _user('g1', role: UserRole.guest, anonymous: true);
+    test('rejects anonymous sessions', () async {
+      final guest = _user('g1', role: UserRole.student, anonymous: true);
       final agent = _user('a1');
       expect(
         () => repo.getOrCreateDm(me: guest, other: agent),
@@ -171,10 +171,7 @@ void main() {
     });
 
     test('isSyntheticShareBody is false for a real caption', () {
-      const post = SharedPostPreview(
-        threadId: 't1',
-        title: 'NPN',
-      );
+      const post = SharedPostPreview(threadId: 't1', title: 'NPN');
       final synthetic = ChatMessage(
         id: '1',
         chatId: 'c',
@@ -225,11 +222,7 @@ void main() {
       final me = _user('me');
       final other = _user('other');
       expect(
-        () => repo.createGroup(
-          creator: me,
-          title: 'Team',
-          members: [other],
-        ),
+        () => repo.createGroup(creator: me, title: 'Team', members: [other]),
         throwsA(isA<StateError>()),
       );
     });
@@ -275,7 +268,10 @@ void main() {
         uid: 'other',
         emoji: '👍',
       );
-      expect(store.messages[chat.id]!.first.reactions.containsKey('other'), isFalse);
+      expect(
+        store.messages[chat.id]!.first.reactions.containsKey('other'),
+        isFalse,
+      );
 
       await repo.toggleReaction(
         chatId: chat.id,
@@ -356,22 +352,54 @@ void main() {
   });
 
   group('setPinned inbox', () {
-    test('pinned chat appears in pinned partition for that user only', () async {
+    test(
+      'pinned chat appears in pinned partition for that user only',
+      () async {
+        final me = _user('me', name: 'María');
+        final other = _user('other', name: 'Carlos');
+        final chat = await repo.getOrCreateDm(me: me, other: other);
+
+        await repo.setPinned(chatId: chat.id, uid: me.uid, pinned: true);
+
+        final mine = await repo.watchChats(me.uid).first;
+        final sections = partitionChatInbox(mine, me.uid);
+        expect(sections.pinned.map((c) => c.id), contains(chat.id));
+        expect(sections.recent.map((c) => c.id), isNot(contains(chat.id)));
+
+        final theirs = await repo.watchChats(other.uid).first;
+        final otherSections = partitionChatInbox(theirs, other.uid);
+        expect(otherSections.pinned.map((c) => c.id), isNot(contains(chat.id)));
+        expect(otherSections.recent.map((c) => c.id), contains(chat.id));
+      },
+    );
+  });
+
+  group('message visibility', () {
+    test('hides a message only for the selected viewer', () async {
       final me = _user('me', name: 'María');
       final other = _user('other', name: 'Carlos');
       final chat = await repo.getOrCreateDm(me: me, other: other);
+      final message = await repo.sendMessage(
+        chatId: chat.id,
+        body: 'private copy',
+        author: me,
+      );
 
-      await repo.setPinned(chatId: chat.id, uid: me.uid, pinned: true);
+      await repo.hideMessageForMe(
+        chatId: chat.id,
+        messageId: message.id,
+        uid: me.uid,
+      );
 
-      final mine = await repo.watchChats(me.uid).first;
-      final sections = partitionChatInbox(mine, me.uid);
-      expect(sections.pinned.map((c) => c.id), contains(chat.id));
-      expect(sections.recent.map((c) => c.id), isNot(contains(chat.id)));
-
-      final theirs = await repo.watchChats(other.uid).first;
-      final otherSections = partitionChatInbox(theirs, other.uid);
-      expect(otherSections.pinned.map((c) => c.id), isNot(contains(chat.id)));
-      expect(otherSections.recent.map((c) => c.id), contains(chat.id));
+      expect(
+        await repo.watchHiddenMessageIds(chatId: chat.id, uid: me.uid).first,
+        contains(message.id),
+      );
+      expect(
+        await repo.watchHiddenMessageIds(chatId: chat.id, uid: other.uid).first,
+        isEmpty,
+      );
+      expect(store.messages[chat.id], hasLength(1));
     });
   });
 
@@ -386,6 +414,31 @@ void main() {
       expect(
         formatChatTime(DateTime(2024, 6, 11, 9, 5), l10n, now: now),
         'Yesterday',
+      );
+    });
+  });
+
+  group('friendlyChatError', () {
+    test('maps unauthenticated callable failures to sign-up copy', () {
+      final l10n = AppLocalizationsEn();
+      expect(
+        friendlyChatError(
+          Exception('[firebase_functions/unauthenticated] Sign in required.'),
+          l10n,
+        ),
+        l10n.errChatRegister,
+      );
+    });
+
+    test('maps permission errors and unknown failures', () {
+      final l10n = AppLocalizationsEn();
+      expect(
+        friendlyChatError(Exception('PERMISSION_DENIED'), l10n),
+        l10n.errNoPermission,
+      );
+      expect(
+        friendlyChatError(Exception('internal timeout'), l10n),
+        l10n.errGenericRetry,
       );
     });
   });

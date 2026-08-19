@@ -6,11 +6,16 @@ import 'package:every_benefits/features/chats/chat_repository.dart';
 class FakeChatStore implements ChatStore {
   final Map<String, ChatConversation> chats = {};
   final Map<String, List<ChatMessage>> messages = {};
+  final Map<String, Set<String>> hiddenMessages = {};
   final Set<String> _hiddenInbox = {};
   final _chatsController = StreamController<void>.broadcast();
   final Map<String, StreamController<void>> _messageControllers = {};
+  final Map<String, StreamController<void>> _hiddenControllers = {};
 
   String _hideKey(String uid, String chatId) => '$uid|$chatId';
+
+  @override
+  Future<void> prepareAccess() async {}
 
   void dispose() {
     _chatsController.close();
@@ -18,6 +23,9 @@ class FakeChatStore implements ChatStore {
       c.close();
     }
     for (final c in _typingControllers.values) {
+      c.close();
+    }
+    for (final c in _hiddenControllers.values) {
       c.close();
     }
   }
@@ -34,14 +42,15 @@ class FakeChatStore implements ChatStore {
   @override
   Stream<List<ChatConversation>> watchChats(String uid) async* {
     List<ChatConversation> current() {
-      final list = chats.values
-          .where(
-            (c) =>
-                c.memberIds.contains(uid) &&
-                !_hiddenInbox.contains(_hideKey(uid, c.id)),
-          )
-          .toList()
-        ..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
+      final list =
+          chats.values
+              .where(
+                (c) =>
+                    c.memberIds.contains(uid) &&
+                    !_hiddenInbox.contains(_hideKey(uid, c.id)),
+              )
+              .toList()
+            ..sort((a, b) => b.lastMessageAt.compareTo(a.lastMessageAt));
       return list;
     }
 
@@ -244,8 +253,9 @@ class FakeChatStore implements ChatStore {
           : message.body;
       final nextUnread = Map<String, int>.from(chat.unreadCounts);
       for (final memberId in chat.memberIds) {
-        nextUnread[memberId] =
-            memberId == message.senderId ? 0 : (nextUnread[memberId] ?? 0) + 1;
+        nextUnread[memberId] = memberId == message.senderId
+            ? 0
+            : (nextUnread[memberId] ?? 0) + 1;
       }
       chats[message.chatId] = chat.copyWith(
         lastMessage: preview,
@@ -279,6 +289,43 @@ class FakeChatStore implements ChatStore {
     }
     list[index] = list[index].copyWith(reactions: current);
     _messagesBump(chatId).add(null);
+  }
+
+  String _hiddenKey(String uid, String chatId) => '$uid|$chatId';
+
+  StreamController<void> _hiddenBump(String key) {
+    return _hiddenControllers.putIfAbsent(
+      key,
+      () => StreamController<void>.broadcast(),
+    );
+  }
+
+  @override
+  Stream<Set<String>> watchHiddenMessageIds({
+    required String chatId,
+    required String uid,
+  }) async* {
+    final key = _hiddenKey(uid, chatId);
+    Set<String> current() => Set<String>.from(hiddenMessages[key] ?? const {});
+    yield current();
+    yield* _hiddenBump(key).stream.map((_) => current());
+  }
+
+  @override
+  Future<void> setMessageHidden({
+    required String chatId,
+    required String messageId,
+    required String uid,
+    required bool hidden,
+  }) async {
+    final key = _hiddenKey(uid, chatId);
+    final ids = hiddenMessages.putIfAbsent(key, () => <String>{});
+    if (hidden) {
+      ids.add(messageId);
+    } else {
+      ids.remove(messageId);
+    }
+    _hiddenBump(key).add(null);
   }
 
   final Map<String, Map<String, int>> typing = {};

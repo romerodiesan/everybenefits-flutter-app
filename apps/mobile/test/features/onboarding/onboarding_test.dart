@@ -49,19 +49,18 @@ void main() {
     await tester.pump();
   }
 
-  testWidgets('welcome story advances to auth with Get started', (tester) async {
+  testWidgets('welcome story advances to auth with Get started', (
+    tester,
+  ) async {
     await pumpAuth(
       tester,
-      WelcomeScreen(
-        authService: auth,
-        onboardingCompletedOverride: false,
-      ),
+      WelcomeScreen(authService: auth, onboardingCompletedOverride: false),
     );
     await tester.pump(const Duration(milliseconds: 100));
 
     expect(find.text('Learn out loud'), findsOneWidget);
 
-    for (var i = 0; i < 3; i++) {
+    for (var i = 0; i < 2; i++) {
       await tester.tap(find.text('Next'));
       await tester.pumpAndSettle();
     }
@@ -70,17 +69,15 @@ void main() {
     await tester.tap(find.text('Get started'));
     await tester.pumpAndSettle();
 
-    expect(find.text('EVERY'), findsOneWidget);
+    expect(find.text('PULSE'), findsOneWidget);
+    expect(find.text('EVERY BENEFITS'), findsOneWidget);
     expect(find.text('Sign in'), findsOneWidget);
   });
 
   testWidgets('completed override opens auth page directly', (tester) async {
     await pumpAuth(
       tester,
-      WelcomeScreen(
-        authService: auth,
-        onboardingCompletedOverride: true,
-      ),
+      WelcomeScreen(authService: auth, onboardingCompletedOverride: true),
     );
     await tester.pump(const Duration(milliseconds: 100));
 
@@ -104,19 +101,19 @@ void main() {
     await tester.pump();
 
     verify(
-      () => auth.signInWithEmail(
-        email: 'agent@every.com',
-        password: 'secret12',
-      ),
+      () =>
+          auth.signInWithEmail(email: 'agent@every.com', password: 'secret12'),
     ).called(1);
   });
 
   testWidgets('register validates password confirmation', (tester) async {
     await pumpAuth(tester, RegisterScreen(authService: auth));
 
-    await tester.enterText(find.byType(TextFormField).at(0), 'agent@every.com');
-    await tester.enterText(find.byType(TextFormField).at(1), 'secret12');
-    await tester.enterText(find.byType(TextFormField).at(2), 'different');
+    await tester.enterText(find.byType(TextFormField).at(0), 'Ada');
+    await tester.enterText(find.byType(TextFormField).at(1), 'Agent');
+    await tester.enterText(find.byType(TextFormField).at(2), 'agent@every.com');
+    await tester.enterText(find.byType(TextFormField).at(3), 'secret12');
+    await tester.enterText(find.byType(TextFormField).at(4), 'different');
     await tester.tap(find.text('Create account').last);
     await tester.pump();
 
@@ -134,10 +131,7 @@ void main() {
 
     await pumpAuth(
       tester,
-      ForgotPasswordScreen(
-        authService: auth,
-        initialEmail: 'agent@every.com',
-      ),
+      ForgotPasswordScreen(authService: auth, initialEmail: 'agent@every.com'),
     );
 
     await tester.tap(find.text('Send link'));
@@ -164,8 +158,7 @@ void main() {
       contains('Incorrect'),
     );
     expect(
-      const AuthException(code: 'email-already-in-use')
-          .localizedMessage(l10n),
+      const AuthException(code: 'email-already-in-use').localizedMessage(l10n),
       contains('already exists'),
     );
     expect(

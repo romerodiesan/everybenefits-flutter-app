@@ -1,19 +1,20 @@
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../firebase/https_callable.dart';
 import 'user_profile.dart';
 import 'user_role.dart';
 
 /// Admin-only role changes / student directory via callables.
 class UserRoleCallable {
-  UserRoleCallable({FirebaseFunctions? functions})
-      : _functions = functions ??
-            FirebaseFunctions.instanceFor(region: 'us-central1');
+  UserRoleCallable({
+    FirebaseFunctions? functions,
+    HttpsCallableClient? callables,
+  }) : _callables = callables ?? HttpsCallableClient(functions: functions);
 
-  final FirebaseFunctions _functions;
+  final HttpsCallableClient _callables;
 
   Future<void> setRole({required String uid, required String role}) async {
-    final callable = _functions.httpsCallable('setUserRole');
-    await callable.call(<String, dynamic>{
+    await _callables.call('setUserRole', <String, dynamic>{
       'uid': uid,
       'role': role,
     });
@@ -21,9 +22,7 @@ class UserRoleCallable {
 
   /// Students awaiting promotion (Admin SDK; bypasses client list rules).
   Future<List<UserProfile>> listStudentsForPromotion() async {
-    final callable = _functions.httpsCallable('listStudentsForPromotion');
-    final result = await callable.call();
-    final data = result.data;
+    final data = await _callables.call('listStudentsForPromotion');
     if (data is! Map) return const [];
     final raw = data['students'];
     if (raw is! List) return const [];

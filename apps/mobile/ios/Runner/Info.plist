@@ -29,7 +29,7 @@
 			<string>Editor</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>com.googleusercontent.apps.978334689853-tkm6t93ck27fnq16prpg4pshst6a1q1g</string>
+				<string>app-1-1001601265155-ios-cb529635090fda32</string>
 			</array>
 		</dict>
 	</array>
@@ -74,8 +74,8 @@
 	<true/>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>audio</string>
 		<string>fetch</string>
+		<string>remote-notification</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

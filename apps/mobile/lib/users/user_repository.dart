@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../firebase/firebase_emulators.dart';
+import '../firebase/https_callable.dart';
 import 'avatar_storage.dart';
 import 'profile_validation.dart';
 import 'user_profile.dart';
@@ -27,11 +28,11 @@ abstract class UserProfileStore {
 
   Stream<UserProfile?> watch(String uid);
 
-  /// Directory of peers for starting chats (excludes anonymous guests).
-  Future<List<UserProfile>> listDirectory({
-    String? excludeUid,
-    int limit = 80,
-  });
+  /// Directory of peers for starting chats (excludes invalid anonymous sessions).
+  Future<List<UserProfile>> listDirectory({String? excludeUid, int limit = 80});
+
+  /// Indexed member lookup by name, email, username, or NPN.
+  Future<List<UserProfile>> searchDirectory(String query, {int limit = 24});
 
   /// Updates Firebase Auth + `users/{uid}.email` via Cloud Functions.
   Future<String> updateAccountEmail(String email);
@@ -50,12 +51,12 @@ class FirestoreUserProfileStore implements UserProfileStore {
   FirestoreUserProfileStore({
     FirebaseFirestore? firestore,
     FirebaseFunctions? functions,
-  })  : _firestore = firestore ?? FirebaseFirestore.instance,
-        _functions = functions ??
-            FirebaseFunctions.instanceFor(region: 'us-central1');
+    HttpsCallableClient? callables,
+  }) : _firestore = firestore ?? FirebaseFirestore.instance,
+       _callables = callables ?? HttpsCallableClient(functions: functions);
 
   final FirebaseFirestore _firestore;
-  final FirebaseFunctions _functions;
+  final HttpsCallableClient _callables;
 
   CollectionReference<Map<String, dynamic>> get _users =>
       _firestore.collection('users');
@@ -105,18 +106,18 @@ class FirestoreUserProfileStore implements UserProfileStore {
   Future<UserProfile?> get(String uid) async {
     // Prefer cache for first paint; fall back to server when cold.
     try {
-      final cached = await _users.doc(uid).get(
-            const GetOptions(source: Source.cache),
-          );
+      final cached = await _users
+          .doc(uid)
+          .get(const GetOptions(source: Source.cache));
       if (cached.exists && cached.data() != null) {
         return UserProfile.fromMap({...cached.data()!, 'uid': uid});
       }
     } catch (_) {
       // Cache miss is expected on first launch / emulator without persistence.
     }
-    final snapshot = await _users.doc(uid).get(
-          const GetOptions(source: Source.serverAndCache),
-        );
+    final snapshot = await _users
+        .doc(uid)
+        .get(const GetOptions(source: Source.serverAndCache));
     if (!snapshot.exists || snapshot.data() == null) return null;
     return UserProfile.fromMap({...snapshot.data()!, 'uid': uid});
   }
@@ -168,31 +169,53 @@ class FirestoreUserProfileStore implements UserProfileStore {
     String? excludeUid,
     int limit = 80,
   }) async {
-    final result = await _functions.httpsCallable('listPublicProfiles').call(
+    final result = await _callables.call(
+      'listPublicProfiles',
       <String, dynamic>{'limit': limit + (excludeUid == null ? 0 : 1)},
     );
-    final payload = result.data is Map ? result.data as Map : const {};
+    final payload = result is Map ? result : const {};
     final raw = payload['profiles'];
-    final list = (raw is List ? raw : const [])
-        .whereType<Map>()
-        .map((data) => UserProfile.fromMap(Map<String, dynamic>.from(data)))
-        .where((p) => p.uid != excludeUid)
-        .take(limit)
-        .toList()
-      ..sort(
-        (a, b) => a.headlineName.toLowerCase().compareTo(
+    final list =
+        (raw is List ? raw : const [])
+            .whereType<Map>()
+            .map((data) => UserProfile.fromMap(Map<String, dynamic>.from(data)))
+            .where((p) => p.uid != excludeUid)
+            .take(limit)
+            .toList()
+          ..sort(
+            (a, b) => a.headlineName.toLowerCase().compareTo(
               b.headlineName.toLowerCase(),
             ),
-      );
+          );
     return list;
   }
 
   @override
+  Future<List<UserProfile>> searchDirectory(
+    String query, {
+    int limit = 24,
+  }) async {
+    final result = await _callables.call(
+      'searchDirectory',
+      <String, dynamic>{'query': query.trim(), 'limit': limit},
+    );
+    final payload = result is Map ? result : const {};
+    final raw = payload['profiles'];
+    return (raw is List ? raw : const [])
+        .whereType<Map>()
+        .map((data) => UserProfile.fromMap(Map<String, dynamic>.from(data)))
+        .where((profile) => profile.uid.isNotEmpty)
+        .take(limit)
+        .toList();
+  }
+
+  @override
   Future<String> updateAccountEmail(String email) async {
-    final result = await _functions.httpsCallable('updateAccountEmail').call(
+    final result = await _callables.call(
+      'updateAccountEmail',
       <String, dynamic>{'email': email.trim().toLowerCase()},
     );
-    final data = result.data is Map ? result.data as Map : const {};
+    final data = result is Map ? result : const {};
     final next = '${data['email'] ?? email}'.trim().toLowerCase();
     await FirebaseAuth.instance.currentUser?.reload();
     return next;
@@ -200,10 +223,11 @@ class FirestoreUserProfileStore implements UserProfileStore {
 
   @override
   Future<String> updateUsername(String username) async {
-    final result = await _functions.httpsCallable('updateUsername').call(
+    final result = await _callables.call(
+      'updateUsername',
       <String, dynamic>{'username': username.trim().toLowerCase()},
     );
-    final data = result.data is Map ? result.data as Map : const {};
+    final data = result is Map ? result : const {};
     return '${data['username'] ?? username}'.trim().toLowerCase();
   }
 
@@ -219,17 +243,19 @@ class FirestoreUserProfileStore implements UserProfileStore {
   }
 }
 
-typedef AuthorPhotoChanged = Future<void> Function({
-  required String authorId,
-  required String? photoUrl,
-});
+typedef AuthorPhotoChanged =
+    Future<void> Function({
+      required String authorId,
+      required String? photoUrl,
+    });
 
 /// Pushes Firestore identity fields onto the signed-in Firebase Auth user.
-typedef AuthProfileSync = Future<void> Function({
-  required String uid,
-  String? displayName,
-  String? photoUrl,
-});
+typedef AuthProfileSync =
+    Future<void> Function({
+      required String uid,
+      String? displayName,
+      String? photoUrl,
+    });
 
 Future<void> syncFirebaseAuthProfile({
   required String uid,
@@ -262,17 +288,16 @@ class UserRepository {
     AvatarStorage? avatarStorage,
     this.onAuthorPhotoChanged,
     AuthProfileSync? syncAuthProfile,
-  })  : _store = store ?? FirestoreUserProfileStore(),
-        _avatarStorageOverride = avatarStorage,
-        _syncAuthProfile = syncAuthProfile ?? syncFirebaseAuthProfile;
+  }) : _store = store ?? FirestoreUserProfileStore(),
+       _avatarStorageOverride = avatarStorage,
+       _syncAuthProfile = syncAuthProfile ?? syncFirebaseAuthProfile;
 
   final UserProfileStore _store;
   final AvatarStorage? _avatarStorageOverride;
   final AuthorPhotoChanged? onAuthorPhotoChanged;
   final AuthProfileSync _syncAuthProfile;
 
-  AvatarStorage get _avatarStorage =>
-      _avatarStorageOverride ?? AvatarStorage();
+  AvatarStorage get _avatarStorage => _avatarStorageOverride ?? AvatarStorage();
 
   Future<UserProfile> ensureProfile(User user) async {
     if (user.isAnonymous) {
@@ -343,8 +368,8 @@ class UserRepository {
 
     final needsBackfill =
         profile.displayNameLower != expectedDisplayLower ||
-            profile.emailLower != expectedEmailLower ||
-            !_sameTokenList(existingTokens, expectedTokens);
+        profile.emailLower != expectedEmailLower ||
+        !_sameTokenList(existingTokens, expectedTokens);
 
     if (!needsBackfill) return;
 
@@ -429,5 +454,9 @@ class UserRepository {
     int limit = 80,
   }) {
     return _store.listDirectory(excludeUid: excludeUid, limit: limit);
+  }
+
+  Future<List<UserProfile>> searchDirectory(String query, {int limit = 24}) {
+    return _store.searchDirectory(query, limit: limit);
   }
 }

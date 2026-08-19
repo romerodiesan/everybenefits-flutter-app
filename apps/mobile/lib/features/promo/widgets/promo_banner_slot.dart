@@ -105,15 +105,16 @@ class _PromoBannerSlotState extends State<PromoBannerSlot> {
   void _recompute() {
     if (!mounted) return;
     final role = widget.profile.roleId;
-    final matched = pickBannersForSurface(
-      _all,
-      widget.surface,
-      role: role,
-      isAnonymous: widget.profile.isAnonymous,
-    ).where((banner) {
-      if (!banner.dismissible) return true;
-      return !_dismiss.isDismissedSync(banner.id, banner.version);
-    }).toList();
+    final matched =
+        pickBannersForSurface(
+          _all,
+          widget.surface,
+          role: role,
+          isAnonymous: widget.profile.isAnonymous,
+        ).where((banner) {
+          if (!banner.dismissible) return true;
+          return !_dismiss.isDismissedSync(banner.id, banner.version);
+        }).toList();
 
     setState(() {
       _visible = matched;
@@ -266,7 +267,7 @@ class _PromoBannerCard extends StatelessWidget {
             child: Image.network(
               imageUrl!,
               fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+              errorBuilder: (_, _, _) => const SizedBox.shrink(),
             ),
           ),
         ),
@@ -370,7 +371,7 @@ class _PromoBannerCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (dismissBtn != null) dismissBtn,
+            ?dismissBtn,
           ],
         ),
       );
@@ -385,7 +386,7 @@ class _PromoBannerCard extends StatelessWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (m != null) m,
+              ?m,
               Padding(
                 padding: EdgeInsets.fromLTRB(14, 14, 14 + padRight, 14),
                 child: Column(
@@ -437,7 +438,7 @@ class _PromoBannerCard extends StatelessWidget {
               ),
             ],
           ),
-          if (dismissBtn != null) dismissBtn,
+          ?dismissBtn,
         ],
       ),
     );

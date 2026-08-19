@@ -30,8 +30,10 @@ class _PulseSkeletonState extends State<PulseSkeleton>
     duration: const Duration(milliseconds: 1100),
   )..repeat(reverse: true);
 
-  late final Animation<double> _opacity = Tween<double>(begin: 0.38, end: 0.72)
-      .animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
+  late final Animation<double> _opacity = Tween<double>(
+    begin: 0.38,
+    end: 0.72,
+  ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
   @override
   void dispose() {
@@ -79,6 +81,7 @@ class PulseFeedSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.separated(
       physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.sm,
@@ -307,6 +310,8 @@ class PulseContactListSkeleton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
+      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: true,
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.sm,
@@ -390,14 +395,25 @@ class PulseCatalogSkeleton extends StatelessWidget {
 
 /// Generic settings / notification list rows.
 class PulseListSkeleton extends StatelessWidget {
-  const PulseListSkeleton({super.key, this.itemCount = 6});
+  const PulseListSkeleton({
+    super.key,
+    this.itemCount = 6,
+    this.shrinkWrap = false,
+  });
 
   final int itemCount;
+
+  /// When true, the skeleton can sit inside another [ListView] without
+  /// unbounded-height layout errors.
+  final bool shrinkWrap;
 
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
-      physics: const NeverScrollableScrollPhysics(),
+      shrinkWrap: shrinkWrap,
+      physics: shrinkWrap
+          ? const NeverScrollableScrollPhysics()
+          : const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.fromLTRB(
         AppSpacing.md,
         AppSpacing.sm,

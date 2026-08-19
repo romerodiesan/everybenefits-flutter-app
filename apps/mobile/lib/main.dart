@@ -14,6 +14,7 @@ import 'app/widgets/pulse_chrome.dart';
 import 'auth/auth.dart';
 import 'features/chats/chat_repository.dart';
 import 'features/forums/forum_repository.dart';
+import 'features/notifications/notification_repository.dart';
 import 'features/university/course_repository.dart';
 import 'features/onboarding/pending_approval_screen.dart';
 import 'features/onboarding/account_status_gate_screen.dart';
@@ -55,7 +56,8 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
   } catch (e, st) {
-    final duplicate = (e is FirebaseException && e.code == 'duplicate-app') ||
+    final duplicate =
+        (e is FirebaseException && e.code == 'duplicate-app') ||
         '$e'.contains('duplicate-app');
     if (!duplicate) {
       Error.throwWithStackTrace(e, st);
@@ -130,6 +132,7 @@ class EveryInsuranceApp extends StatefulWidget {
     this.forumRepository,
     this.chatRepository,
     this.courseRepository,
+    this.notificationRepository,
   });
 
   final AuthService authService;
@@ -139,6 +142,7 @@ class EveryInsuranceApp extends StatefulWidget {
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
   final CourseRepository? courseRepository;
+  final NotificationRepository? notificationRepository;
 
   @override
   State<EveryInsuranceApp> createState() => _EveryInsuranceAppState();
@@ -220,6 +224,7 @@ class _EveryInsuranceAppState extends State<EveryInsuranceApp> {
                     forumRepository: widget.forumRepository,
                     chatRepository: widget.chatRepository,
                     courseRepository: widget.courseRepository,
+                    notificationRepository: widget.notificationRepository,
                     connectionState: snapshot.connectionState,
                     user: snapshot.data,
                   ),
@@ -240,6 +245,7 @@ class _AuthHome extends StatelessWidget {
     required this.forumRepository,
     required this.chatRepository,
     required this.courseRepository,
+    required this.notificationRepository,
     required this.connectionState,
     required this.user,
   });
@@ -249,6 +255,7 @@ class _AuthHome extends StatelessWidget {
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
   final CourseRepository? courseRepository;
+  final NotificationRepository? notificationRepository;
   final ConnectionState connectionState;
   final User? user;
 
@@ -277,6 +284,7 @@ class _AuthHome extends StatelessWidget {
       forumRepository: forumRepository,
       chatRepository: chatRepository,
       courseRepository: courseRepository,
+      notificationRepository: notificationRepository,
     );
   }
 }
@@ -290,6 +298,7 @@ class ProfileBootstrap extends StatefulWidget {
     this.forumRepository,
     this.chatRepository,
     this.courseRepository,
+    this.notificationRepository,
   });
 
   final User user;
@@ -298,14 +307,15 @@ class ProfileBootstrap extends StatefulWidget {
   final ForumRepository? forumRepository;
   final ChatRepository? chatRepository;
   final CourseRepository? courseRepository;
+  final NotificationRepository? notificationRepository;
 
   @override
   State<ProfileBootstrap> createState() => _ProfileBootstrapState();
 }
 
 class _ProfileBootstrapState extends State<ProfileBootstrap> {
-  late final Future<UserProfile> _profileFuture =
-      widget.userRepository.ensureProfile(widget.user);
+  late final Future<UserProfile> _profileFuture = widget.userRepository
+      .ensureProfile(widget.user);
   int _authEpoch = 0;
 
   void _onPasswordLinked() {
@@ -402,7 +412,8 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
               );
             }
 
-            if (!profile.isAnonymous && !isUserApproved(profile.approvalStatus)) {
+            if (!profile.isAnonymous &&
+                !isUserApproved(profile.approvalStatus)) {
               return PendingApprovalScreen(
                 profile: profile,
                 authService: widget.authService,
@@ -418,6 +429,7 @@ class _ProfileBootstrapState extends State<ProfileBootstrap> {
                 forumRepository: widget.forumRepository,
                 chatRepository: widget.chatRepository,
                 courseRepository: widget.courseRepository,
+                notificationRepository: widget.notificationRepository,
               ),
             );
           },

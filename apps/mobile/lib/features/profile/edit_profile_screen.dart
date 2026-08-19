@@ -213,6 +213,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               busy: _busy,
               lockName: false,
               lockNpn: true,
+              lockAgency: true,
               showEmail: true,
               showUsername: true,
               submitLabel: l10n.editProfileSave,

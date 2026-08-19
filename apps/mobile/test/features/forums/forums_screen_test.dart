@@ -66,9 +66,9 @@ class _MemoryForumStore implements ForumStore {
   @override
   Stream<ForumThread?> watchThread(String threadId) async* {
     yield seed.cast<ForumThread?>().firstWhere(
-          (t) => t?.id == threadId,
-          orElse: () => null,
-        );
+      (t) => t?.id == threadId,
+      orElse: () => null,
+    );
   }
 
   @override
@@ -83,31 +83,27 @@ class _MemoryForumStore implements ForumStore {
   Stream<RelevanceVote> watchThreadVote({
     required String threadId,
     required String uid,
-  }) =>
-      Stream.value(RelevanceVote.none);
+  }) => Stream.value(RelevanceVote.none);
 
   @override
   Stream<RelevanceVote> watchReplyVote({
     required String threadId,
     required String replyId,
     required String uid,
-  }) =>
-      Stream.value(RelevanceVote.none);
+  }) => Stream.value(RelevanceVote.none);
 
   @override
   Future<Map<String, RelevanceVote>> fetchReplyVotes({
     required String threadId,
     required String uid,
     required List<String> replyIds,
-  }) async =>
-      {for (final id in replyIds) id: RelevanceVote.none};
+  }) async => {for (final id in replyIds) id: RelevanceVote.none};
 
   @override
   Future<Map<String, RelevanceVote>> fetchThreadVotes({
     required String uid,
     required List<String> threadIds,
-  }) async =>
-      {for (final id in threadIds) id: RelevanceVote.none};
+  }) async => {for (final id in threadIds) id: RelevanceVote.none};
 
   @override
   Future<List<ForumThread>> fetchThreadsByIds(List<String> ids) async {
@@ -285,7 +281,9 @@ void main() {
     expect(find.text('Saved'), findsOneWidget);
   });
 
-  testWidgets('renders an active home promo banner above the feed', (tester) async {
+  testWidgets('renders an active home promo banner above the feed', (
+    tester,
+  ) async {
     final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
     final banner = withBannerCompatDefaults(
       id: 'welcome-everybenefits',
@@ -312,13 +310,15 @@ void main() {
     expect(find.text('Welcome to Pulse'), findsOneWidget);
   });
 
-  testWidgets('guest is read-only without composer or FAB', (tester) async {
+  testWidgets('anonymous session is read-only without composer or FAB', (
+    tester,
+  ) async {
     final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
 
     await tester.pumpWidget(
       _wrap(
         _screen(
-          profile: _profile(role: UserRole.guest, anonymous: true),
+          profile: _profile(role: UserRole.student, anonymous: true),
           forumRepository: repo,
         ),
       ),
@@ -335,11 +335,7 @@ void main() {
     final repo = ForumRepository(
       store: _MemoryForumStore([
         _thread(id: 't1', title: 'Cómo renovar NPN', body: 'Pasos oficiales'),
-        _thread(
-          id: 't2',
-          title: 'Cierre de ventas',
-          body: 'Tips de pipeline',
-        ),
+        _thread(id: 't2', title: 'Cierre de ventas', body: 'Tips de pipeline'),
       ]),
     );
 
@@ -363,6 +359,32 @@ void main() {
     expect(find.text('Cierre de ventas'), findsNothing);
     expect(find.textContaining('search in loaded results'), findsOneWidget);
   });
+
+  testWidgets(
+    'reloading the feed does not throw duplicate AnimatedSwitcher keys',
+    (tester) async {
+      final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
+
+      await tester.pumpWidget(
+        _wrap(
+          _screen(
+            profile: _profile(role: UserRole.agent),
+            forumRepository: repo,
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump();
+      expect(find.text('Bienvenidos a la comunidad'), findsOneWidget);
+
+      await tester.tap(find.text('Mine'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('tapping post opens conversation detail', (tester) async {
     final repo = ForumRepository(store: _MemoryForumStore([_thread()]));
@@ -398,10 +420,7 @@ void main() {
       ChatConversation(
         id: 'c1',
         memberIds: const ['u1', 'other'],
-        memberNames: const {
-          'u1': 'Ada',
-          'other': 'Equipo Ventas CR',
-        },
+        memberNames: const {'u1': 'Ada', 'other': 'Equipo Ventas CR'},
         isGroup: false,
         dmKey: 'other_u1',
         lastMessage: 'Hola',

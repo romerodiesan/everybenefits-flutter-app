@@ -5,19 +5,27 @@ import '../../../app/theme.dart';
 import '../../../l10n/l10n.dart';
 import '../chat_models.dart';
 
-enum ChatMessageMenuAction { react, copy, reply }
+enum ChatMessageMenuAction { react, copy, reply, share, delete }
 
 class ChatMessageMenuResult {
   const ChatMessageMenuResult.react(this.emoji)
-      : action = ChatMessageMenuAction.react;
+    : action = ChatMessageMenuAction.react;
 
   const ChatMessageMenuResult.copy()
-      : action = ChatMessageMenuAction.copy,
-        emoji = null;
+    : action = ChatMessageMenuAction.copy,
+      emoji = null;
 
   const ChatMessageMenuResult.reply()
-      : action = ChatMessageMenuAction.reply,
-        emoji = null;
+    : action = ChatMessageMenuAction.reply,
+      emoji = null;
+
+  const ChatMessageMenuResult.share()
+    : action = ChatMessageMenuAction.share,
+      emoji = null;
+
+  const ChatMessageMenuResult.delete()
+    : action = ChatMessageMenuAction.delete,
+      emoji = null;
 
   final ChatMessageMenuAction action;
   final String? emoji;
@@ -28,6 +36,7 @@ Future<ChatMessageMenuResult?> showChatMessageMenu({
   required BuildContext context,
   required Rect anchor,
   required bool mine,
+  required bool canDelete,
   String? selected,
 }) {
   PulseHaptics.medium();
@@ -40,6 +49,7 @@ Future<ChatMessageMenuResult?> showChatMessageMenu({
     pageBuilder: (ctx, animation, _) => _MenuLayer(
       anchor: anchor,
       mine: mine,
+      canDelete: canDelete,
       selected: selected,
       animation: animation,
     ),
@@ -50,12 +60,14 @@ class _MenuLayer extends StatelessWidget {
   const _MenuLayer({
     required this.anchor,
     required this.mine,
+    required this.canDelete,
     required this.selected,
     required this.animation,
   });
 
   final Rect anchor;
   final bool mine;
+  final bool canDelete;
   final String? selected;
   final Animation<double> animation;
 
@@ -71,8 +83,7 @@ class _MenuLayer extends StatelessWidget {
     final size = media.size;
     final emojis = ChatMessage.reactionEmojis;
 
-    final barWidth =
-        emojis.length * _itemSize + (_barPadding + _barBorder) * 2;
+    final barWidth = emojis.length * _itemSize + (_barPadding + _barBorder) * 2;
     const barHeight = _itemSize + (_barPadding + _barBorder) * 2;
     const totalHeight = barHeight + 8 + _actionsHeight;
 
@@ -104,8 +115,7 @@ class _MenuLayer extends StatelessWidget {
                   parent: animation,
                   curve: Curves.easeOutBack,
                 ),
-                alignment:
-                    mine ? Alignment.bottomRight : Alignment.bottomLeft,
+                alignment: mine ? Alignment.bottomRight : Alignment.bottomLeft,
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
@@ -113,16 +123,26 @@ class _MenuLayer extends StatelessWidget {
                       emojis: emojis,
                       selected: selected,
                       animation: animation,
-                      onPick: (emoji) => Navigator.of(context).pop(
-                        ChatMessageMenuResult.react(emoji),
-                      ),
+                      onPick: (emoji) => Navigator.of(
+                        context,
+                      ).pop(ChatMessageMenuResult.react(emoji)),
                     ),
                     const SizedBox(height: 8),
                     _ActionRow(
                       mine: mine,
-                      onCopy: () => Navigator.of(context).pop(
-                        const ChatMessageMenuResult.copy(),
-                      ),
+                      canDelete: canDelete,
+                      onReply: () => Navigator.of(
+                        context,
+                      ).pop(const ChatMessageMenuResult.reply()),
+                      onCopy: () => Navigator.of(
+                        context,
+                      ).pop(const ChatMessageMenuResult.copy()),
+                      onShare: () => Navigator.of(
+                        context,
+                      ).pop(const ChatMessageMenuResult.share()),
+                      onDelete: () => Navigator.of(
+                        context,
+                      ).pop(const ChatMessageMenuResult.delete()),
                     ),
                   ],
                 ),
@@ -202,11 +222,19 @@ class _ReactionBar extends StatelessWidget {
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
     required this.mine,
+    required this.canDelete,
+    required this.onReply,
     required this.onCopy,
+    required this.onShare,
+    required this.onDelete,
   });
 
   final bool mine;
+  final bool canDelete;
+  final VoidCallback onReply;
   final VoidCallback onCopy;
+  final VoidCallback onShare;
+  final VoidCallback onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -215,16 +243,40 @@ class _ActionRow extends StatelessWidget {
     return Material(
       color: colors.sheet,
       borderRadius: BorderRadius.circular(16),
-      child: Row(
-        mainAxisAlignment:
-            mine ? MainAxisAlignment.end : MainAxisAlignment.start,
-        children: [
-          TextButton.icon(
-            onPressed: onCopy,
-            icon: const Icon(Icons.copy_rounded, size: 18),
-            label: Text(l10n.chatCopy),
-          ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Row(
+          mainAxisAlignment: mine
+              ? MainAxisAlignment.end
+              : MainAxisAlignment.start,
+          children: [
+            TextButton.icon(
+              onPressed: onReply,
+              icon: const Icon(Icons.reply_rounded, size: 18),
+              label: Text(l10n.chatReply),
+            ),
+            TextButton.icon(
+              onPressed: onCopy,
+              icon: const Icon(Icons.copy_rounded, size: 18),
+              label: Text(l10n.chatCopy),
+            ),
+            TextButton.icon(
+              onPressed: onShare,
+              icon: const Icon(Icons.ios_share_rounded, size: 18),
+              label: Text(l10n.chatShareMessage),
+            ),
+            if (canDelete)
+              TextButton.icon(
+                onPressed: onDelete,
+                style: TextButton.styleFrom(
+                  foregroundColor: Theme.of(context).colorScheme.error,
+                ),
+                icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                label: Text(l10n.chatDeleteMessage),
+              ),
+          ],
+        ),
       ),
     );
   }

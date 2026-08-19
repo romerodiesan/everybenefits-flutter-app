@@ -19,8 +19,7 @@ class _StubVoteCallable extends ForumVoteCallable {
     required String threadId,
     String? replyId,
     required RelevanceVote vote,
-  }) async =>
-      succeed;
+  }) async => succeed;
 }
 
 class FakeForumStore implements ForumStore {
@@ -28,8 +27,7 @@ class FakeForumStore implements ForumStore {
   final Map<String, List<ForumReply>> replies = {};
   final Map<String, RelevanceVote> threadVotes = {};
   final Map<String, RelevanceVote> replyVotes = {};
-  final _threadsController =
-      StreamController<List<ForumThread>>.broadcast();
+  final _threadsController = StreamController<List<ForumThread>>.broadcast();
   final Map<String, StreamController<List<ForumReply>>> _replyControllers = {};
   final Map<String, StreamController<RelevanceVote>> _voteControllers = {};
 
@@ -104,12 +102,8 @@ class FakeForumStore implements ForumStore {
       limit: limit,
     );
     yield* _threadsController.stream.asyncMap(
-      (_) => queryThreads(
-        tag: tag,
-        authorId: authorId,
-        sort: sort,
-        limit: limit,
-      ),
+      (_) =>
+          queryThreads(tag: tag, authorId: authorId, sort: sort, limit: limit),
     );
   }
 
@@ -125,9 +119,9 @@ class FakeForumStore implements ForumStore {
     int limit = kForumReplyPageSize,
   }) async* {
     yield (replies[threadId] ?? const []).take(limit).toList();
-    yield* _repliesFor(threadId).stream.map(
-          (list) => list.take(limit).toList(),
-        );
+    yield* _repliesFor(
+      threadId,
+    ).stream.map((list) => list.take(limit).toList());
   }
 
   @override
@@ -410,10 +404,10 @@ UserProfile _agent({String uid = 'agent-1'}) {
   );
 }
 
-UserProfile _guest() {
+UserProfile _anonymousProfile() {
   return UserProfile(
-    uid: 'guest-1',
-    role: UserRole.guest,
+    uid: 'anonymous-1',
+    role: UserRole.student,
     isAnonymous: true,
     profileCompleted: true,
     createdAt: DateTime.utc(2024, 1, 1),
@@ -469,15 +463,7 @@ void main() {
 
   test('normalizeForumTags caps at five unique values', () {
     expect(
-      normalizeForumTags([
-        'Ventas',
-        ' ventas ',
-        'NPN',
-        'A',
-        'B',
-        'C',
-        'D',
-      ]),
+      normalizeForumTags(['Ventas', ' ventas ', 'NPN', 'A', 'B', 'C', 'D']),
       ['ventas', 'npn', 'a', 'b', 'c'],
     );
   });
@@ -507,13 +493,13 @@ void main() {
     );
   });
 
-  test('createThread rejects guests', () async {
+  test('createThread rejects anonymous sessions', () async {
     expect(
       () => repository.createThread(
         tags: ['general'],
         title: 'Nope',
         body: 'Should fail',
-        author: _guest(),
+        author: _anonymousProfile(),
       ),
       throwsStateError,
     );
@@ -655,17 +641,14 @@ void main() {
     expect(found, hasLength(1));
     expect(found.first.id, '1');
 
-    final relevant = filterAndSortThreads(
-      threads,
-      sort: ForumSort.relevant,
-    );
+    final relevant = filterAndSortThreads(threads, sort: ForumSort.relevant);
     expect(relevant.first.id, '2');
   });
 
   test('canParticipateInForums matches roles', () {
     expect(
       canParticipateInForums(
-        roleOrPermissions: UserRole.guest,
+        roleOrPermissions: UserRole.student,
         isAnonymous: true,
       ),
       isFalse,
@@ -827,10 +810,7 @@ void main() {
 
     expect(store.threads[thread.id]?.replyCount, 1);
     expect(store.threads[thread.id]?.acceptedReplyId, isNull);
-    expect(
-      store.threads[thread.id]?.lastReplyAt,
-      DateTime.utc(2024, 1, 3),
-    );
+    expect(store.threads[thread.id]?.lastReplyAt, DateTime.utc(2024, 1, 3));
   });
 
   test('queryThreads paginates and filters by author', () async {
@@ -876,50 +856,55 @@ void main() {
     expect(page.threads, isNotEmpty);
   });
 
-  test('syncAuthorPhotoUrl updates threads and replies for that author only',
-      () async {
-    final author = _agent().copyWith(photoUrl: 'https://old/photo.jpg');
-    final other = UserProfile(
-      uid: 'other',
-      displayName: 'Other',
-      role: UserRole.agent,
-      isAnonymous: false,
-      profileCompleted: true,
-      photoUrl: 'https://other/old.jpg',
-      createdAt: DateTime.utc(2024, 1, 1),
-      updatedAt: DateTime.utc(2024, 1, 1),
-    );
+  test(
+    'syncAuthorPhotoUrl updates threads and replies for that author only',
+    () async {
+      final author = _agent().copyWith(photoUrl: 'https://old/photo.jpg');
+      final other = UserProfile(
+        uid: 'other',
+        displayName: 'Other',
+        role: UserRole.agent,
+        isAnonymous: false,
+        profileCompleted: true,
+        photoUrl: 'https://other/old.jpg',
+        createdAt: DateTime.utc(2024, 1, 1),
+        updatedAt: DateTime.utc(2024, 1, 1),
+      );
 
-    final mine = await repository.createThread(
-      tags: ['general'],
-      title: 'Mi hilo con foto',
-      body: 'Cuerpo suficiente para el hilo',
-      author: author,
-    );
-    await repository.addReply(
-      threadId: mine.id,
-      body: 'Mi respuesta con foto vieja',
-      author: author,
-    );
-    final theirs = await repository.createThread(
-      tags: ['general'],
-      title: 'Hilo de otra persona',
-      body: 'Cuerpo del hilo de otro autor',
-      author: other,
-    );
+      final mine = await repository.createThread(
+        tags: ['general'],
+        title: 'Mi hilo con foto',
+        body: 'Cuerpo suficiente para el hilo',
+        author: author,
+      );
+      await repository.addReply(
+        threadId: mine.id,
+        body: 'Mi respuesta con foto vieja',
+        author: author,
+      );
+      final theirs = await repository.createThread(
+        tags: ['general'],
+        title: 'Hilo de otra persona',
+        body: 'Cuerpo del hilo de otro autor',
+        author: other,
+      );
 
-    await repository.syncAuthorPhotoUrl(
-      authorId: author.uid,
-      photoUrl: 'https://new/photo.jpg?v=1',
-    );
+      await repository.syncAuthorPhotoUrl(
+        authorId: author.uid,
+        photoUrl: 'https://new/photo.jpg?v=1',
+      );
 
-    expect(store.threads[mine.id]!.authorPhotoUrl, 'https://new/photo.jpg?v=1');
-    expect(
-      store.replies[mine.id]!.single.authorPhotoUrl,
-      'https://new/photo.jpg?v=1',
-    );
-    expect(store.threads[theirs.id]!.authorPhotoUrl, 'https://other/old.jpg');
-  });
+      expect(
+        store.threads[mine.id]!.authorPhotoUrl,
+        'https://new/photo.jpg?v=1',
+      );
+      expect(
+        store.replies[mine.id]!.single.authorPhotoUrl,
+        'https://new/photo.jpg?v=1',
+      );
+      expect(store.threads[theirs.id]!.authorPhotoUrl, 'https://other/old.jpg');
+    },
+  );
 
   test('sortRepliesByRelevance puts accepted first', () {
     final now = DateTime.utc(2024, 1, 1);

@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../app/app_spacing.dart';
-import '../../app/layout/pulse_breakpoints.dart';
 import '../../app/layout/pulse_constrained.dart';
 import '../../app/theme.dart';
 import '../../app/widgets/pulse_chrome.dart';
@@ -64,10 +63,8 @@ class _UniversityScreenState extends State<UniversityScreen> {
   Object? _error;
   CourseLevel? _levelFilter;
 
-  Object get _access => AccessScope.accessOf(
-        context,
-        fallbackRoleId: widget.profile.roleId,
-      );
+  Object get _access =>
+      AccessScope.accessOf(context, fallbackRoleId: widget.profile.roleId);
   bool get _canAuthor => canAuthorCourses(_access);
   bool get _isAdmin => canManageCourses(_access);
 
@@ -120,36 +117,27 @@ class _UniversityScreenState extends State<UniversityScreen> {
     );
 
     _subscriptions.add(
-      _repository.watchPaths().listen(
-        (paths) {
-          if (!mounted) return;
-          setState(() => _paths = paths);
-        },
-        onError: (Object _) {},
-      ),
+      _repository.watchPaths().listen((paths) {
+        if (!mounted) return;
+        setState(() => _paths = paths);
+      }, onError: (Object _) {}),
     );
 
     if (_canAuthor) {
       _subscriptions.add(
-        _repository.watchAuthoredCourses(widget.profile.uid).listen(
-          (courses) {
-            if (!mounted) return;
-            setState(() => _authored = courses);
-          },
-          onError: (Object _) {},
-        ),
+        _repository.watchAuthoredCourses(widget.profile.uid).listen((courses) {
+          if (!mounted) return;
+          setState(() => _authored = courses);
+        }, onError: (Object _) {}),
       );
     }
 
     if (_isAdmin) {
       _subscriptions.add(
-        _repository.watchPendingCourses().listen(
-          (courses) {
-            if (!mounted) return;
-            setState(() => _pending = courses);
-          },
-          onError: (Object _) {},
-        ),
+        _repository.watchPendingCourses().listen((courses) {
+          if (!mounted) return;
+          setState(() => _pending = courses);
+        }, onError: (Object _) {}),
       );
     }
   }
@@ -282,54 +270,124 @@ class _UniversityScreenState extends State<UniversityScreen> {
           maxWidth: PulseContentWidth.shell,
           padding: EdgeInsets.zero,
           child: ListView(
-          padding: EdgeInsets.fromLTRB(
-            AppSpacing.lg,
-            AppSpacing.sm,
-            AppSpacing.lg,
-            pulseShellListBottomPad(context, hasFab: true),
-          ),
-          children: [
-            PromoBannerSlot(
-              key: const ValueKey('promo-academy'),
-              surface: PromoBannerSurface.academy,
-              profile: widget.profile,
-              repository: widget.promoBannerRepository,
-              courseRepository: _repository,
-              padding: EdgeInsets.zero,
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.lg,
+              AppSpacing.sm,
+              AppSpacing.lg,
+              pulseShellListBottomPad(context, hasFab: true),
             ),
-            PollSlot(
-              key: const ValueKey('poll-academy'),
-              surface: PromoBannerSurface.academy,
-              profile: widget.profile,
-              padding: const EdgeInsets.only(top: AppSpacing.sm),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                Expanded(
-                  child: _NavTile(
-                    icon: Icons.school_outlined,
-                    label: l10n.academyMyLearning,
-                    tint: AppColors.brandOf(context),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute<void>(
-                          builder: (_) => MyLearningScreen(
-                            profile: widget.profile,
-                            courseRepository: _repository,
+            children: [
+              PromoBannerSlot(
+                key: const ValueKey('promo-academy'),
+                surface: PromoBannerSurface.academy,
+                profile: widget.profile,
+                repository: widget.promoBannerRepository,
+                courseRepository: _repository,
+                padding: EdgeInsets.zero,
+              ),
+              PollSlot(
+                key: const ValueKey('poll-academy'),
+                surface: PromoBannerSurface.academy,
+                profile: widget.profile,
+                padding: const EdgeInsets.only(top: AppSpacing.sm),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Row(
+                children: [
+                  Expanded(
+                    child: _NavTile(
+                      icon: Icons.school_outlined,
+                      label: l10n.academyMyLearning,
+                      tint: AppColors.brandOf(context),
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => MyLearningScreen(
+                              profile: widget.profile,
+                              courseRepository: _repository,
+                            ),
                           ),
-                        ),
-                      );
-                    },
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: _NavTile(
+                      icon: Icons.route_outlined,
+                      label: l10n.academyPaths,
+                      tint: colors.ink,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute<void>(
+                            builder: (_) => LearningPathScreen(
+                              profile: widget.profile,
+                              courseRepository: _repository,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              if (continueLearning.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xl),
+                _SectionTitle(l10n.academyContinueLearning),
+                const SizedBox(height: AppSpacing.sm),
+                for (final entry in continueLearning.take(3)) ...[
+                  _ContinueRow(
+                    entry: entry,
+                    repository: _repository,
+                    onTap: () => _openCourse(entry.course),
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                ],
+              ],
+              if (_isAdmin && _pending.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xl),
+                _SectionTitle(l10n.academyPendingReview),
+                const SizedBox(height: AppSpacing.sm),
+                _CourseGrid(
+                  courses: _pending,
+                  itemBuilder: (course) => CourseCard(
+                    course: course,
+                    repository: _repository,
+                    showStatus: true,
+                    onTap: () => _openCourse(course),
+                    trailing: CourseManageMenu(
+                      course: course,
+                      profile: widget.profile,
+                      repository: _repository,
+                    ),
                   ),
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: _NavTile(
-                    icon: Icons.route_outlined,
-                    label: l10n.academyPaths,
-                    tint: colors.ink,
-                    onTap: () {
+              ],
+              if (myUnpublished.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.xl),
+                _SectionTitle(l10n.academyMyCourses),
+                const SizedBox(height: AppSpacing.sm),
+                _CourseGrid(
+                  courses: myUnpublished,
+                  itemBuilder: (course) => CourseCard(
+                    course: course,
+                    repository: _repository,
+                    showStatus: true,
+                    onTap: () => _openCourse(course),
+                    trailing: CourseManageMenu(
+                      course: course,
+                      profile: widget.profile,
+                      repository: _repository,
+                    ),
+                  ),
+                ),
+              ],
+              const SizedBox(height: AppSpacing.xl),
+              Row(
+                children: [
+                  Expanded(child: _SectionTitle(l10n.academyPaths)),
+                  TextButton(
+                    onPressed: () {
                       Navigator.of(context).push(
                         MaterialPageRoute<void>(
                           builder: (_) => LearningPathScreen(
@@ -339,177 +397,108 @@ class _UniversityScreenState extends State<UniversityScreen> {
                         ),
                       );
                     },
+                    child: Text(l10n.academySeeAll),
                   ),
-                ),
-              ],
-            ),
-            if (continueLearning.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xl),
-              _SectionTitle(l10n.academyContinueLearning),
-              const SizedBox(height: AppSpacing.sm),
-              for (final entry in continueLearning.take(3)) ...[
-                _ContinueRow(
-                  entry: entry,
-                  repository: _repository,
-                  onTap: () => _openCourse(entry.course),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-              ],
-            ],
-            if (_isAdmin && _pending.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xl),
-              _SectionTitle(l10n.academyPendingReview),
-              const SizedBox(height: AppSpacing.sm),
-              _CourseGrid(
-                courses: _pending,
-                itemBuilder: (course) => CourseCard(
-                  course: course,
-                  repository: _repository,
-                  showStatus: true,
-                  onTap: () => _openCourse(course),
-                  trailing: CourseManageMenu(
-                    course: course,
-                    profile: widget.profile,
-                    repository: _repository,
-                  ),
-                ),
+                ],
               ),
-            ],
-            if (myUnpublished.isNotEmpty) ...[
-              const SizedBox(height: AppSpacing.xl),
-              _SectionTitle(l10n.academyMyCourses),
               const SizedBox(height: AppSpacing.sm),
-              _CourseGrid(
-                courses: myUnpublished,
-                itemBuilder: (course) => CourseCard(
-                  course: course,
-                  repository: _repository,
-                  showStatus: true,
-                  onTap: () => _openCourse(course),
-                  trailing: CourseManageMenu(
-                    course: course,
-                    profile: widget.profile,
-                    repository: _repository,
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: AppSpacing.xl),
-            Row(
-              children: [
-                Expanded(child: _SectionTitle(l10n.academyPaths)),
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute<void>(
-                        builder: (_) => LearningPathScreen(
-                          profile: widget.profile,
-                          courseRepository: _repository,
-                        ),
-                      ),
-                    );
-                  },
-                  child: Text(l10n.academySeeAll),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            if (_paths.isEmpty)
-              _AcademyMessage(
-                icon: Icons.route_outlined,
-                message: l10n.pathsEmpty,
-              )
-            else
-              for (final path in _paths.take(4)) ...[
-                PulseSheet(
-                  onTap: () => _openPath(path),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              path.title,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w800,
+              if (_paths.isEmpty)
+                _AcademyMessage(
+                  icon: Icons.route_outlined,
+                  message: l10n.pathsEmpty,
+                )
+              else
+                for (final path in _paths.take(4)) ...[
+                  PulseSheet(
+                    onTap: () => _openPath(path),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                path.title,
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
                               ),
                             ),
+                            AcademyChip(path.level.label(l10n)),
+                          ],
+                        ),
+                        if (path.description.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            path.description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: colors.muted,
+                            ),
                           ),
-                          AcademyChip(path.level.label(l10n)),
                         ],
-                      ),
-                      if (path.description.isNotEmpty) ...[
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 8),
                         Text(
-                          path.description,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.bodyMedium
-                              ?.copyWith(color: colors.muted),
+                          l10n.pathMetaCoursesHours(
+                            path.courseIds.length,
+                            (_pathMinutes(path) / 60).round(),
+                          ),
+                          style: theme.textTheme.bodyMedium,
                         ),
                       ],
-                      const SizedBox(height: 8),
-                      Text(
-                        l10n.pathMetaCoursesHours(
-                          path.courseIds.length,
-                          (_pathMinutes(path) / 60).round(),
-                        ),
-                        style: theme.textTheme.bodyMedium,
-                      ),
-                    ],
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
+              const SizedBox(height: AppSpacing.xl),
+              Row(
+                children: [Expanded(child: _SectionTitle(l10n.academyCourses))],
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              _LevelFilters(
+                selected: _levelFilter,
+                onSelect: (level) => setState(() => _levelFilter = level),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              if (_loading)
+                const PulseCatalogSkeleton()
+              else if (_error != null)
+                _AcademyMessage(
+                  icon: Icons.cloud_off_rounded,
+                  message: friendlyCourseError(_error!, l10n),
+                )
+              else if (filtered.isEmpty)
+                _AcademyMessage(
+                  icon: Icons.school_outlined,
+                  message: l10n.academyCatalogEmpty,
+                )
+              else
+                _CourseGrid(
+                  courses: filtered,
+                  itemBuilder: (course) => CourseCard(
+                    course: course,
+                    repository: _repository,
+                    progress: _enrollments[course.id]?.progressFor(
+                      course.lessonCount,
+                    ),
+                    onTap: () => _openCourse(course),
+                    trailing:
+                        canEditCourse(
+                          course: course,
+                          uid: widget.profile.uid,
+                          roleOrPermissions: _access,
+                        )
+                        ? CourseManageMenu(
+                            course: course,
+                            profile: widget.profile,
+                            repository: _repository,
+                          )
+                        : null,
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-            const SizedBox(height: AppSpacing.xl),
-            Row(
-              children: [
-                Expanded(child: _SectionTitle(l10n.academyCourses)),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _LevelFilters(
-              selected: _levelFilter,
-              onSelect: (level) => setState(() => _levelFilter = level),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            if (_loading)
-              const PulseCatalogSkeleton()
-            else if (_error != null)
-              _AcademyMessage(
-                icon: Icons.cloud_off_rounded,
-                message: friendlyCourseError(_error!, l10n),
-              )
-            else if (filtered.isEmpty)
-              _AcademyMessage(
-                icon: Icons.school_outlined,
-                message: l10n.academyCatalogEmpty,
-              )
-            else
-              _CourseGrid(
-                courses: filtered,
-                itemBuilder: (course) => CourseCard(
-                  course: course,
-                  repository: _repository,
-                  progress: _enrollments[course.id]
-                      ?.progressFor(course.lessonCount),
-                  onTap: () => _openCourse(course),
-                  trailing: canEditCourse(
-                    course: course,
-                    uid: widget.profile.uid,
-                    roleOrPermissions: _access,
-                  )
-                      ? CourseManageMenu(
-                          course: course,
-                          profile: widget.profile,
-                          repository: _repository,
-                        )
-                      : null,
-                ),
-              ),
-          ],
-        ),
+            ],
+          ),
         ),
       ),
     );
@@ -517,10 +506,7 @@ class _UniversityScreenState extends State<UniversityScreen> {
 }
 
 class _CourseGrid extends StatelessWidget {
-  const _CourseGrid({
-    required this.courses,
-    required this.itemBuilder,
-  });
+  const _CourseGrid({required this.courses, required this.itemBuilder});
 
   final List<Course> courses;
   final Widget Function(Course course) itemBuilder;
@@ -732,8 +718,10 @@ class _ContinueRow extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Icon(Icons.play_circle_fill_rounded,
-              color: AppColors.brandOf(context)),
+          Icon(
+            Icons.play_circle_fill_rounded,
+            color: AppColors.brandOf(context),
+          ),
         ],
       ),
     );
@@ -769,11 +757,7 @@ class _AcademyMessage extends StatelessWidget {
 
 /// Shared empty / error block for the academy screens.
 class AcademyMessage extends StatelessWidget {
-  const AcademyMessage({
-    super.key,
-    required this.icon,
-    required this.message,
-  });
+  const AcademyMessage({super.key, required this.icon, required this.message});
 
   final IconData icon;
   final String message;

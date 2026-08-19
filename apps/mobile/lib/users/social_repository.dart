@@ -1,8 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cloud_functions/cloud_functions.dart';
 
+import '../firebase/https_callable.dart';
 import '../users/user_profile.dart';
-import '../users/user_role.dart';
 
 enum SocialStatus { none, outgoing, incoming, contact }
 
@@ -66,12 +66,15 @@ class SocialRepository {
   SocialRepository({
     FirebaseFunctions? functions,
     FirebaseFirestore? firestore,
-  })  : _functions = functions ??
-            FirebaseFunctions.instanceFor(region: 'us-central1'),
-        _firestore = firestore ?? FirebaseFirestore.instance;
+    HttpsCallableClient? callables,
+  }) : _callables = callables ?? HttpsCallableClient(functions: functions),
+       _firestoreOverride = firestore;
 
-  final FirebaseFunctions _functions;
-  final FirebaseFirestore _firestore;
+  final HttpsCallableClient _callables;
+  final FirebaseFirestore? _firestoreOverride;
+
+  FirebaseFirestore get _firestore =>
+      _firestoreOverride ?? FirebaseFirestore.instance;
 
   Future<String?> _resolveProfileUid(String handleOrUid) async {
     final raw = handleOrUid.trim();
@@ -104,65 +107,71 @@ class SocialRepository {
   }
 
   Future<SocialRelationship> getRelationship(String otherUid) async {
-    final result = await _functions.httpsCallable('getSocialRelationship').call(
+    final result = await _callables.call(
+      'getSocialRelationship',
       <String, dynamic>{'otherUid': otherUid},
     );
-    final data = result.data is Map ? result.data as Map : const {};
+    final data = result is Map ? result : const {};
     return SocialRelationship.fromMap(data);
   }
 
   Future<void> sendRequest(String otherUid) async {
-    await _functions.httpsCallable('sendContactRequest').call(
-      <String, dynamic>{'otherUid': otherUid},
-    );
+    await _callables.call('sendContactRequest', <String, dynamic>{
+      'otherUid': otherUid,
+    });
   }
 
   Future<void> acceptRequest(String otherUid) async {
-    await _functions.httpsCallable('acceptContactRequest').call(
+    await _callables.call(
+      'acceptContactRequest',
       <String, dynamic>{'otherUid': otherUid},
     );
   }
 
   Future<void> declineRequest(String otherUid) async {
-    await _functions.httpsCallable('declineContactRequest').call(
+    await _callables.call(
+      'declineContactRequest',
       <String, dynamic>{'otherUid': otherUid},
     );
   }
 
   Future<void> cancelRequest(String otherUid) async {
-    await _functions.httpsCallable('cancelContactRequest').call(
+    await _callables.call(
+      'cancelContactRequest',
       <String, dynamic>{'otherUid': otherUid},
     );
   }
 
   Future<void> removeContact(String otherUid) async {
-    await _functions.httpsCallable('removeContact').call(
-      <String, dynamic>{'otherUid': otherUid},
-    );
+    await _callables.call('removeContact', <String, dynamic>{
+      'otherUid': otherUid,
+    });
   }
 
   Future<void> setBlocked(String otherUid, {required bool blocked}) async {
-    await _functions.httpsCallable('setBlocked').call(
-      <String, dynamic>{'otherUid': otherUid, 'blocked': blocked},
-    );
+    await _callables.call('setBlocked', <String, dynamic>{
+      'otherUid': otherUid,
+      'blocked': blocked,
+    });
   }
 
   Future<void> setMuted(String otherUid, {required bool muted}) async {
-    await _functions.httpsCallable('setMuted').call(
-      <String, dynamic>{'otherUid': otherUid, 'muted': muted},
-    );
+    await _callables.call('setMuted', <String, dynamic>{
+      'otherUid': otherUid,
+      'muted': muted,
+    });
   }
 
   Future<void> follow(String otherUid) async {
-    await _functions.httpsCallable('followUser').call(
-      <String, dynamic>{'otherUid': otherUid},
-    );
+    await _callables.call('followUser', <String, dynamic>{
+      'otherUid': otherUid,
+    });
   }
 
   Future<void> unfollow(String otherUid) async {
-    await _functions.httpsCallable('unfollowUser').call(
-      <String, dynamic>{'otherUid': otherUid},
-    );
+    await _callables.call('unfollowUser', <String, dynamic>{
+      'otherUid': otherUid,
+    });
   }
 
   Future<void> reportMember(
@@ -170,39 +179,41 @@ class SocialRepository {
     required MemberReportReason reason,
     String? details,
   }) async {
-    await _functions.httpsCallable('reportMember').call(
-      <String, dynamic>{
-        'otherUid': otherUid,
-        'reason': reason.name,
-        if (details != null && details.trim().isNotEmpty)
-          'details': details.trim(),
-      },
-    );
+    await _callables.call('reportMember', <String, dynamic>{
+      'otherUid': otherUid,
+      'reason': reason.name,
+      if (details != null && details.trim().isNotEmpty)
+        'details': details.trim(),
+    });
   }
 
-  Future<List<UserProfile>> listContacts() async {
-    final result = await _functions.httpsCallable('listContacts').call();
-    return _cards(result.data);
+  Future<List<UserProfile>> listContacts({int limit = 24}) async {
+    final result = await _callables.call(
+      'listContacts',
+      <String, dynamic>{'limit': limit},
+    );
+    return _cards(result);
   }
 
   Future<List<UserProfile>> listIncomingRequests() async {
-    final result =
-        await _functions.httpsCallable('listIncomingContactRequests').call();
-    return _cards(result.data);
+    final result = await _callables.call('listIncomingContactRequests');
+    return _cards(result);
   }
 
   Future<List<UserProfile>> listFollowers(String otherUid) async {
-    final result = await _functions.httpsCallable('listFollowers').call(
+    final result = await _callables.call(
+      'listFollowers',
       <String, dynamic>{'otherUid': otherUid},
     );
-    return _cards(result.data);
+    return _cards(result);
   }
 
   Future<List<UserProfile>> listFollowing(String otherUid) async {
-    final result = await _functions.httpsCallable('listFollowing').call(
+    final result = await _callables.call(
+      'listFollowing',
       <String, dynamic>{'otherUid': otherUid},
     );
-    return _cards(result.data);
+    return _cards(result);
   }
 
   List<UserProfile> _cards(Object? data) {

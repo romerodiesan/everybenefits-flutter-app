@@ -12,19 +12,19 @@ enum UserRole {
 
   /// Firestore `users.role` wire value (snake_case for agency_owner).
   String get wireValue => switch (this) {
-        UserRole.agencyOwner => 'agency_owner',
-        _ => name,
-      };
+    UserRole.agencyOwner => 'agency_owner',
+    _ => name,
+  };
 
   String label(AppLocalizations l10n) => switch (this) {
-        UserRole.student => l10n.roleStudent,
-        UserRole.agent => l10n.roleAgent,
-        UserRole.agencyOwner => l10n.roleAgencyOwner,
-        UserRole.instructor => l10n.roleInstructor,
-        UserRole.manager => l10n.roleManager,
-        UserRole.admin => l10n.roleAdmin,
-        UserRole.system => l10n.roleAdmin,
-      };
+    UserRole.student => l10n.roleStudent,
+    UserRole.agent => l10n.roleAgent,
+    UserRole.agencyOwner => l10n.roleAgencyOwner,
+    UserRole.instructor => l10n.roleInstructor,
+    UserRole.manager => l10n.roleManager,
+    UserRole.admin => l10n.roleAdmin,
+    UserRole.system => l10n.roleAdmin,
+  };
 
   /// Built-in only. Returns null for custom / unknown slugs.
   static UserRole? tryParseBuiltin(String? value) {
@@ -64,6 +64,21 @@ Object? _asAccess(Object? roleOrPermissions) {
 /// `chats.groups.create`
 bool canCreateChatGroups(Object? roleOrPermissions) {
   return can(_asAccess(roleOrPermissions), Perm.chatsGroupsCreate);
+}
+
+/// `chats.groups.manage`
+bool canManageChatGroups(Object? roleOrPermissions) {
+  return can(_asAccess(roleOrPermissions), Perm.chatsGroupsManage);
+}
+
+/// `chats.messages.moderate`
+bool canModerateChatMessages(Object? roleOrPermissions) {
+  return can(_asAccess(roleOrPermissions), Perm.chatsMessagesModerate);
+}
+
+/// `chats.contacts.all`
+bool canAccessAllChatContacts(Object? roleOrPermissions) {
+  return can(_asAccess(roleOrPermissions), Perm.chatsContactsAll);
 }
 
 /// `chats.groups.default.join`

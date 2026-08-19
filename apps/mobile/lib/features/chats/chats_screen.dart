@@ -14,8 +14,10 @@ import '../../users/users.dart';
 import 'chat_conversation_screen.dart';
 import 'chat_default_group_callable.dart';
 import 'chat_models.dart';
+import 'chat_manage_groups_screen.dart';
 import 'chat_new_chat_screen.dart';
 import 'chat_new_group_screen.dart';
+import 'chat_people_screen.dart';
 import 'chat_repository.dart';
 import '../notifications/notification_bell_button.dart';
 import 'widgets/chat_inbox_widgets.dart';
@@ -27,6 +29,7 @@ class ChatsScreen extends StatefulWidget {
     required this.profile,
     this.chatRepository,
     this.userRepository,
+    this.socialRepository,
     this.showFab = true,
     this.notificationUnread = 0,
     this.onOpenNotifications,
@@ -35,6 +38,7 @@ class ChatsScreen extends StatefulWidget {
   final UserProfile profile;
   final ChatRepository? chatRepository;
   final UserRepository? userRepository;
+  final SocialRepository? socialRepository;
 
   /// When false, the shell owns the FAB.
   final bool showFab;
@@ -46,8 +50,8 @@ class ChatsScreen extends StatefulWidget {
 }
 
 class ChatsScreenState extends State<ChatsScreen> {
-  late final ChatRepository _repo =
-      widget.chatRepository ?? ChatRepository();
+  late final ChatRepository _repo = widget.chatRepository ?? ChatRepository();
+  late final UserRepository _users = widget.userRepository ?? UserRepository();
   final _gate = StreamController<List<ChatConversation>>.broadcast();
   StreamSubscription<List<ChatConversation>>? _sub;
   List<ChatConversation>? _latest;
@@ -84,8 +88,8 @@ class ChatsScreenState extends State<ChatsScreen> {
   Future<void> _maybeJoinDefaultAgentGroup() async {
     if (_defaultJoinAttempted) return;
     if (!belongsInDefaultAgentGroup(
-          AccessScope.accessOf(context, fallbackRoleId: widget.profile.roleId),
-        )) {
+      AccessScope.accessOf(context, fallbackRoleId: widget.profile.roleId),
+    )) {
       return;
     }
     _defaultJoinAttempted = true;
@@ -101,19 +105,28 @@ class ChatsScreenState extends State<ChatsScreen> {
     _listening = shouldListen;
     if (shouldListen) {
       // Fresh RTDB subscription each time TickerMode re-enables the tab.
-      _sub = _repo.watchChats(widget.profile.uid).listen(
-        (chats) {
-          _latest = chats;
-          if (!_gate.isClosed) _gate.add(chats);
-        },
-        onError: (Object error, StackTrace stack) {
-          if (!_gate.isClosed) _gate.addError(error, stack);
-        },
-      );
+      _sub = _repo
+          .watchChats(widget.profile.uid)
+          .listen(
+            (chats) {
+              _latest = chats;
+              if (!_gate.isClosed) _gate.add(chats);
+            },
+            onError: (Object error, StackTrace stack) {
+              if (!_gate.isClosed) _gate.addError(error, stack);
+            },
+          );
     } else {
       _sub?.cancel();
       _sub = null;
     }
+  }
+
+  void _retryInbox() {
+    _sub?.cancel();
+    _sub = null;
+    _listening = null;
+    _syncListen(true);
   }
 
   @override
@@ -124,8 +137,7 @@ class ChatsScreenState extends State<ChatsScreen> {
     super.dispose();
   }
 
-  bool _canSwipe(ChatConversation chat) =>
-      !chat.isDefaultAgentGroup;
+  bool _canSwipe(ChatConversation chat) => !chat.isDefaultAgentGroup;
 
   Future<void> _togglePin(ChatConversation chat) async {
     final l10n = context.l10n;
@@ -143,9 +155,9 @@ class ChatsScreenState extends State<ChatsScreen> {
       );
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyChatError(error, l10n))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(friendlyChatError(error, l10n))));
     }
   }
 
@@ -173,19 +185,16 @@ class ChatsScreenState extends State<ChatsScreen> {
     );
     if (confirmed != true || !mounted) return;
     try {
-      await _repo.hideChatForMe(
-        chatId: chat.id,
-        uid: widget.profile.uid,
-      );
+      await _repo.hideChatForMe(chatId: chat.id, uid: widget.profile.uid);
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(l10n.chatDeleted)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(l10n.chatDeleted)));
     } catch (error) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(friendlyChatError(error, l10n))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(friendlyChatError(error, l10n))));
     }
   }
 
@@ -213,6 +222,42 @@ class ChatsScreenState extends State<ChatsScreen> {
           style: theme.textTheme.headlineMedium?.copyWith(fontSize: 24),
         ),
         actions: [
+          if (canChat)
+            IconButton(
+              tooltip: l10n.peopleTitle,
+              onPressed: () {
+                PulseHaptics.light();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ChatPeopleScreen(
+                      profile: profile,
+                      chatRepository: _repo,
+                      userRepository: _users,
+                      socialRepository: widget.socialRepository,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.people_alt_outlined),
+            ),
+          if (canManageChatGroups(
+            AccessScope.accessOf(context, fallbackRoleId: profile.roleId),
+          ))
+            IconButton(
+              tooltip: l10n.chatManageGroupsTitle,
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => ChatManageGroupsScreen(
+                      profile: profile,
+                      chatRepository: _repo,
+                      userRepository: _users,
+                    ),
+                  ),
+                );
+              },
+              icon: const Icon(Icons.admin_panel_settings_outlined),
+            ),
           if (widget.onOpenNotifications != null)
             NotificationBellButton(
               unreadCount: widget.notificationUnread,
@@ -229,7 +274,7 @@ class ChatsScreenState extends State<ChatsScreen> {
                   context,
                   profile: profile,
                   chatRepository: _repo,
-                  userRepository: widget.userRepository ?? UserRepository(),
+                  userRepository: _users,
                 );
               },
               tooltip: l10n.fabNewChat,
@@ -241,93 +286,106 @@ class ChatsScreenState extends State<ChatsScreen> {
         split: split,
         profile: profile,
         inbox: !canChat
-          ? Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.xl),
-                child: Text(
-                  l10n.chatsGuestPrompt,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colors.muted,
-                    height: 1.4,
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.xl),
+                  child: Text(
+                    l10n.chatsGuestPrompt,
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyLarge?.copyWith(
+                      color: colors.muted,
+                      height: 1.4,
+                    ),
                   ),
                 ),
-              ),
-            )
-          : StreamBuilder<List<ChatConversation>>(
-              stream: _gate.stream,
-              initialData: _latest,
-              builder: (context, snapshot) {
-                Widget child;
-                if (snapshot.hasError) {
-                  child = Center(
-                    key: const ValueKey('error'),
-                    child: Padding(
-                      padding: const EdgeInsets.all(AppSpacing.xl),
-                      child: Text(
-                        friendlyChatError(snapshot.error!, l10n),
-                        textAlign: TextAlign.center,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: colors.muted,
-                        ),
-                      ),
-                    ),
-                  );
-                } else if (!snapshot.hasData) {
-                  child = const PulseChatListSkeleton(key: ValueKey('loading'));
-                } else {
-                  final chats = snapshot.data!;
-                  if (chats.isEmpty) {
+              )
+            : StreamBuilder<List<ChatConversation>>(
+                stream: _gate.stream,
+                initialData: _latest,
+                builder: (context, snapshot) {
+                  Widget child;
+                  if (snapshot.hasError) {
                     child = Center(
-                      key: const ValueKey('empty'),
+                      key: const ValueKey('error'),
                       child: Padding(
                         padding: const EdgeInsets.all(AppSpacing.xl),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             Text(
-                              l10n.chatsEmptyTitle,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              l10n.chatsEmptySubtitle,
+                              friendlyChatError(snapshot.error!, l10n),
                               textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium?.copyWith(
+                              style: theme.textTheme.bodyLarge?.copyWith(
                                 color: colors.muted,
                               ),
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            FilledButton.tonalIcon(
+                              onPressed: _retryInbox,
+                              icon: const Icon(Icons.refresh_rounded),
+                              label: Text(l10n.actionRetry),
                             ),
                           ],
                         ),
                       ),
                     );
-                  } else {
-                    child = _InboxList(
-                      key: const ValueKey('list'),
-                      chats: chats,
-                      profile: profile,
-                      dense: dense,
-                      selectedId: _selectedChat?.id,
-                      search: _search,
-                      filter: _filter,
-                      onFilter: (next) => setState(() => _filter = next),
-                      onSearch: (_) => setState(() {}),
-                      onSelect: selectConversation,
-                      onPin: _togglePin,
-                      onDelete: _confirmDelete,
-                      canSwipe: _canSwipe,
+                  } else if (!snapshot.hasData) {
+                    child = const PulseChatListSkeleton(
+                      key: ValueKey('loading'),
                     );
+                  } else {
+                    final chats = snapshot.data!;
+                    if (chats.isEmpty) {
+                      child = Center(
+                        key: const ValueKey('empty'),
+                        child: Padding(
+                          padding: const EdgeInsets.all(AppSpacing.xl),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                l10n.chatsEmptyTitle,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                l10n.chatsEmptySubtitle,
+                                textAlign: TextAlign.center,
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: colors.muted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    } else {
+                      child = _InboxList(
+                        key: const ValueKey('list'),
+                        chats: chats,
+                        profile: profile,
+                        dense: dense,
+                        selectedId: _selectedChat?.id,
+                        search: _search,
+                        filter: _filter,
+                        onFilter: (next) => setState(() => _filter = next),
+                        onSearch: (_) => setState(() {}),
+                        onSelect: selectConversation,
+                        onPin: _togglePin,
+                        onDelete: _confirmDelete,
+                        canSwipe: _canSwipe,
+                      );
+                    }
                   }
-                }
 
-                return AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 220),
-                  child: child,
-                );
-              },
-            ),
+                  return AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 220),
+                    child: child,
+                  );
+                },
+              ),
       ),
     );
   }
@@ -426,8 +484,8 @@ class _InboxList extends StatelessWidget {
               l10n.chatsInboxFilterEmpty,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.of(context).muted,
-                  ),
+                color: AppColors.of(context).muted,
+              ),
             ),
           )
         else ...[
@@ -453,11 +511,11 @@ class _InboxList extends StatelessWidget {
             Text(
               l10n.chatsSectionRecent.toUpperCase(),
               style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: AppColors.of(context).muted,
-                    fontSize: 11,
-                    letterSpacing: 1.1,
-                    fontWeight: FontWeight.w800,
-                  ),
+                color: AppColors.of(context).muted,
+                fontSize: 11,
+                letterSpacing: 1.1,
+                fontWeight: FontWeight.w800,
+              ),
             ),
             const SizedBox(height: 4),
             for (final chat in recent)
@@ -529,4 +587,3 @@ void openChat(
     ),
   );
 }
-

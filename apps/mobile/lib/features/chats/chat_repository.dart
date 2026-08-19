@@ -1,8 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_database/firebase_database.dart';
 
+import '../../firebase/https_callable.dart';
 import '../../users/user_profile.dart';
 import '../../users/user_role.dart';
 import 'chat_models.dart';
@@ -13,6 +16,10 @@ const kChatMessagePageSize = 40;
 
 /// Persistence port for chats (testable without Firebase).
 abstract class ChatStore {
+  /// Prepares server-backed authorization state before opening RTDB streams.
+  /// In-memory stores need no preparation.
+  Future<void> prepareAccess() async {}
+
   Stream<List<ChatConversation>> watchChats(String uid);
 
   Stream<ChatConversation?> watchChat(String chatId);
@@ -31,10 +38,7 @@ abstract class ChatStore {
   Future<ChatConversation> createChat(ChatConversation chat);
 
   /// True when `userChats/{uid}/{chatId}` exists (safe existence probe).
-  Future<bool> hasUserChatIndex({
-    required String uid,
-    required String chatId,
-  });
+  Future<bool> hasUserChatIndex({required String uid, required String chatId});
 
   /// Removes this chat from [uid]'s inbox index (hide for me).
   Future<void> removeUserChatIndex({
@@ -85,6 +89,18 @@ abstract class ChatStore {
     String? emoji,
   });
 
+  Stream<Set<String>> watchHiddenMessageIds({
+    required String chatId,
+    required String uid,
+  });
+
+  Future<void> setMessageHidden({
+    required String chatId,
+    required String messageId,
+    required String uid,
+    required bool hidden,
+  });
+
   /// uid → last typing heartbeat (ms).
   Stream<Map<String, int>> watchTyping(String chatId);
 
@@ -103,15 +119,49 @@ abstract class ChatStore {
 /// - `userChats/{uid}/{chatId}` — inbox index (`lastMessageAt`)
 /// - `dmIndex/{dmKey}` — DM id lookup
 class RtdbChatStore implements ChatStore {
-  RtdbChatStore({FirebaseDatabase? database, FirebaseFunctions? functions})
-      : _db = database ?? FirebaseDatabase.instance,
-        _functions =
-            functions ?? FirebaseFunctions.instanceFor(region: 'us-central1');
+  RtdbChatStore({
+    FirebaseDatabase? database,
+    FirebaseFunctions? functions,
+    HttpsCallableClient? callables,
+  }) : _db = database ?? FirebaseDatabase.instance,
+       _callables = callables ?? HttpsCallableClient(functions: functions);
 
   final FirebaseDatabase _db;
-  final FirebaseFunctions _functions;
+  final HttpsCallableClient _callables;
+  Future<void>? _accessReady;
 
   DatabaseReference get _root => _db.ref();
+
+  @override
+  Future<void> prepareAccess() async {
+    final pending = _accessReady;
+    if (pending != null) return pending;
+    final next = _refreshChatAccess();
+    _accessReady = next;
+    try {
+      await next;
+    } catch (_) {
+      _accessReady = null;
+      rethrow;
+    }
+  }
+
+  Future<void> _refreshChatAccess() async {
+    try {
+      final result = await _callables.call(
+        'refreshMyChatAccess',
+        <String, dynamic>{},
+      );
+      final data = _asStringKeyedMap(result);
+      if (data['allowed'] == false) {
+        throw StateError('No tienes permisos para usar los chats.');
+      }
+    } on FirebaseFunctionsException catch (error) {
+      // Backward-compatible during a rolling deploy against older Functions.
+      if (error.code == 'not-found' || error.code == 'unimplemented') return;
+      rethrow;
+    }
+  }
 
   Map<String, dynamic> _asStringKeyedMap(Object? raw) {
     if (raw is! Map) return {};
@@ -195,66 +245,67 @@ class RtdbChatStore implements ChatStore {
       'members': {
         for (final id in (row['memberIds'] as List? ?? const [])) '$id': true,
       },
-      'unreadCounts': {
-        viewerUid: _readMillis(row['unreadCount']),
-      },
-      'pinnedBy': {
-        viewerUid: row['pinned'] == true,
-      },
+      'unreadCounts': {viewerUid: _readMillis(row['unreadCount'])},
+      'pinnedBy': {viewerUid: row['pinned'] == true},
     });
   }
 
   /// RTDB `onValue` streams are single-subscription; [Stream.multi] makes each
   /// `.listen` start a fresh native subscription (needed when the inbox pauses).
   @override
-  Stream<List<ChatConversation>> watchChats(String uid) {
+  Stream<List<ChatConversation>> watchChats(String uid) async* {
+    await prepareAccess();
     unawaited(_rebuildInbox());
-    return Stream.multi((controller) {
-      final sub = _root.child('userChats/$uid').onValue.listen(
-        (event) async {
-          try {
-            controller.add(
-              await _inboxFromIndex(
-                event.snapshot.value,
-                viewerUid: uid,
-              ),
-            );
-          } catch (e, st) {
-            controller.addError(e, st);
-          }
-        },
-        onError: controller.addError,
-        onDone: controller.close,
-      );
+    yield* Stream.multi((controller) {
+      final sub = _root
+          .child('userChats/$uid')
+          .onValue
+          .listen(
+            (event) async {
+              try {
+                controller.add(
+                  await _inboxFromIndex(event.snapshot.value, viewerUid: uid),
+                );
+              } catch (e, st) {
+                controller.addError(e, st);
+              }
+            },
+            onError: controller.addError,
+            onDone: controller.close,
+          );
       controller.onCancel = sub.cancel;
     });
   }
 
   Future<void> _rebuildInbox() async {
     try {
-      await _functions.httpsCallable('rebuildChatInbox').call(<String, dynamic>{});
+      await _callables.call('rebuildChatInbox', <String, dynamic>{});
     } catch (_) {
       // Legacy rows refresh automatically on the next chat write.
     }
   }
 
   @override
-  Stream<ChatConversation?> watchChat(String chatId) {
-    return Stream.multi((controller) {
-      final sub = _root.child('chats/$chatId').onValue.listen(
-        (event) {
-          final snap = event.snapshot;
-          if (!snap.exists || snap.value is! Map) {
-            controller.add(null);
-            return;
-          }
-          controller.add(
-            ChatConversation.fromMap(chatId, _asStringKeyedMap(snap.value)),
+  Stream<ChatConversation?> watchChat(String chatId) async* {
+    await prepareAccess();
+    yield* Stream.multi((controller) {
+      final sub = _root
+          .child('chats/$chatId')
+          .onValue
+          .listen(
+            (event) {
+              final snap = event.snapshot;
+              if (!snap.exists || snap.value is! Map) {
+                controller.add(null);
+                return;
+              }
+              controller.add(
+                ChatConversation.fromMap(chatId, _asStringKeyedMap(snap.value)),
+              );
+            },
+            onError: controller.addError,
+            onDone: controller.close,
           );
-        },
-        onError: controller.addError,
-        onDone: controller.close,
-      );
       controller.onCancel = sub.cancel;
     });
   }
@@ -263,8 +314,9 @@ class RtdbChatStore implements ChatStore {
   Stream<List<ChatMessage>> watchMessages(
     String chatId, {
     int limit = kChatMessagePageSize,
-  }) {
-    return Stream.multi((controller) {
+  }) async* {
+    await prepareAccess();
+    yield* Stream.multi((controller) {
       final query = _root
           .child('messages/$chatId')
           .orderByChild('createdAt')
@@ -279,10 +331,9 @@ class RtdbChatStore implements ChatStore {
           final list = <ChatMessage>[];
           for (final entry in raw.entries) {
             final data = _asStringKeyedMap(entry.value);
-            list.add(ChatMessage.fromMap('${entry.key}', {
-              ...data,
-              'chatId': chatId,
-            }));
+            list.add(
+              ChatMessage.fromMap('${entry.key}', {...data, 'chatId': chatId}),
+            );
           }
           list.sort((a, b) => b.createdAt.compareTo(a.createdAt));
           controller.add(list);
@@ -299,9 +350,13 @@ class RtdbChatStore implements ChatStore {
     String dmKey, {
     required String viewerUid,
   }) async {
+    await prepareAccess();
     final byId = await _root.child('chats/$dmKey').get();
     if (byId.exists && byId.value is Map) {
-      final chat = ChatConversation.fromMap(dmKey, _asStringKeyedMap(byId.value));
+      final chat = ChatConversation.fromMap(
+        dmKey,
+        _asStringKeyedMap(byId.value),
+      );
       if (chat.memberIds.contains(viewerUid)) return chat;
     }
 
@@ -310,8 +365,10 @@ class RtdbChatStore implements ChatStore {
     if (mappedId == null || mappedId.isEmpty) return null;
     final snap = await _root.child('chats/$mappedId').get();
     if (!snap.exists || snap.value is! Map) return null;
-    final chat =
-        ChatConversation.fromMap(mappedId, _asStringKeyedMap(snap.value));
+    final chat = ChatConversation.fromMap(
+      mappedId,
+      _asStringKeyedMap(snap.value),
+    );
     if (!chat.memberIds.contains(viewerUid)) return null;
     return chat;
   }
@@ -321,6 +378,7 @@ class RtdbChatStore implements ChatStore {
     required String uid,
     required String chatId,
   }) async {
+    await prepareAccess();
     final snap = await _root.child('userChats/$uid/$chatId').get();
     return snap.exists;
   }
@@ -328,13 +386,11 @@ class RtdbChatStore implements ChatStore {
   @override
   Future<ChatConversation> createChat(ChatConversation chat) async {
     if (chat.isGroup) {
-      final result = await _functions.httpsCallable('createGroupChat').call(
-        <String, dynamic>{
-          'title': chat.title,
-          'memberIds': chat.memberIds,
-        },
+      final result = await _callables.call(
+        'createGroupChat',
+        <String, dynamic>{'title': chat.title, 'memberIds': chat.memberIds},
       );
-      final data = _asStringKeyedMap(result.data);
+      final data = _asStringKeyedMap(result);
       final chatId = '${data['chatId'] ?? ''}'.trim();
       if (chatId.isEmpty) {
         throw StateError('No se pudo crear el grupo.');
@@ -357,9 +413,7 @@ class RtdbChatStore implements ChatStore {
         lastMessage: '',
         lastMessageAt: createdAt,
         lastMessageSenderId: null,
-        unreadCounts: {
-          for (final id in chat.memberIds) id: 0,
-        },
+        unreadCounts: {for (final id in chat.memberIds) id: 0},
         pinnedBy: const {},
         createdAt: createdAt,
         createdBy: chat.createdBy,
@@ -374,10 +428,11 @@ class RtdbChatStore implements ChatStore {
     if (otherUid.isEmpty) {
       throw StateError('Valid recipient required.');
     }
-    final result = await _functions.httpsCallable('createDm').call(
+    final result = await _callables.call(
+      'createDm',
       <String, dynamic>{'otherUid': otherUid},
     );
-    final data = _asStringKeyedMap(result.data);
+    final data = _asStringKeyedMap(result);
     final chatId = '${data['chatId'] ?? chat.dmKey ?? ''}'.trim();
     if (chatId.isEmpty) {
       throw StateError('No se pudo crear el chat.');
@@ -390,8 +445,9 @@ class RtdbChatStore implements ChatStore {
         ? (data['memberIds'] as List).map((e) => '$e').toList()
         : List<String>.from(chat.memberIds);
     final memberNames = data['memberNames'] is Map
-        ? _asStringKeyedMap(data['memberNames'])
-            .map((k, v) => MapEntry(k, '$v'))
+        ? _asStringKeyedMap(
+            data['memberNames'],
+          ).map((k, v) => MapEntry(k, '$v'))
         : Map<String, String>.from(chat.memberNames);
     return ChatConversation(
       id: chatId,
@@ -419,6 +475,7 @@ class RtdbChatStore implements ChatStore {
     required String uid,
     required int count,
   }) async {
+    await prepareAccess();
     await _root.child('chats/$chatId/unreadCounts/$uid').set(count);
   }
 
@@ -429,14 +486,17 @@ class RtdbChatStore implements ChatStore {
     String? photoUrl,
     String? username,
   }) async {
+    await prepareAccess();
     final updates = <String, Object?>{};
     if (photoUrl != null) {
-      updates['chats/$chatId/memberPhotos/$uid'] =
-          photoUrl.trim().isEmpty ? null : photoUrl.trim();
+      updates['chats/$chatId/memberPhotos/$uid'] = photoUrl.trim().isEmpty
+          ? null
+          : photoUrl.trim();
     }
     if (username != null) {
-      updates['chats/$chatId/memberUsernames/$uid'] =
-          username.trim().isEmpty ? null : username.trim();
+      updates['chats/$chatId/memberUsernames/$uid'] = username.trim().isEmpty
+          ? null
+          : username.trim();
     }
     if (updates.isNotEmpty) await _root.update(updates);
   }
@@ -447,6 +507,7 @@ class RtdbChatStore implements ChatStore {
     required String uid,
     required bool pinned,
   }) async {
+    await prepareAccess();
     final ref = _root.child('chats/$chatId/pinnedBy/$uid');
     if (pinned) {
       await ref.set(true);
@@ -460,6 +521,7 @@ class RtdbChatStore implements ChatStore {
     required String uid,
     required String chatId,
   }) async {
+    await prepareAccess();
     await _root.child('userChats/$uid/$chatId').remove();
   }
 
@@ -470,6 +532,7 @@ class RtdbChatStore implements ChatStore {
     required int lastMessageAt,
     bool? pinned,
   }) async {
+    await prepareAccess();
     final updates = <String, Object?>{
       'userChats/$uid/$chatId/lastMessageAt': lastMessageAt,
     };
@@ -486,6 +549,7 @@ class RtdbChatStore implements ChatStore {
 
   @override
   Future<ChatMessage> addMessage(ChatMessage message) async {
+    await prepareAccess();
     final ref = _root.child('messages/${message.chatId}').push();
     final id = ref.key!;
     final payload = message.toMap()
@@ -506,6 +570,7 @@ class RtdbChatStore implements ChatStore {
     required String uid,
     String? emoji,
   }) async {
+    await prepareAccess();
     final ref = _root.child('messages/$chatId/$messageId/reactions/$uid');
     final trimmed = emoji?.trim();
     if (trimmed == null || trimmed.isEmpty) {
@@ -516,25 +581,61 @@ class RtdbChatStore implements ChatStore {
   }
 
   @override
-  Stream<Map<String, int>> watchTyping(String chatId) {
-    return Stream.multi((controller) {
-      final sub = _root.child('typing/$chatId').onValue.listen(
-        (event) {
-          final raw = event.snapshot.value;
-          if (raw is! Map) {
-            controller.add(const {});
-            return;
-          }
-          final out = <String, int>{};
-          for (final entry in raw.entries) {
-            final row = _asStringKeyedMap(entry.value);
-            out['${entry.key}'] = _readMillis(row['at']);
-          }
-          controller.add(out);
-        },
-        onError: controller.addError,
-        onDone: controller.close,
-      );
+  Stream<Set<String>> watchHiddenMessageIds({
+    required String chatId,
+    required String uid,
+  }) async* {
+    await prepareAccess();
+    yield* _root.child('hiddenMessages/$uid/$chatId').onValue.map((event) {
+      final raw = event.snapshot.value;
+      if (raw is! Map) return <String>{};
+      return raw.entries
+          .where((entry) => entry.value == true)
+          .map((entry) => '${entry.key}')
+          .toSet();
+    });
+  }
+
+  @override
+  Future<void> setMessageHidden({
+    required String chatId,
+    required String messageId,
+    required String uid,
+    required bool hidden,
+  }) async {
+    await prepareAccess();
+    final ref = _root.child('hiddenMessages/$uid/$chatId/$messageId');
+    if (hidden) {
+      await ref.set(true);
+    } else {
+      await ref.remove();
+    }
+  }
+
+  @override
+  Stream<Map<String, int>> watchTyping(String chatId) async* {
+    await prepareAccess();
+    yield* Stream.multi((controller) {
+      final sub = _root
+          .child('typing/$chatId')
+          .onValue
+          .listen(
+            (event) {
+              final raw = event.snapshot.value;
+              if (raw is! Map) {
+                controller.add(const {});
+                return;
+              }
+              final out = <String, int>{};
+              for (final entry in raw.entries) {
+                final row = _asStringKeyedMap(entry.value);
+                out['${entry.key}'] = _readMillis(row['at']);
+              }
+              controller.add(out);
+            },
+            onError: controller.addError,
+            onDone: controller.close,
+          );
       controller.onCancel = sub.cancel;
     });
   }
@@ -545,6 +646,7 @@ class RtdbChatStore implements ChatStore {
     required String uid,
     required bool typing,
   }) async {
+    await prepareAccess();
     final ref = _root.child('typing/$chatId/$uid');
     if (typing) {
       await ref.set({'at': DateTime.now().toUtc().millisecondsSinceEpoch});
@@ -563,12 +665,29 @@ class RtdbChatStore implements ChatStore {
 class ChatRepository {
   ChatRepository({
     ChatStore? store,
-    this._idFactory,
+    FirebaseFunctions? functions,
+    HttpsCallableClient? callables,
+    ChatIdFactory? idFactory,
     DateTime Function()? clock,
-  })  : _store = store ?? RtdbChatStore(),
-        _clock = clock ?? (() => DateTime.now().toUtc());
+  }) : this._(
+         store: store,
+         callables: callables ?? HttpsCallableClient(functions: functions),
+         idFactory: idFactory,
+         clock: clock,
+       );
+
+  ChatRepository._({
+    required ChatStore? store,
+    required HttpsCallableClient callables,
+    ChatIdFactory? idFactory,
+    DateTime Function()? clock,
+  }) : _callables = callables,
+       _store = store ?? RtdbChatStore(callables: callables),
+       _idFactory = idFactory,
+       _clock = clock ?? (() => DateTime.now().toUtc());
 
   final ChatStore _store;
+  final HttpsCallableClient _callables;
   final ChatIdFactory? _idFactory;
   final DateTime Function() _clock;
 
@@ -581,22 +700,26 @@ class ChatRepository {
   Stream<List<ChatMessage>> watchMessages(
     String chatId, {
     int limit = kChatMessagePageSize,
-  }) =>
-      _store.watchMessages(chatId, limit: limit);
+  }) => _store.watchMessages(chatId, limit: limit);
 
   Stream<Map<String, int>> watchTyping(String chatId) =>
       _store.watchTyping(chatId);
+
+  Stream<Set<String>> watchHiddenMessageIds({
+    required String chatId,
+    required String uid,
+  }) => _store.watchHiddenMessageIds(chatId: chatId, uid: uid);
 
   Future<void> setTyping({
     required String chatId,
     required String uid,
     required bool typing,
-  }) =>
-      _store.setTyping(chatId: chatId, uid: uid, typing: typing);
+  }) => _store.setTyping(chatId: chatId, uid: uid, typing: typing);
 
   Future<ChatConversation> getOrCreateDm({
     required UserProfile me,
     required UserProfile other,
+    Object? access,
   }) async {
     _ensureCanChat(me);
     _ensureCanChat(other);
@@ -605,18 +728,20 @@ class ChatRepository {
     }
 
     final key = dmKeyFor(me.uid, other.uid);
-    final existing = await _store.findDmByKey(key, viewerUid: me.uid);
-    if (existing != null) return existing;
+    if (!canAccessAllChatContacts(access ?? me.roleId)) {
+      final existing = await _store.findDmByKey(key, viewerUid: me.uid);
+      if (existing != null) {
+        await _ensureDirectMessaging(existing, me.uid);
+        return existing;
+      }
+    }
 
     final now = _clock();
     final id = _idFactory?.call() ?? key;
     final chat = ChatConversation(
       id: id,
       memberIds: [me.uid, other.uid]..sort(),
-      memberNames: {
-        me.uid: me.headlineName,
-        other.uid: other.headlineName,
-      },
+      memberNames: {me.uid: me.headlineName, other.uid: other.headlineName},
       memberPhotos: {
         if (me.photoUrl != null && me.photoUrl!.trim().isNotEmpty)
           me.uid: me.photoUrl!,
@@ -676,9 +801,7 @@ class ChatRepository {
     final chat = ChatConversation(
       id: id,
       memberIds: all.map((p) => p.uid).toList()..sort(),
-      memberNames: {
-        for (final p in all) p.uid: p.headlineName,
-      },
+      memberNames: {for (final p in all) p.uid: p.headlineName},
       memberPhotos: {
         for (final p in all)
           if (p.photoUrl != null && p.photoUrl!.trim().isNotEmpty)
@@ -741,10 +864,7 @@ class ChatRepository {
     );
   }
 
-  Future<void> markRead({
-    required String chatId,
-    required String uid,
-  }) async {
+  Future<void> markRead({required String chatId, required String uid}) async {
     final chat = await _requireChat(chatId);
     if (!chat.memberIds.contains(uid)) {
       throw StateError('No eres miembro de este chat.');
@@ -831,6 +951,89 @@ class ChatRepository {
     );
   }
 
+  Future<void> hideMessageForMe({
+    required String chatId,
+    required String messageId,
+    required String uid,
+  }) {
+    return _store.setMessageHidden(
+      chatId: chatId,
+      messageId: messageId,
+      uid: uid,
+      hidden: true,
+    );
+  }
+
+  Future<void> deleteMessageForEveryone({
+    required String chatId,
+    required String messageId,
+  }) async {
+    await _callables.call('deleteChatMessage', <String, dynamic>{
+      'chatId': chatId,
+      'messageId': messageId,
+    });
+  }
+
+  Future<void> clearMessages(String chatId) async {
+    await _callables.call('clearChatMessages', <String, dynamic>{
+      'chatId': chatId,
+    });
+  }
+
+  Future<List<ChatConversation>> listManagedGroups({int limit = 100}) async {
+    final result = await _callables.call(
+      'listManagedGroupChats',
+      <String, dynamic>{'limit': limit},
+    );
+    final payload = result is Map ? result : const {};
+    final raw = payload['groups'];
+    return (raw is List ? raw : const [])
+        .whereType<Map>()
+        .map((item) {
+          final data = Map<String, dynamic>.from(item);
+          final id = '${data.remove('id') ?? data['chatId'] ?? ''}';
+          return ChatConversation.fromMap(id, data);
+        })
+        .where((chat) => chat.id.isNotEmpty && chat.isGroup)
+        .toList();
+  }
+
+  Future<void> updateGroup({
+    required String chatId,
+    required String title,
+    required Iterable<String> memberIds,
+    String? photoUrl,
+  }) async {
+    await _callables.call('updateGroupChat', <String, dynamic>{
+      'chatId': chatId,
+      'title': title.trim(),
+      'memberIds': memberIds.toSet().toList(),
+      'photoUrl': ?photoUrl,
+    });
+  }
+
+  Future<String> uploadGroupPhoto({
+    required String chatId,
+    required Uint8List bytes,
+    String contentType = 'image/jpeg',
+  }) async {
+    final result = await _callables.call('uploadGroupChatPhoto', <String, dynamic>{
+      'chatId': chatId,
+      'contentType': contentType,
+      'bytesBase64': base64Encode(bytes),
+    });
+    if (result is Map && result['downloadUrl'] is String) {
+      return result['downloadUrl'] as String;
+    }
+    throw StateError('uploadGroupChatPhoto did not return a download URL.');
+  }
+
+  Future<void> deleteGroup(String chatId) async {
+    await _callables.call('deleteGroupChat', <String, dynamic>{
+      'chatId': chatId,
+    });
+  }
+
   Future<ChatMessage> _appendMessage({
     required String chatId,
     required UserProfile author,
@@ -843,6 +1046,7 @@ class ChatRepository {
     if (!chat.memberIds.contains(author.uid)) {
       throw StateError('No eres miembro de este chat.');
     }
+    await _ensureDirectMessaging(chat, author.uid);
 
     final now = _clock();
     // RTDB rules require a non-empty body; shared-post-only uses the preview.
@@ -897,6 +1101,21 @@ class ChatRepository {
       throw StateError('Este chat ya no existe.');
     }
     return snap;
+  }
+
+  Future<void> _ensureDirectMessaging(
+    ChatConversation chat,
+    String viewerUid,
+  ) async {
+    if (chat.isGroup || _store is! RtdbChatStore) return;
+    final otherUid = chat.memberIds.firstWhere(
+      (uid) => uid != viewerUid,
+      orElse: () => '',
+    );
+    if (otherUid.isEmpty) return;
+    await _callables.call('createDm', <String, dynamic>{
+      'otherUid': otherUid,
+    });
   }
 
   void _ensureCanChat(UserProfile profile) {

@@ -3,6 +3,7 @@ import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../firebase/firebase_emulators.dart';
+import '../../firebase/https_callable.dart';
 import 'poll_models.dart';
 
 abstract class PollStore {
@@ -13,17 +14,13 @@ abstract class PollStore {
 
 class FirestorePollStore implements PollStore {
   FirestorePollStore({
-    FirebaseFirestore? firestore,
+    this._firestore,
     FirebaseFunctions? functions,
-  })  : _firestore = firestore,
-        _functionsOverride = functions;
+    HttpsCallableClient? callables,
+  }) : _callables = callables ?? HttpsCallableClient(functions: functions);
 
   final FirebaseFirestore? _firestore;
-  final FirebaseFunctions? _functionsOverride;
-
-  FirebaseFunctions get _functions =>
-      _functionsOverride ??
-      FirebaseFunctions.instanceFor(region: 'us-central1');
+  final HttpsCallableClient _callables;
 
   @override
   Stream<List<Poll>> watchActivePolls() {
@@ -33,29 +30,24 @@ class FirestorePollStore implements PollStore {
           .collection('polls')
           .where('active', isEqualTo: true)
           .snapshots()
-          .map(
-            (snap) {
-              final polls = <Poll>[];
-              for (final doc in snap.docs) {
-                try {
-                  polls.add(pollFromMap(doc.id, doc.data()));
-                } catch (error, stack) {
-                  debugPrint('poll parse ${doc.id}: $error\n$stack');
-                }
+          .map((snap) {
+            final polls = <Poll>[];
+            for (final doc in snap.docs) {
+              try {
+                polls.add(pollFromMap(doc.id, doc.data()));
+              } catch (error, stack) {
+                debugPrint('poll parse ${doc.id}: $error\n$stack');
               }
-              return polls;
-            },
-          );
+            }
+            return polls;
+          });
     } catch (_) {
       return Stream.value(const []);
     }
   }
 
   @override
-  Stream<String?> watchMyVote({
-    required String pollId,
-    required String uid,
-  }) {
+  Stream<String?> watchMyVote({required String pollId, required String uid}) {
     if (pollId.isEmpty || uid.isEmpty) return Stream.value(null);
     try {
       final db = _firestore ?? FirebaseFirestore.instance;
@@ -66,21 +58,18 @@ class FirestorePollStore implements PollStore {
           .doc(uid)
           .snapshots()
           .map((snap) {
-        final optionId = snap.data()?['optionId'];
-        return optionId is String && optionId.isNotEmpty ? optionId : null;
-      });
+            final optionId = snap.data()?['optionId'];
+            return optionId is String && optionId.isNotEmpty ? optionId : null;
+          });
     } catch (_) {
       return Stream.value(null);
     }
   }
 
   @override
-  Future<void> vote({
-    required String pollId,
-    required String optionId,
-  }) async {
+  Future<void> vote({required String pollId, required String optionId}) async {
     try {
-      await _functions.httpsCallable('votePoll').call(<String, dynamic>{
+      await _callables.call('votePoll', <String, dynamic>{
         'pollId': pollId,
         'optionId': optionId,
       });
