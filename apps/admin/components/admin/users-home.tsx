@@ -4,6 +4,11 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import type { ColumnDef, RowSelectionState } from "@tanstack/react-table";
 import type { AdminUserRow, BulkResult } from "@pulse/firebase-web";
+import {
+  canAssignRoleByAuthority,
+  getDefaultPermissionsForRole,
+  isBuiltinRoleId,
+} from "@pulse/shared";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
 import { getAdminRepository } from "@/lib/repositories/admin-repository";
 import { can, canManagePlatform, headlineName } from "@/lib/roles";
@@ -91,7 +96,7 @@ function FilterField({
 
 export function UsersHome() {
   const t = useTranslations();
-  const { profile } = useAuth();
+  const { profile, permissions } = useAuth();
   const access = useAccess();
   const isAdmin = canManagePlatform(access);
   const canDecideApprovals = can(access, "admin.approvals.decide");
@@ -144,10 +149,37 @@ export function UsersHome() {
   );
   const rolesQuery = useAdminRolesQuery(
     { includeInactive: false, includeSystem: false },
-    bulkActive && isAdmin,
+    isAdmin,
   );
   const agencies = agenciesQuery.data?.agencies ?? [];
-  const assignableRoles = rolesQuery.data?.roles ?? [];
+  const roleById = useMemo(
+    () => new Map((rolesQuery.data?.roles ?? []).map((item) => [item.id, item])),
+    [rolesQuery.data?.roles],
+  );
+  const assignableRoles = useMemo(
+    () =>
+      (rolesQuery.data?.roles ?? []).filter((item) =>
+        canAssignRoleByAuthority({
+          actorRole: profile?.role ?? "student",
+          actorPermissions: permissions,
+          targetRole: item.id,
+          targetPermissions: item.permissions,
+        }),
+      ),
+    [permissions, profile?.role, rolesQuery.data?.roles],
+  );
+  const canManageUser = (person: AdminUserRow) => {
+    if (!profile || person.uid === profile.uid) return false;
+    const roleDoc = roleById.get(person.role);
+    if (!roleDoc && !isBuiltinRoleId(person.role)) return false;
+    return canAssignRoleByAuthority({
+      actorRole: profile.role,
+      actorPermissions: permissions,
+      targetRole: person.role,
+      targetPermissions:
+        roleDoc?.permissions ?? getDefaultPermissionsForRole(person.role),
+    });
+  };
 
   useEffect(() => {
     setPageToken(null);
@@ -367,11 +399,13 @@ export function UsersHome() {
         cell: ({ row }) => {
           const person = row.original;
           if (!isAdmin) return null;
+          const manageable = canManageUser(person);
           return (
             <RowActions>
               <RowActionButton
                 variant="secondary"
-                disabled={busyUid === person.uid}
+                disabled={busyUid === person.uid || !manageable}
+                title={!manageable ? t("usersHierarchyBlocked") : undefined}
                 onClick={() => openEdit(person)}
               >
                 {t("usersEdit")}
@@ -379,7 +413,8 @@ export function UsersHome() {
               {person.accountStatus === "deactivated" ? (
                 <RowActionButton
                   variant="secondary"
-                  disabled={busyUid === person.uid}
+                  disabled={busyUid === person.uid || !manageable}
+                  title={!manageable ? t("usersHierarchyBlocked") : undefined}
                   onClick={async () => {
                     setBusyUid(person.uid);
                     try {
@@ -398,8 +433,9 @@ export function UsersHome() {
               ) : (
                 <RowActionButton
                   disabled={
-                    busyUid === person.uid || person.uid === profile?.uid
+                    busyUid === person.uid || !manageable
                   }
+                  title={!manageable ? t("usersHierarchyBlocked") : undefined}
                   onClick={async () => {
                     setBusyUid(person.uid);
                     try {
@@ -421,7 +457,15 @@ export function UsersHome() {
         },
       },
     ],
-    [t, isAdmin, busyUid, profile?.uid, invalidate],
+    [
+      t,
+      isAdmin,
+      busyUid,
+      profile,
+      permissions,
+      roleById,
+      invalidate,
+    ],
   );
 
   const toolbar = (
@@ -583,6 +627,7 @@ export function UsersHome() {
         emptyHint={t("usersEmptyHint")}
         toolbar={toolbar}
         enableRowSelection={enableBulk}
+        canSelectRow={canManageUser}
         rowSelection={rowSelection}
         onRowSelectionChange={(updater) => {
           setRowSelection((prev) => {

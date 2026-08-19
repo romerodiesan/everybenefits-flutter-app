@@ -22,15 +22,27 @@ import {
 } from "@pulse/shared";
 import { useAlerts } from "@/lib/providers/alert-provider";
 import { useAccess } from "@/lib/providers/auth-provider";
-import { canManagePlatform } from "@/lib/roles";
+import { can, canManagePlatform } from "@/lib/roles";
 import { useRouter } from "@/i18n/navigation";
 import { getAdminRepository } from "@/lib/repositories/admin-repository";
 import { reshapeBannerImage } from "@/lib/banner-image-reshape";
+import {
+  datetimeLocalToMillis,
+  fillLocalized,
+  functionsErrorMessage,
+  mergeCampaignItem,
+  millisToDatetimeLocal,
+} from "@/lib/campaign-form";
 import { Button, Input, Label } from "@/components/ui/primitives";
 import {
   BannerPreview,
   PreviewDeviceFrame,
 } from "@/components/admin/banner-preview";
+import {
+  CampaignFilterBar,
+  CampaignLibraryItem,
+  CampaignWorkspace,
+} from "@/components/admin/campaign-workspace";
 
 type FormState = {
   id: string;
@@ -49,6 +61,8 @@ type FormState = {
   href: string;
   imageUrl: string;
   bumpVersion: boolean;
+  startsAt: number | null;
+  endsAt: number | null;
 };
 
 const emptyForm = (): FormState => ({
@@ -68,6 +82,8 @@ const emptyForm = (): FormState => ({
   href: "/academy",
   imageUrl: "",
   bumpVersion: false,
+  startsAt: null,
+  endsAt: null,
 });
 
 function fileToBase64(file: File): Promise<string> {
@@ -81,32 +97,6 @@ function fileToBase64(file: File): Promise<string> {
     };
     reader.readAsDataURL(file);
   });
-}
-
-/** If one locale is blank, mirror the filled locale so save doesn't 400. */
-function fillLocalized(
-  value: PromoBannerLocalizedString,
-): PromoBannerLocalizedString {
-  const en = value.en.trim();
-  const es = value.es.trim();
-  return {
-    en: en || es,
-    es: es || en,
-  };
-}
-
-function functionsErrorMessage(error: unknown, fallback: string): string {
-  if (!error || typeof error !== "object") return fallback;
-  const message =
-    "message" in error && typeof error.message === "string"
-      ? error.message.trim()
-      : "";
-  // Firebase Functions client: "FirebaseError: …" or "invalid-argument: …"
-  const cleaned = message
-    .replace(/^FirebaseError:\s*/i, "")
-    .replace(/^functions\/[\w-]+:\s*/i, "")
-    .trim();
-  return cleaned || fallback;
 }
 
 type ImageProcessMeta = {
@@ -204,7 +194,10 @@ export function BannersHome() {
   const router = useRouter();
   const alerts = useAlerts();
   const access = useAccess();
-  const isAdmin = canManagePlatform(access);
+  const canRead =
+    can(access, "admin.banners.read") || canManagePlatform(access);
+  const canWrite =
+    can(access, "admin.banners.write") || canManagePlatform(access);
 
   const [banners, setBanners] = useState<PromoBanner[]>([]);
   const [loading, setLoading] = useState(true);
@@ -219,7 +212,10 @@ export function BannersHome() {
   const imageInputRef = useRef<HTMLInputElement | null>(null);
   const reshapeTokenRef = useRef(0);
   const [copyLocale, setCopyLocale] = useState<PromoBannerLocale>("en");
-  const [previewLocale, setPreviewLocale] = useState<PromoBannerLocale>("en");
+  const [canvasTab, setCanvasTab] = useState<"compose" | "preview">("compose");
+  const [statusFilter, setStatusFilter] = useState<"all" | "live" | "draft">(
+    "all",
+  );
 
   const imageObjectUrl = useMemo(() => {
     if (!imageFile) return null;
@@ -278,8 +274,8 @@ export function BannersHome() {
   };
 
   useEffect(() => {
-    if (!isAdmin) router.replace("/");
-  }, [isAdmin, router]);
+    if (!canRead) router.replace("/");
+  }, [canRead, router]);
 
   const load = async () => {
     setLoading(true);
@@ -295,14 +291,25 @@ export function BannersHome() {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
+    if (!canRead) return;
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin]);
+  }, [canRead]);
 
   const sorted = useMemo(
     () => [...banners].sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0)),
     [banners],
+  );
+  const visibleBanners = useMemo(
+    () =>
+      sorted.filter((banner) =>
+        statusFilter === "all"
+          ? true
+          : statusFilter === "live"
+            ? banner.active
+            : !banner.active,
+      ),
+    [sorted, statusFilter],
   );
 
   const allowedFormats = formatsForSurface(form.surface);
@@ -331,7 +338,7 @@ export function BannersHome() {
     [editingId, form],
   );
 
-  if (!isAdmin) return null;
+  if (!canRead) return null;
 
   const setSurface = (surface: PromoBannerSurface) => {
     const nextFormats = FORMATS_BY_SURFACE[surface];
@@ -392,6 +399,8 @@ export function BannersHome() {
       href: banner.href,
       imageUrl: banner.imageUrl ?? "",
       bumpVersion: false,
+      startsAt: banner.startsAt,
+      endsAt: banner.endsAt,
     });
     reshapeTokenRef.current += 1;
     setImageSourceFile(null);
@@ -414,6 +423,7 @@ export function BannersHome() {
   };
 
   const onSave = async () => {
+    if (!canWrite) return;
     setBusy(true);
     setError(null);
     try {
@@ -474,6 +484,8 @@ export function BannersHome() {
             }
           : { imageUrl: null, imagePath: null }),
         bumpVersion: form.bumpVersion,
+        startsAt: form.startsAt,
+        endsAt: form.endsAt,
       });
       if (!saved) throw new Error("save failed");
       alerts.success(t("bannersSaved"));
@@ -490,7 +502,7 @@ export function BannersHome() {
         type: saved.type,
       }));
       setImageFile(null);
-      await load();
+      setBanners((prev) => mergeCampaignItem(prev, saved));
     } catch (error) {
       const message = functionsErrorMessage(error, t("bannersSaveError"));
       setError(message);
@@ -501,11 +513,17 @@ export function BannersHome() {
   };
 
   const onDeactivate = async (id: string) => {
+    if (!canWrite) return;
     setBusy(true);
     try {
       await getAdminRepository().deletePromoBanner(id, false);
       alerts.success(t("bannersDeactivated"));
-      await load();
+      setBanners((prev) =>
+        prev.map((banner) =>
+          banner.id === id ? { ...banner, active: false } : banner,
+        ),
+      );
+      if (editingId === id) setForm((prev) => ({ ...prev, active: false }));
     } catch {
       alerts.error(t("bannersSaveError"));
     } finally {
@@ -513,93 +531,244 @@ export function BannersHome() {
     }
   };
 
-  return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 lg:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-brand">
-            {t("bannersWorkspaceEyebrow")}
-          </p>
-          <h1 className="mt-1 font-display text-3xl font-bold tracking-tight">
-            {t("bannersTitle")}
-          </h1>
-          <p className="mt-1 max-w-xl text-sm text-muted">
-            {t("bannersSubtitle")}
-          </p>
-        </div>
-        <Button type="button" onClick={openCreate}>
-          {t("bannersCreate")}
-        </Button>
-      </header>
-
-      <div className="grid gap-6 xl:grid-cols-[240px_minmax(0,1fr)]">
-        <aside className="studio-panel h-fit space-y-2 p-3 xl:sticky xl:top-4">
-          <p className="px-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-            {t("bannersList")}
-          </p>
-          {loading ? (
-            <p className="px-2 py-6 text-sm text-muted">{t("loading")}</p>
-          ) : sorted.length === 0 ? (
-            <p className="px-2 py-6 text-sm text-muted">{t("bannersEmpty")}</p>
-          ) : (
-            <ul className="max-h-[70vh] space-y-1 overflow-y-auto">
-              {sorted.map((banner) => (
-                <li key={banner.id}>
-                  <button
-                    type="button"
-                    onClick={() => openEdit(banner)}
-                    className={`w-full rounded-xl px-3 py-2.5 text-left transition ${
-                      editingId === banner.id
-                        ? "bg-brand/10 ring-1 ring-brand/30"
-                        : "hover:bg-rail/80"
-                    }`}
+  const composeFields = (
+            <div className="space-y-4">
+            <Section title={t("bannersSectionCopy")}>
+              <div className="flex gap-2">
+                {(["en", "es"] as const).map((locale) => (
+                  <Chip
+                    key={locale}
+                    active={copyLocale === locale}
+                    onClick={() => setCopyLocale(locale)}
                   >
-                    <p className="truncate text-sm font-semibold text-ink">
-                      {banner.title.en || banner.id}
-                    </p>
-                    <p className="mt-0.5 truncate text-[11px] text-muted">
-                      {banner.surface} · {banner.format} · {banner.type}
-                      {banner.active ? "" : ` · ${t("bannersInactive")}`}
-                    </p>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </aside>
-
-        <div className="grid gap-6 lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
-          <div className="space-y-4">
-            <div className="studio-panel flex flex-wrap items-center justify-between gap-3 p-4">
-              <div className="min-w-0">
-                <h2 className="font-display text-xl font-bold tracking-tight">
-                  {editingId ? t("bannersEdit") : t("bannersCreate")}
-                </h2>
-                <p className="mt-0.5 text-xs text-muted">
-                  {editingId
-                    ? `${t("bannersId")}: ${editingId}`
-                    : t("bannersWorkspaceHint")}
-                </p>
+                    {locale.toUpperCase()}
+                  </Chip>
+                ))}
               </div>
-              <span
-                className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
-                  form.active
-                    ? "bg-ok/15 text-ok"
-                    : "bg-muted/15 text-muted"
-                }`}
-              >
-                {form.active ? t("bannersActive") : t("bannersInactive")}
-              </span>
+              {(
+                [
+                  ["eyebrow", PROMO_BANNER_LIMITS.eyebrow],
+                  ["title", PROMO_BANNER_LIMITS.title],
+                  ["body", PROMO_BANNER_LIMITS.body],
+                ] as const
+              ).map(([field, max]) => (
+                <div key={field}>
+                  <div className="mb-1 flex items-center justify-between">
+                    <Label>{t(`bannersField_${field}`)}</Label>
+                    <CharCount value={form[field][copyLocale]} max={max} />
+                  </div>
+                  <Input
+                    value={form[field][copyLocale]}
+                    maxLength={max}
+                    disabled={!canWrite}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        [field]: {
+                          ...prev[field],
+                          [copyLocale]: e.target.value,
+                        },
+                      }))
+                    }
+                  />
+                </div>
+              ))}
+              {form.showCta ? (
+                <>
+                  <div>
+                    <div className="mb-1 flex items-center justify-between">
+                      <Label>{t("bannersField_ctaLabel")}</Label>
+                      <CharCount
+                        value={form.ctaLabel[copyLocale]}
+                        max={PROMO_BANNER_LIMITS.ctaLabel}
+                      />
+                    </div>
+                    <Input
+                      value={form.ctaLabel[copyLocale]}
+                      maxLength={PROMO_BANNER_LIMITS.ctaLabel}
+                      disabled={!canWrite}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          ctaLabel: {
+                            ...prev.ctaLabel,
+                            [copyLocale]: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <Label>{t("bannersHref")}</Label>
+                    <Input
+                      value={form.href}
+                      maxLength={PROMO_BANNER_LIMITS.href}
+                      disabled={!canWrite}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, href: e.target.value }))
+                      }
+                      placeholder="/academy"
+                    />
+                  </div>
+                </>
+              ) : null}
+            </Section>
+
+            {form.showImage && form.format !== "text" ? (
+              <Section title={t("bannersSectionMedia")}>
+                <input
+                  ref={imageInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  className="block w-full text-sm text-muted"
+                  disabled={imageProcessing || busy || !canWrite}
+                  onChange={(e) =>
+                    onPickImage(e.target.files?.[0] ?? null)
+                  }
+                />
+                {imageProcessing ? (
+                  <p className="text-[11px] text-muted">
+                    {t("bannersImageReshaping")}
+                  </p>
+                ) : null}
+                {imageMeta ? (
+                  <p className="text-[11px] font-medium text-ink">
+                    {t("bannersImageReshaped", {
+                      width: imageMeta.width,
+                      height: imageMeta.height,
+                      aspect: imageMeta.aspectLabel,
+                      format: t(`bannersFormat_${imageMeta.format}`),
+                    })}
+                  </p>
+                ) : null}
+                {form.imageUrl && !imageFile ? (
+                  <p className="truncate text-[11px] text-muted">
+                    {form.imageUrl}
+                  </p>
+                ) : null}
+                <p className="text-[11px] text-muted">
+                  {(() => {
+                    const target = imageTargetForFormat(form.format);
+                    return target
+                      ? t("bannersImageHintAuto", {
+                          width: target.width,
+                          height: target.height,
+                          aspect: target.label,
+                        })
+                      : t("bannersImageHint");
+                  })()}
+                </p>
+              </Section>
+            ) : null}
             </div>
+  );
+
+  return (
+    <CampaignWorkspace
+      eyebrow={t("bannersWorkspaceEyebrow")}
+      title={t("bannersTitle")}
+      subtitle={t("bannersSubtitle")}
+      createLabel={t("bannersCreate")}
+      onCreate={openCreate}
+      createDisabled={!canWrite}
+      error={error}
+      library={
+        <>
+          <div className="mb-3 flex items-center justify-between px-1">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted">
+              {t("bannersList")}
+            </p>
+            <span className="text-[10px] tabular-nums text-muted">
+              {visibleBanners.length}
+            </span>
+          </div>
+          <CampaignFilterBar
+            value={statusFilter}
+            onChange={setStatusFilter}
+            labels={{
+              all: t("campaignFilter_all"),
+              live: t("campaignFilter_live"),
+              draft: t("campaignFilter_draft"),
+            }}
+          />
+          <div className="mt-3">
+            {loading ? (
+              <div className="space-y-2 py-1" aria-label={t("loading")}>
+                {[0, 1, 2, 3].map((item) => (
+                  <div key={item} className="h-14 animate-pulse rounded-lg bg-rail" />
+                ))}
+              </div>
+            ) : visibleBanners.length === 0 ? (
+              <p className="px-2 py-6 text-sm text-muted">{t("bannersEmpty")}</p>
+            ) : (
+              <ul className="max-h-[70vh] space-y-1 overflow-y-auto">
+                {visibleBanners.map((banner) => (
+                  <li key={banner.id}>
+                    <CampaignLibraryItem
+                      title={banner.title.en || banner.id}
+                      meta={`${banner.surface} · ${banner.format}`}
+                      active={banner.active}
+                      selected={editingId === banner.id}
+                      onClick={() => openEdit(banner)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </>
+      }
+      canvasTabs={[
+        { id: "compose", label: t("campaignTabCompose") },
+        { id: "preview", label: t("campaignTabPreview") },
+      ]}
+      canvasTab={canvasTab}
+      onCanvasTabChange={(id) => setCanvasTab(id as "compose" | "preview")}
+      canvas={
+        canvasTab === "preview" ? (
+          <div className="space-y-4">
+            <PreviewDeviceFrame surface={form.surface}>
+              <BannerPreview
+                banner={previewBanner}
+                locale={copyLocale}
+                imagePreviewUrl={imageObjectUrl}
+              />
+            </PreviewDeviceFrame>
+            <p className="text-[11px] leading-relaxed text-muted">
+              {t("bannersPreviewHint")}
+            </p>
+          </div>
+        ) : (
+          composeFields
+        )
+      }
+      inspector={
+        <>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display text-lg font-semibold">
+                {editingId ? t("bannersEdit") : t("bannersCreate")}
+              </h2>
+              <p className="mt-0.5 truncate text-[11px] text-muted">
+                {editingId || t("campaignUnsaved")}
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase ${
+                form.active ? "bg-ok/15 text-ok" : "bg-muted/15 text-muted"
+              }`}
+            >
+              {form.active ? t("bannersActive") : t("bannersInactive")}
+            </span>
+          </div>
 
             <Section title={t("bannersSectionPlacement")}>
               {!editingId ? (
                 <div>
-                  <div className="mb-1 flex items-center justify-between">
-                    <Label>{t("bannersId")}</Label>
-                  </div>
+                  <Label>{t("bannersId")}</Label>
                   <Input
                     value={form.id}
+                    disabled={!canWrite}
                     onChange={(e) =>
                       setForm((prev) => ({ ...prev, id: e.target.value }))
                     }
@@ -608,7 +777,7 @@ export function BannersHome() {
                 </div>
               ) : null}
               <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
                   {t("bannersSurface")}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -616,7 +785,7 @@ export function BannersHome() {
                     <Chip
                       key={surface}
                       active={form.surface === surface}
-                      onClick={() => setSurface(surface)}
+                      onClick={() => canWrite && setSurface(surface)}
                     >
                       {t(`bannersSurface_${surface}`)}
                     </Chip>
@@ -624,7 +793,7 @@ export function BannersHome() {
                 </div>
               </div>
               <div>
-                <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted">
                   {t("bannersFormat")}
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -632,7 +801,7 @@ export function BannersHome() {
                     <Chip
                       key={format}
                       active={form.format === format}
-                      onClick={() => setFormat(format)}
+                      onClick={() => canWrite && setFormat(format)}
                     >
                       {t(`bannersFormat_${format}`)}
                     </Chip>
@@ -647,7 +816,9 @@ export function BannersHome() {
                   <Chip
                     key={type}
                     active={form.type === type}
-                    onClick={() => setForm((prev) => ({ ...prev, type }))}
+                    onClick={() =>
+                      canWrite && setForm((prev) => ({ ...prev, type }))
+                    }
                   >
                     {t(`bannersType_${type}`)}
                   </Chip>
@@ -656,7 +827,7 @@ export function BannersHome() {
             </Section>
 
             <Section title={t("bannersSectionBehavior")}>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="grid gap-2">
                 <Toggle
                   checked={form.active}
                   onChange={(active) =>
@@ -706,130 +877,38 @@ export function BannersHome() {
               ) : null}
             </Section>
 
-            <Section title={t("bannersSectionCopy")}>
-              <div className="flex gap-2">
-                {(["en", "es"] as const).map((locale) => (
-                  <Chip
-                    key={locale}
-                    active={copyLocale === locale}
-                    onClick={() => setCopyLocale(locale)}
-                  >
-                    {locale.toUpperCase()}
-                  </Chip>
-                ))}
-              </div>
-              {(
-                [
-                  ["eyebrow", PROMO_BANNER_LIMITS.eyebrow],
-                  ["title", PROMO_BANNER_LIMITS.title],
-                  ["body", PROMO_BANNER_LIMITS.body],
-                ] as const
-              ).map(([field, max]) => (
-                <div key={field}>
-                  <div className="mb-1 flex items-center justify-between">
-                    <Label>{t(`bannersField_${field}`)}</Label>
-                    <CharCount value={form[field][copyLocale]} max={max} />
-                  </div>
-                  <Input
-                    value={form[field][copyLocale]}
-                    maxLength={max}
-                    onChange={(e) =>
-                      setForm((prev) => ({
-                        ...prev,
-                        [field]: {
-                          ...prev[field],
-                          [copyLocale]: e.target.value,
-                        },
-                      }))
-                    }
-                  />
-                </div>
-              ))}
-              {form.showCta ? (
-                <>
-                  <div>
-                    <div className="mb-1 flex items-center justify-between">
-                      <Label>{t("bannersField_ctaLabel")}</Label>
-                      <CharCount
-                        value={form.ctaLabel[copyLocale]}
-                        max={PROMO_BANNER_LIMITS.ctaLabel}
-                      />
-                    </div>
-                    <Input
-                      value={form.ctaLabel[copyLocale]}
-                      maxLength={PROMO_BANNER_LIMITS.ctaLabel}
-                      onChange={(e) =>
-                        setForm((prev) => ({
-                          ...prev,
-                          ctaLabel: {
-                            ...prev.ctaLabel,
-                            [copyLocale]: e.target.value,
-                          },
-                        }))
-                      }
-                    />
-                  </div>
-                  <div>
-                    <Label>{t("bannersHref")}</Label>
-                    <Input
-                      value={form.href}
-                      maxLength={PROMO_BANNER_LIMITS.href}
-                      onChange={(e) =>
-                        setForm((prev) => ({ ...prev, href: e.target.value }))
-                      }
-                      placeholder="/academy"
-                    />
-                  </div>
-                </>
-              ) : null}
-            </Section>
-
-            {form.showImage && form.format !== "text" ? (
-              <Section title={t("bannersSectionMedia")}>
-                <input
-                  ref={imageInputRef}
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="block w-full text-sm text-muted"
-                  disabled={imageProcessing || busy}
-                  onChange={(e) =>
-                    onPickImage(e.target.files?.[0] ?? null)
+            <Section title={t("campaignSchedule")}>
+              <label className="block text-xs">
+                {t("campaignStartsAt")}
+                <Input
+                  type="datetime-local"
+                  className="mt-1"
+                  disabled={!canWrite}
+                  value={millisToDatetimeLocal(form.startsAt)}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      startsAt: datetimeLocalToMillis(event.target.value),
+                    }))
                   }
                 />
-                {imageProcessing ? (
-                  <p className="text-[11px] text-muted">
-                    {t("bannersImageReshaping")}
-                  </p>
-                ) : null}
-                {imageMeta ? (
-                  <p className="text-[11px] font-medium text-ink">
-                    {t("bannersImageReshaped", {
-                      width: imageMeta.width,
-                      height: imageMeta.height,
-                      aspect: imageMeta.aspectLabel,
-                      format: t(`bannersFormat_${imageMeta.format}`),
-                    })}
-                  </p>
-                ) : null}
-                {form.imageUrl && !imageFile ? (
-                  <p className="truncate text-[11px] text-muted">
-                    {form.imageUrl}
-                  </p>
-                ) : null}
-                <p className="text-[11px] text-muted">
-                  {(() => {
-                    const target = imageTargetForFormat(form.format);
-                    return target
-                      ? t("bannersImageHintAuto", {
-                          width: target.width,
-                          height: target.height,
-                          aspect: target.label,
-                        })
-                      : t("bannersImageHint");
-                  })()}
-                </p>
-              </Section>
-            ) : null}
+              </label>
+              <label className="block text-xs">
+                {t("campaignEndsAt")}
+                <Input
+                  type="datetime-local"
+                  className="mt-1"
+                  disabled={!canWrite}
+                  value={millisToDatetimeLocal(form.endsAt)}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      endsAt: datetimeLocalToMillis(event.target.value),
+                    }))
+                  }
+                />
+              </label>
+            </Section>
 
             <Section title={t("bannersSectionAudience")}>
               <div className="flex flex-wrap gap-2">
@@ -837,7 +916,7 @@ export function BannersHome() {
                   <Chip
                     key={audience}
                     active={form.audiences.includes(audience)}
-                    onClick={() => toggleAudience(audience)}
+                    onClick={() => canWrite && toggleAudience(audience)}
                   >
                     {audience}
                   </Chip>
@@ -845,16 +924,10 @@ export function BannersHome() {
               </div>
             </Section>
 
-            {error ? (
-              <p role="alert" className="text-sm text-danger">
-                {error}
-              </p>
-            ) : null}
-
             <div className="flex flex-wrap gap-2">
               <Button
                 type="button"
-                disabled={busy || imageProcessing}
+                disabled={busy || imageProcessing || !canWrite}
                 onClick={() => void onSave()}
               >
                 {busy
@@ -867,45 +940,16 @@ export function BannersHome() {
                 <Button
                   type="button"
                   variant="ghost"
-                  disabled={busy}
+                  disabled={busy || !canWrite}
                   onClick={() => void onDeactivate(editingId)}
                 >
                   {t("bannersDeactivate")}
                 </Button>
               ) : null}
             </div>
-          </div>
-
-          <div className="studio-panel h-fit space-y-4 p-4 lg:sticky lg:top-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h2 className="font-display text-lg font-bold tracking-tight">
-                {t("bannersPreviewTitle")}
-              </h2>
-              <div className="flex gap-1.5">
-                {(["en", "es"] as const).map((locale) => (
-                  <Chip
-                    key={locale}
-                    active={previewLocale === locale}
-                    onClick={() => setPreviewLocale(locale)}
-                  >
-                    {locale.toUpperCase()}
-                  </Chip>
-                ))}
-              </div>
-            </div>
-            <PreviewDeviceFrame surface={form.surface}>
-              <BannerPreview
-                banner={previewBanner}
-                locale={previewLocale}
-                imagePreviewUrl={imageObjectUrl}
-              />
-            </PreviewDeviceFrame>
-            <p className="text-[11px] leading-relaxed text-muted">
-              {t("bannersPreviewHint")}
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+        </>
+      }
+    />
   );
 }
+

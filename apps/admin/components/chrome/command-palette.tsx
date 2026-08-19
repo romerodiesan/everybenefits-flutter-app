@@ -13,9 +13,11 @@ type Command = {
 export function CommandPalette({
   open,
   onOpenChange,
+  hiddenIds = [],
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  hiddenIds?: string[];
 }) {
   const t = useTranslations();
   const router = useRouter();
@@ -58,8 +60,11 @@ export function CommandPalette({
     [router, t],
   );
 
-  const filtered = commands.filter((c) =>
-    c.label.toLowerCase().includes(query.trim().toLowerCase()),
+  const hidden = new Set(hiddenIds);
+  const filtered = commands.filter(
+    (c) =>
+      !hidden.has(c.id) &&
+      c.label.toLowerCase().includes(query.trim().toLowerCase()),
   );
 
   if (!open) return null;

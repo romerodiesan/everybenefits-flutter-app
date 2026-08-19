@@ -39,6 +39,7 @@ export type DataTableProps<T> = {
   nextLabel?: string;
   rowsLabel?: string;
   enableRowSelection?: boolean;
+  canSelectRow?: (row: T) => boolean;
   rowSelection?: RowSelectionState;
   onRowSelectionChange?: OnChangeFn<RowSelectionState>;
 };
@@ -66,6 +67,7 @@ export function DataTable<T>({
   nextLabel = "Next",
   rowsLabel = "Rows",
   enableRowSelection = false,
+  canSelectRow,
   rowSelection,
   onRowSelectionChange,
 }: DataTableProps<T>) {
@@ -104,7 +106,9 @@ export function DataTable<T>({
     getCoreRowModel: getCoreRowModel(),
     getRowId: getRowId ? (row) => getRowId(row) : undefined,
     manualPagination: true,
-    enableRowSelection,
+    enableRowSelection: enableRowSelection
+      ? (row) => canSelectRow?.(row.original) ?? true
+      : false,
     onRowSelectionChange,
     state: enableRowSelection
       ? { rowSelection: rowSelection ?? {} }

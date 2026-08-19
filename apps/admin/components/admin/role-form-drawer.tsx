@@ -8,6 +8,8 @@ import {
   PERMISSION_CATEGORIES,
   PROFILE_BADGE_ICONS,
   ROLE_CATEGORIES,
+  getRequiredBuiltinChatPermissions,
+  permissionDescriptionMessageKey,
   permissionNameMessageKey,
   type PermissionCategory,
   type RoleCategory,
@@ -42,21 +44,27 @@ const emptyCreate: RoleFormValues = {
 
 function PermissionMatrix({
   selected,
+  allowed,
+  required,
   disabled,
   onChange,
 }: {
   selected: string[];
+  allowed: readonly string[];
+  required: readonly string[];
   disabled: boolean;
   onChange: (next: string[]) => void;
 }) {
   const t = useTranslations();
   const selectedSet = useMemo(() => new Set(selected), [selected]);
+  const allowedSet = useMemo(() => new Set(allowed), [allowed]);
+  const requiredSet = useMemo(() => new Set(required), [required]);
   const [openCategories, setOpenCategories] = useState<Set<PermissionCategory>>(
     () => new Set(["platform", "admin"]),
   );
 
   const toggle = (key: string) => {
-    if (disabled) return;
+    if (disabled || requiredSet.has(key)) return;
     const next = new Set(selectedSet);
     if (next.has(key)) next.delete(key);
     else next.add(key);
@@ -65,13 +73,13 @@ function PermissionMatrix({
 
   const toggleCategory = (category: PermissionCategory, on: boolean) => {
     if (disabled) return;
-    const keys = PERMISSION_CATALOG.filter((p) => p.category === category).map(
-      (p) => p.key,
-    );
+    const keys = PERMISSION_CATALOG.filter(
+      (p) => p.category === category && allowedSet.has(p.key),
+    ).map((p) => p.key);
     const next = new Set(selectedSet);
     for (const key of keys) {
       if (on) next.add(key);
-      else next.delete(key);
+      else if (!requiredSet.has(key)) next.delete(key);
     }
     onChange([...next]);
   };
@@ -90,14 +98,22 @@ function PermissionMatrix({
     return t.has(msgKey) ? t(msgKey) : fallback;
   };
 
+  const permissionDescription = (key: string, fallback: string) => {
+    const msgKey = permissionDescriptionMessageKey(key);
+    return t.has(msgKey) ? t(msgKey) : fallback;
+  };
+
   return (
     <div className="space-y-2">
       {PERMISSION_CATEGORIES.map((category) => {
         const items = PERMISSION_CATALOG.filter((p) => p.category === category);
-        const selectedInCategory = items.filter((p) =>
+        const availableItems = items.filter((p) => allowedSet.has(p.key));
+        const selectedInCategory = availableItems.filter((p) =>
           selectedSet.has(p.key),
         ).length;
-        const allOn = items.length > 0 && selectedInCategory === items.length;
+        const allOn =
+          availableItems.length > 0 &&
+          selectedInCategory === availableItems.length;
         const isOpen = openCategories.has(category);
 
         return (
@@ -135,14 +151,14 @@ function PermissionMatrix({
                   <span className="block text-[11px] text-muted/80">
                     {t("rolesCategorySelected", {
                       selected: selectedInCategory,
-                      total: items.length,
+                      total: availableItems.length,
                     })}
                   </span>
                 </span>
               </button>
               <button
                 type="button"
-                disabled={disabled}
+                disabled={disabled || availableItems.length === 0}
                 className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-brand hover:bg-brand/10 disabled:opacity-40"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -161,15 +177,24 @@ function PermissionMatrix({
                         type="checkbox"
                         className="mt-1"
                         checked={selectedSet.has(perm.key)}
-                        disabled={disabled}
+                        disabled={
+                          disabled ||
+                          requiredSet.has(perm.key) ||
+                          !allowedSet.has(perm.key)
+                        }
                         onChange={() => toggle(perm.key)}
                       />
                       <span className="min-w-0">
                         <span className="font-medium text-ink">
                           {permissionLabel(perm.key, perm.name)}
+                          {requiredSet.has(perm.key) ? (
+                            <span className="ml-2 rounded-full bg-brand/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-brand">
+                              {t("rolesPermissionRequired")}
+                            </span>
+                          ) : null}
                         </span>
                         <span className="mt-0.5 block text-xs text-muted">
-                          {perm.description}
+                          {permissionDescription(perm.key, perm.description)}
                         </span>
                         <span className="mt-0.5 block font-mono text-[10px] text-muted/70">
                           {perm.key}
@@ -192,6 +217,7 @@ export function RoleFormDrawer({
   mode,
   role,
   canEdit,
+  allowedPermissions,
   systemOnlyLocked,
   busy,
   error,
@@ -202,6 +228,7 @@ export function RoleFormDrawer({
   mode: "create" | "edit";
   role: RoleDoc | null;
   canEdit: boolean;
+  allowedPermissions: readonly string[];
   systemOnlyLocked: boolean;
   busy: boolean;
   error: string | null;
@@ -211,6 +238,10 @@ export function RoleFormDrawer({
   const t = useTranslations();
   const [values, setValues] = useState<RoleFormValues>(emptyCreate);
   const readOnly = !canEdit;
+  const requiredPermissions = useMemo(
+    () => getRequiredBuiltinChatPermissions(values.id),
+    [values.id],
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -220,7 +251,12 @@ export function RoleFormDrawer({
         name: role.name,
         description: role.description ?? "",
         category: role.category,
-        permissions: [...role.permissions],
+        permissions: [
+          ...new Set([
+            ...role.permissions,
+            ...getRequiredBuiltinChatPermissions(role.id),
+          ]),
+        ],
         active: role.active,
         badgeText: role.badgeText ?? "",
         badgeIcon: role.badgeIcon ?? "badge",
@@ -405,6 +441,8 @@ export function RoleFormDrawer({
           </div>
           <PermissionMatrix
             selected={values.permissions}
+            allowed={allowedPermissions}
+            required={requiredPermissions}
             disabled={readOnly}
             onChange={(permissions) =>
               setValues((v) => ({ ...v, permissions }))

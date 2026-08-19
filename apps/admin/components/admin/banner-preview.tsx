@@ -11,7 +11,7 @@ import {
 
 function shellClass(format: PromoBannerFormat) {
   if (format === "card") {
-    return "overflow-hidden rounded-2xl border border-brand/25 bg-gradient-to-br from-brand/[0.1] to-panel";
+    return "overflow-hidden rounded-2xl border border-glass-border bg-sheet";
   }
   if (format === "tile") {
     return "overflow-hidden rounded-xl border border-glass-border bg-panel";

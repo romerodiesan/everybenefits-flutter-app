@@ -11,7 +11,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useLocale, useTranslations } from "next-intl";
 import { Link, usePathname, useRouter } from "@/i18n/navigation";
 import { useAuth, useAccess } from "@/lib/providers/auth-provider";
-import { canAccessAdmin, canManagePlatform, headlineName } from "@/lib/roles";
+import { canAccessAdmin, canManagePlatform, can, headlineName } from "@/lib/roles";
 import { signOutAndRedirect } from "@/lib/firebase/auth";
 import { adminQueryKeys } from "@/lib/admin-query-keys";
 import { getAdminRepository } from "@/lib/repositories/admin-repository";
@@ -322,14 +322,14 @@ export function AdminShell({ children }: { children: ReactNode }) {
         href: "/banners",
         label: t("navBanners"),
         match: (p: string) => p.startsWith("/banners"),
-        adminOnly: true,
+        permission: "admin.banners.read",
         Icon: IconBanners,
       },
       {
         href: "/polls",
         label: t("navPolls"),
         match: (p: string) => p.startsWith("/polls"),
-        adminOnly: true,
+        permission: "admin.polls.read",
         Icon: IconPolls,
       },
     ],
@@ -380,7 +380,13 @@ export function AdminShell({ children }: { children: ReactNode }) {
   }
 
   const isPlatformAdmin = canManagePlatform(access);
-  const visibleNav = nav.filter((item) => !item.adminOnly || isPlatformAdmin);
+  const visibleNav = nav.filter((item) => {
+    if ("permission" in item && item.permission) {
+      return can(access, item.permission) || isPlatformAdmin;
+    }
+    if (item.adminOnly) return isPlatformAdmin;
+    return true;
+  });
 
   return (
     <div className="studio-bg flex h-[100svh] overflow-hidden">
@@ -598,7 +604,19 @@ export function AdminShell({ children }: { children: ReactNode }) {
         </nav>
       </div>
 
-      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
+      <CommandPalette
+        open={cmdOpen}
+        onOpenChange={setCmdOpen}
+        hiddenIds={[
+          ...(!can(access, "admin.banners.read") && !isPlatformAdmin
+            ? ["banners"]
+            : []),
+          ...(!can(access, "admin.polls.read") && !isPlatformAdmin
+            ? ["polls"]
+            : []),
+          ...(!isPlatformAdmin ? ["roles"] : []),
+        ]}
+      />
     </div>
   );
 }

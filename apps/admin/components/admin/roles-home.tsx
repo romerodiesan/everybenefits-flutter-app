@@ -5,6 +5,7 @@ import { useTranslations } from "next-intl";
 import type { ColumnDef } from "@tanstack/react-table";
 import {
   ROLE_CATEGORIES,
+  canAssignRoleByAuthority,
   isSystemRole,
   type RoleCategory,
   type RoleDoc,
@@ -54,7 +55,7 @@ function FilterField({
 export function RolesHome() {
   const t = useTranslations();
   const alerts = useAlerts();
-  const { profile } = useAuth();
+  const { profile, permissions } = useAuth();
   const viewerRole = profile?.role ?? "student";
   const access = useAccess();
   const isSystem = isSystemRole(viewerRole);
@@ -108,7 +109,15 @@ export function RolesHome() {
     if (!role) return canMutateCustom;
     if (role.locked) return false;
     if (role.editableBySystemOnly) return isSystem;
-    return canMutateCustom;
+    return (
+      canMutateCustom &&
+      canAssignRoleByAuthority({
+        actorRole: viewerRole,
+        actorPermissions: permissions,
+        targetRole: role.id,
+        targetPermissions: role.permissions,
+      })
+    );
   };
 
   const onSubmit = async (values: RoleFormValues) => {
@@ -231,7 +240,7 @@ export function RolesHome() {
               <RowActionButton onClick={() => openEdit(role)}>
                 {editable ? t("usersEdit") : t("rolesView")}
               </RowActionButton>
-              {!role.builtIn && canMutateCustom ? (
+              {!role.builtIn && editable ? (
                 <RowActionButton
                   variant="danger"
                   disabled={rowBusy === role.id}
@@ -315,6 +324,7 @@ export function RolesHome() {
         mode={drawerMode}
         role={editing}
         canEdit={canEditRole(editing)}
+        allowedPermissions={permissions}
         systemOnlyLocked={Boolean(
           editing?.editableBySystemOnly && !isSystem,
         )}

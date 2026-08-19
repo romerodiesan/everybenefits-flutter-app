@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { OrgNode, RoleDoc, UserRole } from "@pulse/shared";
 import {
   APPEARANCE_ACCENTS,
   PROFILE_BADGE_ICONS,
+  canAssignRoleByAuthority,
 } from "@pulse/shared";
 import type { AdminUserRow } from "@pulse/firebase-web";
 import { Button, Input, Label } from "@/components/ui/primitives";
 import { Drawer } from "@/components/ui/drawer";
 import { useAdminRolesQuery } from "@/lib/hooks/use-admin-queries";
+import { useAuth } from "@/lib/providers/auth-provider";
 
 const ROLE_KEYS: Partial<Record<UserRole, string>> = {
   student: "roleStudent",
@@ -82,12 +84,24 @@ export function UserFormDrawer({
   onSubmit: (values: UserFormValues) => Promise<void>;
 }) {
   const t = useTranslations();
+  const { profile, permissions } = useAuth();
   const [values, setValues] = useState<UserFormValues>(emptyCreate);
   const rolesQuery = useAdminRolesQuery(
     { includeInactive: false, includeSystem: false },
     open,
   );
-  const assignableRoles = rolesQuery.data?.roles ?? [];
+  const assignableRoles = useMemo(
+    () =>
+      (rolesQuery.data?.roles ?? []).filter((role) =>
+        canAssignRoleByAuthority({
+          actorRole: profile?.role ?? "student",
+          actorPermissions: permissions,
+          targetRole: role.id,
+          targetPermissions: role.permissions,
+        }),
+      ),
+    [permissions, profile?.role, rolesQuery.data?.roles],
+  );
 
   useEffect(() => {
     if (!open) return;
