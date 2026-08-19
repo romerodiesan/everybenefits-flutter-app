@@ -4,6 +4,7 @@ import { FormEvent, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import type { MultiFactorInfo, MultiFactorResolver } from "firebase/auth";
 import { Button, Input, Label } from "@/components/ui/primitives";
+import { PhoneRecaptchaHost } from "@/components/auth/phone-recaptcha-host";
 import {
   PhoneMultiFactorGenerator,
   TotpMultiFactorGenerator,
@@ -89,7 +90,7 @@ export function MfaChallengeForm({
         <p className="mt-1 text-sm text-muted">{t("mfaSubtitle")}</p>
       </div>
 
-      <div id="mfa-recaptcha" />
+      <PhoneRecaptchaHost containerId="mfa-recaptcha" />
 
       {!selected ? (
         <div className="space-y-2">

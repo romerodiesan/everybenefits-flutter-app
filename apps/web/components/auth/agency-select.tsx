@@ -3,6 +3,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useTranslations } from "next-intl";
 import { Input } from "@/components/ui/primitives";
+import { AnchoredPopover } from "@/components/ui/anchored-popover";
 import {
   AGENCY_OWN_ID,
   AGENCY_OWN_VALUE,
@@ -58,7 +59,7 @@ export function AgencySelect({
 }: Props) {
   const t = useTranslations();
   const listId = useId();
-  const rootRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [agencies, setAgencies] = useState<AgencyOption[]>([]);
@@ -96,27 +97,10 @@ export function AgencySelect({
     setSelectedId(resolveSelectedId(value, agencies));
   }, [value, agencies, open]);
 
-  useEffect(() => {
-    if (!open) return;
-    const onDoc = (event: MouseEvent) => {
-      if (!rootRef.current?.contains(event.target as Node)) {
-        setOpen(false);
-        setQuery("");
-      }
-    };
-    const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setOpen(false);
-        setQuery("");
-      }
-    };
-    document.addEventListener("mousedown", onDoc);
-    document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("mousedown", onDoc);
-      document.removeEventListener("keydown", onKey);
-    };
-  }, [open]);
+  const close = () => {
+    setOpen(false);
+    setQuery("");
+  };
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -135,8 +119,7 @@ export function AgencySelect({
 
   const pick = (id: string) => {
     setSelectedId(id);
-    setOpen(false);
-    setQuery("");
+    close();
     if (id === AGENCY_SOLO_ID) {
       onChange({ agency: AGENCY_SOLO_VALUE, orgNodeId: null });
       return;
@@ -153,8 +136,9 @@ export function AgencySelect({
   };
 
   return (
-    <div ref={rootRef} className="relative">
+    <div className="relative">
       <button
+        ref={triggerRef}
         type="button"
         disabled={disabled || loading}
         aria-haspopup="listbox"
@@ -185,77 +169,76 @@ export function AgencySelect({
         </svg>
       </button>
 
-      {open ? (
-        <div
-          id={listId}
-          role="listbox"
-          className="absolute z-30 mt-1 max-h-72 w-full overflow-hidden rounded-xl border border-glass-border bg-sheet shadow-lg"
-        >
-          <div className="border-b border-glass-border p-2">
-            <Input
-              size="sm"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={t("agencySearchPlaceholder")}
-              autoFocus
-            />
-          </div>
-          <ul className="max-h-52 overflow-y-auto py-1">
-            {filtered.length === 0 ? (
-              <li className="px-3 py-2 text-sm text-muted">
-                {t("agencySearchEmpty")}
-              </li>
-            ) : (
-              filtered.map((row) => {
-                const active = row.id === selectedId;
-                return (
-                  <li key={row.id}>
-                    <button
-                      type="button"
-                      role="option"
-                      aria-selected={active}
-                      className={`flex w-full px-3 py-2 text-left text-sm transition hover:bg-brand/10 ${
-                        active ? "bg-brand/14 font-semibold text-brand" : ""
-                      }`}
-                      onClick={() => pick(row.id)}
-                    >
-                      {row.name}
-                    </button>
-                  </li>
-                );
-              })
-            )}
-          </ul>
-          <div className="border-t border-glass-border py-1">
-            <button
-              type="button"
-              role="option"
-              aria-selected={selectedId === AGENCY_SOLO_ID}
-              className={`flex w-full px-3 py-2 text-left text-sm transition hover:bg-brand/10 ${
-                selectedId === AGENCY_SOLO_ID
-                  ? "bg-brand/14 font-semibold text-brand"
-                  : ""
-              }`}
-              onClick={() => pick(AGENCY_SOLO_ID)}
-            >
-              {t("agencySolo")}
-            </button>
-            <button
-              type="button"
-              role="option"
-              aria-selected={selectedId === AGENCY_OWN_ID}
-              className={`flex w-full px-3 py-2 text-left text-sm transition hover:bg-brand/10 ${
-                selectedId === AGENCY_OWN_ID
-                  ? "bg-brand/14 font-semibold text-brand"
-                  : ""
-              }`}
-              onClick={() => pick(AGENCY_OWN_ID)}
-            >
-              {t("agencyOwn")}
-            </button>
-          </div>
+      <AnchoredPopover
+        open={open}
+        onClose={close}
+        anchorRef={triggerRef}
+        id={listId}
+      >
+        <div className="border-b border-glass-border p-2">
+          <Input
+            size="sm"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder={t("agencySearchPlaceholder")}
+            autoFocus
+          />
         </div>
-      ) : null}
+        <ul className="min-h-0 flex-1 overflow-y-auto py-1">
+          {filtered.length === 0 ? (
+            <li className="px-3 py-2 text-sm text-muted">
+              {t("agencySearchEmpty")}
+            </li>
+          ) : (
+            filtered.map((row) => {
+              const active = row.id === selectedId;
+              return (
+                <li key={row.id}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={active}
+                    className={`flex w-full px-3 py-2 text-left text-sm transition hover:bg-brand/10 ${
+                      active ? "bg-brand/14 font-semibold text-brand" : ""
+                    }`}
+                    onClick={() => pick(row.id)}
+                  >
+                    {row.name}
+                  </button>
+                </li>
+              );
+            })
+          )}
+        </ul>
+        <div className="border-t border-glass-border py-1">
+          <button
+            type="button"
+            role="option"
+            aria-selected={selectedId === AGENCY_SOLO_ID}
+            className={`flex w-full px-3 py-2 text-left text-sm transition hover:bg-brand/10 ${
+              selectedId === AGENCY_SOLO_ID
+                ? "bg-brand/14 font-semibold text-brand"
+                : ""
+            }`}
+            onClick={() => pick(AGENCY_SOLO_ID)}
+          >
+            {t("agencySolo")}
+          </button>
+          <button
+            type="button"
+            role="option"
+            aria-selected={selectedId === AGENCY_OWN_ID}
+            className={`flex w-full px-3 py-2 text-left text-sm transition hover:bg-brand/10 ${
+              selectedId === AGENCY_OWN_ID
+                ? "bg-brand/14 font-semibold text-brand"
+                : ""
+            }`}
+            onClick={() => pick(AGENCY_OWN_ID)}
+          >
+            {t("agencyOwn")}
+          </button>
+        </div>
+      </AnchoredPopover>
     </div>
   );
 }

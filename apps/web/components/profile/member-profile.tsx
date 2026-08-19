@@ -36,6 +36,7 @@ import {
 import { mapCallableError } from "@/lib/firebase/callable-errors";
 import type { ForumThread, UserProfile, UserRole } from "@/lib/types";
 import { Avatar, Button, Panel } from "@/components/ui/primitives";
+import { Skeleton } from "@/components/ui/skeleton";
 import { RoleBadgeView } from "@/components/profile/role-badge";
 import { displayHandle, hasClaimedUsername, memberPath } from "@pulse/shared";
 import {
@@ -237,12 +238,7 @@ export function MemberProfile({ handle }: { handle: string }) {
   }
 
   if (loading) {
-    return (
-      <div className="profile-page">
-        <div className="profile-stage animate-pulse" />
-        <p className="mt-8 px-5 text-sm text-muted">{t("loading")}</p>
-      </div>
-    );
+    return <MemberProfileSkeleton />;
   }
 
   if (!person) {
@@ -586,6 +582,31 @@ export function MemberProfile({ handle }: { handle: string }) {
           }
         />
       ) : null}
+    </div>
+  );
+}
+
+export function MemberProfileSkeleton() {
+  return (
+    <div className="profile-page" aria-busy="true" aria-label="Loading profile">
+      <Skeleton className="profile-stage h-44 rounded-none sm:h-56" />
+      <div className="relative mx-auto max-w-4xl px-5 pb-10">
+        <Skeleton className="-mt-14 h-28 w-28 rounded-full ring-4 ring-sheet" />
+        <div className="mt-4 space-y-3">
+          <Skeleton className="h-8 w-56 rounded-lg" />
+          <Skeleton className="h-4 w-36 rounded" />
+          <Skeleton className="h-4 w-72 max-w-full rounded" />
+        </div>
+        <div className="mt-6 flex gap-3">
+          <Skeleton className="h-10 w-28 rounded-xl" />
+          <Skeleton className="h-10 w-28 rounded-xl" />
+        </div>
+        <div className="mt-8 space-y-3">
+          {Array.from({ length: 3 }, (_, index) => (
+            <Skeleton key={index} className="h-32 rounded-2xl" />
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

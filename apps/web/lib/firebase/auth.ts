@@ -76,6 +76,15 @@ export function securityAuthErrorKey(err: unknown): string {
       return "mfaInvalidCode";
     case "auth/too-many-requests":
       return "errorRateLimited";
+    case "auth/invalid-phone-number":
+    case "auth/missing-phone-number":
+      return "phoneVerifyInvalid";
+    case "auth/captcha-check-failed":
+    case "auth/invalid-app-credential":
+    case "auth/missing-recaptcha-token":
+      return "phoneVerifyError";
+    case "auth/quota-exceeded":
+      return "phoneVerifyTooMany";
     default:
       return "errorAuth";
   }

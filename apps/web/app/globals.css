@@ -143,9 +143,9 @@ h3,
   border-radius: var(--radius-sheet);
 }
 
-/* Google Places Autocomplete dropdown (appended to document.body) */
+/* Google Places Autocomplete dropdown (legacy widget, if still attached) */
 .pac-container {
-  z-index: 10000;
+  z-index: 40000;
 }
 
 .pulse-row {

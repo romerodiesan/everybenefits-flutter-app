@@ -220,30 +220,35 @@ export function CompleteProfileForm() {
         <p className="mt-2 text-muted">{t("completeProfileSubtitle")}</p>
         <p className="mt-2 text-sm text-muted">{t("completeProfileNameHint")}</p>
 
-        <form className="mt-8 space-y-4" onSubmit={onSubmit}>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <Label>{t("givenName")}</Label>
-              <Input
-                value={givenName}
-                onChange={(e) => setGivenName(e.target.value)}
-                onBlur={() => setGivenName((v) => normalizePersonName(v))}
-                placeholder={t("givenNamePlaceholder")}
-                autoComplete="given-name"
-                required
-              />
-            </div>
-            <div>
-              <Label>{t("familyName")}</Label>
-              <Input
-                value={familyName}
-                onChange={(e) => setFamilyName(e.target.value)}
-                onBlur={() => setFamilyName((v) => normalizePersonName(v))}
-                placeholder={t("familyNamePlaceholder")}
-                autoComplete="family-name"
-                required
-              />
-            </div>
+        <form className="mt-8 space-y-6" onSubmit={onSubmit}>
+          <div className="space-y-3">
+            <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted">
+              {t("profileSectionIdentity")}
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <Label>{t("givenName")}</Label>
+                <Input
+                  value={givenName}
+                  onChange={(e) => setGivenName(e.target.value)}
+                  onBlur={() => setGivenName((v) => normalizePersonName(v))}
+                  placeholder={t("givenNamePlaceholder")}
+                  autoComplete="given-name"
+                  required
+                />
+              </div>
+              <div>
+                <Label>{t("familyName")}</Label>
+                <Input
+                  value={familyName}
+                  onChange={(e) => setFamilyName(e.target.value)}
+                  onBlur={() => setFamilyName((v) => normalizePersonName(v))}
+                  placeholder={t("familyNamePlaceholder")}
+                  autoComplete="family-name"
+                  required
+                />
+              </div>
+          </div>
           </div>
 
           {canPickRole && (
@@ -276,7 +281,10 @@ export function CompleteProfileForm() {
           )}
 
           {needsLicense && (
-            <div className="space-y-4 border-t border-glass-border pt-4">
+            <div className="space-y-4 border-t border-glass-border pt-6">
+              <p className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted">
+                {t("profileSectionLicense")}
+              </p>
               <div>
                 <Label>{t("npn")}</Label>
                 <Input

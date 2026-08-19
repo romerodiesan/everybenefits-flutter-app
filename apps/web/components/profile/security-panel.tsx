@@ -29,6 +29,7 @@ import {
 import { toE164 } from "@/lib/firebase/profile-phone";
 import { Button, Input, Label } from "@/components/ui/primitives";
 import { CountryCodeSelect } from "@/components/ui/country-code-select";
+import { PhoneRecaptchaHost } from "@/components/auth/phone-recaptcha-host";
 import {
   SettingsPanelShell,
   SettingsRow,
@@ -79,6 +80,7 @@ export function SecurityPanel() {
   const [enrollingTotp, setEnrollingTotp] = useState(false);
 
   const [phoneCountryCode, setPhoneCountryCode] = useState("+1");
+  const [phoneCountryIso2, setPhoneCountryIso2] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [phoneVerificationId, setPhoneVerificationId] = useState<string | null>(
     null,
@@ -271,7 +273,7 @@ export function SecurityPanel() {
       title={t("profileSecurity")}
       subtitle={t("profileSecurityHint")}
     >
-      <div id="security-recaptcha" />
+      <PhoneRecaptchaHost containerId="security-recaptcha" />
 
       <form onSubmit={onSavePassword} className="space-y-3 border-b border-glass-border pb-6">
         <h3 className="text-sm font-bold">
@@ -599,8 +601,10 @@ export function SecurityPanel() {
                     <Label>{t("phoneCountryCode")}</Label>
                     <CountryCodeSelect
                       value={phoneCountryCode}
-                      onChange={(code) => {
+                      iso2={phoneCountryIso2}
+                      onChange={(code, nextIso2) => {
                         setPhoneCountryCode(code);
+                        setPhoneCountryIso2(nextIso2);
                         setPhoneVerificationId(null);
                         setSmsCode("");
                       }}
@@ -637,6 +641,7 @@ export function SecurityPanel() {
                       onClick={() => {
                         setEnrollingSms(false);
                         setPhoneNumber("");
+                        setPhoneCountryIso2("");
                         setPhoneVerificationId(null);
                         setSmsCode("");
                       }}

@@ -251,7 +251,8 @@ export type ChatConversation = {
   pinnedBy: Record<string, boolean>;
   createdAt: number;
   createdBy: string;
-  isDefaultAgentGroup: boolean;
+    isDefaultAgentGroup: boolean;
+  photoUrl?: string | null;
   /** Roles that auto-join when a user is approved. Empty = none. */
   autoJoinRoles: UserRole[];
   /** 1:1 DMs require mutual contacts; groups are always true. */

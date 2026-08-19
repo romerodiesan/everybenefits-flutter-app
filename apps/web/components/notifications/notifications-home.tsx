@@ -13,6 +13,7 @@ import {
   type NotificationChannelFilter,
 } from "@/lib/firebase/notifications";
 import { Button } from "@/components/ui/primitives";
+import { Skeleton } from "@/components/ui/skeleton";
 import { PROFILE_SECTION_KEY } from "@/lib/i18n/switch-locale";
 
 function formatWhen(date: Date | null, fallback: string) {
@@ -55,13 +56,25 @@ export function NotificationsHome() {
   const router = useRouter();
   const { profile } = useAuth();
   const [items, setItems] = useState<AppNotification[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [filter, setFilter] = useState<NotificationChannelFilter>("all");
 
   useEffect(() => {
     if (!profile || profile.isAnonymous) return;
-    return watchNotifications(profile.uid, setItems, () => setItems([]));
+    setInitialLoading(true);
+    return watchNotifications(
+      profile.uid,
+      (next) => {
+        setItems(next);
+        setInitialLoading(false);
+      },
+      () => {
+        setItems([]);
+        setInitialLoading(false);
+      },
+    );
   }, [profile]);
 
   const visibleItems = useMemo(() => {
@@ -176,7 +189,20 @@ export function NotificationsHome() {
         })}
       </div>
 
-      {visibleItems.length === 0 ? (
+      {initialLoading ? (
+        <div className="mt-6 space-y-3" aria-busy="true" aria-label={t("loading")}>
+          {Array.from({ length: 5 }, (_, index) => (
+            <div key={index} className="flex gap-3 rounded-2xl border border-glass-border bg-sheet/50 p-4">
+              <Skeleton className="h-10 w-10 shrink-0 rounded-full" />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-2/3 rounded" />
+                <Skeleton className="h-3 w-full rounded" />
+                <Skeleton className="h-2.5 w-20 rounded" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : visibleItems.length === 0 ? (
         <p className="pulse-sheet mt-6 px-4 py-10 text-center text-sm text-muted">
           {t("notificationsEmpty")}
         </p>

@@ -60,7 +60,7 @@ pnpm dlx vercel
 | Area | Notes |
 |------|--------|
 | Landing | Branded hero + CTAs |
-| Auth | Email/password, Google popup, magic link, guest |
+| Auth | Email/password, Google popup, magic link |
 | Profile completion | Student vs agent |
 | Forums | Feed + master-detail, votes, accept answer, share to chat |
 | Chats | RTDB inbox + split pane, DM/group, reactions, pin/hide |

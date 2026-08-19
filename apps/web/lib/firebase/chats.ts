@@ -129,6 +129,7 @@ export function chatFrom(id: string, data: Record<string, unknown>): ChatConvers
     createdBy: String(data.createdBy ?? ""),
     isDefaultAgentGroup,
     autoJoinRoles,
+    photoUrl: typeof data.photoUrl === "string" ? data.photoUrl : null,
     dmMessagingEnabled:
       Boolean(data.isGroup) || data.dmMessagingEnabled === true,
   };
@@ -649,7 +650,7 @@ export function chatMemberHref(chat: ChatConversation, uid: string) {
 }
 
 export function chatInboxPhoto(chat: ChatConversation, viewerUid: string) {
-  if (chat.isGroup) return "";
+  if (chat.isGroup) return (chat.photoUrl ?? "").trim();
   const other = chat.memberIds.find((id) => id !== viewerUid);
   return other ? chatPhotoFor(chat, other) : "";
 }

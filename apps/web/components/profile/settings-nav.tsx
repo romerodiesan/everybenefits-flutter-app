@@ -129,26 +129,50 @@ export function SettingsPanelShell({
 }) {
   return (
     <section
-      className={`pulse-sheet overflow-hidden ${
+      className={`pulse-sheet overflow-visible ${
         danger ? "border border-[#B42318]/30" : ""
       }`}
     >
-      <div className="border-b border-glass-border px-4 py-3.5 md:px-5">
+      <div className="border-b border-glass-border px-5 py-4 md:px-6">
         <h2
-          className={`font-display text-base font-bold tracking-tight ${
+          className={`font-display text-lg font-bold tracking-tight ${
             danger ? "text-[#D92D20]" : ""
           }`}
         >
           {title}
         </h2>
         {subtitle && (
-          <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted">
+          <p className="mt-1 max-w-prose text-sm leading-relaxed text-muted">
             {subtitle}
           </p>
         )}
       </div>
-      <div className="px-4 py-4 md:px-5">{children}</div>
+      <div className="px-5 py-5 md:px-6 md:py-6">{children}</div>
     </section>
+  );
+}
+
+export function SettingsFieldGroup({
+  title,
+  hint,
+  children,
+}: {
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <h3 className="text-[11px] font-extrabold uppercase tracking-[0.14em] text-muted">
+          {title}
+        </h3>
+        {hint ? (
+          <p className="mt-1 text-xs leading-relaxed text-muted">{hint}</p>
+        ) : null}
+      </div>
+      {children}
+    </div>
   );
 }
 

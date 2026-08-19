@@ -1,7 +1,6 @@
 import {
   PhoneAuthProvider,
   PhoneMultiFactorGenerator,
-  RecaptchaVerifier,
   TotpMultiFactorGenerator,
   getMultiFactorResolver,
   multiFactor,
@@ -14,6 +13,7 @@ import {
   type UserCredential,
 } from "firebase/auth";
 import { getFirebaseAuth } from "./client";
+import { clearInvisibleRecaptcha, verifyPhoneNumberWithRecaptcha } from "./recaptcha-verifier";
 
 export type EnrolledFactor = {
   uid: string;
@@ -65,23 +65,8 @@ export function resolverFromError(error: unknown): MultiFactorResolver | null {
   return getMultiFactorResolver(getFirebaseAuth(), error);
 }
 
-let recaptchaVerifier: RecaptchaVerifier | null = null;
-
-export function clearRecaptcha(): void {
-  try {
-    recaptchaVerifier?.clear();
-  } catch {
-    // ignore
-  }
-  recaptchaVerifier = null;
-}
-
-function getOrCreateRecaptcha(containerId: string): RecaptchaVerifier {
-  clearRecaptcha();
-  recaptchaVerifier = new RecaptchaVerifier(getFirebaseAuth(), containerId, {
-    size: "invisible",
-  });
-  return recaptchaVerifier;
+export function clearRecaptcha(containerId?: string): void {
+  clearInvisibleRecaptcha(containerId);
 }
 
 export async function startTotpEnrollment(
@@ -116,11 +101,9 @@ export async function startPhoneEnrollment(
 ): Promise<string> {
   const user = requireUser();
   const session = await multiFactor(user).getSession();
-  const verifier = getOrCreateRecaptcha(recaptchaContainerId);
-  const provider = new PhoneAuthProvider(getFirebaseAuth());
-  return provider.verifyPhoneNumber(
+  return verifyPhoneNumberWithRecaptcha(
     { phoneNumber: phoneNumber.trim(), session },
-    verifier,
+    recaptchaContainerId,
   );
 }
 
@@ -146,11 +129,9 @@ export async function sendMfaSmsChallenge(
   hint: MultiFactorInfo,
   recaptchaContainerId: string,
 ): Promise<string> {
-  const verifier = getOrCreateRecaptcha(recaptchaContainerId);
-  const provider = new PhoneAuthProvider(getFirebaseAuth());
-  return provider.verifyPhoneNumber(
+  return verifyPhoneNumberWithRecaptcha(
     { multiFactorHint: hint, session: resolver.session },
-    verifier,
+    recaptchaContainerId,
   );
 }
 
