@@ -39,7 +39,7 @@
     "test:integration": "pnpm --filter @pulse/functions test && pnpm test:rules"
   },
   "devDependencies": {
-    "turbo": "^2.10.8",
+    "turbo": "^2.10.10",
     "typescript": "~5.9.3"
   }
 }
